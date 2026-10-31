@@ -18,8 +18,9 @@ by the loading and full-game constructors. The wgpu prepared textures, window,
 API and previous-device state remain separate from those shared inputs.
 `presentation::TerrainBackend` defines section upload, removal, reset and
 presence queries using CPU `SectionMesh` data and supports fallible uploads.
-The existing renderer delegates these operations to wgpu. An upload failure is
-logged; the game does not yet retry a failed upload.
+The existing renderer delegates these operations to wgpu. The game keeps a
+failed mesh in its pending queue for retry, and discards it if a newer mesh
+supersedes it or its column unloads.
 
 These interfaces are deliberately not a complete native-renderer contract yet.
 Before a native renderer can be selected, the game also needs backend-neutral

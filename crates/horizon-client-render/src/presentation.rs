@@ -77,11 +77,13 @@ impl TerrainBackend for Renderer {
     }
 }
 
-/// Upload one mesh through the shared contract and report a backend failure.
-pub fn upload_section(backend: &mut dyn TerrainBackend, key: SectionKey, mesh: &SectionMesh) {
-    if let Err(error) = backend.upload_section(key, mesh) {
-        log::error!("Horizon: failed to upload terrain section {key:?}: {error}");
-    }
+/// Upload one mesh through the shared contract; failures leave it available for retry.
+pub fn upload_section(
+    backend: &mut dyn TerrainBackend,
+    key: SectionKey,
+    mesh: &SectionMesh,
+) -> Result<()> {
+    backend.upload_section(key, mesh)
 }
 
 pub fn clear_sections(backend: &mut dyn TerrainBackend, layout: ColumnLayout) {
@@ -135,26 +137,46 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeTerrain(std::collections::HashSet<SectionKey>);
+    struct FakeTerrain {
+        sections: std::collections::HashSet<SectionKey>,
+        fail_next: bool,
+    }
 
     impl TerrainBackend for FakeTerrain {
         fn upload_section(&mut self, key: SectionKey, _: &SectionMesh) -> Result<()> {
-            self.0.insert(key);
+            if std::mem::take(&mut self.fail_next) {
+                return Err("simulated allocation failure".into());
+            }
+            self.sections.insert(key);
             Ok(())
         }
         fn clear_sections(&mut self, _: ColumnLayout) {
-            self.0.clear();
+            self.sections.clear();
         }
         fn remove_columns(&mut self, columns: &mut dyn Iterator<Item = (i32, i32)>) {
             let gone: std::collections::HashSet<_> = columns.collect();
-            self.0.retain(|key| !gone.contains(&(key.0, key.2)));
+            self.sections.retain(|key| !gone.contains(&(key.0, key.2)));
         }
         fn has_section(&self, key: SectionKey) -> bool {
-            self.0.contains(&key)
+            self.sections.contains(&key)
         }
         fn section_count(&self) -> usize {
-            self.0.len()
+            self.sections.len()
         }
+    }
+
+    #[test]
+    fn terrain_upload_failure_is_returned_to_caller_for_retry() {
+        let mut fake = FakeTerrain {
+            fail_next: true,
+            ..Default::default()
+        };
+        let terrain: &mut dyn TerrainBackend = &mut fake;
+        let mesh = SectionMesh::default();
+        assert!(upload_section(terrain, (1, 0, 2), &mesh).is_err());
+        assert!(!has_section(terrain, (1, 0, 2)));
+        upload_section(terrain, (1, 0, 2), &mesh).unwrap();
+        assert!(has_section(terrain, (1, 0, 2)));
     }
 
     #[test]
@@ -162,9 +184,9 @@ mod tests {
         let mut fake = FakeTerrain::default();
         let terrain: &mut dyn TerrainBackend = &mut fake;
         let mesh = SectionMesh::default();
-        upload_section(terrain, (1, 0, 2), &mesh);
-        upload_section(terrain, (1, 1, 2), &mesh);
-        upload_section(terrain, (3, 0, 4), &mesh);
+        upload_section(terrain, (1, 0, 2), &mesh).unwrap();
+        upload_section(terrain, (1, 1, 2), &mesh).unwrap();
+        upload_section(terrain, (3, 0, 4), &mesh).unwrap();
         assert_eq!(terrain.section_count(), 3);
         remove_columns(terrain, [(1, 2)]);
         assert!(!has_section(terrain, (1, 0, 2)));

@@ -14266,7 +14266,7 @@ impl Game<'_> {
         self.streaming
             .extra
             .extend(waiting.into_iter().map(|chunk| (chunk, 0)));
-        let (uploads, unloaded) =
+        let (mut uploads, unloaded) =
             horizon_client::spans::time("streaming", || self.streaming.update(&mut self.world));
         self.streaming.extra.truncate(areas);
         self.spawn_fresh_chunks();
@@ -14326,9 +14326,19 @@ impl Game<'_> {
             if !budgeted && self.pending_uploads.is_empty() && uploads.len() <= AUTO_UPLOADS_AT_ONCE
             {
                 horizon_client::spans::time("upload", || {
-                    for (key, mesh) in &uploads {
-                        horizon_client::presentation::upload_section(renderer, *key, mesh);
-                    }
+                    self.pending_uploads
+                        .extend(uploads.extract_if(.., |(key, mesh)| {
+                            if let Err(error) =
+                                horizon_client::presentation::upload_section(renderer, *key, mesh)
+                            {
+                                log::warn!(
+                                    "Horizon: failed to upload terrain section {key:?}: {error}"
+                                );
+                                true
+                            } else {
+                                false
+                            }
+                        }));
                 });
                 self.streaming.free(uploads);
             } else {
@@ -14381,7 +14391,13 @@ impl Game<'_> {
                         break;
                     }
                     let (key, mesh) = pending.pop().expect("checked above");
-                    horizon_client::presentation::upload_section(renderer, key, &mesh);
+                    if let Err(error) =
+                        horizon_client::presentation::upload_section(renderer, key, &mesh)
+                    {
+                        log::warn!("Horizon: failed to upload terrain section {key:?}: {error}");
+                        pending.push((key, mesh));
+                        break;
+                    }
                     spent.push((key, mesh));
                     count += 1;
                     bytes += size;
