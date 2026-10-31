@@ -441,8 +441,11 @@ impl Options {
     /// The command line, then what it asks of the process: the game folder, the account.
     /// A bad command line is a [`launch_api::UsageError`] (exit code 2, no crash report).
     fn read() -> Result<Option<Self>> {
-        let Some(mut o) = Self::parse(std::env::args().skip(1))
-            .map_err(|e| launch_api::UsageError(e.to_string()))?
+        Self::read_from(std::env::args().skip(1))
+    }
+
+    fn read_from(args: impl Iterator<Item = String>) -> Result<Option<Self>> {
+        let Some(mut o) = Self::parse(args).map_err(|e| launch_api::UsageError(e.to_string()))?
         else {
             return Ok(None);
         };
@@ -17812,7 +17815,16 @@ fn run_loading(
 pub use launch_api::{UsageError, exit_code};
 
 pub fn run() -> Result<()> {
-    let Some(mut options) = Options::read()? else {
+    run_with_options(Options::read()?)
+}
+
+#[cfg(target_vendor = "uwp")]
+pub fn run_with_args(args: Vec<String>) -> Result<()> {
+    run_with_options(Options::read_from(args.into_iter())?)
+}
+
+fn run_with_options(options: Option<Options>) -> Result<()> {
+    let Some(mut options) = options else {
         return Ok(());
     };
     if options.execution_role == execution_role::ExecutionRole::DedicatedServer

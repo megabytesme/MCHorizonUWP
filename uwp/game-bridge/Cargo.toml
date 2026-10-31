@@ -1,0 +1,21 @@
+[package]
+name = "horizon-uwp-game-bridge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+horizon-client = { path = "../../crates/horizon-client", default-features = false }
+
+[patch.crates-io]
+wgpu-hal = { path = "../../third_party/wgpu-hal" }
+winit = { path = "../../third_party/winit" }
+
+[profile.release]
+panic = "abort"
+codegen-units = 32

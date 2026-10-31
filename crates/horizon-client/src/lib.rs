@@ -1,6 +1,25 @@
 //! Horizon native client: resources, world streaming, rendering and the
 //! bindings between the validated simulation pieces and the game loop.
 #![forbid(unsafe_code)]
+
+// The desktop executable owns the game module. UWP embeds the same game loop
+// in the application host instead of starting a separate desktop executable.
+#[cfg(target_vendor = "uwp")]
+extern crate self as horizon_client;
+#[cfg(target_vendor = "uwp")]
+mod game;
+
+/// Run the game in a UWP host with explicit resource and writable data paths.
+#[cfg(target_vendor = "uwp")]
+pub fn run_uwp(resources: &std::path::Path, game_dir: &std::path::Path) -> Result<()> {
+    let args = vec![
+        "--resources".to_owned(),
+        resources.to_string_lossy().into_owned(),
+        "--game-dir".to_owned(),
+        game_dir.to_string_lossy().into_owned(),
+    ];
+    game::run_with_args(args)
+}
 pub mod advancements;
 pub mod ambience;
 pub mod animate_tick;

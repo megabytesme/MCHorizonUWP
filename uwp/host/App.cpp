@@ -49,6 +49,21 @@ extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
     } catch (Platform::Exception^) { return 0; }
 }
 extern "C" int32_t __cdecl horizon_uwp_run(const uint16_t*, size_t, const uint16_t*, size_t);
+extern "C" void __cdecl horizon_uwp_report_error(const uint8_t* text, size_t len) {
+    if (!text && len != 0) return;
+    auto base = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+    auto file = Platform::String::Concat(base, ref new Platform::String(L"\\horizon-startup-error.txt"));
+    HANDLE h = CreateFile2(file->Data(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+    while (len != 0) {
+        const DWORD chunk = len > MAXDWORD ? MAXDWORD : static_cast<DWORD>(len);
+        DWORD written = 0;
+        if (!WriteFile(h, text, chunk, &written, nullptr) || written == 0) break;
+        text += written;
+        len -= written;
+    }
+    CloseHandle(h);
+}
 #ifdef HORIZON_UWP_FRAME_PROBE
 extern "C" void __cdecl horizon_uwp_frame_presented() {
     static bool recorded = false;
