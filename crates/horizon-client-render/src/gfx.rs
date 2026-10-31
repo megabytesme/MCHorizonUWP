@@ -1283,6 +1283,22 @@ impl Renderer {
         [self.arena.bytes(), vertices * stride]
     }
 }
+/// CPU-side resources shared by renderer implementations. Texture preparation and
+/// reuse of an existing graphics device remain specific to each backend.
+pub struct RendererAssets<'a> {
+    pub sprite_pixels: &'a [u8],
+    pub sprite_size: u32,
+    pub sprite_minimum_size: u32,
+    pub layers: u32,
+    pub sprite_mips: &'a [crate::mipmap::Settings],
+    pub animations: &'a [SpriteAnimation],
+    pub hud_atlas: (&'a [u8], u32, u32),
+    pub glint: (&'a [u8], u32, u32),
+    pub glint_armor: (&'a [u8], u32, u32),
+    pub forcefield: (&'a [u8], u32),
+    pub panorama_faces: &'a panorama::Faces,
+}
+
 impl Renderer {
     /// The drawing surface dimensions in physical pixels.
     pub fn viewport_size(&self) -> [u32; 2] {
@@ -1292,21 +1308,24 @@ impl Renderer {
     pub async fn new(
         window: Arc<Window>,
         offscreen: bool,
-        sprite_pixels: &[u8],
-        sprite_size: u32,
-        sprite_minimum_size: u32,
-        layers: u32,
-        sprite_mips: &[crate::mipmap::Settings],
-        animations: &[SpriteAnimation],
-        hud_atlas: (&[u8], u32, u32),
-        glint: (&[u8], u32, u32),
-        glint_armor: (&[u8], u32, u32),
-        forcefield: (&[u8], u32),
-        panorama_faces: &panorama::Faces,
+        assets: RendererAssets<'_>,
         prepared: Option<PreparedTextures>,
         previous: Option<&Self>,
         api: GraphicsApi,
     ) -> Result<Self> {
+        let RendererAssets {
+            sprite_pixels,
+            sprite_size,
+            sprite_minimum_size,
+            layers,
+            sprite_mips,
+            animations,
+            hud_atlas,
+            glint,
+            glint_armor,
+            forcefield,
+            panorama_faces,
+        } = assets;
         let split = sprite_split();
         if layers > split * SPRITE_ARRAYS {
             return Err(format!(

@@ -680,7 +680,7 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
-            r.clear_sections(self.world.layout());
+            horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         self.apply_settings();
         self.clear_waypoints();
@@ -864,7 +864,7 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
-            r.clear_sections(self.world.layout());
+            horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         let saves = std::env::current_dir()?.join("saves");
         let mut title = horizon_client::title::Title::new(saves.clone(), &self.options.resources)
@@ -1688,7 +1688,7 @@ impl Game<'_> {
             self.clear_lod();
             self.pending_uploads.clear();
             if let Some(renderer) = self.renderer.as_mut() {
-                renderer.clear_sections(self.world.layout());
+                horizon_client::presentation::clear_sections(renderer, self.world.layout());
             }
         }
         let has_sky = self
@@ -1732,7 +1732,7 @@ impl Game<'_> {
             freed.extend(self.streaming.forget(&mut self.world, x, z));
         }
         if let Some(renderer) = self.renderer.as_mut() {
-            renderer.remove_columns(gone.iter().copied());
+            horizon_client::presentation::remove_columns(renderer, gone.iter().copied());
         }
         horizon_client::chunk::free_columns(freed, gone.len());
         // One pass for all of them.
@@ -2566,7 +2566,7 @@ impl Game<'_> {
                     .block_entities
                     .retain(|k, _| (k.0 >> 4, k.2 >> 4) != (x, z));
                 if let Some(renderer) = self.renderer.as_mut() {
-                    renderer.remove_columns([(x, z)]);
+                    horizon_client::presentation::remove_columns(renderer, [(x, z)]);
                 }
             }
             C::ChunkBatchFinished(_) => {

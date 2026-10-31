@@ -47,7 +47,7 @@ impl Game<'_> {
             // Newly edited or not-yet-uploaded terrain is not an occluder.
             self.renderer
                 .as_ref()
-                .is_some_and(|r| r.has_section(section))
+                .is_some_and(|r| horizon_client::presentation::has_section(r, section))
                 && !self.world.dirty_sections.contains(&section)
                 && !self.streaming.is_meshing(section)
                 && !self.pending_uploads.iter().any(|(key, _)| *key == section)
