@@ -1,0 +1,40 @@
+--- a/library/std/src/sys/pal/windows/compat.rs
++++ b/library/std/src/sys/pal/windows/compat.rs
+@@ -110,12 +110,20 @@
+     ///
+     /// This should only be use for modules that exist for the lifetime of std
+     /// (e.g. kernel32 and ntdll).
++    #[cfg(not(target_vendor = "uwp"))]
+     pub unsafe fn new(name: &CStr) -> Option<Self> {
+         // SAFETY: A CStr is always null terminated.
+         unsafe {
+             let module = c::GetModuleHandleA(name.as_ptr().cast::<u8>());
+             NonNull::new(module).map(Self)
+         }
++    }
++
++    #[cfg(target_vendor = "uwp")]
++    pub unsafe fn new(_name: &CStr) -> Option<Self> {
++        // UWP cannot query arbitrary loaded modules by name. Use each
++        // compatibility function's documented fallback instead.
++        None
+     }
+ 
+     // Try to get the address of a function.
+--- a/library/std/src/sys/thread_local/guard/windows.rs
++++ b/library/std/src/sys/thread_local/guard/windows.rs
+@@ -198,6 +198,14 @@
+ /// unmapped.
+ ///
+ /// On failure, return true, which assumes it can be unloaded.
++#[cfg(target_vendor = "uwp")]
++fn cleanup_is_unloadable() -> bool {
++    // Treat module identity as unknown: preserve the existing conservative
++    // fallback, which registers a cleanup hook for unloadable images.
++    true
++}
++
++#[cfg(not(target_vendor = "uwp"))]
+ fn cleanup_is_unloadable() -> bool {
+     // Get a handle to the module of `cleanup`.
+     let cleanup_module = {

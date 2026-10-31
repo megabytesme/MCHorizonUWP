@@ -16,7 +16,8 @@ $source = Join-Path $sysroot 'lib\rustlib\src\rust\library'
 if (-not (Test-Path -LiteralPath $source)) { throw "rust-src is not installed in $Toolchain" }
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 Copy-Item -LiteralPath $source -Destination $library -Recurse
-$patches = @('stdio-uwp.patch', 'file-open-uwp.patch') | ForEach-Object { Join-Path $PSScriptRoot $_ }
+$patches = @('stdio-uwp.patch', 'file-open-uwp.patch', 'module-uwp.patch', 'runtime-uwp.patch') |
+    ForEach-Object { Join-Path $PSScriptRoot $_ }
 $previousCeiling = $env:GIT_CEILING_DIRECTORIES
 # If the copy lives inside the Horizon checkout, prevent git apply from
 # silently ignoring patch paths outside its repository-relative prefix.

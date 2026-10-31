@@ -9,11 +9,24 @@ appended, tested exclusive creation, truncated, and removed a file and
 directory in LocalState. Other filesystem operations and ARM64 have not yet
 been validated.
 
+`module-uwp.patch` uses the conservative unloadable-module path for TLS and
+the existing fallbacks for optional Windows functions. `runtime-uwp.patch`
+adds a process-local environment map (with ASCII case folding), returns
+`Unsupported` for subprocess creation and UWP junction/reparse operations,
+uses `CopyFile2` and `UnlockFileEx`, and exposes null console handles. An x64
+strict UWP probe verified environment get/set/enumeration/removal, unsupported
+process spawning, null stdout handle, directory enumeration, rename, copying,
+and file locking and unlocking.
+These are UWP-specific semantics and do not provide desktop child processes,
+inherited OS environment variables, junctions or reparse-point inspection.
+
 Apply the patch only to a **copy** of the matching `rust-src` tree, not to the installed toolchain. `prepare-source.ps1 -Destination <new-directory>` creates a copy and applies the patch without modifying the toolchain. With Cargo's internal, unsupported `__CARGO_TESTS_ONLY_SRC_ROOT` environment variable set to the absolute path of the copied `library` directory, `RUSTC_BOOTSTRAP=1 cargo +stable build -Zbuild-std=std,panic_abort --target x86_64-uwp-windows-msvc --release` can build against that copy. This Cargo override is a test-only interface and may change. Use a desktop MSVC developer environment for Cargo's build scripts and a UWP environment for the final native host link.
 
 An isolated static library whose only export writes to stdout built against the patched std. It linked with `/NODEFAULTLIB:kernel32.lib /OPT:REF WindowsApp.lib ntdll.lib`; the resulting x64 PE did not import `GetStdHandle`, `CreateFileW`, `CreateProcessW` or `ntdll.dll`. The link required `ntdll.lib` to resolve references in pulled-in std object files even though `/OPT:REF` removed those imports from this small executable. Inspect every final executable's imports; this experiment does not show that larger binaries avoid unsupported calls.
 
-Unaddressed paths include `std::process` calling `CreateProcessW` and Windows-specific `AsRawHandle` implementations directly calling `GetStdHandle`. A UWP port needs proper handling of unsupported process and raw-handle operations. Changing import libraries alone does not make those APIs UWP compatible.
+Other standard-library paths and dependencies may still use unsupported APIs.
+The strict link must reject any such live references; changing import libraries
+alone does not make those APIs UWP compatible.
 
 ## Strict linking of the x64 wgpu probe
 

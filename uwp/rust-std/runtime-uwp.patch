@@ -1,0 +1,251 @@
+--- a/library/std/src/sys/env/mod.rs
++++ b/library/std/src/sys/env/mod.rs
+@@ -15,6 +15,10 @@
+ mod common;
+ 
+ cfg_select! {
++    target_vendor = "uwp" => {
++        mod uwp;
++        pub use uwp::*;
++    }
+     target_family = "unix" => {
+         mod unix;
+         pub use unix::*;
+--- /dev/null
++++ b/library/std/src/sys/env/uwp.rs
+@@ -0,0 +1,40 @@
++//! Process-local environment for AppContainer applications. UWP does not
++//! provide the desktop environment block APIs.
++use crate::collections::BTreeMap;
++use crate::ffi::{OsStr, OsString};
++use crate::os::windows::ffi::OsStrExt;
++use crate::sync::{LazyLock, RwLock};
++use crate::{fmt, io};
++
++type Variables = BTreeMap<Vec<u16>, (OsString, OsString)>;
++static VARIABLES: LazyLock<RwLock<Variables>> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
++
++// Windows environment names are case insensitive. Preserve UTF-16 and fold
++// ASCII names, which includes the conventional variables consumed by Horizon.
++fn key(name: &OsStr) -> Vec<u16> {
++    name.encode_wide().map(|c| if (b'a' as u16..=b'z' as u16).contains(&c) { c - 32 } else { c }).collect()
++}
++
++pub struct Env(crate::vec::IntoIter<(OsString, OsString)>);
++impl fmt::Debug for Env {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.debug_list().entries(self.0.clone()).finish() }
++}
++impl Iterator for Env {
++    type Item = (OsString, OsString);
++    fn next(&mut self) -> Option<Self::Item> { self.0.next() }
++}
++pub fn env() -> Env {
++    let vars = VARIABLES.read().unwrap_or_else(|e| e.into_inner());
++    Env(vars.values().cloned().collect::<Vec<_>>().into_iter())
++}
++pub fn getenv(name: &OsStr) -> Option<OsString> {
++    VARIABLES.read().unwrap_or_else(|e| e.into_inner()).get(&key(name)).map(|(_, value)| value.clone())
++}
++pub unsafe fn setenv(name: &OsStr, value: &OsStr) -> io::Result<()> {
++    VARIABLES.write().unwrap_or_else(|e| e.into_inner()).insert(key(name), (name.to_owned(), value.to_owned()));
++    Ok(())
++}
++pub unsafe fn unsetenv(name: &OsStr) -> io::Result<()> {
++    VARIABLES.write().unwrap_or_else(|e| e.into_inner()).remove(&key(name));
++    Ok(())
++}
+--- a/library/std/src/sys/process/windows.rs
++++ b/library/std/src/sys/process/windows.rs
+@@ -276,6 +276,7 @@
+         self.spawn_with_attributes(default, needs_stdin, None)
+     }
+ 
++    #[cfg(not(target_vendor = "uwp"))]
+     pub fn spawn_with_attributes(
+         &mut self,
+         default: Stdio,
+@@ -437,6 +438,14 @@
+             ))
+         }
+     }
++
++    #[cfg(target_vendor = "uwp")]
++    pub fn spawn_with_attributes(
++        &mut self, _default: Stdio, _needs_stdin: bool,
++        _proc_thread_attribute_list: Option<&ProcThreadAttributeList<'_>>,
++    ) -> io::Result<(Process, StdioPipes)> {
++        Err(io::Error::new(io::ErrorKind::Unsupported, "process creation is unavailable in UWP"))
++    }
+ }
+ 
+ impl fmt::Debug for Command {
+--- a/library/std/src/sys/io/mod.rs
++++ b/library/std/src/sys/io/mod.rs
+@@ -4,6 +4,10 @@
+ 
+ mod is_terminal {
+     cfg_select! {
++        target_vendor = "uwp" => {
++            mod unsupported;
++            pub use unsupported::*;
++        }
+         any(target_family = "unix", target_os = "wasi") => {
+             mod isatty;
+             pub use isatty::*;
+--- a/library/std/src/os/windows/io/raw.rs
++++ b/library/std/src/os/windows/io/raw.rs
+@@ -101,43 +101,54 @@
+ #[stable(feature = "asraw_stdio", since = "1.21.0")]
+ impl AsRawHandle for io::Stdin {
+     fn as_raw_handle(&self) -> RawHandle {
+-        stdio_handle(unsafe { sys::c::GetStdHandle(sys::c::STD_INPUT_HANDLE) as RawHandle })
++        get_stdio_handle(sys::c::STD_INPUT_HANDLE)
+     }
+ }
+ 
+ #[stable(feature = "asraw_stdio", since = "1.21.0")]
+ impl AsRawHandle for io::Stdout {
+     fn as_raw_handle(&self) -> RawHandle {
+-        stdio_handle(unsafe { sys::c::GetStdHandle(sys::c::STD_OUTPUT_HANDLE) as RawHandle })
++        get_stdio_handle(sys::c::STD_OUTPUT_HANDLE)
+     }
+ }
+ 
+ #[stable(feature = "asraw_stdio", since = "1.21.0")]
+ impl AsRawHandle for io::Stderr {
+     fn as_raw_handle(&self) -> RawHandle {
+-        stdio_handle(unsafe { sys::c::GetStdHandle(sys::c::STD_ERROR_HANDLE) as RawHandle })
++        get_stdio_handle(sys::c::STD_ERROR_HANDLE)
+     }
+ }
+ 
+ #[stable(feature = "asraw_stdio_locks", since = "1.35.0")]
+ impl<'a> AsRawHandle for io::StdinLock<'a> {
+     fn as_raw_handle(&self) -> RawHandle {
+-        stdio_handle(unsafe { sys::c::GetStdHandle(sys::c::STD_INPUT_HANDLE) as RawHandle })
++        get_stdio_handle(sys::c::STD_INPUT_HANDLE)
+     }
+ }
+ 
+ #[stable(feature = "asraw_stdio_locks", since = "1.35.0")]
+ impl<'a> AsRawHandle for io::StdoutLock<'a> {
+     fn as_raw_handle(&self) -> RawHandle {
+-        stdio_handle(unsafe { sys::c::GetStdHandle(sys::c::STD_OUTPUT_HANDLE) as RawHandle })
++        get_stdio_handle(sys::c::STD_OUTPUT_HANDLE)
+     }
+ }
+ 
+ #[stable(feature = "asraw_stdio_locks", since = "1.35.0")]
+ impl<'a> AsRawHandle for io::StderrLock<'a> {
+     fn as_raw_handle(&self) -> RawHandle {
+-        stdio_handle(unsafe { sys::c::GetStdHandle(sys::c::STD_ERROR_HANDLE) as RawHandle })
+-    }
++        get_stdio_handle(sys::c::STD_ERROR_HANDLE)
++    }
++}
++
++#[cfg(not(target_vendor = "uwp"))]
++fn get_stdio_handle(kind: u32) -> RawHandle {
++    stdio_handle(unsafe { sys::c::GetStdHandle(kind) as RawHandle })
++}
++
++#[cfg(target_vendor = "uwp")]
++fn get_stdio_handle(_kind: u32) -> RawHandle {
++    // The UWP stdio backend has no native console handles.
++    ptr::null_mut()
+ }
+ 
+ // Translate a handle returned from `GetStdHandle` into a handle to return to
+--- a/library/std/src/sys/fs/windows.rs
++++ b/library/std/src/sys/fs/windows.rs
+@@ -102,6 +102,11 @@
+     #[link_name = "CreateFile2"]
+     fn create_file2(path: *const u16, access: u32, share: u32, disposition: u32,
+                     params: *const CreateFile2Parameters) -> c::HANDLE;
++    #[link_name = "UnlockFileEx"]
++    fn unlock_file_ex(handle: c::HANDLE, reserved: u32, low: u32, high: u32,
++                      overlapped: *mut c::OVERLAPPED) -> c::BOOL;
++    #[link_name = "CopyFile2"]
++    fn copy_file2(from: *const u16, to: *const u16, params: *const c_void) -> i32;
+ }
+ 
+ #[cfg(target_vendor = "uwp")]
+@@ -541,9 +546,18 @@
+         // both an exclusive and shared lock, in which case the documentation states that:
+         // "...two unlock operations are necessary to unlock the region; the first unlock operation
+         // unlocks the exclusive lock, the second unlock operation unlocks the shared lock"
+-        cvt(unsafe { c::UnlockFile(self.handle.as_raw_handle(), 0, 0, u32::MAX, u32::MAX) })?;
+-        let result =
+-            cvt(unsafe { c::UnlockFile(self.handle.as_raw_handle(), 0, 0, u32::MAX, u32::MAX) });
++        let unlock = || {
++            #[cfg(not(target_vendor = "uwp"))]
++            let result = unsafe { c::UnlockFile(self.handle.as_raw_handle(), 0, 0, u32::MAX, u32::MAX) };
++            #[cfg(target_vendor = "uwp")]
++            let result = unsafe {
++                let mut overlapped: c::OVERLAPPED = mem::zeroed();
++                unlock_file_ex(self.handle.as_raw_handle(), 0, u32::MAX, u32::MAX, &mut overlapped)
++            };
++            cvt(result)
++        };
++        unlock()?;
++        let result = unlock();
+         match result {
+             Ok(_) => Ok(()),
+             Err(err) if err.raw_os_error() == Some(c::ERROR_NOT_LOCKED as i32) => Ok(()),
+@@ -731,6 +745,7 @@
+     // NB: returned pointer is derived from `space`, and has provenance to
+     // match. A raw pointer is returned rather than a reference in order to
+     // avoid narrowing provenance to the actual `REPARSE_DATA_BUFFER`.
++    #[cfg(not(target_vendor = "uwp"))]
+     fn reparse_point(
+         &self,
+         space: &mut Align8<[MaybeUninit<u8>]>,
+@@ -755,6 +770,14 @@
+             const _: () = assert!(align_of::<c::REPARSE_DATA_BUFFER>() <= 8);
+             Ok((bytes, space.0.as_mut_ptr().cast::<c::REPARSE_DATA_BUFFER>()))
+         }
++    }
++
++    #[cfg(target_vendor = "uwp")]
++    fn reparse_point(
++        &self,
++        _space: &mut Align8<[MaybeUninit<u8>]>,
++    ) -> io::Result<(u32, *mut c::REPARSE_DATA_BUFFER)> {
++        Err(io::Error::new(io::ErrorKind::Unsupported, "reparse point inspection is unavailable in UWP"))
+     }
+ 
+     fn readlink(&self) -> io::Result<PathBuf> {
+@@ -1646,6 +1669,7 @@
+     get_path(f.handle)
+ }
+ 
++#[cfg(not(target_vendor = "uwp"))]
+ pub fn copy(from: &WCStr, to: &WCStr) -> io::Result<u64> {
+     unsafe extern "system" fn callback(
+         _TotalFileSize: i64,
+@@ -1679,6 +1703,25 @@
+     Ok(size as u64)
+ }
+ 
++#[cfg(target_vendor = "uwp")]
++pub fn copy(from: &WCStr, to: &WCStr) -> io::Result<u64> {
++    let hr = unsafe { copy_file2(from.as_ptr(), to.as_ptr(), ptr::null()) };
++    if hr < 0 {
++        // HRESULT_FROM_WIN32 stores the underlying OS error in the low word.
++        let code = if (hr as u32 & 0xffff0000) == 0x80070000 { hr & 0xffff } else { hr };
++        return Err(io::Error::from_raw_os_error(code));
++    }
++    let mut options = OpenOptions::new();
++    options.read(true);
++    Ok(File::open_native(to, &options)?.file_attr()?.size())
++}
++
++#[cfg(target_vendor = "uwp")]
++pub fn junction_point(_original: &Path, _link: &Path) -> io::Result<()> {
++    Err(io::Error::new(io::ErrorKind::Unsupported, "junction creation is unavailable in UWP"))
++}
++
++#[cfg(not(target_vendor = "uwp"))]
+ pub fn junction_point(original: &Path, link: &Path) -> io::Result<()> {
+     // Create and open a new directory in one go.
+     let mut opts = OpenOptions::new();
