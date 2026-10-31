@@ -153,6 +153,132 @@ pub unsafe extern "C" fn wgpu_probe_horizon_shader(probe: *mut c_void) -> i32 {
     0
 }
 
+/// Compile the actual Horizon terrain pipeline against the active adapter.
+#[no_mangle]
+pub unsafe extern "C" fn wgpu_probe_terrain_shader(probe: *mut c_void) -> i32 {
+    let Some(probe) = (unsafe { (probe as *const Probe).as_ref() }) else {
+        return -1;
+    };
+    let scope = probe.device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let module = probe
+        .device
+        .create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Horizon terrain shader probe"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../../crates/horizon-client-render/src/terrain.wgsl").into(),
+            ),
+        });
+    let texture = |view_dimension| wgpu::BindingType::Texture {
+        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        view_dimension,
+        multisampled: false,
+    };
+    let array = texture(wgpu::TextureViewDimension::D2Array);
+    let sampler = wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering);
+    let uniform = wgpu::BindingType::Buffer {
+        ty: wgpu::BufferBindingType::Uniform,
+        has_dynamic_offset: false,
+        min_binding_size: None,
+    };
+    let entries: Vec<_> = [
+        uniform,
+        array,
+        sampler,
+        texture(wgpu::TextureViewDimension::D2),
+        sampler,
+        array,
+        array,
+        array,
+        array,
+        array,
+        array,
+        array,
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(binding, ty)| wgpu::BindGroupLayoutEntry {
+        binding: binding as u32,
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+        ty,
+        count: None,
+    })
+    .collect();
+    let bindings = probe
+        .device
+        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Horizon terrain bindings probe"),
+            entries: &entries,
+        });
+    let layout = probe
+        .device
+        .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Horizon terrain layout probe"),
+            bind_group_layouts: &[Some(&bindings)],
+            ..Default::default()
+        });
+    let terrain_attributes =
+        wgpu::vertex_attr_array![0=>Float32x3,1=>Uint16x2,2=>Uint16,4=>Uint8x2,3=>Unorm8x4];
+    let instance_attributes = wgpu::vertex_attr_array![5=>Float32x4];
+    let buffers = [
+        Some(wgpu::VertexBufferLayout {
+            array_stride: 24,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &terrain_attributes,
+        }),
+        Some(wgpu::VertexBufferLayout {
+            array_stride: 16,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &instance_attributes,
+        }),
+    ];
+    let constants = [("SPRITE_ARRAYS", 1.0), ("SPRITE_SPLIT", 2048.0)];
+    let _pipeline = probe
+        .device
+        .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Horizon terrain solid probe"),
+            layout: Some(&layout),
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs_terrain"),
+                compilation_options: Default::default(),
+                buffers: &buffers,
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: Some(wgpu::Face::Back),
+                ..Default::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_solid"),
+                compilation_options: wgpu::PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: probe.format.remove_srgb_suffix(),
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+    if let Some(error) = pollster::block_on(scope.pop()) {
+        *LAST_ERROR.lock().unwrap() = error.to_string();
+        return -1;
+    }
+    0
+}
+
 #[no_mangle]
 pub extern "C" fn wgpu_probe_create(window: *mut c_void) -> *mut c_void {
     match create(window) {
