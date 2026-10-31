@@ -15,6 +15,10 @@ The bridge-linked shell started on x64 Windows and on a Surface Pro X. Its
 rendered output has not been visually verified. A signed ARM32 prototype was
 produced for testing, but has not been installed on Windows 10 Mobile.
 Horizon itself still requires UWP window, graphics, and platform API work.
+
+UWP resource-pack overlays cannot create desktop directory junctions. The
+platform helper reports them unsupported, and the existing overlay code
+mirrors the affected directories instead.
 The UWP clipboard currently retains copied text inside the game only; opening
 external links or folders from the game still needs a UWP launcher integration.
 

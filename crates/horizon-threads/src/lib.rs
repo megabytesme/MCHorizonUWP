@@ -260,7 +260,7 @@ fn release() {}
 
 /// The REPARSE_DATA_BUFFER of a mount point naming `name` (UTF-16, `\??\` prefixed). The length
 /// fields are 16 bits: a name too long for them is an error, so the caller copies instead.
-#[cfg(windows)]
+#[cfg(all(windows, not(target_vendor = "uwp")))]
 fn mount_point_buffer(name: &[u16]) -> std::io::Result<Vec<u8>> {
     const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
     let too_long = || std::io::Error::from(std::io::ErrorKind::InvalidInput);
@@ -283,7 +283,7 @@ fn mount_point_buffer(name: &[u16]) -> std::io::Result<Vec<u8>> {
 
 /// A directory junction, which Windows creates without privileges (a directory symlink needs
 /// developer mode): the resource pack overlay links its untouched directories with them.
-#[cfg(windows)]
+#[cfg(all(windows, not(target_vendor = "uwp")))]
 pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Result<()> {
     // What `mklink /J` does, without its ~100 ms `cmd` process per directory: an empty
     // directory given a mount point reparse point (REPARSE_DATA_BUFFER) naming the target.
@@ -328,6 +328,12 @@ pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Resu
         let _ = std::fs::remove_dir(at);
     }
     set
+}
+
+/// UWP cannot create desktop junctions; callers can copy the directory.
+#[cfg(all(windows, target_vendor = "uwp"))]
+pub fn junction(_target: &std::path::Path, _at: &std::path::Path) -> std::io::Result<()> {
+    Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "junctions are unavailable in UWP"))
 }
 
 #[cfg(test)]
@@ -419,7 +425,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(all(test, windows, not(target_vendor = "uwp")))]
 mod junction_tests {
     #[test]
     fn mount_point_buffer_layout() {
