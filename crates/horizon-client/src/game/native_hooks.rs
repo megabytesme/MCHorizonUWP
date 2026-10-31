@@ -2286,7 +2286,7 @@ impl Game<'_> {
     fn native_screen_at(&self) -> Option<(String, Vec<i32>, [f32; 2])> {
         let s = self.shown_native_screen()?;
         let r = self.renderer.as_ref()?;
-        let batch = HudBatch::new([r.config.width, r.config.height]);
+        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
         let (ox, oy) = self.inventory_origin(&batch);
         let at = [self.cursor.0 - ox, self.cursor.1 - oy];
         Some((s.block.clone(), s.data.clone(), at))

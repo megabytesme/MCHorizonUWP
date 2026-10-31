@@ -7458,7 +7458,7 @@ impl Game<'_> {
         let Some(size) = self
             .renderer
             .as_ref()
-            .map(|r| [r.config.width, r.config.height])
+            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
         else {
             return;
         };

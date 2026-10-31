@@ -674,7 +674,7 @@ impl Game<'_> {
         let size = self
             .renderer
             .as_ref()
-            .map_or([1, 1], |r| [r.config.width, r.config.height]);
+            .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
         let b = HudBatch::new(size);
         let hit = CommandBlockScreen::buttons(b.width, b.height, s.cart.is_some())
             .into_iter()

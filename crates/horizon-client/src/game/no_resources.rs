@@ -41,9 +41,9 @@ pub(super) fn show(looked_in: &std::path::Path, settings: &Settings) -> Result<(
 
 impl Missing {
     fn size(&self) -> [u32; 2] {
-        self.renderer
-            .as_ref()
-            .map_or([1280, 720], |r| [r.config.width, r.config.height])
+        self.renderer.as_ref().map_or([1280, 720], |r| {
+            [r.viewport_size()[0], r.viewport_size()[1]]
+        })
     }
 
     /// `f` over a Ui of the window's size, the cursor where the pointer is.
@@ -68,7 +68,7 @@ impl Missing {
         let Some(renderer) = &mut self.renderer else {
             return;
         };
-        match renderer.render(&loading_frame(&batch)) {
+        match horizon_client::presentation::present(renderer, &loading_frame(&batch)) {
             Ok(true) => return,
             Ok(false) => {}
             Err(e) => log::warn!("Horizon: frame failed: {e}"),
@@ -130,7 +130,11 @@ impl ApplicationHandler for Missing {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
                 if let Some(r) = &mut self.renderer {
-                    r.resize(size.width, size.height);
+                    horizon_client::presentation::PresentationBackend::resize(
+                        r,
+                        size.width,
+                        size.height,
+                    );
                 }
                 window.request_redraw();
             }

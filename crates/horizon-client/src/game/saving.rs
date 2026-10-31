@@ -244,7 +244,7 @@ impl Game<'_> {
         let Some(renderer) = &mut self.renderer else {
             return Ok(());
         };
-        let mut hud = HudBatch::new([renderer.config.width, renderer.config.height]);
+        let mut hud = HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
         let progress = match self.pending_save.as_ref().map(|save| &save.stage) {
             Some(Stage::Chunks(_)) => 0.25,
             Some(Stage::Entities(_)) => 0.5,
@@ -257,7 +257,7 @@ impl Game<'_> {
             "Saving world...",
             progress,
         );
-        renderer.render(&loading_frame(&hud))?;
+        horizon_client::presentation::present(renderer, &loading_frame(&hud))?;
         Ok(())
     }
 }

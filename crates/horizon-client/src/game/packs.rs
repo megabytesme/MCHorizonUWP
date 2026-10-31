@@ -269,7 +269,7 @@ impl Game<'_> {
         } = staged;
         // Keep the working GPU resources, and hand its window surface over.
         if let Some(renderer) = &mut self.renderer {
-            renderer.release_surface();
+            horizon_client::presentation::PresentationBackend::release_surface(renderer);
         }
         let renderer = match self
             .window
@@ -290,7 +290,8 @@ impl Game<'_> {
             Ok(renderer) => renderer,
             Err(error) => {
                 if let Some(renderer) = &mut self.renderer {
-                    renderer.recreate_surface().map_err(|restore| {
+                    horizon_client::presentation::PresentationBackend::recreate_surface(renderer)
+                        .map_err(|restore| {
                         format!(
                             "{error}; could not restore the previous rendering surface: {restore}"
                         )

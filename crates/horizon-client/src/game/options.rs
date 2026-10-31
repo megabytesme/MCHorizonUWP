@@ -89,10 +89,9 @@ impl Game<'_> {
         Self::options_path().with_file_name(horizon_client::shader_pack_list::DIR)
     }
     pub(super) fn gui_size(&self) -> (f32, f32) {
-        let size = self
-            .renderer
-            .as_ref()
-            .map_or([1280, 720], |r| [r.config.width, r.config.height]);
+        let size = self.renderer.as_ref().map_or([1280, 720], |r| {
+            [r.viewport_size()[0], r.viewport_size()[1]]
+        });
         let b = HudBatch::new(size);
         (b.width, b.height)
     }
@@ -173,7 +172,7 @@ impl Game<'_> {
         }
         let size = self.gui_size();
         let framebuffer = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.config.width as i32, r.config.height as i32]
+            [r.viewport_size()[0] as i32, r.viewport_size()[1] as i32]
         });
         let mut ui = std::mem::take(&mut self.ui.options);
         let events = ui.click(
@@ -192,7 +191,7 @@ impl Game<'_> {
     pub(super) fn options_drag(&mut self) -> Result<()> {
         let size = self.gui_size();
         let framebuffer = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.config.width as i32, r.config.height as i32]
+            [r.viewport_size()[0] as i32, r.viewport_size()[1] as i32]
         });
         let mut ui = std::mem::take(&mut self.ui.options);
         let events = ui.click(
@@ -225,7 +224,7 @@ impl Game<'_> {
     }
     pub(super) fn options_scroll(&mut self, amount: f32) -> Result<()> {
         let framebuffer = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.config.width as i32, r.config.height as i32]
+            [r.viewport_size()[0] as i32, r.viewport_size()[1] as i32]
         });
         if self.ui.options.page() == Page::Video && self.has_control_down() {
             // VideoSettingsScreen.mouseScrolled: Ctrl with the wheel steps the GUI scale.
@@ -374,7 +373,11 @@ impl Game<'_> {
             r.gamma = s.gamma;
             r.fullbright = s.extras.fullbright;
             r.improved_transparency = s.improved_transparency;
-            r.set_present_mode(s.vsync, s.horizon.present_mode);
+            horizon_client::presentation::PresentationBackend::set_present_mode(
+                r,
+                s.vsync,
+                s.horizon.present_mode,
+            );
             r.animated_textures = s.horizon.animated_textures;
             r.set_mipmap_levels(s.mipmap_levels.max(0) as u32);
             r.set_texture_filtering(

@@ -1001,7 +1001,7 @@ impl Game<'_> {
                     wgpu::DeviceType::Other => "other",
                 },
                 "backend": format!("{:?}", r.info.backend),
-                "size": [r.config.width, r.config.height],
+                "size": [r.viewport_size()[0], r.viewport_size()[1]],
                 "present_mode": format!("{:?}", r.config.present_mode),
                 "drawn_sections": r.drawn_sections,
                 "section_draws": r.section_draws,

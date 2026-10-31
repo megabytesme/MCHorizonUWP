@@ -309,7 +309,11 @@ impl Loading {
     pub(super) fn apply_menu_settings(&mut self) {
         if let Some(renderer) = &mut self.renderer {
             renderer.gamma = self.settings.gamma;
-            renderer.set_present_mode(self.settings.vsync, self.settings.horizon.present_mode);
+            horizon_client::presentation::PresentationBackend::set_present_mode(
+                renderer,
+                self.settings.vsync,
+                self.settings.horizon.present_mode,
+            );
         }
         horizon_client::hud::GUI_SCALE.store(self.settings.gui_scale, Ordering::Relaxed);
         if let Some(gui) = &mut self.gui {
@@ -349,9 +353,9 @@ impl Loading {
     }
 
     fn menu_size(&self) -> [u32; 2] {
-        self.renderer
-            .as_ref()
-            .map_or([1280, 720], |r| [r.config.width, r.config.height])
+        self.renderer.as_ref().map_or([1280, 720], |r| {
+            [r.viewport_size()[0], r.viewport_size()[1]]
+        })
     }
 
     fn save_menu_address(&mut self) {
@@ -542,7 +546,11 @@ impl Loading {
             }
             WindowEvent::Resized(size) => {
                 if let Some(r) = &mut self.renderer {
-                    r.resize(size.width, size.height);
+                    horizon_client::presentation::PresentationBackend::resize(
+                        r,
+                        size.width,
+                        size.height,
+                    );
                 }
                 self.apply_menu_settings();
             }
@@ -588,10 +596,9 @@ impl Loading {
                 if self.menu.options_open && self.menu.dragging {
                     self.menu_options_click(true, false);
                 } else if let Some(title) = &mut self.menu.title {
-                    let size = self
-                        .renderer
-                        .as_ref()
-                        .map_or([1280, 720], |r| [r.config.width, r.config.height]);
+                    let size = self.renderer.as_ref().map_or([1280, 720], |r| {
+                        [r.viewport_size()[0], r.viewport_size()[1]]
+                    });
                     let b = HudBatch::new(size);
                     title.drag(self.menu.cursor, (b.width, b.height));
                     title.drag_field(&self.gui.as_ref().unwrap().atlas, self.menu.cursor.0);

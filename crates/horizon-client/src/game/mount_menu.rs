@@ -368,7 +368,7 @@ impl Game<'_> {
         let Some(r) = self.renderer.as_ref() else {
             return true;
         };
-        let batch = HudBatch::new([r.config.width, r.config.height]);
+        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
         let Some(slot) = self.slot_at(&batch, self.cursor.0, self.cursor.1) else {
             return true;
         };
