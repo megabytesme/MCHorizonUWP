@@ -199,10 +199,14 @@ pub fn catch_stop_signals() {}
 /// World generation, meshing and the tick allocate and free small blocks on
 /// every worker at once; the system heaps serialise them (Windows' heap was
 /// 16% of a chunk's generation time), mimalloc keeps a heap per thread.
+#[cfg(not(target_vendor = "uwp"))]
 pub use mimalloc::MiMalloc as Allocator;
+#[cfg(target_vendor = "uwp")]
+pub use std::alloc::System as Allocator;
 
 /// `mi_option_purge_delay` in mimalloc.h (index 15 in v2 and v3); the bindings
 /// don't name it.
+#[cfg(not(target_vendor = "uwp"))]
 const PURGE_DELAY: libmimalloc_sys::mi_option_t = 15;
 
 /// Set the allocator up, first thing in `main`: free pages go back to the OS
@@ -211,6 +215,7 @@ const PURGE_DELAY: libmimalloc_sys::mi_option_t = 15;
 /// and generation keeps most of its speed-up.
 pub fn configure_allocator() {
     // SAFETY: sets one integer option, which mimalloc reads at each purge.
+    #[cfg(not(target_vendor = "uwp"))]
     unsafe {
         libmimalloc_sys::mi_option_set(PURGE_DELAY, 0);
     }
@@ -222,6 +227,7 @@ pub fn configure_allocator() {
 /// thread that allocated them, and macOS in its zones until memory runs short.
 pub fn release_free_memory() {
     // SAFETY: frees only pages no allocation uses (this thread's heap, shared arenas).
+    #[cfg(not(target_vendor = "uwp"))]
     unsafe {
         libmimalloc_sys::mi_collect(true);
     }
@@ -400,6 +406,7 @@ mod tests {
 
     /// The option set is the purge delay: mimalloc v3's default for it is
     /// 1000 ms, and it is 0 once configured.
+    #[cfg(not(target_vendor = "uwp"))]
     #[test]
     fn configuring_the_allocator_purges_at_once() {
         // SAFETY: reads and sets one integer option.

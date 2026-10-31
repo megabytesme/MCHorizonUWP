@@ -1,5 +1,12 @@
 # Third-party notices
 
+## parking_lot_core
+
+`third_party/parking_lot_core` is [parking_lot_core](https://github.com/Amanieu/parking_lot)
+0.9.12 at commit `d7828fff7b5d6327ae608e82db45f888b344449a`, licensed under MIT
+or Apache-2.0 (`LICENSE-MIT` and `LICENSE-APACHE` in that directory). The copy
+binds the UWP address-wait APIs directly instead of looking up desktop modules.
+
 ## winit
 
 `third_party/winit` is [winit](https://github.com/rust-windowing/winit) 0.30.13 at

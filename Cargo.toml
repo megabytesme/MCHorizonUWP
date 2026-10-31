@@ -59,6 +59,7 @@ large_enum_variant = "allow"
 # Drop this and the folder once a wgpu release has these fixes.
 [patch.crates-io]
 wgpu-hal = { path = "third_party/wgpu-hal" }
+parking_lot_core = { path = "third_party/parking_lot_core" }
 winit = { path = "third_party/winit" }
 
 # Line tables keep file:line in backtraces; full debug info made every
