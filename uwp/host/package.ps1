@@ -1,7 +1,8 @@
 param(
     [ValidateSet('x64', 'arm64', 'arm')][string]$Architecture = 'x64',
     [string]$AngleBin,
-    [switch]$RequireAngle
+    [switch]$RequireAngle,
+    [switch]$Game
 )
 $ErrorActionPreference = 'Stop'
 function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
@@ -15,7 +16,7 @@ function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
         if ($offset -lt 0 -or $offset + 6 -gt $stream.Length) { throw "Invalid PE header: $Path" }
         $stream.Position = $offset
         if ($reader.ReadUInt32() -ne 0x4550 -or $reader.ReadUInt16() -ne $machine) {
-            throw "DLL architecture does not match ${TargetArchitecture}: $Path"
+            throw "PE architecture does not match ${TargetArchitecture}: $Path"
         }
     } finally { $reader.Dispose() }
 }
@@ -47,8 +48,15 @@ if ($AngleBin) {
 } elseif ($RequireAngle) {
     throw "ANGLE DLLs were not found for $Architecture. Build them or pass -AngleBin."
 }
+$executable = if ($Game) {
+    Join-Path (Join-Path (Join-Path $hostDir 'build') "game-$Architecture") 'HorizonUWP.exe'
+} else {
+    Join-Path $build 'HorizonUWP.exe'
+}
+if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Host executable not found: $executable" }
+Assert-PEArchitecture $executable $Architecture
 New-Item -ItemType Directory -Force -Path $stage,(Join-Path $stage 'Assets') | Out-Null
-Copy-Item (Join-Path $build 'HorizonUWP.exe') $stage -Force
+Copy-Item -LiteralPath $executable -Destination $stage -Force
 # Staging persists between builds; remove stale DLLs before copying validated inputs.
 foreach ($name in @('libEGL.dll', 'libGLESv2.dll', 'z.dll')) {
     $old = Join-Path $stage $name
