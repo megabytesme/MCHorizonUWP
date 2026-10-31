@@ -21,6 +21,8 @@ platform helper reports them unsupported, and the existing overlay code
 mirrors the affected directories instead.
 The UWP clipboard currently retains copied text inside the game only; opening
 external links or folders from the game still needs a UWP launcher integration.
+The package declares outbound Internet and private-network access for multiplayer.
+The UWP game does not send Horizon's automatic activity ping.
 
 The unmodified client also completed an x64 release build targeting
 `x86_64-uwp-windows-msvc` using Rust 1.99.1, `RUSTC_BOOTSTRAP=1`, `-Z

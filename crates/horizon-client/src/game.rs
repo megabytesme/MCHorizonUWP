@@ -17865,6 +17865,8 @@ fn run_with_options(options: Option<Options>) -> Result<()> {
     // for a server, a benchmark, a run that quits by itself, a harness's fixture or a run that
     // horizon-ctl drives: those start in a source checkout and wrote the list there.
     if !options.offscreen && !synchronous_startup(&options) {
+        // A packaged UWP build does not send an automatic activity ping.
+        #[cfg(not(target_vendor = "uwp"))]
         horizon_client::heartbeat::start();
         if let Err(e) = horizon_client::multiplayer::add_official_server(&std::env::current_dir()?)
         {
