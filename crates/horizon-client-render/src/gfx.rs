@@ -922,6 +922,11 @@ fn instance_descriptor(
             .remove(wgpu::InstanceFlags::VALIDATION_INDIRECT_CALL);
     }
     let mut descriptor = descriptor.with_env();
+    // UWP uses ANGLE's D3D11 renderer; ignore desktop backend overrides.
+    #[cfg(target_vendor = "uwp")]
+    {
+        descriptor.backends = wgpu::Backends::GL;
+    }
     if allow_nonconformant {
         descriptor
             .flags
@@ -954,6 +959,9 @@ impl wgpu::rwh::HasDisplayHandle for WindowDisplay {
 /// the renderer's start (#746). macOS has Metal only.
 fn backend_order(api: GraphicsApi, os: &str, wgpu_backend: bool) -> Vec<wgpu::Backends> {
     use wgpu::Backends;
+    if cfg!(target_vendor = "uwp") {
+        return vec![Backends::GL];
+    }
     if os == "macos" || wgpu_backend {
         return vec![Backends::default()];
     }
@@ -1186,12 +1194,12 @@ async fn open_backend(
         required_limits: limits,
         ..Default::default()
     };
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_vendor = "uwp")))]
     let opened = match info.backend {
         wgpu::Backend::Vulkan => horizon_hdr::open_vulkan_device(&adapter, &desc),
         _ => None,
     };
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_vendor = "uwp"))]
     let opened = None;
     let opened = match opened {
         Some(opened) => opened,
@@ -1679,6 +1687,9 @@ impl Renderer {
         });
         let mut mip_levels = 1;
         let gl = adapter.get_info().backend == wgpu::Backend::Gl;
+        // Downlevel GLES adapters cannot bind storage textures. The CPU sprite
+        // animator only needs COPY_DST, so request storage usage for GPU jobs only.
+        let gpu_animations = animate::SpriteAnimator::compute(&adapter, &device);
         let sprite_textures: Vec<wgpu::Texture> = prepared
             .sprites
             .into_iter()
@@ -1707,7 +1718,11 @@ impl Renderer {
                             | wgpu::TextureUsages::COPY_DST
                             // Shader packs' atlas copies them (pack_atlas.rs).
                             | wgpu::TextureUsages::COPY_SRC
-                            | wgpu::TextureUsages::STORAGE_BINDING,
+                            | if gpu_animations {
+                                wgpu::TextureUsages::STORAGE_BINDING
+                            } else {
+                                wgpu::TextureUsages::empty()
+                            },
                         view_formats: &[],
                     },
                     wgpu::util::TextureDataOrder::LayerMajor,
@@ -1722,7 +1737,7 @@ impl Renderer {
             sprite_mips,
             &sprite_textures,
             split,
-            animate::SpriteAnimator::compute(&adapter, &device),
+            gpu_animations,
         );
         let sprite_unused = device
             .create_texture(&wgpu::TextureDescriptor {

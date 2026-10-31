@@ -7,9 +7,12 @@ rust-version = "1.85"
 description = "HDR metadata for the swapchain: the Vulkan calls the crates that forbid unsafe code can't make"
 
 [dependencies]
+wgpu = { version = "30.0.1", default-features = false }
+
+[target.'cfg(not(target_vendor = "uwp"))'.dependencies]
 wgpu = { version = "30.0.1", default-features = false, features = ["vulkan"] }
 
-[target.'cfg(not(target_os = "macos"))'.dependencies]
+[target.'cfg(not(any(target_os = "macos", target_vendor = "uwp")))'.dependencies]
 # The version wgpu-hal already uses.
 ash = { version = "0.38", default-features = false }
 
