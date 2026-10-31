@@ -1029,6 +1029,16 @@ fn check_layers(limits: &wgpu::Limits, layers: u32) -> Result<()> {
     }
     Ok(())
 }
+
+/// The CPU draw path uses section origins as vertex data. Compute-based paths
+/// additionally bind them as storage, which downlevel GLES devices may not have.
+fn section_origins_usage(limits: &wgpu::Limits) -> wgpu::BufferUsages {
+    let mut usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
+    if limits.max_storage_buffers_per_shader_stage > 0 {
+        usage |= wgpu::BufferUsages::STORAGE;
+    }
+    usage
+}
 /// Whether the swapchain can take a window of `width` x `height`: each side from 1 to the
 /// device's `max_texture_dimension_2d` (`max`), else `Surface::configure` panics. 0 is a
 /// minimized window. Past `max`: Windows lets a program size a window up to 65535 pixels
@@ -1219,10 +1229,12 @@ async fn open_backend(
 /// What to tell a player whose system offers no usable graphics adapter.
 /// Vulkan is loaded at run time (the game links no graphics library), so a
 /// missing driver shows here rather than as a missing-DLL dialog.
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", not(target_vendor = "uwp")))]
 const NO_GPU_DRIVER: &str = "No graphics driver with Vulkan, DirectX 12 or OpenGL found: Horizon needs \
      a GPU driver with one of them. Install the latest driver for your NVIDIA, AMD or Intel GPU and \
      start the game again";
+#[cfg(all(target_os = "windows", target_vendor = "uwp"))]
+const NO_GPU_DRIVER: &str = "Horizon could not initialize ANGLE with a Direct3D 11 graphics driver";
 #[cfg(target_os = "macos")]
 const NO_GPU_DRIVER: &str = "No Metal graphics device found";
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
@@ -1807,9 +1819,7 @@ impl Renderer {
         let instances = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Section origins"),
             size: instance_capacity * 16,
-            usage: wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::STORAGE,
+            usage: section_origins_usage(&device.limits()),
             mapped_at_creation: false,
         });
         let outline = device.create_buffer(&wgpu::BufferDescriptor {
@@ -4361,9 +4371,7 @@ impl Renderer {
             self.instances = self.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Section origins"),
                 size: self.instance_capacity * 16,
-                usage: wgpu::BufferUsages::VERTEX
-                    | wgpu::BufferUsages::COPY_DST
-                    | wgpu::BufferUsages::STORAGE,
+                usage: section_origins_usage(&self.device.limits()),
                 mapped_at_creation: false,
             });
         }
@@ -6439,6 +6447,17 @@ fn frustum(m: Mat4) -> [Vec4; 6] {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn section_origins_storage_follows_device_limits() {
+        let mut limits = wgpu::Limits::default();
+        limits.max_storage_buffers_per_shader_stage = 0;
+        let downlevel = super::section_origins_usage(&limits);
+        assert!(downlevel.contains(wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST));
+        assert!(!downlevel.contains(wgpu::BufferUsages::STORAGE));
+        limits.max_storage_buffers_per_shader_stage = 1;
+        assert!(super::section_origins_usage(&limits).contains(wgpu::BufferUsages::STORAGE));
+    }
+
     #[test]
     fn drawable_size_skips_minimized_and_oversized_windows() {
         use super::drawable_size;
