@@ -31,6 +31,7 @@ pub fn packs_dir() -> PathBuf {
         .join("resourcepacks")
 }
 /// `Util.getPlatform().openPath`: the system file manager on the folder.
+#[cfg(not(target_vendor = "uwp"))]
 pub fn open_folder(dir: &Path) {
     let program = if cfg!(target_os = "windows") {
         "explorer"
@@ -43,17 +44,27 @@ pub fn open_folder(dir: &Path) {
         log::warn!("Horizon: could not open {}: {e}", dir.display());
     }
 }
+/// UWP has no desktop process launcher; folder access needs a platform picker.
+#[cfg(target_vendor = "uwp")]
+pub fn open_folder(dir: &Path) {
+    log::warn!(
+        "Opening folders is not yet supported in UWP: {}",
+        dir.display()
+    );
+}
 /// `Util.getPlatform().openUri`: the system browser on the link.
 pub fn open_uri(uri: &str) {
     // URLs need Windows' registered protocol handler, not Explorer's path
     // handling. ShellExecute also preserves the URL as one Unicode value,
     // without interpolating its query string into a command interpreter.
-    #[cfg(windows)]
+    #[cfg(all(windows, not(target_vendor = "uwp")))]
     if let Err(error) = open::that_detached(uri) {
         log::warn!("Horizon: could not open URI {uri}: {error}");
     }
     #[cfg(not(windows))]
     open_folder(Path::new(uri));
+    #[cfg(target_vendor = "uwp")]
+    log::warn!("Opening links is not yet supported in UWP: {uri}");
 }
 /// The resource root to load from, given the vanilla root, the selection and
 /// a server's packs, which go on top (`Pack.Position.TOP`, fixed).

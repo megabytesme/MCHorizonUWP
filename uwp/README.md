@@ -15,6 +15,8 @@ The bridge-linked shell started on x64 Windows and on a Surface Pro X. Its
 rendered output has not been visually verified. A signed ARM32 prototype was
 produced for testing, but has not been installed on Windows 10 Mobile.
 Horizon itself still requires UWP window, graphics, and platform API work.
+The UWP clipboard currently retains copied text inside the game only; opening
+external links or folders from the game still needs a UWP launcher integration.
 
 The unmodified client also completed an x64 release build targeting
 `x86_64-uwp-windows-msvc` using Rust 1.99.1, `RUSTC_BOOTSTRAP=1`, `-Z

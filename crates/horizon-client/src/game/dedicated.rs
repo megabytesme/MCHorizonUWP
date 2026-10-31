@@ -118,7 +118,13 @@ impl Watchdog {
                         "We were unable to save this crash report to disk.",
                     ),
                 }
+                #[cfg(not(target_vendor = "uwp"))]
                 std::process::exit(1);
+                #[cfg(target_vendor = "uwp")]
+                {
+                    self.running.store(false, Ordering::Relaxed);
+                    return;
+                }
             }
             // Thread.sleep(nextTickTime + maxTickTime - now).
             let wait = (next + max).saturating_sub(now).max(1_000_000);
