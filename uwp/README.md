@@ -15,3 +15,12 @@ The bridge-linked shell started on x64 Windows and on a Surface Pro X. Its
 rendered output has not been visually verified. A signed ARM32 prototype was
 produced for testing, but has not been installed on Windows 10 Mobile.
 Horizon itself still requires UWP window, graphics, and platform API work.
+
+The unmodified client also completed an x64 release build targeting
+`x86_64-uwp-windows-msvc` using Rust 1.99.1, `RUSTC_BOOTSTRAP=1`, `-Z
+build-std=std,panic_abort`, and the desktop MSVC/SDK link environment. The
+resulting `target/x86_64-uwp-windows-msvc/release/horizon-client.exe` is not a
+working UWP application: PE inspection found desktop imports including
+`CreateWindowExW`, `RegisterClassExW`, `CreateProcessW`, and `GetStdHandle`.
+This build used the original wgpu backend, before the experimental ANGLE
+changes were made. Compilation does not validate AppContainer compatibility.
