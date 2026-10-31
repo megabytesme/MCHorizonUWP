@@ -9,6 +9,11 @@ use parking_lot::{MappedMutexGuard, Mutex, MutexGuard, RwLock};
 /// The amount of time to wait while trying to obtain a lock to the adapter context
 const CONTEXT_LOCK_TIMEOUT_SECS: u64 = 6;
 
+#[cfg(unix)]
+type WaylandWindow = wayland_sys::egl::wl_egl_window;
+#[cfg(not(unix))]
+type WaylandWindow = ffi::c_void;
+
 const EGL_CONTEXT_FLAGS_KHR: i32 = 0x30FC;
 const EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR: i32 = 0x0001;
 const EGL_CONTEXT_OPENGL_ROBUST_ACCESS_EXT: i32 = 0x30BF;
@@ -729,7 +734,22 @@ impl crate::Instance for Instance {
         let egl_result: Result<EglInstance, khronos_egl::Error> =
             Ok(khronos_egl::Instance::new(khronos_egl::Static));
 
-        #[cfg(not(Emscripten))]
+        #[cfg(all(windows, target_vendor = "uwp"))]
+        let egl_result = unsafe {
+            #[link(name = "WindowsApp")]
+            unsafe extern "system" {
+                fn LoadPackagedLibrary(name: *const u16, reserved: u32) -> isize;
+            }
+            let name: Vec<u16> = "libEGL.dll".encode_utf16().chain(Some(0)).collect();
+            let module = LoadPackagedLibrary(name.as_ptr(), 0);
+            if module == 0 {
+                return Err(crate::InstanceError::new("LoadPackagedLibrary(libEGL.dll) failed".into()));
+            }
+            let library: libloading::Library = libloading::os::windows::Library::from_raw(module).into();
+            khronos_egl::DynamicInstance::<khronos_egl::EGL1_4>::load_required_from(library)
+        };
+
+        #[cfg(all(not(Emscripten), not(all(windows, target_vendor = "uwp"))))]
         let egl_result = if cfg!(windows) {
             unsafe {
                 khronos_egl::DynamicInstance::<khronos_egl::EGL1_4>::load_required_from_filename(
@@ -766,6 +786,10 @@ impl crate::Instance for Instance {
         #[cfg(Emscripten)]
         let egl1_5: Option<&Arc<EglInstance>> = Some(&egl);
 
+        #[cfg(all(windows, target_vendor = "uwp"))]
+        if !client_ext_str.contains("EGL_ANGLE_platform_angle") {
+            return Err(crate::InstanceError::new("UWP requires ANGLE with D3D11".into()));
+        }
         let (display, wsi_kind) = match (desc.display.map(|d| d.as_raw()), egl1_5) {
             (Some(Rdh::Wayland(wayland_display_handle)), Some(egl))
                 if client_ext_str.contains("EGL_EXT_platform_wayland") =>
@@ -842,6 +866,21 @@ impl crate::Instance for Instance {
                 }
                 .map_err(instance_err("failed to get XCB display"))?;
                 (display, WindowKind::X11)
+            }
+            #[cfg(all(windows, target_vendor = "uwp"))]
+            _ if client_ext_str.contains("EGL_ANGLE_platform_angle") => {
+                type GetPlatformDisplay = unsafe extern "system" fn(u32, *mut ffi::c_void, *const i32) -> *mut ffi::c_void;
+                let get_display: GetPlatformDisplay = unsafe {
+                    core::mem::transmute(egl.get_proc_address("eglGetPlatformDisplayEXT")
+                        .ok_or_else(|| crate::InstanceError::new("ANGLE missing eglGetPlatformDisplayEXT".into()))?)
+                };
+                // Request D3D11 explicitly, excluding ANGLE's other renderers.
+                let attrs = [0x3203, 0x3208, khronos_egl::NONE];
+                let raw = unsafe { get_display(EGL_PLATFORM_ANGLE_ANGLE, ptr::null_mut(), attrs.as_ptr()) };
+                if raw.is_null() {
+                    return Err(crate::InstanceError::new("ANGLE D3D11 display unavailable".into()));
+                }
+                (unsafe { khronos_egl::Display::from_ptr(raw) }, WindowKind::Unknown)
             }
             x if client_ext_str.contains("EGL_MESA_platform_surfaceless") => {
                 log::debug!(
@@ -931,6 +970,8 @@ impl crate::Instance for Instance {
             (Rwh::Xlib(_), _) => {}
             (Rwh::Xcb(_), _) => {}
             (Rwh::Win32(_), _) => {}
+            #[cfg(target_vendor = "uwp")]
+            (Rwh::WinRt(_), _) => {}
             (Rwh::AppKit(_), _) => {}
             (Rwh::OhosNdk(_), _) => {}
             #[cfg(target_os = "android")]
@@ -1083,7 +1124,7 @@ impl super::Device {
 #[derive(Debug)]
 pub struct Swapchain {
     surface: khronos_egl::Surface,
-    wl_window: Option<*mut wayland_sys::egl::wl_egl_window>,
+    wl_window: Option<*mut WaylandWindow>,
     framebuffer: glow::Framebuffer,
     renderbuffer: glow::Renderbuffer,
     /// Extent because the window lies
@@ -1201,7 +1242,7 @@ impl Surface {
         device: &super::Device,
     ) -> Option<(
         khronos_egl::Surface,
-        Option<*mut wayland_sys::egl::wl_egl_window>,
+        Option<*mut WaylandWindow>,
     )> {
         let gl = &device.shared.context.lock();
         match self.swapchain.write().take() {
@@ -1234,6 +1275,7 @@ impl crate::Surface for Surface {
 
         let (surface, wl_window) = match unsafe { self.unconfigure_impl(device) } {
             Some((sc, wl_window)) => {
+                #[cfg(unix)]
                 if let Some(window) = wl_window {
                     wayland_sys::ffi_dispatch!(
                         wayland_sys::egl::wayland_egl_handle(),
@@ -1282,6 +1324,8 @@ impl crate::Surface for Surface {
                     }
                     #[cfg(Emscripten)]
                     (WindowKind::Unknown, Rwh::Web(handle)) => handle.id as *mut ffi::c_void,
+                    #[cfg(target_vendor = "uwp")]
+                    (WindowKind::Unknown, Rwh::WinRt(handle)) => handle.core_window.as_ptr(),
                     (WindowKind::Unknown, Rwh::Win32(handle)) => {
                         handle.hwnd.get() as *mut ffi::c_void
                     }
@@ -1315,6 +1359,7 @@ impl crate::Surface for Surface {
                     // manage a swapchain on our side.
                     // Some drivers just fail on surface creation seeing `EGL_SINGLE_BUFFER`.
                     if cfg!(any(
+                        target_vendor = "uwp",
                         target_os = "android",
                         target_os = "macos",
                         target_env = "ohos"
@@ -1469,6 +1514,7 @@ impl crate::Surface for Surface {
                 .instance
                 .destroy_surface(self.egl.display, surface)
                 .unwrap();
+            #[cfg(unix)]
             if let Some(window) = wl_window {
                 wayland_sys::ffi_dispatch!(
                     wayland_sys::egl::wayland_egl_handle(),
