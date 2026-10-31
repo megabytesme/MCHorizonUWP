@@ -1,6 +1,10 @@
 #include <windows.h>
 #include "Dx11Renderer.h"
 
+#ifdef HORIZON_UWP_CORE_BRIDGE
+extern "C" int horizon_uwp_protocol_version();
+#endif
+
 using namespace Windows::ApplicationModel::Activation;
 using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Foundation;
@@ -13,6 +17,9 @@ public:
     virtual ~AppView() { delete renderer_; }
 public:
     virtual void Initialize(CoreApplicationView^ view) {
+#ifdef HORIZON_UWP_CORE_BRIDGE
+        if (horizon_uwp_protocol_version() <= 0) throw ref new Platform::FailureException();
+#endif
         view->Activated += ref new TypedEventHandler<CoreApplicationView^, IActivatedEventArgs^>(this, &AppView::Activated);
     }
     virtual void SetWindow(CoreWindow^ window) {
