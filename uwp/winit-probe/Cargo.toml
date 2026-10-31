@@ -1,0 +1,22 @@
+[package]
+name = "horizon-uwp-winit-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+winit = "=0.30.13"
+wgpu = { version = "=30.0.1", default-features = false, features = ["std", "gles", "wgsl"] }
+pollster = "0.4"
+
+[patch.crates-io]
+winit = { path = "../../third_party/winit" }
+wgpu-hal = { path = "../../third_party/wgpu-hal" }
+
+[profile.release]
+panic = "abort"

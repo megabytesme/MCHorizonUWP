@@ -1,5 +1,12 @@
 # Third-party notices
 
+## winit
+
+`third_party/winit` is [winit](https://github.com/rust-windowing/winit) 0.30.13 at
+commit `e9809ef54b18499bb4f2cac945719ecc2a61061b`, licensed under Apache-2.0
+(`third_party/winit/LICENSE`). This copy adds an experimental UWP CoreWindow backend
+and changes platform selection for UWP targets.
+
 ## wgpu-hal
 
 `third_party/wgpu-hal` is [wgpu-hal](https://github.com/gfx-rs/wgpu) 30.0.1 by the gfx-rs

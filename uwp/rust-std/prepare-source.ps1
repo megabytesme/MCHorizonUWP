@@ -17,12 +17,21 @@ if (-not (Test-Path -LiteralPath $source)) { throw "rust-src is not installed in
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 Copy-Item -LiteralPath $source -Destination $library -Recurse
 $patch = Join-Path $PSScriptRoot 'stdio-uwp.patch'
+$previousCeiling = $env:GIT_CEILING_DIRECTORIES
+# If the copy lives inside the Horizon checkout, prevent git apply from
+# silently ignoring patch paths outside its repository-relative prefix.
+$env:GIT_CEILING_DIRECTORIES = Split-Path -Parent $root
 Push-Location $root
 try {
     & git apply --check $patch
     if ($LASTEXITCODE -ne 0) { throw 'The UWP stdio patch does not match this rust-src.' }
     & git apply $patch
     if ($LASTEXITCODE -ne 0) { throw 'Could not apply the UWP stdio patch.' }
-} finally { Pop-Location }
+    & git apply --reverse --check $patch
+    if ($LASTEXITCODE -ne 0) { throw 'The UWP stdio patch was not applied to the source copy.' }
+} finally {
+    Pop-Location
+    $env:GIT_CEILING_DIRECTORIES = $previousCeiling
+}
 Write-Host "Patched Rust source copy: $library"
 Write-Host "Set __CARGO_TESTS_ONLY_SRC_ROOT to this directory before using cargo -Z build-std."

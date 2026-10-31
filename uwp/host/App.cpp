@@ -1,5 +1,70 @@
 #include <windows.h>
 #include "Dx11Renderer.h"
+#ifdef HORIZON_UWP_GAME_BRIDGE
+#include "../window-bridge/CoreWindowEvents.h"
+#include <windows.applicationmodel.h>
+#include <windows.storage.h>
+#include <windows.graphics.display.h>
+
+static Windows::UI::Core::CoreWindow^ current_window;
+static HorizonUwpEvent pending_events[4096];
+static uint32_t event_read, event_write;
+
+static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
+    const uint32_t next = (event_write + 1) % 4096;
+    if (next == event_read) event_read = (event_read + 1) % 4096;
+    pending_events[event_write] = *event;
+    event_write = next;
+}
+extern "C" void* __cdecl horizon_uwp_window_handle() {
+    return reinterpret_cast<void*>(current_window);
+}
+extern "C" void __cdecl horizon_uwp_pump_events() {
+    current_window->Dispatcher->ProcessEvents(Windows::UI::Core::CoreProcessEventsOption::ProcessAllIfPresent);
+}
+extern "C" int __cdecl horizon_uwp_pop_event(HorizonUwpEvent* event) {
+    if (!event || event_read == event_write) return 0;
+    *event = pending_events[event_read];
+    event_read = (event_read + 1) % 4096;
+    return 1;
+}
+extern "C" void __cdecl horizon_uwp_get_metrics(uint32_t* width, uint32_t* height, double* scale) {
+    const double s = Windows::Graphics::Display::DisplayInformation::GetForCurrentView()->LogicalDpi / 96.0;
+    *width = static_cast<uint32_t>(current_window->Bounds.Width * s);
+    *height = static_cast<uint32_t>(current_window->Bounds.Height * s);
+    *scale = s;
+}
+extern "C" void __cdecl horizon_uwp_set_cursor_visible(int visible) {
+    if (!current_window || !current_window->Dispatcher->HasThreadAccess) return;
+    current_window->PointerCursor = visible
+        ? ref new Windows::UI::Core::CoreCursor(Windows::UI::Core::CoreCursorType::Arrow, 0)
+        : nullptr;
+}
+extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
+    if (!current_window || !current_window->Dispatcher->HasThreadAccess) return 0;
+    const double scale = Windows::Graphics::Display::DisplayInformation::GetForCurrentView()->LogicalDpi / 96.0;
+    try {
+        current_window->PointerPosition = Windows::Foundation::Point(static_cast<float>(x / scale), static_cast<float>(y / scale));
+        return 1;
+    } catch (Platform::Exception^) { return 0; }
+}
+extern "C" int32_t __cdecl horizon_uwp_run(const uint16_t*, size_t, const uint16_t*, size_t);
+#ifdef HORIZON_UWP_FRAME_PROBE
+extern "C" void __cdecl horizon_uwp_frame_presented() {
+    static bool recorded = false;
+    if (recorded) return;
+    auto base = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+    auto file = Platform::String::Concat(base, ref new Platform::String(L"\\frame-presented.txt"));
+    HANDLE h = CreateFile2(file->Data(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (h != INVALID_HANDLE_VALUE) {
+        const char marker[] = "wgpu frame presented\n";
+        DWORD count = 0;
+        if (WriteFile(h, marker, sizeof(marker) - 1, &count, nullptr) && count == sizeof(marker) - 1) recorded = true;
+        CloseHandle(h);
+    }
+}
+#endif
+#endif
 
 #ifdef HORIZON_UWP_CORE_BRIDGE
 extern "C" int horizon_uwp_protocol_version();
@@ -14,7 +79,13 @@ ref class AppView sealed : IFrameworkView {
 internal:
     AppView() : renderer_(new horizon_uwp::Dx11Renderer()), closed_(false), visible_(true) {}
 public:
-    virtual ~AppView() { delete renderer_; }
+    virtual ~AppView() {
+#ifdef HORIZON_UWP_GAME_BRIDGE
+        delete window_events_;
+        current_window = nullptr;
+#endif
+        delete renderer_;
+    }
 public:
     virtual void Initialize(CoreApplicationView^ view) {
 #ifdef HORIZON_UWP_CORE_BRIDGE
@@ -24,13 +95,28 @@ public:
     }
     virtual void SetWindow(CoreWindow^ window) {
         window_ = window;
+#ifdef HORIZON_UWP_GAME_BRIDGE
+        current_window = window;
+        window_events_ = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
+        window_events_->EmitInitialSize();
+#endif
         window->Closed += ref new TypedEventHandler<CoreWindow^, CoreWindowEventArgs^>(this, &AppView::Closed);
         window->VisibilityChanged += ref new TypedEventHandler<CoreWindow^, VisibilityChangedEventArgs^>(this, &AppView::VisibilityChanged);
         window->SizeChanged += ref new TypedEventHandler<CoreWindow^, WindowSizeChangedEventArgs^>(this, &AppView::SizeChanged);
+#ifndef HORIZON_UWP_GAME_BRIDGE
         Check(renderer_->Initialize(reinterpret_cast<IUnknown*>(window)));
+#endif
     }
     virtual void Load(Platform::String^) {}
     virtual void Run() {
+#ifdef HORIZON_UWP_GAME_BRIDGE
+        auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+        auto resources = Platform::String::Concat(local_path, ref new Platform::String(L"\\resources"));
+        auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
+        const int32_t result = horizon_uwp_run(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
+                                               reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
+        if (result != 0) throw ref new Platform::FailureException();
+#else
         while (!closed_) {
             if (visible_) {
                 window_->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
@@ -39,6 +125,7 @@ public:
                 window_->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
             }
         }
+#endif
     }
     virtual void Uninitialize() {}
 private:
@@ -46,9 +133,16 @@ private:
     void Activated(CoreApplicationView^, IActivatedEventArgs^) { window_->Activate(); }
     void Closed(CoreWindow^, CoreWindowEventArgs^) { closed_ = true; }
     void VisibilityChanged(CoreWindow^, VisibilityChangedEventArgs^ args) { visible_ = args->Visible; }
-    void SizeChanged(CoreWindow^, WindowSizeChangedEventArgs^) { Check(renderer_->Resize()); }
+    void SizeChanged(CoreWindow^, WindowSizeChangedEventArgs^) {
+#ifndef HORIZON_UWP_GAME_BRIDGE
+        Check(renderer_->Resize());
+#endif
+    }
     CoreWindow^ window_;
     horizon_uwp::Dx11Renderer* renderer_;
+#ifdef HORIZON_UWP_GAME_BRIDGE
+    horizon_uwp::CoreWindowEvents^ window_events_;
+#endif
     bool closed_;
     bool visible_;
 };
