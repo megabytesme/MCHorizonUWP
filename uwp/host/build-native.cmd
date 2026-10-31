@@ -24,6 +24,12 @@ if not exist "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" exit /b 1
 call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
 if errorlevel 1 exit /b %errorlevel%
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
+set "FXC=%ProgramFiles(x86)%\Windows Kits\10\bin\%SDK%\x64\fxc.exe"
+if not exist "%FXC%" exit /b 1
+"%FXC%" /nologo /T vs_4_0_level_9_1 /E VSMain /Vn g_phone_probe_vs /Fh "%OUTDIR%\PhoneProbeVS.h" "%~dp0..\dx11\PhoneProbe.hlsl"
+if errorlevel 1 exit /b 1
+"%FXC%" /nologo /T ps_4_0_level_9_1 /E PSMain /Vn g_phone_probe_ps /Fh "%OUTDIR%\PhoneProbePS.h" "%~dp0..\dx11\PhoneProbe.hlsl"
+if errorlevel 1 exit /b 1
 set "BRIDGE_DEFINE="
 set "BRIDGE_LINK="
 set "GAME_DEFINE="
@@ -41,7 +47,7 @@ if defined HORIZON_UWP_GAME_LIB (
     set GAME_SOURCE="%~dp0..\window-bridge\CoreWindowEvents.cpp"
 )
 pushd "%OUTDIR%"
-cl /nologo /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 %BRIDGE_DEFINE% %GAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" %GAME_SOURCE% /link /APPCONTAINER /SUBSYSTEM:WINDOWS /MACHINE:%MACHINE% WindowsApp.lib d3d11.lib dxgi.lib %BRIDGE_LINK% %GAME_LINK% /OUT:HorizonUWP.exe
+cl /nologo /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 %BRIDGE_DEFINE% %GAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" /I"%OUTDIR%" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" %GAME_SOURCE% /link /APPCONTAINER /SUBSYSTEM:WINDOWS /MACHINE:%MACHINE% WindowsApp.lib d3d11.lib dxgi.lib %BRIDGE_LINK% %GAME_LINK% /OUT:HorizonUWP.exe
 set "RESULT=%errorlevel%"
 popd
 exit /b %RESULT%

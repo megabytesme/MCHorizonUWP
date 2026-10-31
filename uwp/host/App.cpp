@@ -1,9 +1,10 @@
 #include <windows.h>
+#include <windows.storage.h>
+#include <cstdio>
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
 #include <windows.applicationmodel.h>
-#include <windows.storage.h>
 #include <windows.graphics.display.h>
 
 static Windows::UI::Core::CoreWindow^ current_window;
@@ -120,6 +121,16 @@ public:
         window->SizeChanged += ref new TypedEventHandler<CoreWindow^, WindowSizeChangedEventArgs^>(this, &AppView::SizeChanged);
 #ifndef HORIZON_UWP_GAME_BRIDGE
         Check(renderer_->Initialize(reinterpret_cast<IUnknown*>(window)));
+        auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+        auto diagnostic_path = Platform::String::Concat(local_path, ref new Platform::String(L"\\d3d11-feature-levels.txt"));
+        HANDLE diagnostic = CreateFile2(diagnostic_path->Data(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+        if (diagnostic != INVALID_HANDLE_VALUE) {
+            char message[128];
+            const int length = sprintf_s(message, "maximum=0x%04x\nrendering=0x%04x\n", static_cast<unsigned>(renderer_->MaximumFeatureLevel()), static_cast<unsigned>(renderer_->FeatureLevel()));
+            DWORD written = 0;
+            if (length > 0) WriteFile(diagnostic, message, static_cast<DWORD>(length), &written, nullptr);
+            CloseHandle(diagnostic);
+        }
 #endif
     }
     virtual void Load(Platform::String^) {}
