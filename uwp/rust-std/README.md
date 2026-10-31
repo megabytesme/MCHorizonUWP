@@ -1,0 +1,9 @@
+# Experimental UWP stdio patch
+
+`stdio-uwp.patch` is an isolated proof of concept for Rust 1.99.1's `rust-src`. It selects the standard library's existing unsupported stdio backend on UWP. As a result, stdin reaches EOF and stdout/stderr report successful writes while discarding their contents. UWP logging needs a separate implementation. It does not make all of Rust std or Horizon UWP compatible.
+
+Apply the patch only to a **copy** of the matching `rust-src` tree, not to the installed toolchain. With Cargo's internal, unsupported `__CARGO_TESTS_ONLY_SRC_ROOT` environment variable set to the absolute path of the copied `library` directory, `RUSTC_BOOTSTRAP=1 cargo +stable build -Zbuild-std=std,panic_abort --target x86_64-uwp-windows-msvc --release` can build against that copy. This Cargo override is a test-only interface and may change. Use a desktop MSVC developer environment for Cargo's build scripts and a UWP environment for the final native host link.
+
+An isolated static library whose only export writes to stdout built against the patched std. It linked with `/NODEFAULTLIB:kernel32.lib /OPT:REF WindowsApp.lib ntdll.lib`; the resulting x64 PE did not import `GetStdHandle`, `CreateFileW`, `CreateProcessW` or `ntdll.dll`. The link required `ntdll.lib` to resolve references in pulled-in std object files even though `/OPT:REF` removed those imports from this small executable. Inspect every final executable's imports; this experiment does not show that larger binaries avoid unsupported calls.
+
+Unaddressed paths include `std::fs` calling `CreateFileW`, `std::process` calling `CreateProcessW`, and Windows-specific `AsRawHandle` implementations directly calling `GetStdHandle`. A UWP port needs proper filesystem semantics and explicit handling of unsupported process and raw-handle operations. Changing import libraries alone does not make those APIs UWP compatible.
