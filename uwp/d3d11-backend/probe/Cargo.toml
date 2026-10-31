@@ -1,0 +1,18 @@
+[package]
+name = "horizon-uwp-d3d11-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+horizon-uwp-d3d11 = { path = "..", features = ["readback-probe"] }
+windows-result = "0.4.1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 32

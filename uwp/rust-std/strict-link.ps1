@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory)][string[]]$Objects,
     [Parameter(Mandatory)][string]$RustLibrary,
     [Parameter(Mandatory)][string]$Output,
-    [ValidateSet('X64', 'ARM64')][string]$Machine = 'X64',
+    [ValidateSet('X64', 'ARM64', 'ARM')][string]$Machine = 'X64',
     [string[]]$ExtraLibraries = @()
 )
 
