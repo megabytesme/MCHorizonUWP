@@ -10611,7 +10611,7 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
-            r.clear_sections(self.world.layout());
+            horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         self.apply_settings();
         self.streaming.sky_light = dim != Dim::Nether;
@@ -10713,7 +10713,7 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
-            r.clear_sections(self.world.layout());
+            horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         self.apply_settings();
         Ok(destination)
@@ -10933,7 +10933,7 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
-            r.clear_sections(self.world.layout());
+            horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         self.title = Some(
             Title::new(
@@ -14327,7 +14327,7 @@ impl Game<'_> {
             {
                 horizon_client::spans::time("upload", || {
                     for (key, mesh) in &uploads {
-                        renderer.upload(*key, mesh);
+                        horizon_client::presentation::upload_section(renderer, *key, mesh);
                     }
                 });
                 self.streaming.free(uploads);
@@ -14381,14 +14381,17 @@ impl Game<'_> {
                         break;
                     }
                     let (key, mesh) = pending.pop().expect("checked above");
-                    renderer.upload(key, &mesh);
+                    horizon_client::presentation::upload_section(renderer, key, &mesh);
                     spent.push((key, mesh));
                     count += 1;
                     bytes += size;
                 }
                 self.streaming.free(spent);
             }
-            renderer.remove_columns(unloaded.iter().map(|c| (c.x, c.z)));
+            horizon_client::presentation::remove_columns(
+                renderer,
+                unloaded.iter().map(|c| (c.x, c.z)),
+            );
             if let (Some(lod), Some(player)) = (&mut self.lod, &self.player) {
                 let lod_distance =
                     horizon_client::graphics::lod_distance_capped(far_distance, &renderer.info);
@@ -17078,21 +17081,23 @@ fn build_renderer(
     let mut renderer = pollster::block_on(Renderer::new(
         window,
         offscreen,
-        &assets.pixels,
-        assets.sprite_size,
-        assets.sprite_minimum_size,
-        assets.texture_layers,
-        &assets.sprite_mips,
-        &assets.animations,
-        (&atlas.pixels, atlas.width, atlas.height),
-        (&atlas.glint.0, atlas.glint.1, atlas.glint.2),
-        (
-            &atlas.glint_armor.0,
-            atlas.glint_armor.1,
-            atlas.glint_armor.2,
-        ),
-        (&pack.forcefield.2, pack.forcefield.0),
-        &gui.panorama,
+        horizon_client::gfx::RendererAssets {
+            sprite_pixels: &assets.pixels,
+            sprite_size: assets.sprite_size,
+            sprite_minimum_size: assets.sprite_minimum_size,
+            layers: assets.texture_layers,
+            sprite_mips: &assets.sprite_mips,
+            animations: &assets.animations,
+            hud_atlas: (&atlas.pixels, atlas.width, atlas.height),
+            glint: (&atlas.glint.0, atlas.glint.1, atlas.glint.2),
+            glint_armor: (
+                &atlas.glint_armor.0,
+                atlas.glint_armor.1,
+                atlas.glint_armor.2,
+            ),
+            forcefield: (&pack.forcefield.2, pack.forcefield.0),
+            panorama_faces: &gui.panorama,
+        },
         prepared,
         previous,
         api,
@@ -17141,17 +17146,19 @@ fn loading_renderer(
     let mut renderer = pollster::block_on(Renderer::new(
         window,
         offscreen,
-        &[255, 255, 255, 255],
-        1,
-        1,
-        1,
-        &[],
-        &[],
-        (pixels, width, height),
-        (glint_pixels, glint_width, glint_height),
-        (glint_pixels, glint_width, glint_height),
-        (&FORCEFIELD[..], 1),
-        panorama,
+        horizon_client::gfx::RendererAssets {
+            sprite_pixels: &[255, 255, 255, 255],
+            sprite_size: 1,
+            sprite_minimum_size: 1,
+            layers: 1,
+            sprite_mips: &[],
+            animations: &[],
+            hud_atlas: (pixels, width, height),
+            glint: (glint_pixels, glint_width, glint_height),
+            glint_armor: (glint_pixels, glint_width, glint_height),
+            forcefield: (&FORCEFIELD[..], 1),
+            panorama_faces: panorama,
+        },
         None,
         previous,
         api,

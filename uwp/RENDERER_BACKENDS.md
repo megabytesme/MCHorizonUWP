@@ -13,13 +13,20 @@ its existing wgpu methods, so its rendering behavior and ANGLE selection are
 unchanged. Game code now reads viewport dimensions without accessing wgpu's
 `SurfaceConfiguration`.
 
-This interface is deliberately not a complete native-renderer contract yet.
+`gfx::RendererAssets` groups the CPU texture, atlas and panorama inputs used
+by the loading and full-game constructors. The wgpu prepared textures, window,
+API and previous-device state remain separate from those shared inputs.
+`presentation::TerrainBackend` defines section upload, removal, reset and
+presence queries using CPU `SectionMesh` data and supports fallible uploads.
+The existing renderer delegates these operations to wgpu. An upload failure is
+logged; the game does not yet retry a failed upload.
+
+These interfaces are deliberately not a complete native-renderer contract yet.
 Before a native renderer can be selected, the game also needs backend-neutral
 interfaces for at least:
 
-- creating the renderer from the CPU-side texture, atlas and panorama inputs;
-- uploading, removing and querying section and LOD meshes, including their
-  block-entity and visibility metadata;
+- initialization and resource reload through an actual native implementation;
+- LOD meshes, section block-entity and visibility metadata;
 - screenshot readback, diagnostics and timing currently exposed through
   wgpu-specific fields;
 - resource reloads, shader-pack capabilities and settings, with clear behavior

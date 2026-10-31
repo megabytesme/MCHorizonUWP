@@ -1,14 +1,16 @@
 //! The window-facing part of a renderer, independent of its graphics API.
 //!
-//! `Frame` holds the CPU-side inputs for a single frame. Terrain uploads,
-//! asset creation and renderer diagnostics still use `gfx::Renderer` directly;
-//! they must gain backend-neutral interfaces before a second renderer can be
-//! substituted for the whole game.
+//! `Frame` holds the CPU-side inputs for a single frame. Surface presentation
+//! and terrain mesh lifecycle pass through backend contracts; device creation,
+//! LOD meshes and renderer diagnostics still use `gfx::Renderer` directly.
+//! These also need interfaces before the entire game can use another backend.
 
 use crate::{
     Result,
-    gfx::{Frame, Renderer},
+    chunk::ColumnLayout,
+    gfx::{Frame, Renderer, SectionKey},
     graphics::PresentMode,
+    mesher::SectionMesh,
 };
 
 /// Presentation and surface lifecycle operations shared by game renderers.
@@ -44,6 +46,59 @@ impl PresentationBackend for Renderer {
     }
 }
 
+/// The CPU mesh lifecycle, independent of the GPU representation.
+///
+/// Upload replaces the previous mesh for a section. A failed upload returns an
+/// error, allowing the game to report it rather than silently discard it.
+pub trait TerrainBackend {
+    fn upload_section(&mut self, key: SectionKey, mesh: &SectionMesh) -> Result<()>;
+    fn clear_sections(&mut self, layout: ColumnLayout);
+    fn remove_columns(&mut self, columns: &mut dyn Iterator<Item = (i32, i32)>);
+    fn has_section(&self, key: SectionKey) -> bool;
+    fn section_count(&self) -> usize;
+}
+
+impl TerrainBackend for Renderer {
+    fn upload_section(&mut self, key: SectionKey, mesh: &SectionMesh) -> Result<()> {
+        Renderer::upload(self, key, mesh);
+        Ok(())
+    }
+    fn clear_sections(&mut self, layout: ColumnLayout) {
+        Renderer::clear_sections(self, layout);
+    }
+    fn remove_columns(&mut self, columns: &mut dyn Iterator<Item = (i32, i32)>) {
+        Renderer::remove_columns(self, columns);
+    }
+    fn has_section(&self, key: SectionKey) -> bool {
+        Renderer::has_section(self, key)
+    }
+    fn section_count(&self) -> usize {
+        Renderer::section_count(self)
+    }
+}
+
+/// Upload one mesh through the shared contract and report a backend failure.
+pub fn upload_section(backend: &mut dyn TerrainBackend, key: SectionKey, mesh: &SectionMesh) {
+    if let Err(error) = backend.upload_section(key, mesh) {
+        log::error!("Horizon: failed to upload terrain section {key:?}: {error}");
+    }
+}
+
+pub fn clear_sections(backend: &mut dyn TerrainBackend, layout: ColumnLayout) {
+    backend.clear_sections(layout);
+}
+
+pub fn remove_columns(
+    backend: &mut dyn TerrainBackend,
+    columns: impl IntoIterator<Item = (i32, i32)>,
+) {
+    backend.remove_columns(&mut columns.into_iter());
+}
+
+pub fn has_section(backend: &dyn TerrainBackend, key: SectionKey) -> bool {
+    backend.has_section(key)
+}
+
 /// Present through the shared contract, including loading and save screens.
 pub fn present(backend: &mut dyn PresentationBackend, frame: &Frame<'_>) -> Result<bool> {
     backend.present_frame(frame)
@@ -77,6 +132,46 @@ mod tests {
             Ok(())
         }
         fn set_present_mode(&mut self, _: bool, _: PresentMode) {}
+    }
+
+    #[derive(Default)]
+    struct FakeTerrain(std::collections::HashSet<SectionKey>);
+
+    impl TerrainBackend for FakeTerrain {
+        fn upload_section(&mut self, key: SectionKey, _: &SectionMesh) -> Result<()> {
+            self.0.insert(key);
+            Ok(())
+        }
+        fn clear_sections(&mut self, _: ColumnLayout) {
+            self.0.clear();
+        }
+        fn remove_columns(&mut self, columns: &mut dyn Iterator<Item = (i32, i32)>) {
+            let gone: std::collections::HashSet<_> = columns.collect();
+            self.0.retain(|key| !gone.contains(&(key.0, key.2)));
+        }
+        fn has_section(&self, key: SectionKey) -> bool {
+            self.0.contains(&key)
+        }
+        fn section_count(&self) -> usize {
+            self.0.len()
+        }
+    }
+
+    #[test]
+    fn terrain_lifecycle_routes_cpu_meshes_and_column_removal() {
+        let mut fake = FakeTerrain::default();
+        let terrain: &mut dyn TerrainBackend = &mut fake;
+        let mesh = SectionMesh::default();
+        upload_section(terrain, (1, 0, 2), &mesh);
+        upload_section(terrain, (1, 1, 2), &mesh);
+        upload_section(terrain, (3, 0, 4), &mesh);
+        assert_eq!(terrain.section_count(), 3);
+        remove_columns(terrain, [(1, 2)]);
+        assert!(!has_section(terrain, (1, 0, 2)));
+        assert!(!has_section(terrain, (1, 1, 2)));
+        assert!(has_section(terrain, (3, 0, 4)));
+        clear_sections(terrain, ColumnLayout::VANILLA);
+        assert_eq!(terrain.section_count(), 0);
     }
 
     #[test]
