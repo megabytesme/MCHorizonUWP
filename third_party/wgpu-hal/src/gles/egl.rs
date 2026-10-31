@@ -1291,6 +1291,7 @@ impl crate::Surface for Surface {
                 (sc, wl_window)
             }
             None => {
+                #[cfg_attr(not(unix), allow(unused_mut))]
                 let mut wl_window = None;
                 let (mut temp_xlib_handle, mut temp_xcb_handle);
                 let native_window_ptr = match (self.wsi.kind, self.raw_window_handle) {
@@ -1509,13 +1510,13 @@ impl crate::Surface for Surface {
     }
 
     unsafe fn unconfigure(&self, device: &super::Device) {
-        if let Some((surface, wl_window)) = unsafe { self.unconfigure_impl(device) } {
+        if let Some((surface, _wl_window)) = unsafe { self.unconfigure_impl(device) } {
             self.egl
                 .instance
                 .destroy_surface(self.egl.display, surface)
                 .unwrap();
             #[cfg(unix)]
-            if let Some(window) = wl_window {
+            if let Some(window) = _wl_window {
                 wayland_sys::ffi_dispatch!(
                     wayland_sys::egl::wayland_egl_handle(),
                     wl_egl_window_destroy,
