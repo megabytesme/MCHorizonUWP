@@ -24,7 +24,11 @@ pub unsafe extern "C" fn horizon_uwp_run(
     let game_dir = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
     let resources = PathBuf::from(std::ffi::OsString::from_wide(resources));
     let game_dir = PathBuf::from(std::ffi::OsString::from_wide(game_dir));
-    match horizon_client::run_uwp(&resources, &game_dir) {
+    horizon_client::logging::set_game_home(game_dir.clone());
+    horizon_client::logging::init(&game_dir, "Render thread");
+    let result = horizon_client::run_uwp(&resources, &game_dir);
+    horizon_client::logging::flush();
+    match result {
         Ok(()) => 0,
         Err(error) => {
             let message = format!("Horizon UWP startup failed: {error}");
