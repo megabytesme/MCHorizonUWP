@@ -38,3 +38,20 @@ pub unsafe extern "C" fn uwp_fs_probe(path: *const u16, len: usize) -> u32 {
     if std::fs::remove_dir(&dir).is_err() { return 11 }
     0
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn uwp_sync_probe() -> u32 {
+    use std::sync::Arc;
+    use std::time::Duration;
+    let value = Arc::new(parking_lot::Mutex::new(0usize));
+    let guard = value.lock();
+    let handles: Vec<_> = (0..4).map(|_| {
+        let value = value.clone();
+        std::thread::spawn(move || { for _ in 0..1000 { *value.lock() += 1; } })
+    }).collect();
+    std::thread::sleep(Duration::from_millis(50));
+    drop(guard);
+    for handle in handles { if handle.join().is_err() { return 1; } }
+    if *value.lock() != 4000 { return 2; }
+    0
+}

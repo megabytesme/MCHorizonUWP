@@ -16,7 +16,7 @@ adds a process-local environment map (with ASCII case folding), returns
 uses `CopyFile2` and `UnlockFileEx`, and exposes null console handles. An x64
 strict UWP probe verified environment get/set/enumeration/removal, unsupported
 process spawning, null stdout handle, directory enumeration, rename, copying,
-and file locking and unlocking.
+file locking and unlocking, and four-thread `parking_lot` contention.
 These are UWP-specific semantics and do not provide desktop child processes,
 inherited OS environment variables, junctions or reparse-point inspection.
 
@@ -48,3 +48,13 @@ fails if the linked program actually retains a sentinel. A release x64 wgpu
 probe built using the patched std linked this way and presented a clear frame
 in a UWP CoreWindow through ANGLE and D3D11. It is not the Horizon game;
 other code paths can require desktop APIs and must be ported individually.
+
+## Runtime regression probe
+
+The `fs-probe` Rust static library checks environment, process, filesystem,
+and synchronization behavior. Build it with the patched source and x64 UWP
+target, then run `cmd /c uwp\rust-std\fs-probe\build-host.cmd`. Stage its
+`build/HorizonUWP.exe` in a loose UWP package with a distinct package identity
+and the usual host manifest assets. Once registered and activated, the package
+writes `runtime-probe.txt` in its LocalState directory; zero for both results
+means the checks passed. The test creates and removes its own temporary files.
