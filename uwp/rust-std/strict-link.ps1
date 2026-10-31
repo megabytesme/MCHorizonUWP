@@ -1,0 +1,31 @@
+param(
+    [Parameter(Mandatory)][string[]]$Objects,
+    [Parameter(Mandatory)][string]$RustLibrary,
+    [Parameter(Mandatory)][string]$Output,
+    [ValidateSet('X64', 'ARM64')][string]$Machine = 'X64',
+    [string[]]$ExtraLibraries = @()
+)
+
+# Run in a UWP MSVC developer environment. The sentinel object resolves
+# references in Rust std objects which are discarded by /OPT:REF; it must
+# never supply a function used by the resulting program.
+$ErrorActionPreference = 'Stop'
+$outputPath = [IO.Path]::GetFullPath($Output)
+$outputDir = [IO.Path]::GetDirectoryName($outputPath)
+New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+$stubObj = Join-Path $outputDir 'dead-import-sentinels.obj'
+$mapPath = "$outputPath.map"
+& cl /nologo /c /MD /O2 /Gy /Gw "/Fo$stubObj" (Join-Path $PSScriptRoot 'dead-import-sentinels.c')
+if ($LASTEXITCODE -ne 0) { throw "Compiling link sentinels failed: $LASTEXITCODE" }
+
+$linkArgs = @('/nologo', '/APPCONTAINER', '/SUBSYSTEM:WINDOWS', "/MACHINE:$Machine", '/OPT:REF',
+    '/NODEFAULTLIB:kernel32.lib', "/MAP:$mapPath", "/OUT:$outputPath") +
+    $Objects + @($stubObj, 'WindowsApp.lib', 'ntdll.lib') + $ExtraLibraries + @($RustLibrary)
+& link @linkArgs
+if ($LASTEXITCODE -ne 0) { throw "Strict UWP link failed: $LASTEXITCODE" }
+if (Select-String -Path $mapPath -Pattern 'dead-import-sentinels\.obj|forbidden_api' -Quiet) {
+    # Make it impossible to mistake this artifact for a safe strict link.
+    Remove-Item -LiteralPath $outputPath -Force
+    throw "The linked program uses a forbidden desktop API sentinel; inspect $mapPath."
+}
+Write-Host "Strict UWP link succeeded; no diagnostic sentinel remains in $mapPath"

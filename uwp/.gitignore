@@ -1,5 +1,7 @@
 core-bridge/target/
+game-bridge/target/
 host/build/
+rust-std/build/
 wgpu-angle-probe/target/
 wgpu-angle-probe/*.exe
 wgpu-angle-probe/*.obj
