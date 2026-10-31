@@ -25,3 +25,6 @@ float4 PSMain(VertexOutput input) : SV_TARGET {
     clip(color.a - 0.1);
     return color;
 }
+float4 PSAlpha(VertexOutput input) : SV_TARGET {
+    return atlas.Sample(atlas_sampler, input.uv) * input.color;
+}

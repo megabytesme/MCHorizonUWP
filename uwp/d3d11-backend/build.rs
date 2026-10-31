@@ -18,6 +18,7 @@ fn main() {
     for (entry, profile, file) in [
         ("VSMain", "vs_4_0_level_9_1", "terrain-vs.cso"),
         ("PSMain", "ps_4_0_level_9_1", "terrain-ps.cso"),
+        ("PSAlpha", "ps_4_0_level_9_1", "terrain-alpha-ps.cso"),
     ] {
         let status = Command::new(&fxc)
             .args(["/nologo", "/Zpr", "/T", profile, "/E", entry, "/Fo"])

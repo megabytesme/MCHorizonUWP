@@ -21,6 +21,7 @@ use windows::{
 
 const VS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-vs.cso"));
 const PS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-ps.cso"));
+const PS_ALPHA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-alpha-ps.cso"));
 
 /// Expanded vertex format used by the feature-level 9_1 terrain pipeline.
 #[repr(C)]
@@ -43,13 +44,26 @@ pub struct Texture {
     view: ID3D11ShaderResourceView,
 }
 
+/// Rendering state for solid/cutout terrain, translucent geometry, or UI.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DrawPass {
+    Cutout,
+    Translucent,
+    Overlay,
+}
+
 struct Pipeline {
     vertex_shader: ID3D11VertexShader,
     pixel_shader: ID3D11PixelShader,
+    alpha_shader: ID3D11PixelShader,
     input_layout: ID3D11InputLayout,
     constants: ID3D11Buffer,
     sampler: ID3D11SamplerState,
     rasterizer: ID3D11RasterizerState,
+    depth_write: ID3D11DepthStencilState,
+    depth_read: ID3D11DepthStencilState,
+    depth_off: ID3D11DepthStencilState,
+    alpha_blend: ID3D11BlendState,
 }
 
 /// A hardware Direct3D 11 device deliberately restricted to feature level 9_1.
@@ -277,6 +291,17 @@ impl Renderer {
 
     /// Draws one mesh with a row-major world-to-clip matrix and its atlas.
     pub fn draw(&self, mesh: &Mesh, atlas: &Texture, view_projection: [[f32; 4]; 4]) {
+        self.draw_pass(mesh, atlas, view_projection, DrawPass::Cutout);
+    }
+
+    /// Draws cutout terrain, depth-tested translucent geometry, or UI.
+    pub fn draw_pass(
+        &self,
+        mesh: &Mesh,
+        atlas: &Texture,
+        view_projection: [[f32; 4]; 4],
+        pass: DrawPass,
+    ) {
         let p = &self.pipeline;
         unsafe {
             self.context.UpdateSubresource(
@@ -298,10 +323,17 @@ impl Renderer {
             self.context
                 .IASetIndexBuffer(&mesh.indices, DXGI_FORMAT_R16_UINT, 0);
             self.context.RSSetState(&p.rasterizer);
+            let (depth, blend, pixel) = match pass {
+                DrawPass::Cutout => (&p.depth_write, None, &p.pixel_shader),
+                DrawPass::Translucent => (&p.depth_read, Some(&p.alpha_blend), &p.alpha_shader),
+                DrawPass::Overlay => (&p.depth_off, Some(&p.alpha_blend), &p.alpha_shader),
+            };
+            self.context.OMSetDepthStencilState(depth, 0);
+            self.context.OMSetBlendState(blend, None, u32::MAX);
             self.context.VSSetShader(&p.vertex_shader, None);
             self.context
                 .VSSetConstantBuffers(0, Some(&[Some(p.constants.clone())]));
-            self.context.PSSetShader(&p.pixel_shader, None);
+            self.context.PSSetShader(pixel, None);
             self.context
                 .PSSetSamplers(0, Some(&[Some(p.sampler.clone())]));
             self.context
@@ -392,6 +424,12 @@ impl Pipeline {
             device.CreateVertexShader(VS, None::<&ID3D11ClassLinkage>, Some(&mut vertex_shader))?;
             let mut pixel_shader = None;
             device.CreatePixelShader(PS, None::<&ID3D11ClassLinkage>, Some(&mut pixel_shader))?;
+            let mut alpha_shader = None;
+            device.CreatePixelShader(
+                PS_ALPHA,
+                None::<&ID3D11ClassLinkage>,
+                Some(&mut alpha_shader),
+            )?;
             let elements = [
                 D3D11_INPUT_ELEMENT_DESC {
                     SemanticName: s!("POSITION"),
@@ -443,14 +481,67 @@ impl Pipeline {
             };
             let mut rasterizer = None;
             device.CreateRasterizerState(&desc, Some(&mut rasterizer))?;
+            let depth_write = create_depth_state(device, true, true)?;
+            let depth_read = create_depth_state(device, true, false)?;
+            let depth_off = create_depth_state(device, false, false)?;
+            let mut desc = D3D11_BLEND_DESC::default();
+            desc.RenderTarget[0] = D3D11_RENDER_TARGET_BLEND_DESC {
+                BlendEnable: true.into(),
+                SrcBlend: D3D11_BLEND_SRC_ALPHA,
+                DestBlend: D3D11_BLEND_INV_SRC_ALPHA,
+                BlendOp: D3D11_BLEND_OP_ADD,
+                SrcBlendAlpha: D3D11_BLEND_ONE,
+                DestBlendAlpha: D3D11_BLEND_INV_SRC_ALPHA,
+                BlendOpAlpha: D3D11_BLEND_OP_ADD,
+                RenderTargetWriteMask: D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8,
+            };
+            let mut alpha_blend = None;
+            device.CreateBlendState(&desc, Some(&mut alpha_blend))?;
             Ok(Self {
                 vertex_shader: vertex_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 pixel_shader: pixel_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                alpha_shader: alpha_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 input_layout: input_layout.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 constants: constants.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 sampler: sampler.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 rasterizer: rasterizer.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                depth_write,
+                depth_read,
+                depth_off,
+                alpha_blend: alpha_blend.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
             })
         }
     }
+}
+
+fn create_depth_state(
+    device: &ID3D11Device,
+    enabled: bool,
+    write: bool,
+) -> Result<ID3D11DepthStencilState> {
+    let stencil = D3D11_DEPTH_STENCILOP_DESC {
+        StencilFailOp: D3D11_STENCIL_OP_KEEP,
+        StencilDepthFailOp: D3D11_STENCIL_OP_KEEP,
+        StencilPassOp: D3D11_STENCIL_OP_KEEP,
+        StencilFunc: D3D11_COMPARISON_ALWAYS,
+    };
+    let desc = D3D11_DEPTH_STENCIL_DESC {
+        DepthEnable: enabled.into(),
+        DepthWriteMask: if write {
+            D3D11_DEPTH_WRITE_MASK_ALL
+        } else {
+            D3D11_DEPTH_WRITE_MASK_ZERO
+        },
+        DepthFunc: D3D11_COMPARISON_LESS_EQUAL,
+        StencilEnable: false.into(),
+        StencilReadMask: 0xff,
+        StencilWriteMask: 0xff,
+        FrontFace: stencil,
+        BackFace: stencil,
+    };
+    let mut state = None;
+    unsafe {
+        device.CreateDepthStencilState(&desc, Some(&mut state))?;
+    }
+    state.ok_or_else(|| Error::from_hresult(E_INVALIDARG))
 }
