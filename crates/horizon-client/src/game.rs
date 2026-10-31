@@ -6904,7 +6904,7 @@ impl Game<'_> {
         let Some(window) = &self.window else { return };
         let size = self.renderer.as_ref().map_or_else(
             || window.inner_size().into(),
-            |r| [r.config.width, r.config.height],
+            |r| [r.viewport_size()[0], r.viewport_size()[1]],
         );
         let [vx, vy] = self.view_at.map(f64::from);
         let centre = winit::dpi::PhysicalPosition::new(
@@ -8625,7 +8625,7 @@ impl Game<'_> {
         let Some(size) = self
             .renderer
             .as_ref()
-            .map(|r| [r.config.width, r.config.height])
+            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
         else {
             return false;
         };
@@ -8653,7 +8653,7 @@ impl Game<'_> {
         let Some(size) = self
             .renderer
             .as_ref()
-            .map(|r| [r.config.width, r.config.height])
+            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
         else {
             return false;
         };
@@ -8835,7 +8835,7 @@ impl Game<'_> {
         let Some(r) = self.renderer.as_ref() else {
             return;
         };
-        let batch = HudBatch::new([r.config.width, r.config.height]);
+        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
         if let Some(slot) = self.slot_at(&batch, self.cursor.0, self.cursor.1)
             && slot != 200
             && slot < Creative::DISPLAY
@@ -8851,7 +8851,7 @@ impl Game<'_> {
         let Some(r) = self.renderer.as_ref() else {
             return (None, false);
         };
-        let batch = HudBatch::new([r.config.width, r.config.height]);
+        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
         (
             self.slot_at(&batch, self.cursor.0, self.cursor.1),
             self.clicked_outside(&batch),
@@ -9085,7 +9085,7 @@ impl Game<'_> {
         let Some(size) = self
             .renderer
             .as_ref()
-            .map(|r| [r.config.width, r.config.height])
+            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
         else {
             return;
         };
@@ -12974,7 +12974,7 @@ impl Game<'_> {
         let Some(size) = self
             .renderer
             .as_ref()
-            .map(|r| [r.config.width, r.config.height])
+            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
         else {
             return;
         };
@@ -13254,7 +13254,8 @@ impl Game<'_> {
         // server starts, with the server's chunk map and progress.
         if self.integrated_starting.is_some() {
             if let Some(renderer) = &mut self.renderer {
-                let mut hud = HudBatch::new([renderer.config.width, renderer.config.height]);
+                let mut hud =
+                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
                 let (w, h) = (hud.width, hud.height);
                 horizon_client::ui::menu_background(
                     &mut hud,
@@ -13281,13 +13282,14 @@ impl Game<'_> {
                     Some(&status),
                     progress,
                 );
-                return renderer.render(&loading_frame(&hud));
+                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
             }
             return Ok(false);
         }
         if let Some(loader) = &self.world_loader {
             if let Some(renderer) = &mut self.renderer {
-                let mut hud = HudBatch::new([renderer.config.width, renderer.config.height]);
+                let mut hud =
+                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
                 // WorldOpenFlows.upgradeAndOpenWorld: the file fixers run on
                 // FileFixerProgressScreen.
                 if loader.upgrade.is_file_fixing() && !loader.cancelled {
@@ -13297,7 +13299,7 @@ impl Game<'_> {
                         &loader.upgrade,
                         self.cursor,
                     );
-                    return renderer.render(&loading_frame(&hud));
+                    return horizon_client::presentation::present(renderer, &loading_frame(&hud));
                 }
                 horizon_client::level_loading::draw_progress(
                     &mut hud,
@@ -13309,20 +13311,21 @@ impl Game<'_> {
                     },
                     0.0,
                 );
-                return renderer.render(&loading_frame(&hud));
+                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
             }
             return Ok(false);
         }
         if self.pending_entry.is_some() {
             if let (Some(renderer), Some(loader)) = (&mut self.renderer, &self.rest_loader) {
-                let mut hud = HudBatch::new([renderer.config.width, renderer.config.height]);
+                let mut hud =
+                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
                 horizon_client::level_loading::draw_progress(
                     &mut hud,
                     &self.gui.atlas,
                     loader.progress.line(),
                     loader.progress.fraction(),
                 );
-                return renderer.render(&loading_frame(&hud));
+                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
             }
             return Ok(false);
         }
@@ -13330,7 +13333,8 @@ impl Game<'_> {
         // (`LoadingOverlay`) until `drive_pack_reload` applies it.
         if let Some(reload) = &self.pack_reload {
             if let Some(renderer) = &mut self.renderer {
-                let mut hud = HudBatch::new([renderer.config.width, renderer.config.height]);
+                let mut hud =
+                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
                 horizon_client::level_loading::draw_loading_overlay(
                     &mut hud,
                     &self.gui.atlas,
@@ -13338,14 +13342,14 @@ impl Game<'_> {
                     reload.progress.fraction(),
                     self.settings.file.bool("darkMojangStudiosBackground"),
                 );
-                return renderer.render(&loading_frame(&hud));
+                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
             }
             return Ok(false);
         }
         let Some(size) = self
             .renderer
             .as_ref()
-            .map(|r| [r.config.width, r.config.height])
+            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
         else {
             return Ok(false);
         };
@@ -13779,7 +13783,9 @@ impl Game<'_> {
         let result = match self.renderer.as_mut() {
             Some(renderer) => {
                 renderer.set_pass_timing(self.debug);
-                horizon_client::spans::time("renderer", || renderer.render(&frame))
+                horizon_client::spans::time("renderer", || {
+                    horizon_client::presentation::present(renderer, &frame)
+                })
             }
             None => Err("renderer".into()),
         };
@@ -14573,7 +14579,7 @@ impl ApplicationHandler for Game<'_> {
             match &event {
                 WindowEvent::CursorMoved { position, .. } => {
                     if let Some(r) = &self.renderer {
-                        let b = HudBatch::new([r.config.width, r.config.height]);
+                        let b = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
                         self.cursor = (position.x as f32 / b.scale, position.y as f32 / b.scale);
                     }
                 }
@@ -14657,7 +14663,11 @@ impl ApplicationHandler for Game<'_> {
                 }
                 WindowEvent::Resized(size) => {
                     if let Some(r) = &mut self.renderer {
-                        r.resize(size.width, size.height);
+                        horizon_client::presentation::PresentationBackend::resize(
+                            r,
+                            size.width,
+                            size.height,
+                        );
                     }
                 }
                 WindowEvent::RedrawRequested => {
@@ -14693,7 +14703,11 @@ impl ApplicationHandler for Game<'_> {
                 }
                 WindowEvent::Resized(size) => {
                     if let Some(r) = &mut self.renderer {
-                        r.resize(size.width, size.height);
+                        horizon_client::presentation::PresentationBackend::resize(
+                            r,
+                            size.width,
+                            size.height,
+                        );
                     }
                     self.observe_fullscreen();
                 }
@@ -14714,7 +14728,7 @@ impl ApplicationHandler for Game<'_> {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     if let Some(r) = &self.renderer {
-                        let b = HudBatch::new([r.config.width, r.config.height]);
+                        let b = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
                         self.cursor = (position.x as f32 / b.scale, position.y as f32 / b.scale);
                         if self.dialog_open() {
                             self.dialog_drag();
@@ -14911,7 +14925,7 @@ impl ApplicationHandler for Game<'_> {
                     let size = self
                         .renderer
                         .as_ref()
-                        .map(|r| [r.config.width, r.config.height])
+                        .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
                         .unwrap_or([1, 1]);
                     let b = HudBatch::new(size);
                     let atlas = &self.gui.atlas;
@@ -14934,7 +14948,7 @@ impl ApplicationHandler for Game<'_> {
                         let size = self
                             .renderer
                             .as_ref()
-                            .map(|r| [r.config.width, r.config.height])
+                            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
                             .unwrap_or([1, 1]);
                         self.book_click(size);
                     }
@@ -14944,7 +14958,7 @@ impl ApplicationHandler for Game<'_> {
                         let size = self
                             .renderer
                             .as_ref()
-                            .map(|r| [r.config.width, r.config.height])
+                            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
                             .unwrap_or([1, 1]);
                         self.sign_edit_click(size);
                     }
@@ -15071,14 +15085,14 @@ impl ApplicationHandler for Game<'_> {
                             let size = self
                                 .renderer
                                 .as_ref()
-                                .map_or([1, 1], |r| [r.config.width, r.config.height]);
+                                .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
                             self.advancements_mouse(pressed, size);
                         }
                         Screen::Stats if pressed && button == MouseButton::Left => {
                             let size = self
                                 .renderer
                                 .as_ref()
-                                .map_or([1, 1], |r| [r.config.width, r.config.height]);
+                                .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
                             self.stats_click(size);
                         }
                         Screen::Stats if button == MouseButton::Left => self.stats_release(),
@@ -17513,7 +17527,7 @@ impl Loading {
         };
         let offscreen = self.options.as_ref().is_some_and(|o| o.offscreen);
         if let Some(renderer) = &mut self.renderer {
-            renderer.release_surface();
+            horizon_client::presentation::PresentationBackend::release_surface(renderer);
         }
         match loading_renderer(
             window,
@@ -17559,7 +17573,7 @@ impl Loading {
         let Some(size) = self
             .renderer
             .as_ref()
-            .map(|r| [r.config.width, r.config.height])
+            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
         else {
             return;
         };
@@ -17571,7 +17585,7 @@ impl Loading {
             self.settings.file.double("panoramaScrollSpeed") as f32,
         );
         if let Some(renderer) = &mut self.renderer {
-            match renderer.render(&frame) {
+            match horizon_client::presentation::present(renderer, &frame) {
                 Ok(true) if self.gui.is_some() && self.menu.pending.is_none() => {
                     self.menu.perf.title_shown()
                 }
@@ -17598,7 +17612,7 @@ impl Loading {
         let window = self.window.clone().ok_or("window closed")?;
         // Keep the loader's device and swap in the real textures in one step.
         if let Some(renderer) = &mut self.renderer {
-            renderer.release_surface();
+            horizon_client::presentation::PresentationBackend::release_surface(renderer);
         }
         let renderer_at = Instant::now();
         let renderer = build_renderer(

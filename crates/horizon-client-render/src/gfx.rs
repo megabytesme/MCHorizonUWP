@@ -1284,6 +1284,11 @@ impl Renderer {
     }
 }
 impl Renderer {
+    /// The drawing surface dimensions in physical pixels.
+    pub fn viewport_size(&self) -> [u32; 2] {
+        [self.config.width, self.config.height]
+    }
+
     pub async fn new(
         window: Arc<Window>,
         offscreen: bool,
