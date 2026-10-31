@@ -1,0 +1,9 @@
+[package]
+name = "uwp-fs-probe"
+version = "0.1.0"
+edition = "2024"
+[workspace]
+[lib]
+crate-type = ["staticlib"]
+[profile.release]
+panic = "abort"

@@ -16,19 +16,21 @@ $source = Join-Path $sysroot 'lib\rustlib\src\rust\library'
 if (-not (Test-Path -LiteralPath $source)) { throw "rust-src is not installed in $Toolchain" }
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 Copy-Item -LiteralPath $source -Destination $library -Recurse
-$patch = Join-Path $PSScriptRoot 'stdio-uwp.patch'
+$patches = @('stdio-uwp.patch', 'file-open-uwp.patch') | ForEach-Object { Join-Path $PSScriptRoot $_ }
 $previousCeiling = $env:GIT_CEILING_DIRECTORIES
 # If the copy lives inside the Horizon checkout, prevent git apply from
 # silently ignoring patch paths outside its repository-relative prefix.
 $env:GIT_CEILING_DIRECTORIES = Split-Path -Parent $root
 Push-Location $root
 try {
-    & git apply --check $patch
-    if ($LASTEXITCODE -ne 0) { throw 'The UWP stdio patch does not match this rust-src.' }
-    & git apply $patch
-    if ($LASTEXITCODE -ne 0) { throw 'Could not apply the UWP stdio patch.' }
-    & git apply --reverse --check $patch
-    if ($LASTEXITCODE -ne 0) { throw 'The UWP stdio patch was not applied to the source copy.' }
+    foreach ($patch in $patches) {
+        & git apply --check $patch
+        if ($LASTEXITCODE -ne 0) { throw "The UWP patch does not match this rust-src: $patch" }
+        & git apply $patch
+        if ($LASTEXITCODE -ne 0) { throw "Could not apply the UWP patch: $patch" }
+        & git apply --reverse --check $patch
+        if ($LASTEXITCODE -ne 0) { throw "The UWP patch was not applied: $patch" }
+    }
 } finally {
     Pop-Location
     $env:GIT_CEILING_DIRECTORIES = $previousCeiling

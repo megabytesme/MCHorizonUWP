@@ -2,6 +2,7 @@ core-bridge/target/
 game-bridge/target/
 host/build/
 rust-std/build/
+rust-std/fs-probe/target/
 wgpu-angle-probe/target/
 wgpu-angle-probe/*.exe
 wgpu-angle-probe/*.obj

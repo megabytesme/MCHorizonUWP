@@ -24,3 +24,6 @@ SENTINEL(GetSystemDirectoryW);
 SENTINEL(GetEnvironmentVariableW);
 SENTINEL(CreateProcessW);
 SENTINEL(ExitProcess);
+SENTINEL(GetModuleHandleA);
+SENTINEL(GetModuleHandleW);
+SENTINEL(GetModuleHandleExW);
