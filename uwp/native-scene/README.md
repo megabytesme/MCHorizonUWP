@@ -10,7 +10,8 @@ The backend's UWP GPU probe exercises atlas packing, section upload and column
 removal and checks the rendered colours by reading back the x64 framebuffer.
 The same probe compiles and strict-links for ARM32; no phone run is implied.
 The scene keeps section origins in `f64` and converts them to camera-relative
-`f32` offsets when drawing. It currently uses coarse per-section rather than
-per-quad translucent sorting, has no frustum or cave
-culling, and no animated sprite updates. These limits must be addressed for a
+`f32` offsets when drawing, and conservatively culls sections against the
+camera frustum using their actual geometry bounds. It currently uses coarse
+per-section rather than per-quad translucent sorting, has no cave culling,
+and has no animated sprite updates. These limits must be addressed for a
 complete world renderer.
