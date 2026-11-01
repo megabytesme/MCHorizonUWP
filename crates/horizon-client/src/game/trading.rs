@@ -609,10 +609,7 @@ impl Game<'_> {
     }
     /// `MerchantScreen.mouseDragged`: the held scroller follows the cursor.
     pub(super) fn merchant_drag(&mut self) {
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return;
         };

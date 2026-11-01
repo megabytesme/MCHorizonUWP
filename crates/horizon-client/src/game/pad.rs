@@ -266,6 +266,10 @@ impl Game<'_> {
 
     /// The left stick as the move vector, while playing.
     pub(super) fn pad_move(&self) -> Option<[f32; 2]> {
+        #[cfg(target_vendor = "uwp")]
+        if self.screen == Screen::Playing && self.focused && self.touch.movement.is_some() {
+            return self.touch.movement;
+        }
         let settings = &self.settings.controller;
         if !settings.enabled || self.pad_in_menu() || !self.pad_focused() {
             return None;

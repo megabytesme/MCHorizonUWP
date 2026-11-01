@@ -971,12 +971,8 @@ impl Game<'_> {
     ) -> Result<()> {
         let id = self.window.as_ref().ok_or("no window yet")?.id();
         let scale = self
-            .renderer
-            .as_ref()
-            .map(|r| {
-                horizon_client::hud::HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]])
-                    .scale
-            })
+            .renderer_viewport()
+            .map(|size| horizon_client::hud::HudBatch::new(size).scale)
             .ok_or("no renderer yet")?;
         let device_id = DeviceId::dummy();
         for (i, &(x, y)) in points.iter().enumerate() {
@@ -1553,15 +1549,8 @@ impl Game<'_> {
                 let steps = a.f64(2, "STEPS")? as f32;
                 let id = self.window.as_ref().ok_or("no window yet")?.id();
                 let scale = self
-                    .renderer
-                    .as_ref()
-                    .map(|r| {
-                        horizon_client::hud::HudBatch::new([
-                            r.viewport_size()[0],
-                            r.viewport_size()[1],
-                        ])
-                        .scale
-                    })
+                    .renderer_viewport()
+                    .map(|size| horizon_client::hud::HudBatch::new(size).scale)
                     .ok_or("no renderer yet")?;
                 let device_id = DeviceId::dummy();
                 let position = PhysicalPosition::new(f64::from(x * scale), f64::from(y * scale));

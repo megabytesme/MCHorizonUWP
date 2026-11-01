@@ -24,6 +24,7 @@ CoreWindowEvents::CoreWindowEvents(CoreWindow^ w, HorizonUwpEventCallback callba
     pointer_move_ = w->PointerMoved += ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &CoreWindowEvents::OnPointerMove);
     pointer_down_ = w->PointerPressed += ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &CoreWindowEvents::OnPointerDown);
     pointer_up_ = w->PointerReleased += ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &CoreWindowEvents::OnPointerUp);
+    pointer_cancel_ = w->PointerCaptureLost += ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &CoreWindowEvents::OnPointerCancel);
     pointer_wheel_ = w->PointerWheelChanged += ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &CoreWindowEvents::OnPointerWheel);
     try {
         mouse_ = MouseDevice::GetForCurrentView();
@@ -44,6 +45,7 @@ CoreWindowEvents::~CoreWindowEvents() {
     window_->PointerMoved -= pointer_move_;
     window_->PointerPressed -= pointer_down_;
     window_->PointerReleased -= pointer_up_;
+    window_->PointerCaptureLost -= pointer_cancel_;
     window_->PointerWheelChanged -= pointer_wheel_;
 }
 
@@ -105,6 +107,7 @@ void CoreWindowEvents::EmitPointer(uint32_t kind, PointerEventArgs^ args) {
 void CoreWindowEvents::OnPointerMove(CoreWindow^, PointerEventArgs^ e) { EmitPointer(HORIZON_UWP_POINTER_MOVE, e); }
 void CoreWindowEvents::OnPointerDown(CoreWindow^, PointerEventArgs^ e) { EmitPointer(HORIZON_UWP_POINTER_DOWN, e); }
 void CoreWindowEvents::OnPointerUp(CoreWindow^, PointerEventArgs^ e) { EmitPointer(HORIZON_UWP_POINTER_UP, e); }
+void CoreWindowEvents::OnPointerCancel(CoreWindow^, PointerEventArgs^ e) { EmitPointer(HORIZON_UWP_POINTER_CANCEL, e); }
 void CoreWindowEvents::OnPointerWheel(CoreWindow^, PointerEventArgs^ e) { EmitPointer(HORIZON_UWP_POINTER_WHEEL, e); }
 void CoreWindowEvents::OnMouseDelta(MouseDevice^, MouseEventArgs^ args) {
     HorizonUwpEvent e{}; e.kind = HORIZON_UWP_MOUSE_DELTA;

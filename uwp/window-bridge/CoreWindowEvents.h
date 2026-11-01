@@ -21,6 +21,7 @@ enum HorizonUwpEventKind : uint32_t {
     HORIZON_UWP_POINTER_UP,
     HORIZON_UWP_POINTER_WHEEL,
     HORIZON_UWP_MOUSE_DELTA,
+    HORIZON_UWP_POINTER_CANCEL,
 };
 
 enum HorizonUwpEventFlags : uint32_t {
@@ -74,6 +75,7 @@ private:
     void OnPointerMove(Windows::UI::Core::CoreWindow^, Windows::UI::Core::PointerEventArgs^);
     void OnPointerDown(Windows::UI::Core::CoreWindow^, Windows::UI::Core::PointerEventArgs^);
     void OnPointerUp(Windows::UI::Core::CoreWindow^, Windows::UI::Core::PointerEventArgs^);
+    void OnPointerCancel(Windows::UI::Core::CoreWindow^, Windows::UI::Core::PointerEventArgs^);
     void OnPointerWheel(Windows::UI::Core::CoreWindow^, Windows::UI::Core::PointerEventArgs^);
     void OnMouseDelta(Windows::Devices::Input::MouseDevice^, Windows::Devices::Input::MouseEventArgs^);
     void EmitKey(uint32_t kind, Windows::UI::Core::KeyEventArgs^ args);
@@ -86,7 +88,7 @@ private:
     void* context_;
     Windows::Foundation::EventRegistrationToken size_, dpi_, focus_, visibility_, close_;
     Windows::Foundation::EventRegistrationToken key_down_, key_up_, character_;
-    Windows::Foundation::EventRegistrationToken pointer_move_, pointer_down_, pointer_up_, pointer_wheel_;
+    Windows::Foundation::EventRegistrationToken pointer_move_, pointer_down_, pointer_up_, pointer_cancel_, pointer_wheel_;
     Windows::Foundation::EventRegistrationToken mouse_delta_;
 };
 }

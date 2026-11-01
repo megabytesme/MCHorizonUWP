@@ -10,6 +10,7 @@ use crate::platform_impl::Fullscreen;
 unsafe extern "C" {
     fn horizon_uwp_set_cursor_visible(visible: i32);
     fn horizon_uwp_set_cursor_position(x: f64, y: f64) -> i32;
+    fn horizon_uwp_set_ime_allowed(allowed: i32);
 }
 
 pub struct Window { shared: Arc<Shared>, handle: usize, title: Mutex<String> }
@@ -60,7 +61,7 @@ impl Window {
     pub fn set_window_level(&self, _: window::WindowLevel) {}
     pub fn set_window_icon(&self, _: Option<crate::icon::Icon>) {}
     pub fn set_ime_cursor_area(&self, _: Position, _: Size) {}
-    pub fn set_ime_allowed(&self, _: bool) {}
+    pub fn set_ime_allowed(&self, allowed: bool) { unsafe { horizon_uwp_set_ime_allowed(i32::from(allowed)); } }
     pub fn set_ime_purpose(&self, _: window::ImePurpose) {}
     pub fn focus_window(&self) {}
     pub fn request_user_attention(&self, _: Option<window::UserAttentionType>) {}

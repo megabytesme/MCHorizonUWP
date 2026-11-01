@@ -1,5 +1,5 @@
 use std::cell::Cell;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomData;
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,17 +54,50 @@ impl<T: 'static> EventLoop<T> {
         let id = crate::window::WindowId(WindowId(1));
         let device = crate::event::DeviceId(DeviceId);
         let mut pending_surrogate: Option<u16> = None;
+        let mut contacts: HashMap<u32, (f64, f64)> = HashMap::new();
+        let mut mouse_touch: Option<u32> = None;
         while !target.p.exiting() {
             unsafe { horizon_uwp_pump_events() };
             handler(Event::NewEvents(event::StartCause::Poll), target);
             let mut native = NativeEvent::default();
             while unsafe { horizon_uwp_pop_event(&mut native) } != 0 {
-                if matches!(native.kind, 9 | 10) {
+                if native.kind == 2 && native.value == 0 {
+                    for (contact, (x, y)) in contacts.drain() {
+                        handler(Event::WindowEvent { window_id: id, event: WindowEvent::Touch(event::Touch {
+                            device_id: device, phase: event::TouchPhase::Cancelled,
+                            location: (x, y).into(), force: None, id: contact as u64,
+                        }) }, target);
+                    }
+                    if mouse_touch.take().is_some() {
+                        handler(Event::WindowEvent { window_id: id, event: WindowEvent::MouseInput {
+                            device_id: device, state: event::ElementState::Released, button: event::MouseButton::Left,
+                        } }, target);
+                    }
+                }
+                let touch = native.pointer_type == 0 && matches!(native.kind, 8 | 9 | 10 | 13);
+                if touch {
+                    let pos = (native.x as f64, native.y as f64);
+                    let phase = match native.kind {
+                        9 => {
+                            if contacts.is_empty() { mouse_touch = Some(native.pointer_id); }
+                            contacts.insert(native.pointer_id, pos);
+                            event::TouchPhase::Started
+                        },
+                        10 => { contacts.remove(&native.pointer_id); event::TouchPhase::Ended },
+                        13 => { contacts.remove(&native.pointer_id); event::TouchPhase::Cancelled },
+                        _ => { if let Some(old) = contacts.get_mut(&native.pointer_id) { *old = pos; } event::TouchPhase::Moved },
+                    };
+                    handler(Event::WindowEvent { window_id: id, event: WindowEvent::Touch(event::Touch {
+                        device_id: device, phase, location: pos.into(), force: None, id: native.pointer_id as u64,
+                    }) }, target);
+                }
+                let mouse_compatible = !touch || mouse_touch == Some(native.pointer_id);
+                if mouse_compatible && matches!(native.kind, 9 | 10 | 13) {
                     handler(Event::WindowEvent { window_id: id, event: WindowEvent::CursorMoved {
                         device_id: device, position: (native.x as f64, native.y as f64).into()
                     } }, target);
                 }
-                let window_event = match native.kind {
+                let window_event = if !mouse_compatible { None } else { match native.kind {
                     1 => Some(WindowEvent::Resized((native.width.max(0.0) as u32, native.height.max(0.0) as u32).into())),
                     2 => Some(WindowEvent::Focused(native.value != 0)),
                     3 => Some(WindowEvent::Occluded(native.value == 0)),
@@ -89,9 +122,11 @@ impl<T: 'static> EventLoop<T> {
                     9 | 10 => pointer_button(native.button_change).or_else(|| (native.pointer_type == 0).then_some(event::MouseButton::Left)).map(|button| WindowEvent::MouseInput { device_id: device, state: if native.kind == 9 { event::ElementState::Pressed } else { event::ElementState::Released }, button }),
                     11 => Some(WindowEvent::MouseWheel { device_id: device, delta: event::MouseScrollDelta::LineDelta(if native.flags & 4 != 0 { native.wheel_delta as f32 / 120.0 } else { 0.0 }, if native.flags & 4 == 0 { native.wheel_delta as f32 / 120.0 } else { 0.0 }), phase: event::TouchPhase::Moved }),
                     12 => { handler(Event::DeviceEvent { device_id: device, event: event::DeviceEvent::MouseMotion { delta: (native.x as f64, native.y as f64) } }, target); None },
+                    13 if touch => Some(WindowEvent::MouseInput { device_id: device, state: event::ElementState::Released, button: event::MouseButton::Left }),
                     _ => None,
-                };
+                }};
                 if let Some(event) = window_event { handler(Event::WindowEvent { window_id: id, event }, target); }
+                if touch && matches!(native.kind, 10 | 13) && mouse_touch == Some(native.pointer_id) { mouse_touch = None; }
             }
             for event in self.receiver.try_iter() { handler(Event::UserEvent(event), target); }
             if target.p.shared.created.load(Ordering::Acquire) && target.p.shared.redraw.swap(false, Ordering::AcqRel) {

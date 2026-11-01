@@ -671,10 +671,7 @@ impl Game<'_> {
                 return;
             }
         }
-        let size = self
-            .renderer
-            .as_ref()
-            .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
+        let size = self.renderer_viewport().unwrap_or([1, 1]);
         let b = HudBatch::new(size);
         let hit = CommandBlockScreen::buttons(b.width, b.height, s.cart.is_some())
             .into_iter()

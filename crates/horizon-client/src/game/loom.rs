@@ -150,10 +150,7 @@ impl Game<'_> {
     }
     /// `LoomScreen.mouseDragged` on the scroller.
     pub(super) fn loom_drag(&mut self) {
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return;
         };

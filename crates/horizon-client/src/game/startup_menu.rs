@@ -20,6 +20,8 @@ pub(super) struct StartupMenu {
     modifiers: ModifiersState,
     physical_keys: HashSet<KeyCode>,
     dragging: bool,
+    #[cfg(target_vendor = "uwp")]
+    ime_allowed: bool,
     clipboard: SystemClipboard,
     selection: AppendSelection,
     pub pending: Option<PendingWorldEntry>,
@@ -536,6 +538,12 @@ impl Loading {
             }
         }
         match event {
+            #[cfg(target_vendor = "uwp")]
+            WindowEvent::Ime(winit::event::Ime::Commit(text)) if !self.menu.options_open => {
+                if let Some(title) = &mut self.menu.title {
+                    title.type_text(&text);
+                }
+            }
             WindowEvent::CloseRequested => {
                 if !self.settings.quit_shortcuts
                     && horizon_client::input::is_quit_shortcut_down(
@@ -713,6 +721,16 @@ impl Loading {
             _ => {}
         }
         Ok(())
+    }
+
+    #[cfg(target_vendor = "uwp")]
+    pub(super) fn sync_menu_ime(&mut self) {
+        let want = !self.menu.options_open && self.menu.pending.is_none()
+            && self.menu.title.as_mut().is_some_and(|title| title.focused_field().is_some());
+        if want != self.menu.ime_allowed {
+            if let Some(window) = &self.window { window.set_ime_allowed(want); }
+            self.menu.ime_allowed = want;
+        }
     }
 
     pub(super) fn draw_menu(&mut self, batch: &mut HudBatch) {

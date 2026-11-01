@@ -7475,10 +7475,7 @@ impl Game<'_> {
     }
     /// A container click: the server answers with the authoritative slots.
     pub(super) fn remote_click(&mut self, right: bool) {
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return;
         };

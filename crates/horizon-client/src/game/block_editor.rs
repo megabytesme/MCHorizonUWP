@@ -333,10 +333,7 @@ impl Game<'_> {
     }
 
     pub(super) fn block_editor_click(&mut self) {
-        let size = self
-            .renderer
-            .as_ref()
-            .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
+        let size = self.renderer_viewport().unwrap_or([1, 1]);
         let b = HudBatch::new(size);
         let cursor = self.cursor;
         let shift = self.keys.contains(&KeyCode::ShiftLeft);
@@ -435,10 +432,7 @@ impl Game<'_> {
         let ctrl = self.keys.contains(&KeyCode::ControlLeft);
         let shift = self.keys.contains(&KeyCode::ShiftLeft);
         let types_text = self.types_text();
-        let size = self
-            .renderer
-            .as_ref()
-            .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
+        let size = self.renderer_viewport().unwrap_or([1, 1]);
         let b = HudBatch::new(size);
         match key {
             KeyCode::Escape => {

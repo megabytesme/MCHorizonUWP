@@ -7,6 +7,7 @@
 #include "../window-bridge/CoreWindowEvents.h"
 #include <windows.applicationmodel.h>
 #include <windows.graphics.display.h>
+#include <windows.ui.viewmanagement.h>
 
 static Windows::UI::Core::CoreWindow^ current_window;
 static std::atomic<DWORD> current_window_thread{0};
@@ -45,6 +46,17 @@ extern "C" void __cdecl horizon_uwp_set_cursor_visible(int visible) {
     current_window->PointerCursor = visible
         ? ref new Windows::UI::Core::CoreCursor(Windows::UI::Core::CoreCursorType::Arrow, 0)
         : nullptr;
+}
+extern "C" void __cdecl horizon_uwp_set_ime_allowed(int allowed) {
+    if (!current_window || !current_window->Dispatcher->HasThreadAccess) return;
+    try {
+        auto pane = Windows::UI::ViewManagement::InputPane::GetForCurrentView();
+        if (pane) {
+            if (allowed) pane->TryShow(); else pane->TryHide();
+        }
+    } catch (Platform::Exception^) {
+        // InputPane is optional on devices without a touch keyboard.
+    }
 }
 extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
     if (!current_window || !current_window->Dispatcher->HasThreadAccess) return 0;

@@ -188,6 +188,8 @@ mod options;
 mod packs;
 mod pad;
 mod pad_menu;
+#[cfg(any(target_vendor = "uwp", test))]
+mod touch;
 mod paintings;
 mod pandas;
 mod passengers;
@@ -1989,6 +1991,8 @@ struct Game<'a> {
     last_input: Instant,
     /// Controllers (Horizon's own).
     pad: pad::Pads,
+    #[cfg(target_vendor = "uwp")]
+    touch: touch::TouchControls,
     frames: u64,
     /// The glint clock and options, read once at the start of each frame
     /// (game/item_draw.rs).
@@ -8643,10 +8647,7 @@ impl Game<'_> {
         if !numeric {
             return false;
         }
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return false;
         };
@@ -8671,10 +8672,7 @@ impl Game<'_> {
     /// slot or the off hand, THROW one or the whole stack.
     fn inventory_hotkey(&mut self, key: KeyCode) -> bool {
         use horizon_client::menu::Input;
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return false;
         };
@@ -9103,10 +9101,7 @@ impl Game<'_> {
         if self.remote.is_some() {
             return self.remote_click(right);
         }
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return;
         };
@@ -13004,10 +12999,7 @@ impl Game<'_> {
             && cursor.1 < oy + y + 16.0
     }
     fn click_creative(&mut self, right: bool) {
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return;
         };
@@ -13547,6 +13539,10 @@ impl Game<'_> {
             Vec::new()
         };
         let mut hud = horizon_client::spans::time("hud", || self.hud(size));
+        #[cfg(target_vendor = "uwp")]
+        if self.title.is_none() && self.screen == Screen::Playing {
+            self.touch.draw(&mut hud, &self.gui.atlas);
+        }
         self.flush_ime(&mut hud);
         // LevelLoadingScreen (Reason.OTHER) draws the title's panorama.
         let title = self.title.is_some()
@@ -14545,6 +14541,16 @@ impl ApplicationHandler for Game<'_> {
         if self.window.as_ref().is_none_or(|w| w.id() != id) {
             return;
         }
+        #[cfg(target_vendor = "uwp")]
+        {
+            if let WindowEvent::Touch(touch) = event {
+                self.touch_event(touch);
+                return;
+            }
+            if self.touch.suppress_mouse(&event) {
+                return;
+            }
+        }
         follow_keymap(&mut event);
         // MacosUtil.setCtrlClickEmulatesRightClick: Control + left click is a right click.
         if let WindowEvent::MouseInput { state, button, .. } = &mut event
@@ -14996,10 +15002,7 @@ impl ApplicationHandler for Game<'_> {
                     button: MouseButton::Left,
                     ..
                 } if self.title.is_some() && state == ElementState::Pressed => {
-                    let size = self
-                        .renderer
-                        .as_ref()
-                        .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+                    let size = self.renderer_viewport()
                         .unwrap_or([1, 1]);
                     let b = HudBatch::new(size);
                     let atlas = &self.gui.atlas;
@@ -15019,20 +15022,14 @@ impl ApplicationHandler for Game<'_> {
                 WindowEvent::MouseInput { .. } if self.title.is_some() => {}
                 WindowEvent::MouseInput { state, button, .. } if self.book.is_some() => {
                     if state == ElementState::Pressed && button == MouseButton::Left {
-                        let size = self
-                            .renderer
-                            .as_ref()
-                            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+                        let size = self.renderer_viewport()
                             .unwrap_or([1, 1]);
                         self.book_click(size);
                     }
                 }
                 WindowEvent::MouseInput { state, button, .. } if self.sign_edit.is_some() => {
                     if state == ElementState::Pressed && button == MouseButton::Left {
-                        let size = self
-                            .renderer
-                            .as_ref()
-                            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+                        let size = self.renderer_viewport()
                             .unwrap_or([1, 1]);
                         self.sign_edit_click(size);
                     }
@@ -15156,17 +15153,11 @@ impl ApplicationHandler for Game<'_> {
                             self.death_click()?
                         }
                         Screen::Advancements if button == MouseButton::Left => {
-                            let size = self
-                                .renderer
-                                .as_ref()
-                                .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
+                            let size = self.renderer_viewport().unwrap_or([1, 1]);
                             self.advancements_mouse(pressed, size);
                         }
                         Screen::Stats if pressed && button == MouseButton::Left => {
-                            let size = self
-                                .renderer
-                                .as_ref()
-                                .map_or([1, 1], |r| [r.viewport_size()[0], r.viewport_size()[1]]);
+                            let size = self.renderer_viewport().unwrap_or([1, 1]);
                             self.stats_click(size);
                         }
                         Screen::Stats if button == MouseButton::Left => self.stats_release(),
@@ -15894,6 +15885,8 @@ impl<'a> Game<'a> {
             previous: now,
             last_input: now,
             pad: Default::default(),
+            #[cfg(target_vendor = "uwp")]
+            touch: Default::default(),
             frames: 0,
             glint_frame: Default::default(),
             item_level_cache: Default::default(),
@@ -17593,6 +17586,8 @@ impl Loading {
             self.error = Some(error);
             event_loop.exit();
         }
+        #[cfg(target_vendor = "uwp")]
+        self.sync_menu_ime();
     }
     /// The menu bundle arrived: rebuild the loading screen with the real atlas
     /// and title panorama.

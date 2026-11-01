@@ -1060,10 +1060,7 @@ impl Game<'_> {
         if self.station.is_none() && (!self.brewing_open() || self.remote.is_some()) {
             return false;
         }
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return true;
         };
@@ -1194,10 +1191,7 @@ impl Game<'_> {
     pub(super) fn station_drag(&mut self) {
         self.loom_drag();
         self.merchant_drag();
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
+        let Some(size) = self.renderer_viewport()
         else {
             return;
         };
