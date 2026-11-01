@@ -11,6 +11,7 @@ horizon = ["dep:horizon-client-render"]
 d3d11 = ["dep:horizon-uwp-d3d11"]
 
 [dependencies]
+log = "0.4"
 horizon-client-render = { path = "../../crates/horizon-client-render", default-features = false, optional = true }
 
 [patch.crates-io]

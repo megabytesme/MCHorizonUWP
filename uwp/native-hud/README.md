@@ -17,9 +17,9 @@ patched pages are retained for dynamic glyph updates.
 The renderer must provide the GUI-pixel-to-clip-space transform using the
 actual physical viewport and returned GUI scale. It must preserve each blend,
 scissor and sample mode: `GlintMask` needs a separate glint texture and shader;
-`Invert`, `Additive`, `Depth`, `Vignette` and `EndPortal` need their own
-rendering states or must be reported as unsupported. The existing D3D11
-prototype does not yet implement all of those paths. Page boundaries currently
+`Depth` and `EndPortal` need their own rendering states or must be
+reported as unsupported. The native presenter supports alpha, invert,
+additive, and vignette atlas blending. Page boundaries currently
 assume nearest sampling with clamp-to-edge; filtered sampling requires border
 texels to avoid seams. The CPU page copy increases atlas memory use until the
 source atlas storage is shared or released.
@@ -30,9 +30,9 @@ scissored and glint metadata, and glyph patches; the optional Horizon feature
 also includes a test using a real `HudBatch`.
 
 Enable `d3d11` for `d3d11::HudRenderer`, which creates GPU pages on first use and
-renders standard alpha HUD batches with the GUI transform. It explicitly
-returns an error before drawing when a batch needs another blend or glint
-mode. Changed regions are coalesced and uploaded when a page is next used.
-The initial implementation creates per-frame immutable meshes; these are correctness-first choices
-that need optimization for mobile. The presenter has passed ARM32 compilation;
-GPU readback of this integration is still pending.
+renders HUD batches with the GUI transform. Strict `draw` returns an error
+for unsupported glint, scissored depth, or EndPortal; `draw_supported` skips
+those runs, reports them to the caller, and logs each category once. Changed
+regions are coalesced and uploaded when a page is next used. Unchanged HUD meshes reuse immutable GPU buffers across frames; the CPU
+geometry cache is capped at 4 MiB. Larger batches are rebuilt per frame. ARM32 compilation has passed, and x64 UWP GPU readback verified
+paged alpha drawing and retained glyph updates.
