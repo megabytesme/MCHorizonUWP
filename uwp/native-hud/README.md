@@ -30,10 +30,10 @@ standalone tests exercise page crossings, draw ordering, interpolation,
 scissored and glint metadata, and glyph patches; the optional Horizon feature
 also includes a test using a real `HudBatch`.
 
-Enable `d3d11` for `d3d11::HudRenderer`, which creates the GPU pages and
+Enable `d3d11` for `d3d11::HudRenderer`, which creates GPU pages on first use and
 renders standard alpha HUD batches with the GUI transform. It explicitly
 returns an error before drawing when a batch needs another blend or glint
-mode. The initial implementation recreates changed immutable pages and
+mode. The initial implementation recreates changed pages on next use and
 creates per-frame immutable meshes; these are correctness-first choices
 that need optimization for mobile. The presenter has passed ARM32 compilation;
 GPU readback of this integration is still pending.
