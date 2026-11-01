@@ -1,0 +1,11 @@
+[package]
+name = "horizon-native-panorama"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+glam = "0.30"
+horizon-uwp-d3d11 = { path = "../d3d11-backend" }
