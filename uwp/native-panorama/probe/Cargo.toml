@@ -1,0 +1,14 @@
+[package]
+name = "horizon-native-panorama-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+horizon-native-panorama = { path = ".." }
+horizon-uwp-d3d11 = { path = "../../d3d11-backend", features = ["readback-probe"] }
