@@ -1964,6 +1964,8 @@ struct Game<'a> {
     screen: Screen,
     window: Option<Arc<Window>>,
     renderer: Option<Renderer>,
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    native_renderer: Option<horizon_client::native_renderer::NativeRenderer>,
     /// CPU geometry storage retained across frames, including empty/title frames.
     entity_vertices: Vec<Vertex>,
     /// Horizon Extras' dynamic lights this frame (`dynamic_lights.rs`), and how brightly each
@@ -2597,6 +2599,25 @@ fn camera_rotation(camera_type: perspective::CameraType, yaw: f32, pitch: f32) -
     )
 }
 impl Game<'_> {
+    fn renderer_viewport(&self) -> Option<[u32; 2]> {
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(renderer) = &self.native_renderer {
+            return Some(renderer.viewport_size());
+        }
+        self.renderer.as_ref().map(Renderer::viewport_size)
+    }
+
+    fn present_loading_frame(&mut self, frame: &Frame<'_>) -> Result<bool> {
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(renderer) = &mut self.native_renderer {
+            return renderer.present(frame);
+        }
+        match &mut self.renderer {
+            Some(renderer) => horizon_client::presentation::present(renderer, frame),
+            None => Ok(false),
+        }
+    }
+
     fn eye_position(&self) -> Option<[f64; 3]> {
         let p = self.player.as_ref()?;
         Some([
@@ -8832,10 +8853,10 @@ impl Game<'_> {
         let Some((ty, slots)) = self.inv_drag.clone() else {
             return;
         };
-        let Some(r) = self.renderer.as_ref() else {
+        let Some(size) = self.renderer_viewport() else {
             return;
         };
-        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
+        let batch = HudBatch::new(size);
         if let Some(slot) = self.slot_at(&batch, self.cursor.0, self.cursor.1)
             && slot != 200
             && slot < Creative::DISPLAY
@@ -8848,10 +8869,10 @@ impl Game<'_> {
     }
     /// The hovered slot and whether the cursor is outside the window.
     fn inventory_target(&self) -> (Option<usize>, bool) {
-        let Some(r) = self.renderer.as_ref() else {
+        let Some(size) = self.renderer_viewport() else {
             return (None, false);
         };
-        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
+        let batch = HudBatch::new(size);
         (
             self.slot_at(&batch, self.cursor.0, self.cursor.1),
             self.clicked_outside(&batch),
@@ -10613,6 +10634,10 @@ impl Game<'_> {
         if let Some(r) = self.renderer.as_mut() {
             horizon_client::presentation::clear_sections(r, self.world.layout());
         }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(r) = self.native_renderer.as_mut() {
+            horizon_client::presentation::clear_sections(r, self.world.layout());
+        }
         self.apply_settings();
         self.streaming.sky_light = dim != Dim::Nether;
         self.streaming.nether_shading = dim == Dim::Nether;
@@ -10713,6 +10738,10 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
+            horizon_client::presentation::clear_sections(r, self.world.layout());
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(r) = self.native_renderer.as_mut() {
             horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         self.apply_settings();
@@ -10933,6 +10962,10 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
+            horizon_client::presentation::clear_sections(r, self.world.layout());
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(r) = self.native_renderer.as_mut() {
             horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         self.title = Some(
@@ -13253,9 +13286,8 @@ impl Game<'_> {
         // Minecraft.doWorldLoad: the LevelLoadingScreen while single player's
         // server starts, with the server's chunk map and progress.
         if self.integrated_starting.is_some() {
-            if let Some(renderer) = &mut self.renderer {
-                let mut hud =
-                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
+            if let Some(size) = self.renderer_viewport() {
+                let mut hud = HudBatch::new(size);
                 let (w, h) = (hud.width, hud.height);
                 horizon_client::ui::menu_background(
                     &mut hud,
@@ -13282,14 +13314,13 @@ impl Game<'_> {
                     Some(&status),
                     progress,
                 );
-                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
+                return self.present_loading_frame(&loading_frame(&hud));
             }
             return Ok(false);
         }
         if let Some(loader) = &self.world_loader {
-            if let Some(renderer) = &mut self.renderer {
-                let mut hud =
-                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
+            if let Some(size) = self.renderer_viewport() {
+                let mut hud = HudBatch::new(size);
                 // WorldOpenFlows.upgradeAndOpenWorld: the file fixers run on
                 // FileFixerProgressScreen.
                 if loader.upgrade.is_file_fixing() && !loader.cancelled {
@@ -13299,7 +13330,7 @@ impl Game<'_> {
                         &loader.upgrade,
                         self.cursor,
                     );
-                    return horizon_client::presentation::present(renderer, &loading_frame(&hud));
+                    return self.present_loading_frame(&loading_frame(&hud));
                 }
                 horizon_client::level_loading::draw_progress(
                     &mut hud,
@@ -13311,30 +13342,28 @@ impl Game<'_> {
                     },
                     0.0,
                 );
-                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
+                return self.present_loading_frame(&loading_frame(&hud));
             }
             return Ok(false);
         }
         if self.pending_entry.is_some() {
-            if let (Some(renderer), Some(loader)) = (&mut self.renderer, &self.rest_loader) {
-                let mut hud =
-                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
+            if let (Some(size), Some(loader)) = (self.renderer_viewport(), &self.rest_loader) {
+                let mut hud = HudBatch::new(size);
                 horizon_client::level_loading::draw_progress(
                     &mut hud,
                     &self.gui.atlas,
                     loader.progress.line(),
                     loader.progress.fraction(),
                 );
-                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
+                return self.present_loading_frame(&loading_frame(&hud));
             }
             return Ok(false);
         }
         // A pack reload covers the frame with its progress
         // (`LoadingOverlay`) until `drive_pack_reload` applies it.
         if let Some(reload) = &self.pack_reload {
-            if let Some(renderer) = &mut self.renderer {
-                let mut hud =
-                    HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
+            if let Some(size) = self.renderer_viewport() {
+                let mut hud = HudBatch::new(size);
                 horizon_client::level_loading::draw_loading_overlay(
                     &mut hud,
                     &self.gui.atlas,
@@ -13342,15 +13371,11 @@ impl Game<'_> {
                     reload.progress.fraction(),
                     self.settings.file.bool("darkMojangStudiosBackground"),
                 );
-                return horizon_client::presentation::present(renderer, &loading_frame(&hud));
+                return self.present_loading_frame(&loading_frame(&hud));
             }
             return Ok(false);
         }
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
-        else {
+        let Some(size) = self.renderer_viewport() else {
             return Ok(false);
         };
         let alpha = self.clock.fraction();
@@ -13780,6 +13805,12 @@ impl Game<'_> {
             },
             chunk_fade: self.settings.chunk_fade,
         };
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let result = match &mut self.native_renderer {
+            Some(renderer) => horizon_client::spans::time("renderer", || renderer.present(&frame)),
+            None => Err("native renderer".into()),
+        };
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         let result = match self.renderer.as_mut() {
             Some(renderer) => {
                 renderer.set_pass_timing(self.debug);
@@ -14319,7 +14350,17 @@ impl Game<'_> {
             log::warn!("Horizon: failed to save unloaded chunks: {e}");
         }
         let (far_distance, far_reduced) = self.far_terrain_choice();
-        if let Some(renderer) = self.renderer.as_mut() {
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let terrain: Option<&mut dyn horizon_client::presentation::TerrainBackend> = self
+            .native_renderer
+            .as_mut()
+            .map(|r| r as &mut dyn horizon_client::presentation::TerrainBackend);
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
+        let terrain: Option<&mut dyn horizon_client::presentation::TerrainBackend> = self
+            .renderer
+            .as_mut()
+            .map(|r| r as &mut dyn horizon_client::presentation::TerrainBackend);
+        if let Some(renderer) = terrain {
             let g = &self.settings.horizon;
             let budgeted = g.chunk_updates > 0 || g.upload_budget_kib > 0;
             // The meshes, once copied, are freed by a worker (`Streaming::free`).
@@ -14408,6 +14449,8 @@ impl Game<'_> {
                 renderer,
                 unloaded.iter().map(|c| (c.x, c.z)),
             );
+        }
+        if let Some(renderer) = self.renderer.as_mut() {
             if let (Some(lod), Some(player)) = (&mut self.lod, &self.player) {
                 let lod_distance =
                     horizon_client::graphics::lod_distance_capped(far_distance, &renderer.info);
@@ -14597,8 +14640,8 @@ impl ApplicationHandler for Game<'_> {
         {
             match &event {
                 WindowEvent::CursorMoved { position, .. } => {
-                    if let Some(r) = &self.renderer {
-                        let b = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
+                    if let Some(size) = self.renderer_viewport() {
+                        let b = HudBatch::new(size);
                         self.cursor = (position.x as f32 / b.scale, position.y as f32 / b.scale);
                     }
                 }
@@ -14681,6 +14724,12 @@ impl ApplicationHandler for Game<'_> {
                     }
                 }
                 WindowEvent::Resized(size) => {
+                    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+                    if let Some(r) = &mut self.native_renderer {
+                        if let Err(error) = r.resize([size.width, size.height]) {
+                            log::warn!("Horizon: native resize failed: {error}");
+                        }
+                    }
                     if let Some(r) = &mut self.renderer {
                         horizon_client::presentation::PresentationBackend::resize(
                             r,
@@ -14721,6 +14770,12 @@ impl ApplicationHandler for Game<'_> {
                     horizon_client::preedit::set_preedit(None)
                 }
                 WindowEvent::Resized(size) => {
+                    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+                    if let Some(r) = &mut self.native_renderer {
+                        if let Err(error) = r.resize([size.width, size.height]) {
+                            log::warn!("Horizon: native resize failed: {error}");
+                        }
+                    }
                     if let Some(r) = &mut self.renderer {
                         horizon_client::presentation::PresentationBackend::resize(
                             r,
@@ -14746,8 +14801,8 @@ impl ApplicationHandler for Game<'_> {
                     }
                 }
                 WindowEvent::CursorMoved { position, .. } => {
-                    if let Some(r) = &self.renderer {
-                        let b = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
+                    if let Some(size) = self.renderer_viewport() {
+                        let b = HudBatch::new(size);
                         self.cursor = (position.x as f32 / b.scale, position.y as f32 / b.scale);
                         if self.dialog_open() {
                             self.dialog_drag();
@@ -15825,6 +15880,8 @@ impl<'a> Game<'a> {
             screen: Screen::Playing,
             window: None,
             renderer: None,
+            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            native_renderer: None,
             entity_vertices: Vec::new(),
             dynamic_lights: Vec::new(),
             luminance: None,
@@ -17669,6 +17726,7 @@ impl Loading {
             horizon_client::presentation::PresentationBackend::release_surface(renderer);
         }
         let renderer_at = Instant::now();
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         let renderer = build_renderer(
             window.clone(),
             options.offscreen,
@@ -17678,6 +17736,16 @@ impl Loading {
             loaded.renderer_cpu,
             self.settings.horizon.api,
         )?;
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let native_renderer = {
+            let mut renderer = self
+                .native_renderer
+                .take()
+                .ok_or("native renderer is unavailable")?;
+            let assets = &loaded.pack.render;
+            renderer.set_terrain(&assets.pixels, assets.sprite_size, assets.texture_layers)?;
+            renderer
+        };
         log::info!(
             "Horizon: world renderer ready after {} ms",
             self.started.elapsed().as_millis()
@@ -17712,7 +17780,14 @@ impl Loading {
         };
         let game_ms = game_at.elapsed().as_millis();
         game.window = Some(window);
-        game.renderer = Some(renderer);
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
+        {
+            game.renderer = Some(renderer);
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        {
+            game.native_renderer = Some(native_renderer);
+        }
         game.world_renderer_ready = true;
         game.fullscreen = self.fullscreen;
         game.panorama_rotation = self.panorama_rotation;
@@ -17771,12 +17846,6 @@ impl ApplicationHandler for App {
                     event_loop.exit();
                     return;
                 }
-                // Native title rendering is usable while gameplay integration is
-                // in progress. Keep the loaded resources alive in this mode;
-                // do not silently create a wgpu renderer on the native path.
-                #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-                let next: Option<std::result::Result<Loaded, String>> = None;
-                #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
                 let next = if loading.menu.reload_packs {
                     None
                 } else {
