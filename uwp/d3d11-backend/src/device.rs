@@ -19,6 +19,9 @@ use windows::{
     core::{Error, IUnknown, Interface, Result, s},
 };
 
+mod dynamic_mesh;
+pub use dynamic_mesh::DynamicMesh;
+
 const VS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-vs.cso"));
 const PS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-ps.cso"));
 const PS_OPAQUE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-opaque-ps.cso"));

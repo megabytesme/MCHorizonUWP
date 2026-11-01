@@ -7,6 +7,25 @@
 use horizon_client_render::{gfx::Frame, mesher::Vertex as SourceVertex};
 use horizon_native_hud::{Atlas, PagePatch};
 
+// Keep retained dynamic GPU buffers bounded on 32-bit devices. Geometry
+// outside this budget is still rendered using a short-lived immutable mesh.
+#[cfg(any(windows, test))]
+const MAX_DYNAMIC_VERTICES: usize = 262_144;
+#[cfg(any(windows, test))]
+const MAX_DYNAMIC_SLOTS: usize = 128;
+
+#[cfg(any(windows, test))]
+fn dynamic_capacity(used: usize, old: usize, needed: usize) -> Option<usize> {
+    if needed == 0 || needed > u16::MAX as usize {
+        return None;
+    }
+    if old >= needed {
+        return Some(old);
+    }
+    let capacity = needed.next_power_of_two().min(u16::MAX as usize);
+    (used.checked_sub(old)?.checked_add(capacity)? <= MAX_DYNAMIC_VERTICES).then_some(capacity)
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Vertex {
     position: [f32; 3],
@@ -233,6 +252,18 @@ mod tests {
     }
 
     #[test]
+    fn dynamic_mesh_budget_reuses_and_bounds_gpu_capacity() {
+        assert_eq!(dynamic_capacity(0, 0, 3), Some(4));
+        assert_eq!(dynamic_capacity(16, 16, 3), Some(16));
+        assert_eq!(dynamic_capacity(16, 16, 17), Some(32));
+        assert_eq!(dynamic_capacity(MAX_DYNAMIC_VERTICES, 0, 3), None);
+        assert_eq!(dynamic_capacity(MAX_DYNAMIC_VERTICES, 16, 17), None);
+        assert_eq!(dynamic_capacity(0, 0, 65_535), Some(65_535));
+        assert_eq!(dynamic_capacity(0, 0, 65_536), None);
+        assert_eq!(dynamic_capacity(0, 0, 0), None);
+    }
+
+    #[test]
     fn interior_quad_emits_original_triangles_in_page_coordinates() {
         let atlas = Atlas::new([4, 2], &[255; 32], 2).unwrap();
         let quad = [
@@ -288,19 +319,23 @@ mod tests {
 #[cfg(windows)]
 pub mod d3d11 {
     use super::*;
-    use horizon_uwp_d3d11::{DrawPass, Renderer, Texture, Vertex as GpuVertex};
+    use horizon_uwp_d3d11::{DrawPass, DynamicMesh, Renderer, Texture, Vertex as GpuVertex};
     use std::error::Error;
     type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
     pub struct EntityRenderer {
         textures: Vec<Option<Texture>>,
         layout: Vec<([u32; 2], [u32; 2])>,
+        dynamic: Vec<DynamicMesh>,
+        dynamic_vertices: usize,
     }
     impl EntityRenderer {
         pub fn new(atlas: &Atlas) -> Self {
             Self {
                 textures: (0..atlas.pages.len()).map(|_| None).collect(),
                 layout: atlas.pages.iter().map(|p| (p.origin, p.size)).collect(),
+                dynamic: Vec::new(),
+                dynamic_vertices: 0,
             }
         }
         pub fn draw_vertices(
@@ -327,6 +362,7 @@ pub mod d3d11 {
                 }
                 self.textures[p.page] = None;
             }
+            let mut slot = 0;
             for batch in batches(atlas, vertices, nether) {
                 let page = &atlas.pages[batch.page];
                 if self.textures[batch.page].is_none() {
@@ -342,14 +378,41 @@ pub mod d3d11 {
                             color: v.color,
                         })
                         .collect();
-                    let indices: Vec<_> = (0..part.len()).map(|i| i as u16).collect();
-                    let mesh = renderer.create_mesh(&v, &indices)?;
-                    renderer.draw_pass(
-                        &mesh,
-                        self.textures[batch.page].as_ref().unwrap(),
-                        matrix.to_cols_array_2d(),
-                        DrawPass::Entity,
-                    );
+                    let old = self.dynamic.get(slot).map_or(0, DynamicMesh::capacity);
+                    let capacity = if slot < MAX_DYNAMIC_SLOTS && slot <= self.dynamic.len() {
+                        dynamic_capacity(self.dynamic_vertices, old, part.len())
+                    } else {
+                        None
+                    };
+                    if let Some(capacity) = capacity {
+                        if old < capacity {
+                            let mesh = renderer.create_dynamic_mesh(capacity)?;
+                            if slot == self.dynamic.len() {
+                                self.dynamic.push(mesh);
+                            } else {
+                                self.dynamic[slot] = mesh;
+                            }
+                            self.dynamic_vertices = self.dynamic_vertices - old + capacity;
+                        }
+                        let mesh = &mut self.dynamic[slot];
+                        renderer.update_dynamic_mesh(mesh, &v)?;
+                        renderer.draw_pass(
+                            mesh.mesh(),
+                            self.textures[batch.page].as_ref().unwrap(),
+                            matrix.to_cols_array_2d(),
+                            DrawPass::Entity,
+                        );
+                    } else {
+                        let indices: Vec<_> = (0..part.len()).map(|i| i as u16).collect();
+                        let mesh = renderer.create_mesh(&v, &indices)?;
+                        renderer.draw_pass(
+                            &mesh,
+                            self.textures[batch.page].as_ref().unwrap(),
+                            matrix.to_cols_array_2d(),
+                            DrawPass::Entity,
+                        );
+                    }
+                    slot += 1;
                 }
             }
             Ok(())

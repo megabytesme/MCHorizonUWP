@@ -216,6 +216,7 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
             &probe.atlas,
             identity,
         );
+        let dynamic_result = test_dynamic_mesh(&probe.renderer, identity);
         let entity_result = test_entity_pass(
             &probe.renderer,
             &probe.occluded,
@@ -275,9 +276,10 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
                     && hud_result.is_ok()
                     && blend_result.is_ok()
                     && depth_reset_result.is_ok()
-                    && entity_result.is_ok();
+                    && entity_result.is_ok()
+                    && dynamic_result.is_ok();
                 format!(
-                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; reverse={reverse:?}; invalid_rejected={rejects_invalid_patch}; hud={hud_result:?}; blends={blend_result:?}; depth_reset={depth_reset_result:?}; entity={entity_result:?}\n",
+                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; reverse={reverse:?}; invalid_rejected={rejects_invalid_patch}; hud={hud_result:?}; blends={blend_result:?}; depth_reset={depth_reset_result:?}; entity={entity_result:?}; dynamic={dynamic_result:?}\n",
                     if pass { "PASS" } else { "FAIL" }
                 )
             }
@@ -291,6 +293,73 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
         probe.checked = true;
     }
     probe.renderer.present().is_ok()
+}
+
+fn test_dynamic_mesh(
+    renderer: &Renderer,
+    matrix: [[f32; 4]; 4],
+) -> Result<(), Box<dyn std::error::Error>> {
+    if renderer.create_dynamic_mesh(0).is_ok() || renderer.create_dynamic_mesh(65_536).is_ok() {
+        return Err(std::io::Error::other("invalid dynamic capacity accepted").into());
+    }
+    let texture = renderer.create_atlas(1, 1, &[255, 255, 255, 255])?;
+    let quad = |left: f32, right: f32, color: [f32; 4]| {
+        let vertex = |x, y| Vertex {
+            position: [x, y, 0.5],
+            uv: [0.5, 0.5],
+            color,
+        };
+        [
+            vertex(left, -0.9),
+            vertex(left, 0.9),
+            vertex(right, -0.9),
+            vertex(right, -0.9),
+            vertex(left, 0.9),
+            vertex(right, 0.9),
+        ]
+    };
+    let red = quad(-0.9, 0.0, [1., 0., 0., 1.]);
+    let green = quad(0.0, 0.9, [0., 1., 0., 1.]);
+    let mut mesh = renderer.create_dynamic_mesh(6)?;
+    renderer.begin_frame([0., 0., 0., 1.])?;
+    renderer.update_dynamic_mesh(&mut mesh, &red)?;
+    renderer.draw_pass(mesh.mesh(), &texture, matrix, DrawPass::Opaque);
+    renderer.update_dynamic_mesh(&mut mesh, &green)?;
+    renderer.draw_pass(mesh.mesh(), &texture, matrix, DrawPass::Opaque);
+    let pixels = renderer.probe_pixels()?;
+    let expected = [
+        [255u8, 0, 0, 255],
+        [0, 255, 0, 255],
+        [255, 0, 0, 255],
+        [0, 255, 0, 255],
+    ];
+    if pixels
+        .iter()
+        .zip(expected)
+        .any(|(p, e)| p.iter().zip(e).any(|(&a, b)| a.abs_diff(b) > 5))
+    {
+        return Err(std::io::Error::other(format!(
+            "dynamic discard changed queued draw: {pixels:?}"
+        ))
+        .into());
+    }
+    if renderer.update_dynamic_mesh(&mut mesh, &[]).is_ok()
+        || renderer
+            .update_dynamic_mesh(&mut mesh, &[green[0]; 7])
+            .is_ok()
+    {
+        return Err(std::io::Error::other("invalid dynamic update accepted").into());
+    }
+    renderer.begin_frame([0., 0., 0., 1.])?;
+    renderer.draw_pass(mesh.mesh(), &texture, matrix, DrawPass::Opaque);
+    let pixels = renderer.probe_pixels()?;
+    if pixels[1][1] < 250 || pixels[3][1] < 250 {
+        return Err(std::io::Error::other(format!(
+            "rejected update changed prior buffer: {pixels:?}"
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 fn test_entity_pass(
