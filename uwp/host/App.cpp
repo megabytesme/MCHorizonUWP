@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <windows.storage.h>
 #include <cstdio>
+#include <atomic>
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
@@ -8,6 +9,7 @@
 #include <windows.graphics.display.h>
 
 static Windows::UI::Core::CoreWindow^ current_window;
+static std::atomic<DWORD> current_window_thread{0};
 static HorizonUwpEvent pending_events[4096];
 static uint32_t event_read, event_write;
 
@@ -18,6 +20,9 @@ static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
     event_write = next;
 }
 extern "C" void* __cdecl horizon_uwp_window_handle() {
+    // CoreWindow must only be handed out on its owning UI thread.
+    const DWORD owner = current_window_thread.load(std::memory_order_acquire);
+    if (!owner || GetCurrentThreadId() != owner) return nullptr;
     return reinterpret_cast<void*>(current_window);
 }
 extern "C" void __cdecl horizon_uwp_pump_events() {
@@ -98,6 +103,7 @@ public:
     virtual ~AppView() {
 #ifdef HORIZON_UWP_GAME_BRIDGE
         delete window_events_;
+        current_window_thread.store(0, std::memory_order_release);
         current_window = nullptr;
 #endif
         delete renderer_;
@@ -113,6 +119,7 @@ public:
         window_ = window;
 #ifdef HORIZON_UWP_GAME_BRIDGE
         current_window = window;
+        current_window_thread.store(GetCurrentThreadId(), std::memory_order_release);
         window_events_ = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
         window_events_->EmitInitialSize();
 #endif

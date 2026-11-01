@@ -1,7 +1,9 @@
 param(
     [ValidateSet('x64', 'arm64', 'arm')][string]$Architecture = 'x64',
     [string]$AngleBin,
-    [switch]$RequireAngle
+    [switch]$RequireAngle,
+    [string]$Executable,
+    [string]$OutputDirectory
 )
 $ErrorActionPreference = 'Stop'
 function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
@@ -22,6 +24,10 @@ function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
 $hostDir = $PSScriptRoot
 $build = Join-Path $hostDir 'build'
 if ($Architecture -ne 'x64') { $build = Join-Path $build $Architecture }
+if ($OutputDirectory) { $build = [IO.Path]::GetFullPath($OutputDirectory) }
+if (-not $Executable) { $Executable = Join-Path $build 'HorizonUWP.exe' }
+if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { throw "Missing executable: $Executable" }
+Assert-PEArchitecture $Executable $Architecture
 $stage = Join-Path $build 'package'
 $repositoryRoot = Split-Path -Parent (Split-Path -Parent $hostDir)
 if (-not $AngleBin) {
@@ -48,7 +54,7 @@ if ($AngleBin) {
     throw "ANGLE DLLs were not found for $Architecture. Build them or pass -AngleBin."
 }
 New-Item -ItemType Directory -Force -Path $stage,(Join-Path $stage 'Assets') | Out-Null
-Copy-Item (Join-Path $build 'HorizonUWP.exe') $stage -Force
+Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage 'HorizonUWP.exe') -Force
 # Staging persists between builds; remove stale DLLs before copying validated inputs.
 foreach ($name in @('libEGL.dll', 'libGLESv2.dll', 'z.dll')) {
     $old = Join-Path $stage $name

@@ -10,13 +10,19 @@ if /i "%ARCH%"=="arm64" (
     set "GAME_MACHINE=ARM64"
     set "SDK=10.0.26100.0"
 )
-if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" exit /b 1
+if /i "%ARCH%"=="arm" (
+    set "VCARCH=x64_arm"
+    set "GAME_MACHINE=ARM"
+    set "SDK=10.0.15063.0"
+)
+if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="arm" exit /b 1
 if not defined HORIZON_UWP_GAME_LIB (
     echo Set HORIZON_UWP_GAME_LIB to the Rust game bridge static library.
     exit /b 1
 )
 if not exist "%HORIZON_UWP_GAME_LIB%" exit /b 1
 set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
+if /i "%ARCH%"=="arm" set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community"
 call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
 if errorlevel 1 exit /b %errorlevel%
 set "OUTDIR=%~dp0build\game-%ARCH%"
