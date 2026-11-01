@@ -17451,6 +17451,8 @@ fn run_event_loop(mut game: Game<'_>) -> Result<()> {
 struct Loading {
     window: Option<Arc<Window>>,
     renderer: Option<Renderer>,
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    native_renderer: Option<horizon_client::native_renderer::NativeRenderer>,
     gui: Option<UiResources>,
     settings: Settings,
     fullscreen: horizon_client::window::FullscreenState,
@@ -17506,7 +17508,9 @@ impl Loading {
             }
         };
         horizon_client::telemetry::note_display(&window);
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         let offscreen = self.options.as_ref().is_some_and(|o| o.offscreen);
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         match loading_renderer(
             window.clone(),
             offscreen,
@@ -17548,10 +17552,26 @@ impl Loading {
         let Some(window) = self.window.clone() else {
             return;
         };
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        {
+            let size = window.inner_size();
+            drop(self.native_renderer.take());
+            match horizon_client::native_renderer::NativeRenderer::new(
+                &self.gui.as_ref().expect("GUI was just assigned").atlas,
+                [size.width, size.height],
+            ) {
+                Ok(renderer) => self.native_renderer = Some(renderer),
+                Err(error) => self.error = Some(error),
+            }
+            return;
+        }
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         let offscreen = self.options.as_ref().is_some_and(|o| o.offscreen);
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         if let Some(renderer) = &mut self.renderer {
             horizon_client::presentation::PresentationBackend::release_surface(renderer);
         }
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         match loading_renderer(
             window,
             offscreen,
@@ -17593,11 +17613,11 @@ impl Loading {
         event_loop.set_control_flow(ControlFlow::Poll);
     }
     fn draw(&mut self) {
-        let Some(size) = self
-            .renderer
-            .as_ref()
-            .map(|r| [r.viewport_size()[0], r.viewport_size()[1]])
-        else {
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
+        let size = self.renderer.as_ref().map(Renderer::viewport_size);
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let size = self.native_renderer.as_ref().map(|r| r.viewport_size());
+        let Some(size) = size else {
             return;
         };
         let mut batch = HudBatch::new(size);
@@ -17607,6 +17627,17 @@ impl Loading {
             self.started.elapsed().as_secs_f32(),
             self.settings.file.double("panoramaScrollSpeed") as f32,
         );
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(renderer) = &mut self.native_renderer {
+            match renderer.present(&frame) {
+                Ok(true) if self.gui.is_some() && self.menu.pending.is_none() => {
+                    self.menu.perf.title_shown()
+                }
+                Ok(_) => {}
+                Err(e) => log::warn!("Horizon: native loading screen frame failed: {e}"),
+            }
+        }
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         if let Some(renderer) = &mut self.renderer {
             match horizon_client::presentation::present(renderer, &frame) {
                 Ok(true) if self.gui.is_some() && self.menu.pending.is_none() => {
@@ -17740,11 +17771,18 @@ impl ApplicationHandler for App {
                     event_loop.exit();
                     return;
                 }
-                match if loading.menu.reload_packs {
+                // Native title rendering is usable while gameplay integration is
+                // in progress. Keep the loaded resources alive in this mode;
+                // do not silently create a wgpu renderer on the native path.
+                #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+                let next: Option<std::result::Result<Loaded, String>> = None;
+                #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
+                let next = if loading.menu.reload_packs {
                     None
                 } else {
                     loading.loaded.take()
-                } {
+                };
+                match next {
                     None => Step::Waiting,
                     Some(Err(e)) => Step::Failed(e.into()),
                     Some(Ok(loaded)) => match loading.finish(loaded) {
@@ -17808,6 +17846,8 @@ fn run_loading(
     let loading = Loading {
         window: None,
         renderer: None,
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        native_renderer: None,
         gui: None,
         settings,
         fullscreen: horizon_client::window::FullscreenState::new(false),

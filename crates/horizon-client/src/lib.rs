@@ -20,6 +20,9 @@ pub fn run_uwp(resources: &std::path::Path, game_dir: &std::path::Path) -> Resul
     ];
     game::run_with_args(args)
 }
+#[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+pub mod native_renderer;
+
 pub mod advancements;
 pub mod ambience;
 pub mod animate_tick;

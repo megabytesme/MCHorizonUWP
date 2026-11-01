@@ -353,9 +353,13 @@ impl Loading {
     }
 
     fn menu_size(&self) -> [u32; 2] {
-        self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.viewport_size()[0], r.viewport_size()[1]]
-        })
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(renderer) = &self.native_renderer {
+            return renderer.viewport_size();
+        }
+        self.renderer
+            .as_ref()
+            .map_or([1280, 720], |r| r.viewport_size())
     }
 
     fn save_menu_address(&mut self) {
@@ -545,6 +549,10 @@ impl Loading {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
+                #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+                if let Some(r) = &mut self.native_renderer {
+                    r.resize([size.width, size.height])?;
+                }
                 if let Some(r) = &mut self.renderer {
                     horizon_client::presentation::PresentationBackend::resize(
                         r,
@@ -595,13 +603,13 @@ impl Loading {
                 self.update_menu_cursor();
                 if self.menu.options_open && self.menu.dragging {
                     self.menu_options_click(true, false);
-                } else if let Some(title) = &mut self.menu.title {
-                    let size = self.renderer.as_ref().map_or([1280, 720], |r| {
-                        [r.viewport_size()[0], r.viewport_size()[1]]
-                    });
-                    let b = HudBatch::new(size);
-                    title.drag(self.menu.cursor, (b.width, b.height));
-                    title.drag_field(&self.gui.as_ref().unwrap().atlas, self.menu.cursor.0);
+                } else {
+                    let size = self.menu_size();
+                    if let Some(title) = &mut self.menu.title {
+                        let b = HudBatch::new(size);
+                        title.drag(self.menu.cursor, (b.width, b.height));
+                        title.drag_field(&self.gui.as_ref().unwrap().atlas, self.menu.cursor.0);
+                    }
                 }
             }
             WindowEvent::MouseInput { state, button, .. } if self.menu.options_open => {
@@ -807,6 +815,8 @@ mod tests {
         Loading {
             window: None,
             renderer: None,
+            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            native_renderer: None,
             gui: None,
             settings: Settings::default(),
             fullscreen: horizon_client::window::FullscreenState::new(false),

@@ -1143,6 +1143,10 @@ dependencies = [
  "horizon-hdr",
  "horizon-items",
  "horizon-mods",
+ "horizon-native-hud",
+ "horizon-native-scene",
+ "horizon-native-terrain",
+ "horizon-native-window",
  "horizon-protocol",
  "horizon-server-files",
  "horizon-shader-api",
@@ -1150,6 +1154,7 @@ dependencies = [
  "horizon-telemetry",
  "horizon-theme",
  "horizon-threads",
+ "horizon-uwp-d3d11",
  "horizon-world",
  "log",
  "miniz_oxide 0.8.9",
@@ -1313,8 +1318,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "horizon-native-hud"
+version = "0.1.0"
+dependencies = [
+ "horizon-client-render",
+ "horizon-uwp-d3d11",
+]
+
+[[package]]
+name = "horizon-native-scene"
+version = "0.1.0"
+dependencies = [
+ "horizon-native-terrain",
+ "horizon-uwp-d3d11",
+]
+
+[[package]]
 name = "horizon-native-terrain"
 version = "0.1.0"
+
+[[package]]
+name = "horizon-native-window"
+version = "0.1.0"
+dependencies = [
+ "horizon-uwp-d3d11",
+ "windows 0.62.2",
+]
 
 [[package]]
 name = "horizon-port-pack"
@@ -1449,6 +1478,14 @@ dependencies = [
  "libmimalloc-sys",
  "mimalloc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "horizon-uwp-d3d11"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "windows 0.62.2",
 ]
 
 [[package]]

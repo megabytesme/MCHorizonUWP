@@ -67,6 +67,13 @@ unicode-bidi = "0.3.18"
 # `LevelStorageAccess.estimateDiskSpace`: usable disk space, without unsafe code on Windows.
 fs4 = { version = "1.1.0", default-features = false, features = ["sync"] }
 
+[target.'cfg(target_vendor = "uwp")'.dependencies]
+horizon-native-hud = { path = "../../uwp/native-hud", features = ["horizon", "d3d11"], optional = true }
+horizon-native-scene = { path = "../../uwp/native-scene", optional = true }
+horizon-native-window = { path = "../../uwp/native-window", optional = true }
+horizon-native-terrain = { path = "../../uwp/native-terrain", optional = true }
+horizon-uwp-d3d11 = { path = "../../uwp/d3d11-backend", optional = true }
+
 [target.'cfg(unix)'.dependencies]
 # The server thread's CPU time per tick (`HORIZON_SPIKES`, spans.rs).
 rustix = { version = "1", default-features = false, features = ["std", "time", "process", "fs"] }
@@ -93,6 +100,8 @@ winresource = "0.1"
 
 [features]
 default = ["audio", "controllers"]
+native-d3d11 = ["dep:horizon-native-hud", "dep:horizon-native-scene", "dep:horizon-native-window", "dep:horizon-native-terrain", "dep:horizon-uwp-d3d11", "horizon-client-render/native-d3d11"]
+native-d3d11-readback = ["native-d3d11", "horizon-uwp-d3d11/readback-probe"]
 # Sound output. Without it (and `controllers`) the program links neither libasound nor libudev on
 # Linux: the server build (`--no-default-features`, released as horizon-engine; docs/server.md).
 audio = ["horizon-client-render/audio"]

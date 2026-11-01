@@ -433,6 +433,46 @@ impl Renderer {
         unsafe { self.swap_chain.Present(1, DXGI_PRESENT(0)).ok() }
     }
 
+    /// Count pixels differing from a black RGB clear before presentation.
+    /// This blocking readback is intended only for one-off diagnostics.
+    #[cfg(feature = "readback-probe")]
+    pub fn probe_non_black_pixels(&self) -> Result<(u32, u32, u64)> {
+        unsafe {
+            let back: ID3D11Texture2D = self.swap_chain.GetBuffer(0)?;
+            let mut desc = D3D11_TEXTURE2D_DESC::default();
+            back.GetDesc(&mut desc);
+            if desc.Width == 0 || desc.Height == 0 {
+                return Err(Error::from_hresult(E_INVALIDARG));
+            }
+            let (width, height) = (desc.Width, desc.Height);
+            desc.Usage = D3D11_USAGE_STAGING;
+            desc.BindFlags = 0;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
+            desc.MiscFlags = 0;
+            let mut staging = None;
+            self.device.CreateTexture2D(&desc, None, Some(&mut staging))?;
+            let staging = staging.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
+            self.context.CopyResource(&staging, &back);
+            let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+            self.context.Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
+            if mapped.pData.is_null() || mapped.RowPitch < width * 4 {
+                self.context.Unmap(&staging, 0);
+                return Err(Error::from_hresult(E_INVALIDARG));
+            }
+            let mut non_black = 0u64;
+            for y in 0..height as usize {
+                let row = (mapped.pData as *const u8).add(y * mapped.RowPitch as usize);
+                for pixel in std::slice::from_raw_parts(row, width as usize * 4).chunks_exact(4) {
+                    if pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0 {
+                        non_black += 1;
+                    }
+                }
+            }
+            self.context.Unmap(&staging, 0);
+            Ok((width, height, non_black))
+        }
+    }
+
     /// Samples four points from the current back buffer before presentation.
     /// Used only by the isolated renderer regression probe.
     #[cfg(feature = "readback-probe")]
