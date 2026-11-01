@@ -613,7 +613,7 @@ impl Graphics {
         automatic_worker_count(
             cores,
             self.battery,
-            cfg!(all(target_vendor = "uwp", target_arch = "arm")),
+            crate::options_file::LOW_MEMORY_UWP_DEFAULTS,
         )
     }
     /// The frame cap battery mode adds: 60 in a world, 30 in menus without a
@@ -661,10 +661,10 @@ pub fn apply_preset(preset: Preset, s: &mut crate::settings::Settings) {
     g.weather = true;
 }
 
-/// Leave a core for rendering; 32-bit UWP caps automatic worker memory.
-fn automatic_worker_count(cores: usize, battery: bool, arm32_uwp: bool) -> usize {
+/// Leave a core for rendering; constrained UWP targets cap worker memory.
+fn automatic_worker_count(cores: usize, battery: bool, low_memory_uwp: bool) -> usize {
     let auto = cores.saturating_sub(1).max(1);
-    let auto = if arm32_uwp { auto.min(2) } else { auto };
+    let auto = if low_memory_uwp { auto.min(2) } else { auto };
     if battery { auto.div_ceil(2) } else { auto }
 }
 
@@ -832,11 +832,7 @@ mod tests {
         let cores = std::thread::available_parallelism().map_or(2, |n| n.get());
         assert_eq!(
             g.worker_threads(),
-            automatic_worker_count(
-                cores,
-                false,
-                cfg!(all(target_vendor = "uwp", target_arch = "arm"))
-            )
+            automatic_worker_count(cores, false, crate::options_file::LOW_MEMORY_UWP_DEFAULTS)
         );
         assert_eq!(automatic_worker_count(8, false, true), 2);
         assert_eq!(automatic_worker_count(8, false, false), 7);

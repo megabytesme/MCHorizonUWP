@@ -105,10 +105,18 @@ fn def(key: &str, kind: Kind, default: V) -> Def {
     }
 }
 
-/// Conservative initial distances for 32-bit UWP devices. Saved options and
-/// explicit launch arguments still take precedence over these defaults.
-const fn distance_defaults(arm32_uwp: bool) -> (i32, i32) {
-    if arm32_uwp { (4, 5) } else { (12, 12) }
+/// UWP ARM32 and the native D3D11 ARM64 path use conservative defaults.
+/// Saved options and explicit launch arguments still take precedence.
+pub(crate) const LOW_MEMORY_UWP_DEFAULTS: bool = cfg!(all(
+    target_vendor = "uwp",
+    any(
+        target_arch = "arm",
+        all(target_arch = "aarch64", feature = "native-d3d11")
+    )
+));
+
+const fn distance_defaults(low_memory_uwp: bool) -> (i32, i32) {
+    if low_memory_uwp { (4, 5) } else { (12, 12) }
 }
 
 /// The processing order of `Options.processOptions`.
@@ -125,8 +133,7 @@ static TABLE: LazyLock<Vec<Def>> = LazyLock::new(|| {
         |key: &str, names: &'static [&'static str], d: i32| def(key, O(Named(names)), V::Int(d));
     let id = |key: &str, count: i32, d: i32| def(key, O(Id(count)), V::Int(d));
     let pb = |key: &str, d: bool| def(key, PB, V::Bool(d));
-    let (render_distance, simulation_distance) =
-        distance_defaults(cfg!(all(target_vendor = "uwp", target_arch = "arm")));
+    let (render_distance, simulation_distance) = distance_defaults(LOW_MEMORY_UWP_DEFAULTS);
     let mut t = vec![
         b("ao", true),
         i("biomeBlendRadius", 0, 7, 2),
@@ -843,14 +850,14 @@ mod control_tests {
     use super::*;
 
     #[test]
-    fn phone_distance_defaults_do_not_override_saved_values() {
+    fn conservative_distance_defaults_do_not_override_saved_values() {
         assert_eq!(distance_defaults(true), (4, 5));
         assert_eq!(distance_defaults(false), (12, 12));
         let saved = OptionsFile::parse("renderDistance:9\nsimulationDistance:7\n");
         assert_eq!(saved.int("renderDistance"), 9);
         assert_eq!(saved.int("simulationDistance"), 7);
         let first_run = OptionsFile::default();
-        let expected = distance_defaults(cfg!(all(target_vendor = "uwp", target_arch = "arm")));
+        let expected = distance_defaults(LOW_MEMORY_UWP_DEFAULTS);
         assert_eq!(
             (
                 first_run.int("renderDistance"),

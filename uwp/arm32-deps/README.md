@@ -71,7 +71,8 @@ prohibited API sentinels. This establishes link compatibility only; the
 existing wgpu rendering path still cannot render on a feature-level 9_1 phone.
 The native D3D11 renderer remains under development.
 
-For 32-bit UWP builds, first-run defaults are render distance 4 and simulation
-distance 5, and automatic chunk workers are capped at 2 to reduce phone memory
-pressure. Existing saved options and explicitly chosen worker counts or launch
-arguments take precedence. Other platforms retain their existing defaults.
+For 32-bit UWP and ARM64 UWP builds using the native D3D11 feature, first-run
+defaults are render distance 4 and simulation distance 5, and automatic chunk
+workers are capped at 2 to reduce memory pressure. Existing saved options and
+explicitly chosen worker counts or launch arguments take precedence. Other
+platforms, including ARM64 UWP builds using wgpu, retain their existing defaults.
