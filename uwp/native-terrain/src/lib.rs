@@ -171,6 +171,18 @@ impl Atlas {
         Ok(batches)
     }
 
+    /// Convert depth-writing solid/cutout quads and group by atlas page and
+    /// opaque pass. This reduces state changes while preserving triangle order
+    /// within each group. Do not use this for alpha-blended terrain: its
+    /// source draw order must be preserved by `convert_quads`.
+    pub fn convert_solid_quads(
+        &self,
+        vertices: &[SourceVertex],
+        origin: [f32; 3],
+    ) -> Result<Vec<MeshBatch>, Error> {
+        Ok(merge_solid_batches(self.convert_quads(vertices, origin)?))
+    }
+
     fn emit_triangle(
         &self,
         batches: &mut Vec<MeshBatch>,
@@ -261,6 +273,32 @@ pub struct MeshBatch {
     pub force_opaque: bool,
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u16>,
+}
+
+/// Group depth-writing batches by page/pass while keeping all indices within
+/// the u16 vertex limit. A new batch starts when that group is full.
+fn merge_solid_batches(batches: Vec<MeshBatch>) -> Vec<MeshBatch> {
+    let mut out: Vec<MeshBatch> = Vec::new();
+    let mut current = std::collections::HashMap::<(usize, bool), usize>::new();
+    for mut batch in batches {
+        let key = (batch.atlas_page, batch.force_opaque);
+        let destination = current
+            .get(&key)
+            .copied()
+            .filter(|&index| out[index].vertices.len() + batch.vertices.len() <= MAX_VERTICES);
+        if let Some(index) = destination {
+            let target = &mut out[index];
+            let base = target.vertices.len() as u16;
+            target
+                .indices
+                .extend(batch.indices.into_iter().map(|i| i + base));
+            target.vertices.append(&mut batch.vertices);
+        } else {
+            current.insert(key, out.len());
+            out.push(batch);
+        }
+    }
+    out
 }
 
 #[derive(Clone, Copy)]
@@ -404,6 +442,64 @@ mod tests {
         let batches = atlas.convert_quads(&vertices, [0.; 3]).unwrap();
         assert!(batches.len() > 1);
         assert!(batches.iter().all(|b| b.vertices.len() <= MAX_VERTICES
+            && b.indices.iter().all(|&i| (i as usize) < b.vertices.len())));
+    }
+
+    #[test]
+    fn solid_batches_merge_alternating_passes_without_losing_triangles() {
+        let atlas = Atlas::from_layers(1, 1, &[1, 2, 3, 255]).unwrap();
+        let vertices: Vec<_> = (0..100)
+            .flat_map(|i| {
+                let mut q = quad(if i % 2 == 0 { OPAQUE_LAYER } else { 0 }, 1.);
+                for v in &mut q {
+                    v.position[0] += i as f32;
+                }
+                q
+            })
+            .collect();
+        let ordered = atlas.convert_quads(&vertices, [0.; 3]).unwrap();
+        assert_eq!(ordered.len(), 100);
+        assert!(
+            ordered
+                .windows(2)
+                .all(|pair| pair[0].force_opaque != pair[1].force_opaque)
+        );
+        let merged = atlas.convert_solid_quads(&vertices, [0.; 3]).unwrap();
+        assert_eq!(merged.len(), 2);
+        let triangles = |batches: &[MeshBatch], opaque| -> Vec<Vertex> {
+            batches
+                .iter()
+                .filter(|b| b.force_opaque == opaque)
+                .flat_map(|b| b.indices.iter().map(|&i| b.vertices[i as usize]))
+                .collect()
+        };
+        for opaque in [false, true] {
+            assert_eq!(triangles(&merged, opaque), triangles(&ordered, opaque));
+        }
+    }
+
+    #[test]
+    fn solid_batch_merging_splits_before_u16_limit() {
+        let v = Vertex {
+            position: [0.; 3],
+            uv: [0.; 2],
+            color: [1.; 4],
+        };
+        let batch = |page, count| MeshBatch {
+            atlas_page: page,
+            force_opaque: true,
+            vertices: vec![v; count],
+            indices: vec![0, 1, 2],
+        };
+        let merged = merge_solid_batches(vec![batch(0, 65_532), batch(1, 3), batch(0, 6)]);
+        let page_zero: Vec<_> = merged.iter().filter(|b| b.atlas_page == 0).collect();
+        assert_eq!(page_zero.len(), 2);
+        assert_eq!(
+            page_zero.iter().map(|b| b.vertices.len()).sum::<usize>(),
+            65_538
+        );
+        assert_eq!(page_zero.iter().map(|b| b.indices.len()).sum::<usize>(), 6);
+        assert!(merged.iter().all(|b| b.vertices.len() <= MAX_VERTICES
             && b.indices.iter().all(|&i| (i as usize) < b.vertices.len())));
     }
 

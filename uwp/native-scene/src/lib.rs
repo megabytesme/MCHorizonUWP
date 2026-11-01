@@ -60,7 +60,7 @@ impl TerrainScene {
             return Err(std::io::Error::other("non-finite terrain origin").into());
         }
         let bounds = section_bounds(solid.iter().chain(translucent));
-        let solid = upload_batches(renderer, self.atlas.convert_quads(solid, [0.0; 3])?)?;
+        let solid = upload_batches(renderer, self.atlas.convert_solid_quads(solid, [0.0; 3])?)?;
         let translucent =
             upload_batches(renderer, self.atlas.convert_quads(translucent, [0.0; 3])?)?;
         self.sections.insert(
