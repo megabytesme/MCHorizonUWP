@@ -258,8 +258,16 @@ impl Game<'_> {
             }
         }
     }
+    /// The native renderer cannot yet swap both its terrain and HUD atlases
+    /// transactionally. Reject the change before touching the live scene.
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    pub(super) fn apply_staged_pack(&mut self, _staged: StagedPack) -> horizon_client::Result<()> {
+        Err("Runtime resource-pack reload is not yet supported by the native Direct3D renderer".into())
+    }
+
     /// The render-thread half: the renderer on the new pack's textures, then
     /// the swap (`ReloadInstance`'s application listeners).
+    #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
     pub(super) fn apply_staged_pack(&mut self, staged: StagedPack) -> horizon_client::Result<()> {
         let StagedPack {
             root,
