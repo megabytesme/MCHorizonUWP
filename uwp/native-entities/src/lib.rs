@@ -109,6 +109,41 @@ fn batches(atlas: &Atlas, source: &[SourceVertex], nether: bool) -> Vec<Batch> {
         }) {
             continue;
         }
+        // Most entity quads use a sprite wholly inside one page. Their
+        // triangles need no polygon clipping; emit them directly. On a page
+        // boundary retain the general path, since a degenerate UV triangle
+        // can legitimately map to both neighbouring pages.
+        let single_page = atlas.pages.iter().enumerate().find(|(_, page)| {
+            converted.iter().all(|v| {
+                (0..2).all(|axis| {
+                    let lo = page.origin[axis] as f32;
+                    let hi = (page.origin[axis] + page.size[axis]) as f32;
+                    if atlas.pages.len() == 1 {
+                        v.uv[axis] >= lo && v.uv[axis] <= hi
+                    } else {
+                        v.uv[axis] > lo && v.uv[axis] < hi
+                    }
+                })
+            })
+        });
+        if let Some((page_id, page)) = single_page {
+            for v in &mut converted {
+                for axis in 0..2 {
+                    v.uv[axis] = (v.uv[axis] - page.origin[axis] as f32) / page.size[axis] as f32;
+                }
+            }
+            if result.last().is_none_or(|b| b.page != page_id) {
+                result.push(Batch {
+                    page: page_id,
+                    vertices: Vec::new(),
+                });
+            }
+            let vertices = &mut result.last_mut().unwrap().vertices;
+            for i in [0, 1, 2, 0, 2, 3] {
+                vertices.push(converted[i]);
+            }
+            continue;
+        }
         for indices in [[0, 1, 2], [0, 2, 3]] {
             let tri = indices.map(|i| converted[i]);
             let min = [0, 1].map(|i| tri.iter().map(|v| v.uv[i]).fold(f32::INFINITY, f32::min));
@@ -195,6 +230,40 @@ mod tests {
                 .flat_map(|b| &b.vertices)
                 .all(|v| v.uv.iter().all(|u| *u >= 0. && *u <= 1.))
         );
+    }
+
+    #[test]
+    fn interior_quad_emits_original_triangles_in_page_coordinates() {
+        let atlas = Atlas::new([4, 2], &[255; 32], 2).unwrap();
+        let quad = [
+            vertex([0., 0., 1.], [0.1, 0.1]),
+            vertex([1., 0., 1.], [0.4, 0.1]),
+            vertex([1., 1., 2.], [0.4, 0.9]),
+            vertex([0., 1., 2.], [0.1, 0.9]),
+        ];
+        let out = batches(&atlas, &quad, false);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].page, 0);
+        assert_eq!(out[0].vertices.len(), 6);
+        for (v, i) in out[0].vertices.iter().zip([0, 1, 2, 0, 2, 3]) {
+            assert_eq!(v.position, quad[i].pos);
+            assert!((v.uv[0] - quad[i].uv[0] * 2.).abs() < 1e-6);
+            assert!((v.uv[1] - quad[i].uv[1]).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn page_boundary_with_collapsed_uv_keeps_both_page_draws() {
+        let atlas = Atlas::new([4, 2], &[255; 32], 2).unwrap();
+        let quad = [
+            vertex([0., 0., 0.], [0.5, 0.2]),
+            vertex([1., 0., 0.], [0.5, 0.2]),
+            vertex([1., 1., 0.], [0.5, 0.8]),
+            vertex([0., 1., 0.], [0.5, 0.8]),
+        ];
+        let out = batches(&atlas, &quad, false);
+        assert!(out.iter().any(|b| b.page == 0));
+        assert!(out.iter().any(|b| b.page == 1));
     }
 
     #[test]
