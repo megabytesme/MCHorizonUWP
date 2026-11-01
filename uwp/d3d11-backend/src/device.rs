@@ -108,6 +108,21 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    /// Identifies the adapter backing this device for the in-game debug overlay.
+    pub fn adapter_info(&self) -> Result<(String, u32)> {
+        let dxgi: IDXGIDevice = self.device.cast()?;
+        let desc = unsafe { dxgi.GetAdapter()?.GetDesc()? };
+        let end = desc
+            .Description
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(desc.Description.len());
+        Ok((
+            String::from_utf16_lossy(&desc.Description[..end]),
+            desc.VendorId,
+        ))
+    }
+
     /// Creates a renderer for an existing UWP CoreWindow.
     ///
     /// # Safety

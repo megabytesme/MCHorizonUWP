@@ -48,7 +48,12 @@ impl NativeTimings {
                 self.uploads,
                 self.upload_time.as_secs_f64() * 1000.0
             );
-            log::info!("Horizon: native scene visible sections={} opaque batches={} translucent batches={}", counts.0, counts.1, counts.2);
+            log::info!(
+                "Horizon: native scene visible sections={} opaque batches={} translucent batches={}",
+                counts.0,
+                counts.1,
+                counts.2
+            );
             *self = Self::default();
         }
     }
@@ -151,6 +156,10 @@ impl NativeRenderer {
 
     pub fn viewport_size(&self) -> [u32; 2] {
         self.viewport
+    }
+
+    pub fn adapter_info(&self) -> Option<(String, u32)> {
+        self.window.renderer().adapter_info().ok()
     }
 
     pub fn resize(&mut self, viewport: [u32; 2]) -> crate::Result<()> {
@@ -307,10 +316,14 @@ impl NativeRenderer {
             sample.mark(6);
             let counts = if timings.frames == 119 {
                 match (&self.scene, world_view) {
-                    (Some(scene), Some(view)) => scene.visible_counts(view, frame.camera.to_array()),
+                    (Some(scene), Some(view)) => {
+                        scene.visible_counts(view, frame.camera.to_array())
+                    }
                     _ => (0, 0, 0),
                 }
-            } else { (0, 0, 0) };
+            } else {
+                (0, 0, 0)
+            };
             timings.record(sample, counts);
         }
         Ok(true)

@@ -425,6 +425,52 @@ impl Game<'_> {
                 ],
             );
         }
+        #[cfg(feature = "native-d3d11")]
+        if let Some(r) = self.native_renderer.as_ref() {
+            static CPU: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+            d.group(
+                "system",
+                [format!(
+                    "CPU: {}",
+                    CPU.get_or_init(horizon_client::crash::cpu)
+                )],
+            );
+            if let Some((name, vendor)) = r.adapter_info() {
+                d.group(
+                    "system",
+                    [format!(
+                        "Display: {}x{} ({})",
+                        framebuffer[0],
+                        framebuffer[1],
+                        debug_overlay::vendor_name(vendor)
+                    )],
+                );
+                d.group(
+                    "system",
+                    [name, "Direct3D 11 (feature level 9_1)".to_owned()],
+                );
+            } else {
+                d.group(
+                    "system",
+                    [
+                        format!("Display: {}x{}", framebuffer[0], framebuffer[1]),
+                        "Direct3D 11 (feature level 9_1)".to_owned(),
+                    ],
+                );
+            }
+            if let Some(w) = self.window.as_ref() {
+                let density = w.scale_factor();
+                let logical = w.inner_size().to_logical::<f64>(density);
+                d.group(
+                    "system",
+                    [format!(
+                        "Window: {}x{} ({density:.2}x pixel density)",
+                        logical.width.round() as i32,
+                        logical.height.round() as i32
+                    )],
+                );
+            }
+        }
         // Horizon's own: HDR's output while the setting is on, under the GPU (a group of its
         // own would move others to the other column).
         if self.settings.horizon.hdr

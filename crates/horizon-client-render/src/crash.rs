@@ -240,7 +240,13 @@ pub fn cpu() -> String {
     };
     format!(
         "{threads}x {}",
-        name.unwrap_or_else(|| std::env::consts::ARCH.into())
+        name.unwrap_or_else(|| {
+            if cfg!(target_vendor = "uwp") {
+                "unknown".into()
+            } else {
+                std::env::consts::ARCH.into()
+            }
+        })
     )
 }
 
