@@ -23,6 +23,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "horizon-native-hud"
+version = "0.1.0"
+dependencies = [
+ "horizon-uwp-d3d11",
+ "log",
+]
+
+[[package]]
 name = "horizon-native-scene"
 version = "0.1.0"
 dependencies = [
@@ -46,10 +54,17 @@ dependencies = [
 name = "horizon-uwp-d3d11-probe"
 version = "0.1.0"
 dependencies = [
+ "horizon-native-hud",
  "horizon-native-scene",
  "horizon-native-terrain",
  "horizon-uwp-d3d11",
 ]
+
+[[package]]
+name = "log"
+version = "0.4.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "proc-macro2"

@@ -13,6 +13,7 @@ crate-type = ["staticlib"]
 horizon-uwp-d3d11 = { path = "..", features = ["readback-probe"] }
 horizon-native-scene = { path = "../../native-scene" }
 horizon-native-terrain = { path = "../../native-terrain" }
+horizon-native-hud = { path = "../../native-hud", features = ["d3d11"] }
 
 [profile.release]
 panic = "abort"

@@ -206,6 +206,23 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
         probe
             .renderer
             .set_depth_convention(DepthConvention::Forward);
+        let hud_result = test_hud(&probe.renderer);
+        let blend_result =
+            test_overlay_blends(&probe.renderer, &probe.occluded, &probe.atlas, identity);
+        let depth_reset_result = test_depth_reset(
+            &probe.renderer,
+            &probe.mesh,
+            &probe.occluded,
+            &probe.atlas,
+            identity,
+        );
+        let entity_result = test_entity_pass(
+            &probe.renderer,
+            &probe.occluded,
+            &probe.overlay,
+            &probe.atlas,
+            identity,
+        );
         let message = match (
             original.unwrap(),
             blended.unwrap(),
@@ -254,9 +271,13 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
                     && matches(&terrain, expected)
                     && matches(&patched, expected_patched)
                     && matches(&reverse, expected_reverse)
-                    && rejects_invalid_patch;
+                    && rejects_invalid_patch
+                    && hud_result.is_ok()
+                    && blend_result.is_ok()
+                    && depth_reset_result.is_ok()
+                    && entity_result.is_ok();
                 format!(
-                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; reverse={reverse:?}; invalid_rejected={rejects_invalid_patch}\n",
+                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; reverse={reverse:?}; invalid_rejected={rejects_invalid_patch}; hud={hud_result:?}; blends={blend_result:?}; depth_reset={depth_reset_result:?}; entity={entity_result:?}\n",
                     if pass { "PASS" } else { "FAIL" }
                 )
             }
@@ -270,6 +291,188 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
         probe.checked = true;
     }
     probe.renderer.present().is_ok()
+}
+
+fn test_entity_pass(
+    renderer: &Renderer,
+    front: &Mesh,
+    back: &Mesh,
+    atlas: &Texture,
+    matrix: [[f32; 4]; 4],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let translucent_green = renderer.create_atlas(1, 1, &[0, 255, 0, 64])?;
+    renderer.begin_frame([0.2, 0.4, 0.6, 1.0])?;
+    renderer.draw_pass(front, &translucent_green, matrix, DrawPass::Entity);
+    renderer.draw_pass(back, atlas, matrix, DrawPass::Entity);
+    let pixels = renderer.probe_pixels()?;
+    let expected = [38u8, 140, 115, 255];
+    if pixels
+        .iter()
+        .any(|p| p.iter().zip(expected).any(|(&a, b)| a.abs_diff(b) > 5))
+    {
+        return Err(
+            std::io::Error::other(format!("entity blend/depth mismatch: {pixels:?}")).into(),
+        );
+    }
+    Ok(())
+}
+
+fn test_depth_reset(
+    renderer: &Renderer,
+    near: &Mesh,
+    far: &Mesh,
+    atlas: &Texture,
+    matrix: [[f32; 4]; 4],
+) -> Result<(), Box<dyn std::error::Error>> {
+    renderer.begin_frame([0.0, 0.0, 0.0, 1.0])?;
+    renderer.draw(near, atlas, matrix);
+    renderer.clear_depth()?;
+    renderer.draw(far, atlas, matrix);
+    let pixels = renderer.probe_pixels()?;
+    let expected = [255u8, 230, 70, 255];
+    if pixels
+        .iter()
+        .any(|p| p.iter().zip(expected).any(|(&a, b)| a.abs_diff(b) > 5))
+    {
+        return Err(
+            std::io::Error::other(format!("depth reset did not expose hand: {pixels:?}")).into(),
+        );
+    }
+    Ok(())
+}
+
+fn test_overlay_blends(
+    renderer: &Renderer,
+    mesh: &Mesh,
+    atlas: &Texture,
+    matrix: [[f32; 4]; 4],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let cases = [
+        (DrawPass::OverlayInvert, [204u8, 148, 139, 255]),
+        (DrawPass::OverlayAdditive, [255u8, 255, 223, 255]),
+        (DrawPass::OverlayVignette, [0u8, 10, 111, 255]),
+    ];
+    for (pass, expected) in cases {
+        renderer.begin_frame([0.2, 0.4, 0.6, 1.0])?;
+        renderer.draw_pass(mesh, atlas, matrix, pass);
+        let pixels = renderer.probe_pixels()?;
+        if pixels
+            .iter()
+            .any(|p| p.iter().zip(expected).any(|(&a, b)| a.abs_diff(b) > 5))
+        {
+            return Err(std::io::Error::other(format!(
+                "{pass:?}: expected={expected:?} got={pixels:?}"
+            ))
+            .into());
+        }
+    }
+    let transparent = renderer.create_atlas(1, 1, &[255, 255, 255, 0])?;
+    renderer.begin_frame([0.2, 0.4, 0.6, 1.0])?;
+    renderer.draw_pass(mesh, &transparent, matrix, DrawPass::OverlayInvert);
+    let pixels = renderer.probe_pixels()?;
+    let expected = [51u8, 102, 153, 255];
+    if pixels
+        .iter()
+        .any(|p| p.iter().zip(expected).any(|(&a, b)| a.abs_diff(b) > 5))
+    {
+        return Err(std::io::Error::other(format!(
+            "transparent invert modified background: {pixels:?}"
+        ))
+        .into());
+    }
+    renderer.begin_frame([0.2, 0.4, 0.6, 1.0])?;
+    renderer.draw_pass(mesh, &transparent, matrix, DrawPass::Opaque);
+    let opaque = renderer.probe_pixels()?;
+    if opaque.iter().any(|p| *p != [255, 255, 255, 255]) {
+        return Err(
+            std::io::Error::other(format!("forced opaque discarded texels: {opaque:?}")).into(),
+        );
+    }
+    renderer.begin_frame([0.2, 0.4, 0.6, 1.0])?;
+    renderer.draw_pass(mesh, &transparent, matrix, DrawPass::Cutout);
+    let cutout = renderer.probe_pixels()?;
+    if cutout
+        .iter()
+        .any(|p| p.iter().zip(expected).any(|(&a, b)| a.abs_diff(b) > 5))
+    {
+        return Err(
+            std::io::Error::other(format!("cutout drew transparent texels: {cutout:?}")).into(),
+        );
+    }
+    Ok(())
+}
+
+fn test_hud(renderer: &Renderer) -> Result<(), Box<dyn std::error::Error>> {
+    use horizon_native_hud::{Atlas, Blend, Run, Vertex, d3d11::HudRenderer};
+    let mut atlas = Atlas::new(
+        [2, 2],
+        &[
+            255, 70, 70, 255, 70, 255, 70, 255, 70, 70, 255, 255, 255, 230, 70, 255,
+        ],
+        1,
+    )?;
+    let make = |x, y, u, v| Vertex {
+        pos: [x, y],
+        uv: [u, v],
+        color: [1.0; 4],
+        depth: 0.5,
+        glint_uv: [0.0; 2],
+    };
+    let tl = make(0.125, 0.125, 0.0, 0.0);
+    let tr = make(0.875, 0.125, 1.0, 0.0);
+    let bl = make(0.125, 0.875, 0.0, 1.0);
+    let br = make(0.875, 0.875, 1.0, 1.0);
+    let vertices = [tl, tr, br, tl, br, bl];
+    let draws = atlas.convert(
+        &vertices,
+        &[Run {
+            vertices: 0..6,
+            blend: Blend::Alpha,
+        }],
+    )?;
+    let mut hud = HudRenderer::new(renderer, &atlas)?;
+    renderer.begin_frame([0.0, 0.0, 0.0, 1.0])?;
+    hud.draw(renderer, &atlas, &[], &draws, [1, 1], 1.0)?;
+    let original = renderer.probe_pixels()?;
+    let patches = atlas.patch([0, 0], [1, 1], &[180, 30, 220, 255])?;
+    let mut unsupported = draws.clone();
+    for draw in &mut unsupported {
+        draw.blend = Blend::EndPortal;
+    }
+    if hud
+        .draw(renderer, &atlas, &patches, &unsupported, [1, 1], 1.0)
+        .is_ok()
+    {
+        return Err(std::io::Error::other("unsupported HUD blend was accepted").into());
+    }
+    renderer.begin_frame([0.0, 0.0, 0.0, 1.0])?;
+    hud.draw(renderer, &atlas, &[], &draws, [1, 1], 1.0)?;
+    let updated = renderer.probe_pixels()?;
+    let expected = [
+        [255u8, 70, 70, 255],
+        [70, 255, 70, 255],
+        [70, 70, 255, 255],
+        [255, 230, 70, 255],
+    ];
+    let expected_updated = [
+        [180u8, 30, 220, 255],
+        [70, 255, 70, 255],
+        [70, 70, 255, 255],
+        [255, 230, 70, 255],
+    ];
+    let matches = |actual: [[u8; 4]; 4], expected: [[u8; 4]; 4]| {
+        actual
+            .iter()
+            .zip(expected)
+            .all(|(a, b)| a.iter().zip(b).all(|(&x, y)| x.abs_diff(y) <= 5))
+    };
+    if !matches(original, expected) || !matches(updated, expected_updated) {
+        return Err(std::io::Error::other(format!(
+            "HUD pixels: original={original:?} updated={updated:?}"
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 #[unsafe(no_mangle)]

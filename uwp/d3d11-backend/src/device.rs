@@ -21,7 +21,10 @@ use windows::{
 
 const VS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-vs.cso"));
 const PS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-ps.cso"));
+const PS_OPAQUE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-opaque-ps.cso"));
+const PS_ENTITY: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/entity-ps.cso"));
 const PS_ALPHA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-alpha-ps.cso"));
+const PS_INVERT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/terrain-invert-ps.cso"));
 
 /// Expanded vertex format used by the feature-level 9_1 terrain pipeline.
 #[repr(C)]
@@ -50,9 +53,14 @@ pub struct Texture {
 /// Rendering state for solid/cutout terrain, translucent geometry, or UI.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DrawPass {
+    Opaque,
+    Entity,
     Cutout,
     Translucent,
     Overlay,
+    OverlayInvert,
+    OverlayAdditive,
+    OverlayVignette,
 }
 
 /// Depth convention used by the projection matrix submitted with each draw.
@@ -65,7 +73,10 @@ pub enum DepthConvention {
 struct Pipeline {
     vertex_shader: ID3D11VertexShader,
     pixel_shader: ID3D11PixelShader,
+    opaque_shader: ID3D11PixelShader,
+    entity_shader: ID3D11PixelShader,
     alpha_shader: ID3D11PixelShader,
+    invert_shader: ID3D11PixelShader,
     input_layout: ID3D11InputLayout,
     constants: ID3D11Buffer,
     sampler: ID3D11SamplerState,
@@ -76,6 +87,9 @@ struct Pipeline {
     reverse_read: ID3D11DepthStencilState,
     depth_off: ID3D11DepthStencilState,
     alpha_blend: ID3D11BlendState,
+    invert_blend: ID3D11BlendState,
+    additive_blend: ID3D11BlendState,
+    vignette_blend: ID3D11BlendState,
 }
 
 /// A hardware Direct3D 11 device deliberately restricted to feature level 9_1.
@@ -365,6 +379,23 @@ impl Renderer {
         Ok(())
     }
 
+    /// Clears depth without changing the color target, for the player's hand.
+    pub fn clear_depth(&self) -> Result<()> {
+        let depth = self
+            .depth
+            .as_ref()
+            .ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
+        let clear = match self.depth_convention {
+            DepthConvention::Forward => 1.0,
+            DepthConvention::Reverse => 0.0,
+        };
+        unsafe {
+            self.context
+                .ClearDepthStencilView(depth, D3D11_CLEAR_DEPTH.0 as u32, clear, 0);
+        }
+        Ok(())
+    }
+
     /// Draws one mesh with a row-major world-to-clip matrix and its atlas.
     pub fn draw(&self, mesh: &Mesh, atlas: &Texture, view_projection: [[f32; 4]; 4]) {
         self.draw_pass(mesh, atlas, view_projection, DrawPass::Cutout);
@@ -400,6 +431,18 @@ impl Renderer {
                 .IASetIndexBuffer(&mesh.indices, DXGI_FORMAT_R16_UINT, 0);
             self.context.RSSetState(&p.rasterizer);
             let (depth, blend, pixel) = match (pass, self.depth_convention) {
+                (DrawPass::Opaque, DepthConvention::Forward) => {
+                    (&p.depth_write, None, &p.opaque_shader)
+                }
+                (DrawPass::Opaque, DepthConvention::Reverse) => {
+                    (&p.reverse_write, None, &p.opaque_shader)
+                }
+                (DrawPass::Entity, DepthConvention::Forward) => {
+                    (&p.depth_write, Some(&p.alpha_blend), &p.entity_shader)
+                }
+                (DrawPass::Entity, DepthConvention::Reverse) => {
+                    (&p.reverse_write, Some(&p.alpha_blend), &p.entity_shader)
+                }
                 (DrawPass::Cutout, DepthConvention::Forward) => {
                     (&p.depth_write, None, &p.pixel_shader)
                 }
@@ -413,6 +456,15 @@ impl Renderer {
                     (&p.reverse_read, Some(&p.alpha_blend), &p.alpha_shader)
                 }
                 (DrawPass::Overlay, _) => (&p.depth_off, Some(&p.alpha_blend), &p.alpha_shader),
+                (DrawPass::OverlayInvert, _) => {
+                    (&p.depth_off, Some(&p.invert_blend), &p.invert_shader)
+                }
+                (DrawPass::OverlayAdditive, _) => {
+                    (&p.depth_off, Some(&p.additive_blend), &p.alpha_shader)
+                }
+                (DrawPass::OverlayVignette, _) => {
+                    (&p.depth_off, Some(&p.vignette_blend), &p.alpha_shader)
+                }
             };
             self.context.OMSetDepthStencilState(depth, 0);
             self.context.OMSetBlendState(blend, None, u32::MAX);
@@ -437,6 +489,17 @@ impl Renderer {
     /// This blocking readback is intended only for one-off diagnostics.
     #[cfg(feature = "readback-probe")]
     pub fn probe_non_black_pixels(&self) -> Result<(u32, u32, u64)> {
+        self.probe_pixels_different_from([0, 0, 0], 0)
+    }
+
+    /// Count backbuffer pixels differing from a known RGB clear by more than
+    /// `tolerance` per channel. Call before presenting the frame.
+    #[cfg(feature = "readback-probe")]
+    pub fn probe_pixels_different_from(
+        &self,
+        clear: [u8; 3],
+        tolerance: u8,
+    ) -> Result<(u32, u32, u64)> {
         unsafe {
             let back: ID3D11Texture2D = self.swap_chain.GetBuffer(0)?;
             let mut desc = D3D11_TEXTURE2D_DESC::default();
@@ -450,11 +513,13 @@ impl Renderer {
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
             desc.MiscFlags = 0;
             let mut staging = None;
-            self.device.CreateTexture2D(&desc, None, Some(&mut staging))?;
+            self.device
+                .CreateTexture2D(&desc, None, Some(&mut staging))?;
             let staging = staging.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
             self.context.CopyResource(&staging, &back);
             let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
-            self.context.Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
+            self.context
+                .Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
             if mapped.pData.is_null() || mapped.RowPitch < width * 4 {
                 self.context.Unmap(&staging, 0);
                 return Err(Error::from_hresult(E_INVALIDARG));
@@ -463,7 +528,11 @@ impl Renderer {
             for y in 0..height as usize {
                 let row = (mapped.pData as *const u8).add(y * mapped.RowPitch as usize);
                 for pixel in std::slice::from_raw_parts(row, width as usize * 4).chunks_exact(4) {
-                    if pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0 {
+                    // The swap chain is BGRA while `clear` is RGB.
+                    if pixel[2].abs_diff(clear[0]) > tolerance
+                        || pixel[1].abs_diff(clear[1]) > tolerance
+                        || pixel[0].abs_diff(clear[2]) > tolerance
+                    {
                         non_black += 1;
                     }
                 }
@@ -550,11 +619,29 @@ impl Pipeline {
             device.CreateVertexShader(VS, None::<&ID3D11ClassLinkage>, Some(&mut vertex_shader))?;
             let mut pixel_shader = None;
             device.CreatePixelShader(PS, None::<&ID3D11ClassLinkage>, Some(&mut pixel_shader))?;
+            let mut opaque_shader = None;
+            device.CreatePixelShader(
+                PS_OPAQUE,
+                None::<&ID3D11ClassLinkage>,
+                Some(&mut opaque_shader),
+            )?;
+            let mut entity_shader = None;
+            device.CreatePixelShader(
+                PS_ENTITY,
+                None::<&ID3D11ClassLinkage>,
+                Some(&mut entity_shader),
+            )?;
             let mut alpha_shader = None;
             device.CreatePixelShader(
                 PS_ALPHA,
                 None::<&ID3D11ClassLinkage>,
                 Some(&mut alpha_shader),
+            )?;
+            let mut invert_shader = None;
+            device.CreatePixelShader(
+                PS_INVERT,
+                None::<&ID3D11ClassLinkage>,
+                Some(&mut invert_shader),
             )?;
             let elements = [
                 D3D11_INPUT_ELEMENT_DESC {
@@ -627,10 +714,31 @@ impl Pipeline {
             };
             let mut alpha_blend = None;
             device.CreateBlendState(&desc, Some(&mut alpha_blend))?;
+            desc.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_DEST_COLOR;
+            desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_COLOR;
+            desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+            desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+            let mut invert_blend = None;
+            device.CreateBlendState(&desc, Some(&mut invert_blend))?;
+            desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+            desc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+            desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+            desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+            let mut additive_blend = None;
+            device.CreateBlendState(&desc, Some(&mut additive_blend))?;
+            desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+            desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_COLOR;
+            desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
+            desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+            let mut vignette_blend = None;
+            device.CreateBlendState(&desc, Some(&mut vignette_blend))?;
             Ok(Self {
                 vertex_shader: vertex_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 pixel_shader: pixel_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                opaque_shader: opaque_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                entity_shader: entity_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 alpha_shader: alpha_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                invert_shader: invert_shader.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 input_layout: input_layout.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 constants: constants.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 sampler: sampler.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
@@ -641,6 +749,9 @@ impl Pipeline {
                 reverse_read,
                 depth_off,
                 alpha_blend: alpha_blend.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                invert_blend: invert_blend.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                additive_blend: additive_blend.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                vignette_blend: vignette_blend.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
             })
         }
     }
