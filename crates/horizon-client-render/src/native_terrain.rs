@@ -2,6 +2,8 @@
 //! conversion used by the feature-level 9_1 D3D11 renderer.
 
 use crate::{
+    assets::RenderAssets,
+    gfx::RendererAssets,
     mesher::{SectionMesh, TerrainVertex},
     sprites::Sprites,
 };
@@ -11,6 +13,16 @@ use horizon_native_terrain::{Atlas, Error, SourceVertex};
 /// collection finalized without pixels is rejected by the atlas validator.
 pub fn from_sprites(sprites: &Sprites) -> Result<Atlas, Error> {
     Atlas::from_layers(sprites.size, sprites.count(), &sprites.pixels)
+}
+
+/// Build the native block atlas from the resources passed to renderer startup.
+pub fn from_renderer_assets(assets: &RendererAssets<'_>) -> Result<Atlas, Error> {
+    Atlas::from_layers(assets.sprite_size, assets.layers as usize, assets.sprite_pixels)
+}
+
+/// Build the native block atlas from loaded game assets before renderer startup.
+pub fn from_render_assets(assets: &RenderAssets) -> Result<Atlas, Error> {
+    Atlas::from_layers(assets.sprite_size, assets.texture_layers as usize, &assets.pixels)
 }
 
 /// A section's real meshed quads, kept in Horizon's solid/translucent order.
