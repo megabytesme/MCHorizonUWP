@@ -365,10 +365,9 @@ impl Game<'_> {
         if !self.mount_active() || self.remote.is_some() {
             return false;
         }
-        let Some(r) = self.renderer.as_ref() else {
+        let Some(batch) = self.gui_scale() else {
             return true;
         };
-        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
         let Some(slot) = self.slot_at(&batch, self.cursor.0, self.cursor.1) else {
             return true;
         };

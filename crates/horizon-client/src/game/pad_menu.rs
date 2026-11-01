@@ -102,9 +102,7 @@ impl Game<'_> {
     }
 
     pub(super) fn gui_scale(&self) -> Option<HudBatch> {
-        self.renderer
-            .as_ref()
-            .map(|r| HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]))
+        self.renderer_viewport().map(HudBatch::new)
     }
 
     /// Focus mode is on for the open screen.

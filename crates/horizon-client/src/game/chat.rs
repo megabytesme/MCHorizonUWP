@@ -582,10 +582,9 @@ impl Game<'_> {
         }
         self.ui.chat_draft_shown = false;
         self.refresh_dynamic_registries();
-        let size = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.viewport_size()[0], r.viewport_size()[1]]
-        });
-        let b = HudBatch::new(size);
+        let b = self
+            .gui_scale()
+            .unwrap_or_else(|| HudBatch::new([1280, 720]));
         let m = Measure(&self.gui.atlas.font);
         let c = Commands {
             dispatcher: chat_tree(&self.remote),
@@ -899,9 +898,7 @@ impl Game<'_> {
     }
     pub(super) fn chat_scroll(&mut self, amount: f32) {
         let cursor = self.cursor;
-        let height = self.renderer.as_ref().map_or(720.0, |r| {
-            HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]).height
-        });
+        let height = self.gui_scale().map_or(720.0, |batch| batch.height);
         let _ = height;
         let mouse = (cursor.0.floor() as i32, cursor.1.floor() as i32);
         if let Some(screen) = self.ui.chat_screen.as_mut()
@@ -916,18 +913,15 @@ impl Game<'_> {
     }
     pub(super) fn chat_click(&mut self) {
         let cursor = self.cursor;
-        let height = self.renderer.as_ref().map_or(720.0, |r| {
-            HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]).height
-        });
+        let batch = self.gui_scale();
+        let height = batch.as_ref().map_or(720.0, |batch| batch.height);
         let m = Measure(&self.gui.atlas.font);
         let c = Commands {
             dispatcher: chat_tree(&self.remote),
             registries: &self.ui.registries,
         };
         if self.ui.in_bed_chat && self.sleeping.is_some() {
-            let width = self.renderer.as_ref().map_or(1280.0, |r| {
-                HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]).width
-            });
+            let width = batch.as_ref().map_or(1280.0, |batch| batch.width);
             let (x, y, w, h) = Self::leave_bed_button(width, height);
             if horizon_client::screen_draw::inside((cursor.0 as i32, cursor.1 as i32), x, y, w, h) {
                 self.wake_up();

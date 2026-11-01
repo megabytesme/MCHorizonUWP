@@ -425,10 +425,9 @@ impl Game<'_> {
     }
     /// A left press on a sort button sorts its slots (true).
     pub(super) fn sort_press(&mut self) -> bool {
-        let Some(r) = self.renderer.as_ref() else {
+        let Some(batch) = self.gui_scale() else {
             return false;
         };
-        let batch = HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]);
         let (ox, oy) = self.inventory_origin(&batch);
         let (cx, cy) = self.cursor;
         let hit = self.sort_buttons().into_iter().find(|((x, y), _)| {

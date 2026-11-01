@@ -89,9 +89,7 @@ impl Game<'_> {
         Self::options_path().with_file_name(horizon_client::shader_pack_list::DIR)
     }
     pub(super) fn gui_size(&self) -> (f32, f32) {
-        let size = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.viewport_size()[0], r.viewport_size()[1]]
-        });
+        let size = self.renderer_viewport().unwrap_or([1280, 720]);
         let b = HudBatch::new(size);
         (b.width, b.height)
     }
@@ -171,9 +169,10 @@ impl Game<'_> {
             self.dragging = true;
         }
         let size = self.gui_size();
-        let framebuffer = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.viewport_size()[0] as i32, r.viewport_size()[1] as i32]
-        });
+        let framebuffer = self
+            .renderer_viewport()
+            .unwrap_or([1280, 720])
+            .map(|v| v as i32);
         let mut ui = std::mem::take(&mut self.ui.options);
         let events = ui.click(
             &mut self.settings,
@@ -190,9 +189,10 @@ impl Game<'_> {
     }
     pub(super) fn options_drag(&mut self) -> Result<()> {
         let size = self.gui_size();
-        let framebuffer = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.viewport_size()[0] as i32, r.viewport_size()[1] as i32]
-        });
+        let framebuffer = self
+            .renderer_viewport()
+            .unwrap_or([1280, 720])
+            .map(|v| v as i32);
         let mut ui = std::mem::take(&mut self.ui.options);
         let events = ui.click(
             &mut self.settings,
@@ -223,9 +223,10 @@ impl Game<'_> {
             .shortcut(&self.gui.atlas, shortcut, &mut self.clipboard)
     }
     pub(super) fn options_scroll(&mut self, amount: f32) -> Result<()> {
-        let framebuffer = self.renderer.as_ref().map_or([1280, 720], |r| {
-            [r.viewport_size()[0] as i32, r.viewport_size()[1] as i32]
-        });
+        let framebuffer = self
+            .renderer_viewport()
+            .unwrap_or([1280, 720])
+            .map(|v| v as i32);
         if self.ui.options.page() == Page::Video && self.has_control_down() {
             // VideoSettingsScreen.mouseScrolled: Ctrl with the wheel steps the GUI scale.
             let mut ui = std::mem::take(&mut self.ui.options);

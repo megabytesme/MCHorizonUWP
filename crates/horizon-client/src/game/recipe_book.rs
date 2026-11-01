@@ -588,8 +588,7 @@ impl Game<'_> {
         (self.recipe_ui.time / SWAP_TICKS).floor() as usize
     }
     fn batch_for_size(&self) -> Option<HudBatch> {
-        let r = self.renderer.as_ref()?;
-        Some(HudBatch::new([r.viewport_size()[0], r.viewport_size()[1]]))
+        self.gui_scale()
     }
 
     // ---- clicks ----

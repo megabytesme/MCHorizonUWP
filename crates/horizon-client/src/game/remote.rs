@@ -682,6 +682,10 @@ impl Game<'_> {
         if let Some(r) = self.renderer.as_mut() {
             horizon_client::presentation::clear_sections(r, self.world.layout());
         }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(r) = self.native_renderer.as_mut() {
+            horizon_client::presentation::clear_sections(r, self.world.layout());
+        }
         self.apply_settings();
         self.clear_waypoints();
         self.boss_overlay.reset();
@@ -864,6 +868,10 @@ impl Game<'_> {
         self.clear_lod();
         self.pending_uploads.clear();
         if let Some(r) = self.renderer.as_mut() {
+            horizon_client::presentation::clear_sections(r, self.world.layout());
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(r) = self.native_renderer.as_mut() {
             horizon_client::presentation::clear_sections(r, self.world.layout());
         }
         let saves = std::env::current_dir()?.join("saves");
@@ -1690,6 +1698,10 @@ impl Game<'_> {
             if let Some(renderer) = self.renderer.as_mut() {
                 horizon_client::presentation::clear_sections(renderer, self.world.layout());
             }
+            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            if let Some(renderer) = self.native_renderer.as_mut() {
+                horizon_client::presentation::clear_sections(renderer, self.world.layout());
+            }
         }
         let has_sky = self
             .remote
@@ -1732,6 +1744,10 @@ impl Game<'_> {
             freed.extend(self.streaming.forget(&mut self.world, x, z));
         }
         if let Some(renderer) = self.renderer.as_mut() {
+            horizon_client::presentation::remove_columns(renderer, gone.iter().copied());
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(renderer) = self.native_renderer.as_mut() {
             horizon_client::presentation::remove_columns(renderer, gone.iter().copied());
         }
         horizon_client::chunk::free_columns(freed, gone.len());
@@ -2566,6 +2582,10 @@ impl Game<'_> {
                     .block_entities
                     .retain(|k, _| (k.0 >> 4, k.2 >> 4) != (x, z));
                 if let Some(renderer) = self.renderer.as_mut() {
+                    horizon_client::presentation::remove_columns(renderer, [(x, z)]);
+                }
+                #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+                if let Some(renderer) = self.native_renderer.as_mut() {
                     horizon_client::presentation::remove_columns(renderer, [(x, z)]);
                 }
             }

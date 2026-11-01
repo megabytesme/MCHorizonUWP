@@ -241,10 +241,10 @@ impl Game<'_> {
         ) {
             return Ok(());
         }
-        let Some(renderer) = &mut self.renderer else {
+        let Some(size) = self.renderer_viewport() else {
             return Ok(());
         };
-        let mut hud = HudBatch::new([renderer.viewport_size()[0], renderer.viewport_size()[1]]);
+        let mut hud = HudBatch::new(size);
         let progress = match self.pending_save.as_ref().map(|save| &save.stage) {
             Some(Stage::Chunks(_)) => 0.25,
             Some(Stage::Entities(_)) => 0.5,
@@ -257,7 +257,14 @@ impl Game<'_> {
             "Saving world...",
             progress,
         );
-        horizon_client::presentation::present(renderer, &loading_frame(&hud))?;
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(renderer) = &mut self.native_renderer {
+            renderer.present(&loading_frame(&hud))?;
+            return Ok(());
+        }
+        if let Some(renderer) = &mut self.renderer {
+            horizon_client::presentation::present(renderer, &loading_frame(&hud))?;
+        }
         Ok(())
     }
 }
