@@ -3,7 +3,9 @@ param(
     [string]$AngleBin,
     [switch]$RequireAngle,
     [string]$Executable,
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [string]$Resources,
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$')][string]$IdentityName
 )
 $ErrorActionPreference = 'Stop'
 function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
@@ -62,7 +64,25 @@ foreach ($name in @('libEGL.dll', 'libGLESv2.dll', 'z.dll')) {
 }
 foreach ($file in $angleFiles) { Copy-Item -LiteralPath $file -Destination $stage -Force }
 if ($AngleBin) { Write-Host "Staged ANGLE DLLs from $AngleBin" }
+$resourceStage = Join-Path $stage 'resources'
+if (-not $Resources -and (Test-Path -LiteralPath $resourceStage)) {
+    throw "Resource staging already exists; use a fresh OutputDirectory: $resourceStage"
+}
+if ($Resources) {
+    $resourceRoot = [IO.Path]::GetFullPath($Resources)
+    if (-not (Test-Path -LiteralPath (Join-Path $resourceRoot 'horizon-resources.json') -PathType Leaf)) {
+        throw "Prepared resource manifest not found under $resourceRoot"
+    }
+    if (Test-Path -LiteralPath $resourceStage) {
+        throw "Resource staging already exists; use a fresh OutputDirectory: $resourceStage"
+    }
+    Copy-Item -LiteralPath $resourceRoot -Destination $resourceStage -Recurse
+    Write-Host "Staged user-provided resources from $resourceRoot"
+}
 $manifest = (Get-Content (Join-Path $hostDir 'AppxManifest.xml') -Raw).Replace('ProcessorArchitecture="x64"', "ProcessorArchitecture=`"$Architecture`"")
+if ($IdentityName) {
+    $manifest = $manifest.Replace('Name="HorizonUWPPrototype"', "Name=`"$IdentityName`"")
+}
 Set-Content -Path (Join-Path $stage 'AppxManifest.xml') -Value $manifest -Encoding UTF8
 Add-Type -AssemblyName System.Drawing
 foreach ($logo in @(@('StoreLogo.png',50), @('Square150x150Logo.png',150), @('Square44x44Logo.png',44))) {
@@ -75,6 +95,7 @@ foreach ($logo in @(@('StoreLogo.png',50), @('Square150x150Logo.png',150), @('Sq
 $makeAppx = '${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe'
 $makeAppx = [Environment]::ExpandEnvironmentVariables($makeAppx.Replace('${env:ProgramFiles(x86)}', '%ProgramFiles(x86)%'))
 $package = Join-Path $build "HorizonUWP-$Architecture.appx"
-& $makeAppx pack /d $stage /p $package /o
-if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed ($LASTEXITCODE)" }
+$makeLog = Join-Path $build "makeappx-$Architecture.log"
+& $makeAppx pack /d $stage /p $package /o *> $makeLog
+if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed ($LASTEXITCODE); see $makeLog" }
 Write-Host "Unsigned package: $package"

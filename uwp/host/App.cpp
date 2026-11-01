@@ -145,6 +145,18 @@ public:
 #ifdef HORIZON_UWP_GAME_BRIDGE
         auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
         auto resources = Platform::String::Concat(local_path, ref new Platform::String(L"\\resources"));
+        // Prefer prepared, writable local resources; a sideloaded phone package
+        // can include the same prepared tree under its installed location.
+        auto manifest = Platform::String::Concat(resources, ref new Platform::String(L"\\horizon-resources.json"));
+        HANDLE local_manifest = CreateFile2(manifest->Data(), GENERIC_READ,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                            OPEN_EXISTING, nullptr);
+        if (local_manifest == INVALID_HANDLE_VALUE) {
+            auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
+            resources = Platform::String::Concat(installed, ref new Platform::String(L"\\resources"));
+        } else {
+            CloseHandle(local_manifest);
+        }
         auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
         const int32_t result = horizon_uwp_run(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                                                reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
