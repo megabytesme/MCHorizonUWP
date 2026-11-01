@@ -7,4 +7,4 @@
 mod device;
 
 #[cfg(windows)]
-pub use device::{DrawPass, Mesh, Renderer, Texture, Vertex};
+pub use device::{DepthConvention, DrawPass, Mesh, Renderer, Texture, Vertex};

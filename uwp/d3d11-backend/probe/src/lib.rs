@@ -1,6 +1,6 @@
 use horizon_native_scene::TerrainScene;
 use horizon_native_terrain::{Atlas, SourceVertex};
-use horizon_uwp_d3d11::{DrawPass, Mesh, Renderer, Texture, Vertex};
+use horizon_uwp_d3d11::{DepthConvention, DrawPass, Mesh, Renderer, Texture, Vertex};
 use std::ffi::c_void;
 
 unsafe extern "C" {
@@ -192,14 +192,29 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
                 probe.renderer.draw(&probe.mesh, &probe.atlas, identity);
                 probe.renderer.probe_pixels()
             });
+        probe
+            .renderer
+            .set_depth_convention(DepthConvention::Reverse);
+        let reverse_pixels = probe
+            .renderer
+            .begin_frame([0.04, 0.18, 0.28, 1.0])
+            .and_then(|_| {
+                probe.renderer.draw(&probe.occluded, &probe.atlas, identity);
+                probe.renderer.draw(&probe.mesh, &probe.atlas, identity);
+                probe.renderer.probe_pixels()
+            });
+        probe
+            .renderer
+            .set_depth_convention(DepthConvention::Forward);
         let message = match (
             original.unwrap(),
             blended.unwrap(),
             overlay_pixels,
             terrain_pixels,
             patched_pixels,
+            reverse_pixels,
         ) {
-            (Ok(pixels), Ok(blended), Ok(overlay), Ok(terrain), Ok(patched)) => {
+            (Ok(pixels), Ok(blended), Ok(overlay), Ok(terrain), Ok(patched), Ok(reverse)) => {
                 let expected = [
                     [255u8, 70, 70, 255],
                     [70, 255, 70, 255],
@@ -224,6 +239,7 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
                     [70, 70, 255, 255],
                     [255, 230, 70, 255],
                 ];
+                let expected_reverse = [[255u8, 230, 70, 255]; 4];
                 let matches = |pixels: &[[u8; 4]; 4], expected: [[u8; 4]; 4]| {
                     pixels.iter().zip(expected).all(|(actual, expected)| {
                         actual
@@ -237,14 +253,15 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
                     && matches(&overlay, expected_overlay)
                     && matches(&terrain, expected)
                     && matches(&patched, expected_patched)
+                    && matches(&reverse, expected_reverse)
                     && rejects_invalid_patch;
                 format!(
-                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; invalid_rejected={rejects_invalid_patch}\n",
+                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; reverse={reverse:?}; invalid_rejected={rejects_invalid_patch}\n",
                     if pass { "PASS" } else { "FAIL" }
                 )
             }
-            (before, blended, overlay, terrain, patched) => format!(
-                "FAIL: readback errors before={before:?} blended={blended:?} overlay={overlay:?} terrain={terrain:?} patched={patched:?}\n"
+            (before, blended, overlay, terrain, patched, reverse) => format!(
+                "FAIL: readback errors before={before:?} blended={blended:?} overlay={overlay:?} terrain={terrain:?} patched={patched:?} reverse={reverse:?}\n"
             ),
         };
         unsafe {

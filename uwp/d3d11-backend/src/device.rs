@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, marker::PhantomData, rc::Rc};
 use windows::{
     Win32::{
         Foundation::{E_INVALIDARG, HMODULE},
@@ -55,6 +55,13 @@ pub enum DrawPass {
     Overlay,
 }
 
+/// Depth convention used by the projection matrix submitted with each draw.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DepthConvention {
+    Forward,
+    Reverse,
+}
+
 struct Pipeline {
     vertex_shader: ID3D11VertexShader,
     pixel_shader: ID3D11PixelShader,
@@ -65,6 +72,8 @@ struct Pipeline {
     rasterizer: ID3D11RasterizerState,
     depth_write: ID3D11DepthStencilState,
     depth_read: ID3D11DepthStencilState,
+    reverse_write: ID3D11DepthStencilState,
+    reverse_read: ID3D11DepthStencilState,
     depth_off: ID3D11DepthStencilState,
     alpha_blend: ID3D11BlendState,
 }
@@ -77,6 +86,8 @@ pub struct Renderer {
     target: Option<ID3D11RenderTargetView>,
     depth: Option<ID3D11DepthStencilView>,
     pipeline: Pipeline,
+    depth_convention: DepthConvention,
+    _ui_thread: PhantomData<Rc<()>>,
 }
 
 impl Renderer {
@@ -132,7 +143,14 @@ impl Renderer {
             target: Some(target),
             depth: Some(depth),
             pipeline,
+            depth_convention: DepthConvention::Forward,
+            _ui_thread: PhantomData,
         })
+    }
+
+    /// Selects the depth convention of subsequently submitted frames.
+    pub fn set_depth_convention(&mut self, convention: DepthConvention) {
+        self.depth_convention = convention;
     }
 
     fn create_targets(
@@ -314,7 +332,7 @@ impl Renderer {
         Ok(())
     }
 
-    /// Starts a frame with conventional depth (near = 0, far = 1).
+    /// Starts a frame using the selected depth convention.
     pub fn begin_frame(&self, color: [f32; 4]) -> Result<()> {
         let target = self
             .target
@@ -327,8 +345,12 @@ impl Renderer {
         unsafe {
             let desc = self.swap_chain.GetDesc1()?;
             self.context.ClearRenderTargetView(target, &color);
+            let clear_depth = match self.depth_convention {
+                DepthConvention::Forward => 1.0,
+                DepthConvention::Reverse => 0.0,
+            };
             self.context
-                .ClearDepthStencilView(depth, D3D11_CLEAR_DEPTH.0 as u32, 1.0, 0);
+                .ClearDepthStencilView(depth, D3D11_CLEAR_DEPTH.0 as u32, clear_depth, 0);
             self.context
                 .OMSetRenderTargets(Some(&[Some(target.clone())]), depth);
             self.context.RSSetViewports(Some(&[D3D11_VIEWPORT {
@@ -377,10 +399,20 @@ impl Renderer {
             self.context
                 .IASetIndexBuffer(&mesh.indices, DXGI_FORMAT_R16_UINT, 0);
             self.context.RSSetState(&p.rasterizer);
-            let (depth, blend, pixel) = match pass {
-                DrawPass::Cutout => (&p.depth_write, None, &p.pixel_shader),
-                DrawPass::Translucent => (&p.depth_read, Some(&p.alpha_blend), &p.alpha_shader),
-                DrawPass::Overlay => (&p.depth_off, Some(&p.alpha_blend), &p.alpha_shader),
+            let (depth, blend, pixel) = match (pass, self.depth_convention) {
+                (DrawPass::Cutout, DepthConvention::Forward) => {
+                    (&p.depth_write, None, &p.pixel_shader)
+                }
+                (DrawPass::Cutout, DepthConvention::Reverse) => {
+                    (&p.reverse_write, None, &p.pixel_shader)
+                }
+                (DrawPass::Translucent, DepthConvention::Forward) => {
+                    (&p.depth_read, Some(&p.alpha_blend), &p.alpha_shader)
+                }
+                (DrawPass::Translucent, DepthConvention::Reverse) => {
+                    (&p.reverse_read, Some(&p.alpha_blend), &p.alpha_shader)
+                }
+                (DrawPass::Overlay, _) => (&p.depth_off, Some(&p.alpha_blend), &p.alpha_shader),
             };
             self.context.OMSetDepthStencilState(depth, 0);
             self.context.OMSetBlendState(blend, None, u32::MAX);
@@ -535,9 +567,13 @@ impl Pipeline {
             };
             let mut rasterizer = None;
             device.CreateRasterizerState(&desc, Some(&mut rasterizer))?;
-            let depth_write = create_depth_state(device, true, true)?;
-            let depth_read = create_depth_state(device, true, false)?;
-            let depth_off = create_depth_state(device, false, false)?;
+            let depth_write = create_depth_state(device, true, true, D3D11_COMPARISON_LESS_EQUAL)?;
+            let depth_read = create_depth_state(device, true, false, D3D11_COMPARISON_LESS_EQUAL)?;
+            let reverse_write =
+                create_depth_state(device, true, true, D3D11_COMPARISON_GREATER_EQUAL)?;
+            let reverse_read =
+                create_depth_state(device, true, false, D3D11_COMPARISON_GREATER_EQUAL)?;
+            let depth_off = create_depth_state(device, false, false, D3D11_COMPARISON_ALWAYS)?;
             let mut desc = D3D11_BLEND_DESC::default();
             desc.RenderTarget[0] = D3D11_RENDER_TARGET_BLEND_DESC {
                 BlendEnable: true.into(),
@@ -561,6 +597,8 @@ impl Pipeline {
                 rasterizer: rasterizer.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 depth_write,
                 depth_read,
+                reverse_write,
+                reverse_read,
                 depth_off,
                 alpha_blend: alpha_blend.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
             })
@@ -572,6 +610,7 @@ fn create_depth_state(
     device: &ID3D11Device,
     enabled: bool,
     write: bool,
+    comparison: D3D11_COMPARISON_FUNC,
 ) -> Result<ID3D11DepthStencilState> {
     let stencil = D3D11_DEPTH_STENCILOP_DESC {
         StencilFailOp: D3D11_STENCIL_OP_KEEP,
@@ -586,7 +625,7 @@ fn create_depth_state(
         } else {
             D3D11_DEPTH_WRITE_MASK_ZERO
         },
-        DepthFunc: D3D11_COMPARISON_LESS_EQUAL,
+        DepthFunc: comparison,
         StencilEnable: false.into(),
         StencilReadMask: 0xff,
         StencilWriteMask: 0xff,
