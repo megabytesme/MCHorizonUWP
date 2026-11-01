@@ -17,13 +17,13 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / ".local" / "arm32-windows-sys"
 CARGO_HOME = Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo"))
-VERSIONS = ("0.52.0", "0.59.0", "0.61.2")
+VERSIONS = ("0.52.0", "0.59.0", "0.60.2", "0.61.2")
 FILES = {
     "src/Windows/Win32/Networking/WinSock/mod.rs": ("WSADATA", "SERVENT"),
     "src/Windows/Win32/System/WindowsProgramming/mod.rs": ("DELAYLOAD_INFO",),
     "src/Windows/Win32/System/Memory/mod.rs": ("MEMORY_BASIC_INFORMATION",),
 }
-EXPECTED_COUNTS = {"0.52.0": 3, "0.59.0": 1, "0.61.2": 2}
+EXPECTED_COUNTS = {"0.52.0": 3, "0.59.0": 1, "0.60.2": 2, "0.61.2": 2}
 
 
 def find_source(version: str) -> Path | None:
