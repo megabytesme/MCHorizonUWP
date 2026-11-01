@@ -33,12 +33,19 @@ pub struct TerrainScene {
 }
 
 impl TerrainScene {
-    pub fn new(renderer: &Renderer, atlas: Atlas) -> Result<Self> {
-        let textures = atlas
-            .pages
-            .iter()
-            .map(|page| renderer.create_atlas(page.width, page.height, &page.rgba))
-            .collect::<std::result::Result<Vec<_>, _>>()?;
+    pub fn new(renderer: &Renderer, mut atlas: Atlas) -> Result<Self> {
+        let mut textures = Vec::with_capacity(atlas.pages.len());
+        for page in &mut atlas.pages {
+            let levels: Vec<&[u8]> = std::iter::once(page.rgba.as_slice())
+                .chain(page.mips.iter().map(Vec::as_slice))
+                .collect();
+            let texture = renderer.create_atlas_mips(page.width, page.height, &levels)?;
+            // Mesh conversion only needs dimensions and placements. Release each
+            // CPU page promptly, reducing the startup peak on smaller devices.
+            page.rgba = Vec::new();
+            page.mips = Vec::new();
+            textures.push(texture);
+        }
         Ok(Self {
             atlas,
             textures,
@@ -145,10 +152,20 @@ impl TerrainScene {
     }
 
     /// Visible section and draw-batch counts for opt-in diagnostics.
-    pub fn visible_counts(&self, view_projection: [[f32; 4]; 4], camera: [f64; 3]) -> (usize, usize, usize) {
+    pub fn visible_counts(
+        &self,
+        view_projection: [[f32; 4]; 4],
+        camera: [f64; 3],
+    ) -> (usize, usize, usize) {
         let sections = self.visible_sections(view_projection, camera);
-        let opaque = sections.iter().map(|(section, _)| section.solid.len()).sum();
-        let translucent = sections.iter().map(|(section, _)| section.translucent.len()).sum();
+        let opaque = sections
+            .iter()
+            .map(|(section, _)| section.solid.len())
+            .sum();
+        let translucent = sections
+            .iter()
+            .map(|(section, _)| section.translucent.len())
+            .sum();
         (sections.len(), opaque, translucent)
     }
 

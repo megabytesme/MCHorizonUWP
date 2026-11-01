@@ -48,6 +48,7 @@ pub struct Texture {
     texture: ID3D11Texture2D,
     width: u32,
     height: u32,
+    mipmapped: bool,
 }
 
 /// Rendering state for solid/cutout terrain, translucent geometry, or UI.
@@ -80,6 +81,7 @@ struct Pipeline {
     input_layout: ID3D11InputLayout,
     constants: ID3D11Buffer,
     sampler: ID3D11SamplerState,
+    mip_sampler: ID3D11SamplerState,
     rasterizer: ID3D11RasterizerState,
     depth_write: ID3D11DepthStencilState,
     depth_read: ID3D11DepthStencilState,
@@ -251,21 +253,41 @@ impl Renderer {
 
     /// Uploads a tightly packed RGBA8 atlas within the 9_1 2048-pixel limit.
     pub fn create_atlas(&self, width: u32, height: u32, rgba: &[u8]) -> Result<Texture> {
-        let expected = (width as usize)
-            .checked_mul(height as usize)
-            .and_then(|n| n.checked_mul(4));
+        self.create_atlas_mips(width, height, &[rgba])
+    }
+
+    /// Uploads explicitly authored mip levels; each level is tightly packed.
+    pub fn create_atlas_mips(&self, width: u32, height: u32, levels: &[&[u8]]) -> Result<Texture> {
         if width == 0
             || height == 0
             || width > 2048
             || height > 2048
-            || expected != Some(rgba.len())
+            || levels.is_empty()
+            || levels.len() > (width.min(height).ilog2() + 1) as usize
         {
             return Err(Error::from_hresult(E_INVALIDARG));
+        }
+        let mut data = Vec::with_capacity(levels.len());
+        for (level, rgba) in levels.iter().enumerate() {
+            let w = width >> level;
+            let h = height >> level;
+            if (w as usize)
+                .checked_mul(h as usize)
+                .and_then(|n| n.checked_mul(4))
+                != Some(rgba.len())
+            {
+                return Err(Error::from_hresult(E_INVALIDARG));
+            }
+            data.push(D3D11_SUBRESOURCE_DATA {
+                pSysMem: rgba.as_ptr().cast(),
+                SysMemPitch: w * 4,
+                ..Default::default()
+            });
         }
         let desc = D3D11_TEXTURE2D_DESC {
             Width: width,
             Height: height,
-            MipLevels: 1,
+            MipLevels: levels.len() as u32,
             ArraySize: 1,
             Format: DXGI_FORMAT_R8G8B8A8_UNORM,
             SampleDesc: DXGI_SAMPLE_DESC {
@@ -276,15 +298,10 @@ impl Renderer {
             BindFlags: D3D11_BIND_SHADER_RESOURCE.0 as u32,
             ..Default::default()
         };
-        let data = D3D11_SUBRESOURCE_DATA {
-            pSysMem: rgba.as_ptr().cast(),
-            SysMemPitch: width * 4,
-            ..Default::default()
-        };
         unsafe {
             let mut texture = None;
             self.device
-                .CreateTexture2D(&desc, Some(&data), Some(&mut texture))?;
+                .CreateTexture2D(&desc, Some(data.as_ptr()), Some(&mut texture))?;
             let texture = texture.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
             let mut view = None;
             self.device
@@ -294,6 +311,7 @@ impl Renderer {
                 texture,
                 width,
                 height,
+                mipmapped: levels.len() > 1,
             })
         }
     }
@@ -317,7 +335,8 @@ impl Renderer {
         let expected = (width as usize)
             .checked_mul(height as usize)
             .and_then(|n| n.checked_mul(4));
-        if width == 0
+        if atlas.mipmapped
+            || width == 0
             || height == 0
             || right > atlas.width
             || bottom > atlas.height
@@ -472,8 +491,14 @@ impl Renderer {
             self.context
                 .VSSetConstantBuffers(0, Some(&[Some(p.constants.clone())]));
             self.context.PSSetShader(pixel, None);
-            self.context
-                .PSSetSamplers(0, Some(&[Some(p.sampler.clone())]));
+            self.context.PSSetSamplers(
+                0,
+                Some(&[Some(if atlas.mipmapped {
+                    p.mip_sampler.clone()
+                } else {
+                    p.sampler.clone()
+                })]),
+            );
             self.context
                 .PSSetShaderResources(0, Some(&[Some(atlas.view.clone())]));
             self.context.DrawIndexed(mesh.index_count, 0, 0);
@@ -686,6 +711,12 @@ impl Pipeline {
             };
             let mut sampler = None;
             device.CreateSamplerState(&desc, Some(&mut sampler))?;
+            let mip_desc = D3D11_SAMPLER_DESC {
+                Filter: D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR,
+                ..desc
+            };
+            let mut mip_sampler = None;
+            device.CreateSamplerState(&mip_desc, Some(&mut mip_sampler))?;
             let desc = D3D11_RASTERIZER_DESC {
                 FillMode: D3D11_FILL_SOLID,
                 CullMode: D3D11_CULL_NONE,
@@ -742,6 +773,7 @@ impl Pipeline {
                 input_layout: input_layout.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 constants: constants.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 sampler: sampler.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                mip_sampler: mip_sampler.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 rasterizer: rasterizer.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
                 depth_write,
                 depth_read,

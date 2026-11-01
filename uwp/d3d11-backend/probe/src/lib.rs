@@ -206,6 +206,7 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
         probe
             .renderer
             .set_depth_convention(DepthConvention::Forward);
+        let mip_result = test_mip_selection(&probe.renderer, identity);
         let hud_result = test_hud(&probe.renderer);
         let blend_result =
             test_overlay_blends(&probe.renderer, &probe.occluded, &probe.atlas, identity);
@@ -272,12 +273,13 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
                     && matches(&patched, expected_patched)
                     && matches(&reverse, expected_reverse)
                     && rejects_invalid_patch
+                    && mip_result.is_ok()
                     && hud_result.is_ok()
                     && blend_result.is_ok()
                     && depth_reset_result.is_ok()
                     && entity_result.is_ok();
                 format!(
-                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; reverse={reverse:?}; invalid_rejected={rejects_invalid_patch}; hud={hud_result:?}; blends={blend_result:?}; depth_reset={depth_reset_result:?}; entity={entity_result:?}\n",
+                    "{}: pixels={pixels:?}; blended={blended:?}; overlay={overlay:?}; terrain={terrain:?}; patched={patched:?}; reverse={reverse:?}; invalid_rejected={rejects_invalid_patch}; mip={mip_result:?}; hud={hud_result:?}; blends={blend_result:?}; depth_reset={depth_reset_result:?}; entity={entity_result:?}\n",
                     if pass { "PASS" } else { "FAIL" }
                 )
             }
@@ -291,6 +293,58 @@ pub unsafe extern "C" fn horizon_d3d11_probe_render(probe: *mut c_void) -> bool 
         probe.checked = true;
     }
     probe.renderer.present().is_ok()
+}
+
+fn test_mip_selection(
+    renderer: &Renderer,
+    matrix: [[f32; 4]; 4],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let solid = |w: usize, color: [u8; 4]| -> Vec<u8> { (0..w * w).flat_map(|_| color).collect() };
+    let base = solid(16, [255, 0, 0, 255]);
+    let mid = solid(8, [0, 255, 0, 255]);
+    let min = solid(4, [0, 0, 255, 255]);
+    let texture = renderer.create_atlas_mips(16, 16, &[&base, &mid, &min])?;
+    if renderer
+        .update_atlas(&texture, 0, 0, 1, 1, &[255, 255, 255, 255])
+        .is_ok()
+    {
+        return Err(std::io::Error::other(
+            "mipmapped atlas update should be rejected without refreshing its other levels",
+        )
+        .into());
+    }
+    let quad = [
+        Vertex {
+            position: [-1.0, -1.0, 0.5],
+            uv: [0.0, 4096.0],
+            color: [1.0; 4],
+        },
+        Vertex {
+            position: [-1.0, 1.0, 0.5],
+            uv: [0.0, 0.0],
+            color: [1.0; 4],
+        },
+        Vertex {
+            position: [1.0, -1.0, 0.5],
+            uv: [4096.0, 4096.0],
+            color: [1.0; 4],
+        },
+        Vertex {
+            position: [1.0, 1.0, 0.5],
+            uv: [4096.0, 0.0],
+            color: [1.0; 4],
+        },
+    ];
+    let mesh = renderer.create_mesh(&quad, &[0, 1, 2, 2, 1, 3])?;
+    renderer.begin_frame([0.0, 0.0, 0.0, 1.0])?;
+    renderer.draw(&mesh, &texture, matrix);
+    let pixels = renderer.probe_pixels()?;
+    if pixels.iter().any(|p| p[0] > 5 || p[1] > 5 || p[2] < 250) {
+        return Err(
+            std::io::Error::other(format!("expected blue minified mip, got {pixels:?}")).into(),
+        );
+    }
+    Ok(())
 }
 
 fn test_entity_pass(
