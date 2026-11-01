@@ -1,0 +1,22 @@
+[package]
+name = "horizon-native-entities-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+glam = "0.30"
+horizon-native-entities = { path = ".." }
+horizon-native-hud = { path = "../../native-hud" }
+horizon-client-render = { path = "../../../crates/horizon-client-render", default-features = false }
+horizon-uwp-d3d11 = { path = "../../d3d11-backend", features = ["readback-probe"] }
+
+[patch.crates-io]
+wgpu-hal = { path = "../../../third_party/wgpu-hal" }
+winit = { path = "../../../third_party/winit" }
+parking_lot_core = { path = "../../../third_party/parking_lot_core" }
