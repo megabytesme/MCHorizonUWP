@@ -2,7 +2,7 @@
 use horizon_client_render::mesher::Vertex;
 use horizon_native_entities::d3d11::EntityRenderer;
 use horizon_native_hud::Atlas;
-use horizon_uwp_d3d11::{DepthConvention, Renderer};
+use horizon_uwp_d3d11::{DepthConvention, DrawPass, Renderer, Vertex as GpuVertex};
 use std::ffi::c_void;
 
 #[repr(C)]
@@ -48,6 +48,15 @@ unsafe fn run(window: *mut c_void) -> Result<Report, Box<dyn std::error::Error>>
     entities.draw_vertices(&renderer, &atlas, &[], &quad, glam::Mat4::IDENTITY, false)?;
     let first = renderer.probe_pixels()?;
     let (width, height, non_black) = renderer.probe_non_black_pixels()?;
+    // The entity wrote reverse-Z depth at 0.5. Closer translucent water at
+    // 0.8 must blend over it, retaining both the entity and water colors.
+    let water = renderer.create_atlas(1, 1, &[0, 0, 255, 128])?;
+    let water_vertices: Vec<_> = quad.iter().map(|v| GpuVertex {
+        position: [v.pos[0], v.pos[1], 0.8], uv: [0.5, 0.5], color: [1.; 4],
+    }).collect();
+    let water_mesh = renderer.create_mesh(&water_vertices, &[0, 1, 2, 0, 2, 3])?;
+    renderer.draw_pass(&water_mesh, &water, glam::Mat4::IDENTITY.to_cols_array_2d(), DrawPass::Translucent);
+    let composite = renderer.probe_pixels()?;
     let patches = atlas.patch([0, 0], [2, 2], &[0, 0, 255, 255].repeat(4))?;
     renderer.begin_frame([0., 0., 0., 1.])?;
     entities.draw_vertices(
@@ -63,6 +72,10 @@ unsafe fn run(window: *mut c_void) -> Result<Report, Box<dyn std::error::Error>>
         && first[0][1] < 10
         && first[1][1] > 200
         && first[1][0] < 10
+        && (110..=145).contains(&composite[0][0])
+        && (110..=145).contains(&composite[0][2])
+        && (110..=145).contains(&composite[1][1])
+        && (110..=145).contains(&composite[1][2])
         && patched[0][2] > 200
         && patched[1][1] > 200
         && non_black >= u64::from(width) * u64::from(height) * 9 / 10;

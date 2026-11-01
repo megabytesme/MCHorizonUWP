@@ -23,5 +23,6 @@ The `probe` crate is an isolated x64 UWP GPU test. Build its static library for
 `HORIZON_ENTITY_PROBE_LIB` to the resulting library and run `probe/build-host.cmd`.
 The host must be registered in a separate UWP package. It writes
 `LocalState/entity-probe.txt` after rendering and reading back a two-page
-Horizon entity quad, then changing one page. The strict linker rejects any
+Horizon entity quad, compositing translucent water over the depth-tested
+entity, then changing one atlas page. The strict linker rejects any
 live dummy window functions or forbidden desktop import sentinels.

@@ -18,6 +18,7 @@ extern "C" void horizon_uwp_get_metrics() {}
 extern "C" void horizon_uwp_set_cursor_visible() {}
 extern "C" void horizon_uwp_set_cursor_position() {}
 extern "C" void horizon_uwp_window_handle() {}
+extern "C" void horizon_uwp_set_ime_allowed() {}
 
 using namespace Windows::ApplicationModel::Activation;
 using namespace Windows::ApplicationModel::Core;
