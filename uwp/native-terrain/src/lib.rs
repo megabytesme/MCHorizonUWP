@@ -44,6 +44,8 @@ pub struct AtlasPage {
     pub width: u32,
     pub height: u32,
     pub rgba: Vec<u8>,
+    /// Additional, independently packed mip levels, from largest to smallest.
+    pub mips: Vec<Vec<u8>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -98,6 +100,7 @@ impl Atlas {
                 width,
                 height,
                 rgba: vec![0; width as usize * height as usize * 4],
+                mips: Vec::new(),
             };
             for i in 0..count {
                 let x = (i % cols) as u32 * tile;
@@ -119,6 +122,101 @@ impl Atlas {
                 }
             }
             pages.push(page);
+        }
+        Ok(Self {
+            pages,
+            sprite_side,
+            placements,
+        })
+    }
+
+    /// Pack precomputed layer-major mip images into aligned, wrapped slots.
+    /// Every supplied level must have room for a one-texel gutter.
+    pub fn from_mip_layers(
+        sprite_side: u32,
+        layer_count: usize,
+        levels: &[Vec<u8>],
+    ) -> Result<Self, Error> {
+        if !sprite_side.is_power_of_two()
+            || sprite_side < 4
+            || sprite_side > MAX_TEXTURE_SIDE / 2
+            || layer_count == 0
+            || layer_count > OPAQUE_LAYER as usize
+            || levels.is_empty()
+        {
+            return Err(Error(
+                "invalid mipmapped sprite dimensions or layer count".into(),
+            ));
+        }
+        let max_extra = sprite_side.ilog2().saturating_sub(1) as usize;
+        if levels.len() > max_extra + 1 {
+            return Err(Error("mip levels would consume the sprite gutter".into()));
+        }
+        for (level, pixels) in levels.iter().enumerate() {
+            let side = sprite_side >> level;
+            if (side as usize)
+                .checked_mul(side as usize)
+                .and_then(|n| n.checked_mul(4))
+                .and_then(|n| n.checked_mul(layer_count))
+                != Some(pixels.len())
+            {
+                return Err(Error("mip pixel buffer has the wrong length".into()));
+            }
+        }
+        let tile = sprite_side * 2;
+        let inset = sprite_side / 2;
+        let max_cols = MAX_TEXTURE_SIDE / tile;
+        let capacity = max_cols as usize * max_cols as usize;
+        let mut pages = Vec::new();
+        let mut placements = Vec::with_capacity(layer_count);
+        for first in (0..layer_count).step_by(capacity) {
+            let count = (layer_count - first).min(capacity);
+            let mut cols = 1usize;
+            while cols * cols < count && cols < max_cols as usize {
+                cols += 1;
+            }
+            let rows = count.div_ceil(cols);
+            let width = (cols as u32 * tile).next_power_of_two();
+            let height = (rows as u32 * tile).next_power_of_two();
+            let mut packed = Vec::with_capacity(levels.len());
+            for (level, pixels) in levels.iter().enumerate() {
+                let side = sprite_side >> level;
+                let level_tile = tile >> level;
+                let level_inset = inset >> level;
+                let level_width = width >> level;
+                let level_height = height >> level;
+                let layer_bytes = (side * side * 4) as usize;
+                let mut page = vec![0; level_width as usize * level_height as usize * 4];
+                for i in 0..count {
+                    let x = (i % cols) as u32 * level_tile;
+                    let y = (i / cols) as u32 * level_tile;
+                    let source = &pixels[(first + i) * layer_bytes..(first + i + 1) * layer_bytes];
+                    for ty in 0..level_tile {
+                        let sy = (ty + side - (level_inset % side)) % side;
+                        for tx in 0..level_tile {
+                            let sx = (tx + side - (level_inset % side)) % side;
+                            let src = ((sy * side + sx) * 4) as usize;
+                            let dst = (((y + ty) * level_width + x + tx) * 4) as usize;
+                            page[dst..dst + 4].copy_from_slice(&source[src..src + 4]);
+                        }
+                    }
+                }
+                packed.push(page);
+            }
+            for i in 0..count {
+                placements.push(Placement {
+                    page: pages.len(),
+                    x: (i % cols) as u32 * tile + inset,
+                    y: (i / cols) as u32 * tile + inset,
+                });
+            }
+            let rgba = packed.remove(0);
+            pages.push(AtlasPage {
+                width,
+                height,
+                rgba,
+                mips: packed,
+            });
         }
         Ok(Self {
             pages,
@@ -373,6 +471,42 @@ mod tests {
             color: 0xff33_2211,
             light: 0x00f0,
         })
+    }
+
+    #[test]
+    fn mip_slots_keep_wrapped_gutters_isolated_at_every_level() {
+        let levels = vec![
+            [vec![11u8; 4 * 4 * 4], vec![99u8; 4 * 4 * 4]].concat(),
+            [vec![11u8; 2 * 2 * 4], vec![99u8; 2 * 2 * 4]].concat(),
+        ];
+        let atlas = Atlas::from_mip_layers(4, 2, &levels).unwrap();
+        let page = &atlas.pages[0];
+        for (level, pixels) in std::iter::once(&page.rgba)
+            .chain(page.mips.iter())
+            .enumerate()
+        {
+            let tile = 8 >> level;
+            let width = page.width >> level;
+            for y in 0..tile {
+                for x in 0..tile * 2 {
+                    let px = ((y * width + x) * 4) as usize;
+                    assert_eq!(pixels[px], if x < tile { 11 } else { 99 });
+                }
+            }
+        }
+        assert!(Atlas::from_mip_layers(4, 2, &levels[..1]).is_ok());
+        assert!(
+            Atlas::from_mip_layers(
+                4,
+                2,
+                &levels[..2]
+                    .iter()
+                    .chain(std::iter::once(&vec![]))
+                    .cloned()
+                    .collect::<Vec<_>>()
+            )
+            .is_err()
+        );
     }
 
     #[test]

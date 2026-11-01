@@ -140,13 +140,29 @@ impl NativeRenderer {
     /// Upload block sprite pages before accepting world section meshes.
     pub fn set_terrain(
         &mut self,
-        pixels: &[u8],
-        sprite_size: u32,
-        layers: u32,
+        assets: &horizon_client_render::assets::RenderAssets,
     ) -> crate::Result<()> {
-        let atlas =
-            horizon_native_terrain::Atlas::from_layers(sprite_size, layers as usize, pixels)?;
-        let scene = horizon_native_scene::TerrainScene::new(self.window.renderer(), atlas)?;
+        let mip_scene = (|| -> crate::Result<_> {
+            let atlas = native_terrain::from_render_assets(assets)?;
+            Ok(horizon_native_scene::TerrainScene::new(
+                self.window.renderer(),
+                atlas,
+            )?)
+        })();
+        let scene = match mip_scene {
+            Ok(scene) => scene,
+            Err(error) => {
+                log::warn!(
+                    "Native terrain mip atlas unavailable ({error}); retrying with the compact atlas"
+                );
+                let atlas = horizon_native_terrain::Atlas::from_layers(
+                    assets.sprite_size,
+                    assets.texture_layers as usize,
+                    &assets.pixels,
+                )?;
+                horizon_native_scene::TerrainScene::new(self.window.renderer(), atlas)?
+            }
+        };
         self.window
             .renderer_mut()
             .set_depth_convention(horizon_uwp_d3d11::DepthConvention::Reverse);

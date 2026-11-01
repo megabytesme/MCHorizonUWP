@@ -17739,7 +17739,7 @@ impl Loading {
                 .take()
                 .ok_or("native renderer is unavailable")?;
             let assets = &loaded.pack.render;
-            renderer.set_terrain(&assets.pixels, assets.sprite_size, assets.texture_layers)?;
+            renderer.set_terrain(assets)?;
             renderer
         };
         log::info!(
