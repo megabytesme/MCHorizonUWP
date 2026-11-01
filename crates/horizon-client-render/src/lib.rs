@@ -53,6 +53,8 @@ pub mod mod_list;
 pub mod model_library;
 pub mod models;
 pub mod multiline_edit;
+#[cfg(feature = "native-d3d11")]
+pub mod native_terrain;
 pub mod options_file;
 pub mod options_fixes;
 pub mod options_ui;

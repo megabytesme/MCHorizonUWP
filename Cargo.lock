@@ -1209,6 +1209,7 @@ dependencies = [
  "horizon-core",
  "horizon-hdr",
  "horizon-items",
+ "horizon-native-terrain",
  "horizon-protocol",
  "horizon-shader-api",
  "horizon-shaders",
@@ -1310,6 +1311,10 @@ dependencies = [
  "wasmparser",
  "zip",
 ]
+
+[[package]]
+name = "horizon-native-terrain"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-port-pack"
