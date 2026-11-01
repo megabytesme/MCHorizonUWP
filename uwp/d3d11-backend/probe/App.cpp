@@ -1,6 +1,10 @@
 // UWP lifecycle glue for the Rust-owned Direct3D 9_1 renderer test.
 #include <windows.h>
 #include <windows.storage.h>
+#ifdef HORIZON_D3D11_PHONE_DIALOG
+#include <windows.ui.popups.h>
+#include <cstring>
+#endif
 
 extern "C" void* __cdecl horizon_d3d11_probe_create(void* window);
 extern "C" bool __cdecl horizon_d3d11_probe_render(void* probe);
@@ -14,6 +18,18 @@ extern "C" void __cdecl horizon_d3d11_probe_report(const unsigned char* text, si
     DWORD written = 0;
     if (size <= MAXDWORD) WriteFile(file, text, static_cast<DWORD>(size), &written, nullptr);
     CloseHandle(file);
+#ifdef HORIZON_D3D11_PHONE_DIALOG
+    try {
+        const bool passed = size >= 4 && std::memcmp(text, "PASS", 4) == 0;
+        auto content = passed
+            ? L"PASS: Direct3D 9_1 textures, depth, transparency, overlays and terrain conversion worked."
+            : L"FAIL: the Direct3D 9_1 test did not produce the expected pixels. Details are saved in app storage.";
+        auto dialog = ref new Windows::UI::Popups::MessageDialog(ref new Platform::String(content), ref new Platform::String(L"Horizon D3D11 test"));
+        dialog->ShowAsync();
+    } catch (Platform::Exception^) {
+        // The diagnostic file remains available if the dialog cannot open.
+    }
+#endif
 }
 
 using namespace Windows::ApplicationModel::Activation;

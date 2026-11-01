@@ -11,7 +11,8 @@ crate-type = ["staticlib"]
 
 [dependencies]
 horizon-uwp-d3d11 = { path = "..", features = ["readback-probe"] }
-windows-result = "0.4.1"
+horizon-native-scene = { path = "../../native-scene" }
+horizon-native-terrain = { path = "../../native-terrain" }
 
 [profile.release]
 panic = "abort"

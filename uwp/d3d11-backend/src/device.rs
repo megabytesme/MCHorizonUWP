@@ -42,6 +42,9 @@ pub struct Mesh {
 /// A single 2D RGBA texture atlas. Array textures are unavailable at 9_1.
 pub struct Texture {
     view: ID3D11ShaderResourceView,
+    texture: ID3D11Texture2D,
+    width: u32,
+    height: u32,
 }
 
 /// Rendering state for solid/cutout terrain, translucent geometry, or UI.
@@ -237,7 +240,7 @@ impl Renderer {
                 Count: 1,
                 Quality: 0,
             },
-            Usage: D3D11_USAGE_IMMUTABLE,
+            Usage: D3D11_USAGE_DEFAULT,
             BindFlags: D3D11_BIND_SHADER_RESOURCE.0 as u32,
             ..Default::default()
         };
@@ -256,8 +259,59 @@ impl Renderer {
                 .CreateShaderResourceView(&texture, None, Some(&mut view))?;
             Ok(Texture {
                 view: view.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?,
+                texture,
+                width,
+                height,
             })
         }
+    }
+
+    /// Replaces a tightly packed atlas rectangle, including font glyph patches.
+    pub fn update_atlas(
+        &self,
+        atlas: &Texture,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+    ) -> Result<()> {
+        let right = x
+            .checked_add(width)
+            .ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
+        let bottom = y
+            .checked_add(height)
+            .ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
+        let expected = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|n| n.checked_mul(4));
+        if width == 0
+            || height == 0
+            || right > atlas.width
+            || bottom > atlas.height
+            || expected != Some(rgba.len())
+        {
+            return Err(Error::from_hresult(E_INVALIDARG));
+        }
+        let bounds = D3D11_BOX {
+            left: x,
+            top: y,
+            front: 0,
+            right,
+            bottom,
+            back: 1,
+        };
+        unsafe {
+            self.context.UpdateSubresource(
+                &atlas.texture,
+                0,
+                Some(&bounds),
+                rgba.as_ptr().cast(),
+                width * 4,
+                0,
+            );
+        }
+        Ok(())
     }
 
     /// Starts a frame with conventional depth (near = 0, far = 1).

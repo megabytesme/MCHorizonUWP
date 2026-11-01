@@ -23,6 +23,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "horizon-native-scene"
+version = "0.1.0"
+dependencies = [
+ "horizon-native-terrain",
+ "horizon-uwp-d3d11",
+]
+
+[[package]]
+name = "horizon-native-terrain"
+version = "0.1.0"
+
+[[package]]
 name = "horizon-uwp-d3d11"
 version = "0.1.0"
 dependencies = [
@@ -34,8 +46,9 @@ dependencies = [
 name = "horizon-uwp-d3d11-probe"
 version = "0.1.0"
 dependencies = [
+ "horizon-native-scene",
+ "horizon-native-terrain",
  "horizon-uwp-d3d11",
- "windows-result",
 ]
 
 [[package]]
