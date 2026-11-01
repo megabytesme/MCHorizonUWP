@@ -342,6 +342,8 @@ pub struct Streaming {
     decorates: bool,
     lighting: FxHashMap<(i32, i32), u64>,
     meshing: FxHashMap<(i32, i32, i32), u64>,
+    /// All queued, executing, or completed mesh jobs, including stale ones.
+    mesh_jobs: usize,
     /// The sequence each section's latest accepted mesh was dispatched at
     /// (`CompiledSectionMesh.compileTaskStartTimeNs`).
     compile_started: FxHashMap<(i32, i32, i32), u64>,
@@ -738,6 +740,7 @@ impl Streaming {
             decorates: generator.decorates(),
             lighting: Default::default(),
             meshing: Default::default(),
+            mesh_jobs: 0,
             compile_started: Default::default(),
             lit: Default::default(),
             meshed: Default::default(),
@@ -856,6 +859,9 @@ impl Streaming {
     /// times four plus `bias`, which orders a column's jobs. A job without a
     /// column (a save, meshes to free) goes ahead of every other.
     fn submit(&mut self, at: Option<(i32, i32)>, bias: i64, job: Job) {
+        if matches!(&job, Job::Mesh(..)) {
+            self.mesh_jobs += 1;
+        }
         self.order += 1;
         let priority = at.map_or(i64::MIN, |(x, z)| self.distance(x, z) * 4 + bias);
         self.shared.queue.lock().unwrap().push(Queued {
@@ -1193,6 +1199,8 @@ impl Streaming {
                     }
                 }
                 Done::Meshed(x, sy, z, mesh, seq) => {
+                    debug_assert!(self.mesh_jobs > 0);
+                    self.mesh_jobs = self.mesh_jobs.saturating_sub(1);
                     if self.meshing.get(&(x, sy, z)) != Some(&seq) {
                         stale.push(((x, sy, z), mesh));
                         continue;
@@ -1526,13 +1534,18 @@ impl Streaming {
         // jobs went stale long before a worker reached them (#3629). What
         // stays dirty is asked for again, from the current centre, as
         // capacity frees; `requeue` then has a small queue to keep close.
-        let room = (self.threads.len() * 32).saturating_sub(self.meshing.len());
-        nearest_first(&mut candidates, room);
+        let room = (self.threads.len() * 32).saturating_sub(self.mesh_jobs);
+        limit_mesh_candidates(&mut candidates, room);
         for (_, x, z, sections) in candidates {
             let Some(region) = Self::region(world, x, z) else {
                 continue;
             };
-            world.dirty_sections.take_column(x, z);
+            // Keep the unselected sections dirty so they are reconsidered
+            // when a later completion opens another slot.
+            let remaining = world.dirty_sections.take_column(x, z) & !sections;
+            for sy in remaining.iter() {
+                world.dirty_sections.insert((x, sy as i32, z));
+            }
             for sy in sections.iter().map(|sy| sy as i32) {
                 let first = self.meshed.insert((x, z));
                 self.sequence += 1;
@@ -2183,6 +2196,20 @@ fn nearest_first<T: Ord>(candidates: &mut Vec<T>, room: usize) {
     }
     candidates.sort_unstable();
 }
+/// Limit ready columns by *section* count, not column count. A partially
+/// selected column retains its other dirty section bits for a later update.
+fn limit_mesh_candidates(candidates: &mut Vec<(i64, i32, i32, SectionMask)>, room: usize) {
+    nearest_first(candidates, room);
+    let mut left = room;
+    for (_, _, _, sections) in candidates.iter_mut() {
+        if sections.len() > left {
+            *sections = sections.iter().take(left).collect();
+        }
+        left -= sections.len();
+    }
+    candidates.retain(|(_, _, _, sections)| !sections.is_empty());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2363,6 +2390,54 @@ mod tests {
         let mut past = expected.clone();
         nearest_first(&mut past, expected.len() + 10);
         assert_eq!(past, expected);
+    }
+
+    #[test]
+    fn mesh_budget_splits_columns_without_losing_dirty_sections() {
+        let mut dirty = crate::world::DirtySections::default();
+        for x in [2, 0, 1] {
+            for sy in 0..12 {
+                dirty.insert((x, sy, 0));
+            }
+        }
+        let mut submitted = Vec::new();
+        while !dirty.is_empty() {
+            let mut candidates: Vec<_> = dirty
+                .columns()
+                .map(|((x, z), mask)| (i64::from(x * x + z * z), x, z, mask))
+                .collect();
+            limit_mesh_candidates(&mut candidates, 5);
+            assert!(
+                candidates
+                    .iter()
+                    .map(|candidate| candidate.3.len())
+                    .sum::<usize>()
+                    <= 5
+            );
+            for (_, x, z, selected) in candidates {
+                let remaining = dirty.take_column(x, z) & !selected;
+                for sy in remaining.iter() {
+                    dirty.insert((x, sy as i32, z));
+                }
+                submitted.extend(selected.iter().map(|sy| (x, sy as i32, z)));
+            }
+        }
+        assert_eq!(submitted.len(), 36);
+        assert_eq!(
+            &submitted[..5],
+            &[(0, 0, 0), (0, 1, 0), (0, 2, 0), (0, 3, 0), (0, 4, 0)]
+        );
+        assert_eq!(
+            submitted
+                .iter()
+                .copied()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            36
+        );
+        assert!(submitted[..12].iter().all(|key| key.0 == 0));
+        assert!(submitted[12..24].iter().all(|key| key.0 == 1));
+        assert!(submitted[24..].iter().all(|key| key.0 == 2));
     }
 
     /// What the scheduler counts as ready to light: every neighbour a

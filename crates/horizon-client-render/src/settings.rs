@@ -205,10 +205,11 @@ pub struct Settings {
 }
 impl Default for Settings {
     fn default() -> Self {
+        let file = OptionsFile::default();
         Self {
             fov: 70.0,
-            render_distance: 12,
-            simulation_distance: 12,
+            render_distance: file.int("renderDistance"),
+            simulation_distance: file.int("simulationDistance"),
             sensitivity: 0.5,
             master_volume: 1.0,
             volumes: [1.0; 11],
@@ -270,7 +271,7 @@ impl Default for Settings {
             main_hand_left: false,
             resource_packs: Vec::new(),
             keys: KeyBinds::default(),
-            file: OptionsFile::default(),
+            file,
             invert_x: false,
             toggle_attack: false,
             toggle_use: false,
@@ -889,6 +890,13 @@ mod tests {
         assert_eq!(fresh.inactivity_fps_limit, empty.inactivity_fps_limit);
         assert_eq!(fresh.render_distance, empty.render_distance);
         assert_eq!(fresh.simulation_distance, empty.simulation_distance);
+        assert_eq!(fresh.render_distance, fresh.file.int("renderDistance"));
+        assert_eq!(
+            fresh.simulation_distance,
+            fresh.file.int("simulationDistance")
+        );
+        let saved = Settings::parse("renderDistance:9\nsimulationDistance:7\n");
+        assert_eq!((saved.render_distance, saved.simulation_distance), (9, 7));
     }
     #[test]
     fn subtitle_options() {

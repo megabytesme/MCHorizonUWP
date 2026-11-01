@@ -609,11 +609,12 @@ impl Graphics {
         // and render threads are raised above four cores, where vanilla
         // raises its server thread). Leaving two idled a core of a 4-thread
         // laptop while a world loaded: a teleport there took ~15% longer.
-        let auto = std::thread::available_parallelism()
-            .map_or(2, |n| n.get())
-            .saturating_sub(1)
-            .max(1);
-        if self.battery { auto.div_ceil(2) } else { auto }
+        let cores = std::thread::available_parallelism().map_or(2, |n| n.get());
+        automatic_worker_count(
+            cores,
+            self.battery,
+            cfg!(all(target_vendor = "uwp", target_arch = "arm")),
+        )
     }
     /// The frame cap battery mode adds: 60 in a world, 30 in menus without a
     /// world or while another window has focus.
@@ -658,6 +659,13 @@ pub fn apply_preset(preset: Preset, s: &mut crate::settings::Settings) {
     g.sky = true;
     g.fog = true;
     g.weather = true;
+}
+
+/// Leave a core for rendering; 32-bit UWP caps automatic worker memory.
+fn automatic_worker_count(cores: usize, battery: bool, arm32_uwp: bool) -> usize {
+    let auto = cores.saturating_sub(1).max(1);
+    let auto = if arm32_uwp { auto.min(2) } else { auto };
+    if battery { auto.div_ceil(2) } else { auto }
 }
 
 #[cfg(test)]
@@ -822,7 +830,18 @@ mod tests {
         let g = Graphics::default();
         assert_eq!(g.workers, 0);
         let cores = std::thread::available_parallelism().map_or(2, |n| n.get());
-        assert_eq!(g.worker_threads(), cores.saturating_sub(1).max(1));
+        assert_eq!(
+            g.worker_threads(),
+            automatic_worker_count(
+                cores,
+                false,
+                cfg!(all(target_vendor = "uwp", target_arch = "arm"))
+            )
+        );
+        assert_eq!(automatic_worker_count(8, false, true), 2);
+        assert_eq!(automatic_worker_count(8, false, false), 7);
+        assert_eq!(automatic_worker_count(8, true, true), 1);
+        assert_eq!(automatic_worker_count(1, false, true), 1);
         // A manual count is the player's own choice, kept as asked.
         let manual = Graphics { workers: 3, ..g };
         assert_eq!(manual.worker_threads(), 3);

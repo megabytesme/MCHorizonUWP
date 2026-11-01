@@ -70,3 +70,8 @@ host have also passed the strict SDK 15063 link audit without retained
 prohibited API sentinels. This establishes link compatibility only; the
 existing wgpu rendering path still cannot render on a feature-level 9_1 phone.
 The native D3D11 renderer remains under development.
+
+For 32-bit UWP builds, first-run defaults are render distance 4 and simulation
+distance 5, and automatic chunk workers are capped at 2 to reduce phone memory
+pressure. Existing saved options and explicitly chosen worker counts or launch
+arguments take precedence. Other platforms retain their existing defaults.

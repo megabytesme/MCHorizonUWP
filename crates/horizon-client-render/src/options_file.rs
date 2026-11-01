@@ -105,6 +105,12 @@ fn def(key: &str, kind: Kind, default: V) -> Def {
     }
 }
 
+/// Conservative initial distances for 32-bit UWP devices. Saved options and
+/// explicit launch arguments still take precedence over these defaults.
+const fn distance_defaults(arm32_uwp: bool) -> (i32, i32) {
+    if arm32_uwp { (4, 5) } else { (12, 12) }
+}
+
 /// The processing order of `Options.processOptions`.
 static TABLE: LazyLock<Vec<Def>> = LazyLock::new(|| {
     use Kind::{List, Option as O, PlainBool as PB, PlainInt as PI, PlainStr as PS, Tutorial};
@@ -119,6 +125,8 @@ static TABLE: LazyLock<Vec<Def>> = LazyLock::new(|| {
         |key: &str, names: &'static [&'static str], d: i32| def(key, O(Named(names)), V::Int(d));
     let id = |key: &str, count: i32, d: i32| def(key, O(Id(count)), V::Int(d));
     let pb = |key: &str, d: bool| def(key, PB, V::Bool(d));
+    let (render_distance, simulation_distance) =
+        distance_defaults(cfg!(all(target_vendor = "uwp", target_arch = "arm")));
     let mut t = vec![
         b("ao", true),
         i("biomeBlendRadius", 0, 7, 2),
@@ -162,8 +170,8 @@ static TABLE: LazyLock<Vec<Def>> = LazyLock::new(|| {
         b("reducedDebugInfo", false),
         def("renderClouds", O(Clouds), V::Int(2)),
         i("cloudRange", 2, 128, 128),
-        i("renderDistance", 2, MAX_RENDER_DISTANCE, 12),
-        i("simulationDistance", 5, 32, 12),
+        i("renderDistance", 2, MAX_RENDER_DISTANCE, render_distance),
+        i("simulationDistance", 5, 32, simulation_distance),
         u("screenEffectScale", 1.0),
         def("soundDevice", O(AnyStr), V::Str(String::new())),
         b("vignette", true),
@@ -833,6 +841,24 @@ impl OptionsFile {
 #[cfg(test)]
 mod control_tests {
     use super::*;
+
+    #[test]
+    fn phone_distance_defaults_do_not_override_saved_values() {
+        assert_eq!(distance_defaults(true), (4, 5));
+        assert_eq!(distance_defaults(false), (12, 12));
+        let saved = OptionsFile::parse("renderDistance:9\nsimulationDistance:7\n");
+        assert_eq!(saved.int("renderDistance"), 9);
+        assert_eq!(saved.int("simulationDistance"), 7);
+        let first_run = OptionsFile::default();
+        let expected = distance_defaults(cfg!(all(target_vendor = "uwp", target_arch = "arm")));
+        assert_eq!(
+            (
+                first_run.int("renderDistance"),
+                first_run.int("simulationDistance")
+            ),
+            expected
+        );
+    }
 
     #[test]
     fn describes_values_with_what_they_accept() {
