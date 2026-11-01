@@ -453,6 +453,66 @@ mod tests {
                 .is_err()
         );
     }
+    #[test]
+    fn paged_triangles_match_unpaged_point_sampling() {
+        let mut pixels = vec![0; 8 * 8 * 4];
+        for y in 0..8 {
+            for x in 0..8 {
+                pixels[(y * 8 + x) * 4] = (y * 8 + x) as u8;
+                pixels[(y * 8 + x) * 4 + 3] = 255;
+            }
+        }
+        let atlas = Atlas::new([8, 8], &pixels, 4).unwrap();
+        let vertices = [
+            vertex([0.0, 0.0], [0.0, 0.0], [1.0; 4]),
+            vertex([8.0, 0.0], [1.0, 0.0], [1.0; 4]),
+            vertex([0.0, 8.0], [0.0, 1.0], [1.0; 4]),
+        ];
+        let draws = atlas
+            .convert(
+                &vertices,
+                &[Run {
+                    vertices: 0..3,
+                    blend: Blend::Alpha,
+                }],
+            )
+            .unwrap();
+        for y in 0..7 {
+            for x in 0..7 - y {
+                // Offset from integer edges, including page boundaries, so the
+                // test does not depend on triangle rasterizer edge ownership.
+                let p = [x as f32 + 0.31, y as f32 + 0.17];
+                let expected = pixels[(y * 8 + x) * 4];
+                let mut found = None;
+                for draw in &draws {
+                    for triangle in draw.vertices.chunks_exact(3) {
+                        let a = triangle[0].pos;
+                        let b = triangle[1].pos;
+                        let c = triangle[2].pos;
+                        let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+                        let w0 =
+                            ((b[1] - c[1]) * (p[0] - c[0]) + (c[0] - b[0]) * (p[1] - c[1])) / det;
+                        let w1 =
+                            ((c[1] - a[1]) * (p[0] - c[0]) + (a[0] - c[0]) * (p[1] - c[1])) / det;
+                        let w2 = 1.0 - w0 - w1;
+                        if w0 >= -1e-6 && w1 >= -1e-6 && w2 >= -1e-6 {
+                            let uv = [0, 1].map(|i| {
+                                triangle[0].uv[i] * w0
+                                    + triangle[1].uv[i] * w1
+                                    + triangle[2].uv[i] * w2
+                            });
+                            let page = &atlas.pages[draw.page];
+                            let u = ((uv[0] * page.size[0] as f32) as u32).min(page.size[0] - 1);
+                            let v = ((uv[1] * page.size[1] as f32) as u32).min(page.size[1] - 1);
+                            found = Some(page.rgba[((v * page.size[0] + u) * 4) as usize]);
+                            break;
+                        }
+                    }
+                }
+                assert_eq!(found, Some(expected), "point {p:?}");
+            }
+        }
+    }
 }
 
 #[cfg(feature = "horizon")]

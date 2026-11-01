@@ -12,8 +12,7 @@ triangle against the page boundaries, preserves triangle order and
 interpolates position, color, depth, and glint coordinates. It returns page-local
 UVs and the original blend/scissor/sample metadata. Apply each returned patch
 to its texture before drawing the returned batches in order. CPU copies of
-patched pages are retained, so a backend with immutable textures can recreate
-changed pages; an updateable texture is more efficient for dynamic glyphs.
+patched pages are retained for dynamic glyph updates.
 
 The renderer must provide the GUI-pixel-to-clip-space transform using the
 actual physical viewport and returned GUI scale. It must preserve each blend,
@@ -33,7 +32,7 @@ also includes a test using a real `HudBatch`.
 Enable `d3d11` for `d3d11::HudRenderer`, which creates GPU pages on first use and
 renders standard alpha HUD batches with the GUI transform. It explicitly
 returns an error before drawing when a batch needs another blend or glint
-mode. The initial implementation recreates changed pages on next use and
-creates per-frame immutable meshes; these are correctness-first choices
+mode. Changed regions are coalesced and uploaded when a page is next used.
+The initial implementation creates per-frame immutable meshes; these are correctness-first choices
 that need optimization for mobile. The presenter has passed ARM32 compilation;
 GPU readback of this integration is still pending.

@@ -1,7 +1,10 @@
 //! The initial FL9_1 alpha HUD pass. Unsupported states return an error.
-use crate::{Atlas, Blend, Draw, Error, PagePatch, SampleMode};
+use crate::{Atlas, Blend, Draw, Error, PagePatch, SampleMode, byte_len};
 use horizon_uwp_d3d11::{DrawPass, Renderer, Texture, Vertex};
-use std::{collections::BTreeSet, error::Error as StdError};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    error::Error as StdError,
+};
 
 type Result<T> = std::result::Result<T, Box<dyn StdError>>;
 
@@ -9,7 +12,7 @@ type Result<T> = std::result::Result<T, Box<dyn StdError>>;
 pub struct HudRenderer {
     textures: Vec<Option<Texture>>,
     layout: Vec<([u32; 2], [u32; 2])>,
-    dirty: BTreeSet<usize>,
+    dirty: BTreeMap<usize, [u32; 4]>,
 }
 
 impl HudRenderer {
@@ -33,13 +36,13 @@ impl HudRenderer {
         Ok(Self {
             textures,
             layout,
-            dirty: BTreeSet::new(),
+            dirty: BTreeMap::new(),
         })
     }
 
-    /// Render a converted batch in order after the frame has begun. Immutable
-    /// texture pages touched by patches are recreated before drawing. This
-    /// first pass explicitly supports standard atlas alpha blending only.
+    /// Render a converted batch in order after the frame has begun. Changed
+    /// texture regions are uploaded before drawing. This first pass
+    /// explicitly supports standard atlas alpha blending only.
     pub fn draw(
         &mut self,
         renderer: &Renderer,
@@ -58,12 +61,12 @@ impl HudRenderer {
         {
             return Err(Box::new(Error("HUD atlas does not match GPU pages")));
         }
-        if patches.iter().any(|patch| patch.page >= atlas.pages.len()) {
-            return Err(Box::new(Error("HUD patch refers to an invalid page")));
+        // Retain coalesced changed regions across failed/unsupported frames.
+        // The source atlas owns the latest pixels, so no patch bytes need to
+        // be kept and the queue is bounded by the number of atlas pages.
+        for patch in patches {
+            record_dirty(&mut self.dirty, atlas, patch)?;
         }
-        // Keep page changes even if validation or upload fails, because a
-        // subsequent frame may no longer carry the original glyph patches.
-        self.dirty.extend(patches.iter().map(|patch| patch.page));
         if viewport.contains(&0) || !gui_scale.is_finite() || gui_scale <= 0.0 {
             return Err(Box::new(Error("invalid HUD viewport or GUI scale")));
         }
@@ -88,7 +91,7 @@ impl HudRenderer {
         let used: BTreeSet<_> = draws.iter().map(|draw| draw.page).collect();
         let mut replacement = Vec::new();
         for &id in &used {
-            if self.textures[id].is_none() || self.dirty.contains(&id) {
+            if self.textures[id].is_none() {
                 let page = &atlas.pages[id];
                 replacement.push((
                     id,
@@ -120,6 +123,29 @@ impl HudRenderer {
             self.textures[id] = Some(texture);
             self.dirty.remove(&id);
         }
+        for &id in &used {
+            if let Some(rect) = self.dirty.get(&id).copied() {
+                let page = &atlas.pages[id];
+                let size = [rect[2] - rect[0], rect[3] - rect[1]];
+                let mut rgba = vec![0; byte_len(size)?];
+                let row_bytes = size[0] as usize * 4;
+                for row in 0..size[1] as usize {
+                    let src =
+                        ((rect[1] as usize + row) * page.size[0] as usize + rect[0] as usize) * 4;
+                    let dst = row * row_bytes;
+                    rgba[dst..dst + row_bytes].copy_from_slice(&page.rgba[src..src + row_bytes]);
+                }
+                renderer.update_atlas(
+                    self.textures[id].as_ref().expect("used page was uploaded"),
+                    rect[0],
+                    rect[1],
+                    size[0],
+                    size[1],
+                    &rgba,
+                )?;
+                self.dirty.remove(&id);
+            }
+        }
         let sx = 2.0 * gui_scale / viewport[0] as f32;
         let sy = -2.0 * gui_scale / viewport[1] as f32;
         let matrix = [
@@ -137,5 +163,63 @@ impl HudRenderer {
             );
         }
         Ok(())
+    }
+}
+
+fn record_dirty(
+    dirty: &mut BTreeMap<usize, [u32; 4]>,
+    atlas: &Atlas,
+    patch: &PagePatch,
+) -> Result<()> {
+    let Some(page) = atlas.pages.get(patch.page) else {
+        return Err(Box::new(Error("HUD patch refers to an invalid page")));
+    };
+    let right = patch.origin[0].checked_add(patch.size[0]);
+    let bottom = patch.origin[1].checked_add(patch.size[1]);
+    if patch.size.contains(&0)
+        || patch.rgba.len() != byte_len(patch.size)?
+        || right.is_none_or(|v| v > page.size[0])
+        || bottom.is_none_or(|v| v > page.size[1])
+    {
+        return Err(Box::new(Error("HUD patch is outside its page")));
+    }
+    let rect = [
+        patch.origin[0],
+        patch.origin[1],
+        right.unwrap(),
+        bottom.unwrap(),
+    ];
+    dirty
+        .entry(patch.page)
+        .and_modify(|r| {
+            r[0] = r[0].min(rect[0]);
+            r[1] = r[1].min(rect[1]);
+            r[2] = r[2].max(rect[2]);
+            r[3] = r[3].max(rect[3]);
+        })
+        .or_insert(rect);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn pending_updates_are_coalesced_and_bounds_checked() {
+        let atlas = Atlas::new([4, 4], &vec![0; 4 * 4 * 4], 4).unwrap();
+        let mut dirty = BTreeMap::new();
+        let mut patch = PagePatch {
+            page: 0,
+            origin: [1, 0],
+            size: [1, 2],
+            rgba: vec![0; 8],
+        };
+        record_dirty(&mut dirty, &atlas, &patch).unwrap();
+        patch.origin = [3, 2];
+        record_dirty(&mut dirty, &atlas, &patch).unwrap();
+        assert_eq!(dirty.get(&0), Some(&[1, 0, 4, 4]));
+        patch.origin = [4, 0];
+        assert!(record_dirty(&mut dirty, &atlas, &patch).is_err());
+        assert_eq!(dirty.get(&0), Some(&[1, 0, 4, 4]));
     }
 }
