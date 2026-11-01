@@ -15506,10 +15506,9 @@ impl ApplicationHandler for Game<'_> {
                     let ticked = Instant::now();
                     let rendered = self.render()?;
                     self.apply_cursor_icon();
-                    if let Some(threshold) = self.options.spikes
-                        && let Some(r) = self.renderer.as_ref()
-                    {
-                        let cpu = now.elapsed().saturating_sub(r.last_wait).as_secs_f32() * 1000.0;
+                    if let Some(threshold) = self.options.spikes {
+                        let wait = self.renderer.as_ref().map_or(Duration::ZERO, |r| r.last_wait);
+                        let cpu = now.elapsed().saturating_sub(wait).as_secs_f32() * 1000.0;
                         let spans = horizon_client::spans::take();
                         if cpu > threshold {
                             // The render thread's own CPU time in the frame:
@@ -17613,8 +17612,10 @@ impl Loading {
         {
             let size = window.inner_size();
             drop(self.native_renderer.take());
+            let gui = self.gui.as_ref().expect("GUI was just assigned");
             match horizon_client::native_renderer::NativeRenderer::new(
-                &self.gui.as_ref().expect("GUI was just assigned").atlas,
+                &gui.atlas,
+                &gui.panorama,
                 [size.width, size.height],
             ) {
                 Ok(renderer) => self.native_renderer = Some(renderer),
@@ -17965,8 +17966,12 @@ pub fn run() -> Result<()> {
 }
 
 #[cfg(target_vendor = "uwp")]
-pub fn run_with_args(args: Vec<String>) -> Result<()> {
-    run_with_options(Options::read_from(args.into_iter())?)
+pub fn run_with_args(args: Vec<String>, smoke_diagnostics: bool) -> Result<()> {
+    let mut options = Options::read_from(args.into_iter())?;
+    if smoke_diagnostics && let Some(options) = &mut options {
+        options.spikes = Some(33.0);
+    }
+    run_with_options(options)
 }
 
 fn run_with_options(options: Option<Options>) -> Result<()> {

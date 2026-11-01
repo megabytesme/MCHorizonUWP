@@ -100,24 +100,34 @@ impl TerrainScene {
             .count()
     }
 
-    /// Draw solid geometry first, then translucent sections back-to-front.
+    /// Draw terrain in two passes, allowing entities to be drawn between them.
     /// `view_projection` is camera-relative, with no camera translation baked in.
-    /// Per-quad translucent sorting is pending.
     pub fn draw(&self, renderer: &Renderer, view_projection: [[f32; 4]; 4], camera: [f64; 3]) {
-        let mut sections: Vec<_> = self
-            .sections
-            .values()
-            .filter_map(|section| {
-                let matrix = section_matrix(view_projection, section.origin, camera);
-                section
-                    .bounds
-                    .is_some_and(|bounds| visible(bounds, matrix))
-                    .then_some((section, matrix))
-            })
-            .collect();
-        for (section, matrix) in &sections {
-            self.draw_batches(renderer, &section.solid, *matrix, DrawPass::Cutout);
+        self.draw_opaque(renderer, view_projection, camera);
+        self.draw_translucent(renderer, view_projection, camera);
+    }
+
+    /// Opaque and alpha-cutout terrain writes world depth.
+    pub fn draw_opaque(
+        &self,
+        renderer: &Renderer,
+        view_projection: [[f32; 4]; 4],
+        camera: [f64; 3],
+    ) {
+        for (section, matrix) in self.visible_sections(view_projection, camera) {
+            self.draw_batches(renderer, &section.solid, matrix, DrawPass::Cutout);
         }
+    }
+
+    /// Blended terrain reads depth and is sorted back-to-front by section.
+    /// Per-quad translucent sorting is pending.
+    pub fn draw_translucent(
+        &self,
+        renderer: &Renderer,
+        view_projection: [[f32; 4]; 4],
+        camera: [f64; 3],
+    ) {
+        let mut sections = self.visible_sections(view_projection, camera);
         let distance = |section: &Section| -> f64 {
             (0..3)
                 .map(|i| (section.origin[i] + 8.0 - camera[i]).powi(2))
@@ -132,6 +142,31 @@ impl TerrainScene {
                 DrawPass::Translucent,
             );
         }
+    }
+
+    /// Visible section and draw-batch counts for opt-in diagnostics.
+    pub fn visible_counts(&self, view_projection: [[f32; 4]; 4], camera: [f64; 3]) -> (usize, usize, usize) {
+        let sections = self.visible_sections(view_projection, camera);
+        let opaque = sections.iter().map(|(section, _)| section.solid.len()).sum();
+        let translucent = sections.iter().map(|(section, _)| section.translucent.len()).sum();
+        (sections.len(), opaque, translucent)
+    }
+
+    fn visible_sections(
+        &self,
+        view_projection: [[f32; 4]; 4],
+        camera: [f64; 3],
+    ) -> Vec<(&Section, [[f32; 4]; 4])> {
+        self.sections
+            .values()
+            .filter_map(|section| {
+                let matrix = section_matrix(view_projection, section.origin, camera);
+                section
+                    .bounds
+                    .is_some_and(|bounds| visible(bounds, matrix))
+                    .then_some((section, matrix))
+            })
+            .collect()
     }
 
     fn draw_batches(

@@ -1143,7 +1143,9 @@ dependencies = [
  "horizon-hdr",
  "horizon-items",
  "horizon-mods",
+ "horizon-native-entities",
  "horizon-native-hud",
+ "horizon-native-panorama",
  "horizon-native-scene",
  "horizon-native-terrain",
  "horizon-native-window",
@@ -1318,10 +1320,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "horizon-native-entities"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "horizon-client-render",
+ "horizon-native-hud",
+ "horizon-uwp-d3d11",
+]
+
+[[package]]
 name = "horizon-native-hud"
 version = "0.1.0"
 dependencies = [
  "horizon-client-render",
+ "horizon-uwp-d3d11",
+ "log",
+]
+
+[[package]]
+name = "horizon-native-panorama"
+version = "0.1.0"
+dependencies = [
+ "glam",
  "horizon-uwp-d3d11",
 ]
 

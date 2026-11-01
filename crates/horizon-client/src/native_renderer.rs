@@ -13,10 +13,76 @@ use horizon_client_render::{
 use horizon_native_hud::{Atlas, d3d11::HudRenderer};
 use horizon_native_window::NativeRenderer as WindowRenderer;
 
+// Marker-gated CPU wall timings. Present includes its synchronization wait;
+// these are not GPU timestamp queries and do not measure simulation time.
+#[cfg(feature = "native-d3d11-readback")]
+#[derive(Default)]
+struct NativeTimings {
+    frames: u32,
+    parts: [std::time::Duration; 7],
+    uploads: u64,
+    upload_time: std::time::Duration,
+}
+
+#[cfg(feature = "native-d3d11-readback")]
+impl NativeTimings {
+    fn record(&mut self, sample: NativeFrameSample, counts: (usize, usize, usize)) {
+        for (total, elapsed) in self.parts.iter_mut().zip(sample.parts) {
+            *total += elapsed;
+        }
+        self.frames += 1;
+        if self.frames >= 120 {
+            let ms = self
+                .parts
+                .map(|d| d.as_secs_f64() * 1000.0 / f64::from(self.frames));
+            log::info!(
+                "Horizon: native frame CPU averages ms over {} frames: prep={:.2} opaque={:.2} entities={:.2} translucent={:.2} hand={:.2} hud={:.2} present={:.2}; {} section uploads in {:.1} ms total",
+                self.frames,
+                ms[0],
+                ms[1],
+                ms[2],
+                ms[3],
+                ms[4],
+                ms[5],
+                ms[6],
+                self.uploads,
+                self.upload_time.as_secs_f64() * 1000.0
+            );
+            log::info!("Horizon: native scene visible sections={} opaque batches={} translucent batches={}", counts.0, counts.1, counts.2);
+            *self = Self::default();
+        }
+    }
+}
+
+#[cfg(feature = "native-d3d11-readback")]
+struct NativeFrameSample {
+    last: std::time::Instant,
+    parts: [std::time::Duration; 7],
+}
+#[cfg(feature = "native-d3d11-readback")]
+impl NativeFrameSample {
+    fn new() -> Self {
+        Self {
+            last: std::time::Instant::now(),
+            parts: [std::time::Duration::ZERO; 7],
+        }
+    }
+    fn mark(&mut self, part: usize) {
+        let now = std::time::Instant::now();
+        self.parts[part] += now.duration_since(self.last);
+        self.last = now;
+    }
+    fn restart(&mut self) {
+        self.last = std::time::Instant::now();
+    }
+}
+
 pub struct NativeRenderer {
     window: WindowRenderer,
     atlas: Atlas,
     hud: HudRenderer,
+    panorama: horizon_native_panorama::Panorama,
+    entities: horizon_native_entities::d3d11::EntityRenderer,
     viewport: [u32; 2],
     scene: Option<horizon_native_scene::TerrainScene>,
     layout: ColumnLayout,
@@ -26,26 +92,43 @@ pub struct NativeRenderer {
     probed_world: bool,
     #[cfg(feature = "native-d3d11-readback")]
     world_probe_frames: u64,
+    #[cfg(feature = "native-d3d11-readback")]
+    timings: Option<NativeTimings>,
 }
 
 impl NativeRenderer {
-    pub fn new(atlas: &HudAtlas, viewport: [u32; 2]) -> crate::Result<Self> {
+    pub fn new(
+        atlas: &HudAtlas,
+        faces: &horizon_client_render::gfx::panorama::Faces,
+        viewport: [u32; 2],
+    ) -> crate::Result<Self> {
         let window = WindowRenderer::from_host_window()?;
+        #[cfg(feature = "native-d3d11-readback")]
+        let diagnostics = horizon_client_render::logging::game_home()
+            .join("native-world-smoke.enable")
+            .is_file();
         let atlas = Atlas::from_horizon(atlas, 2048)?;
         let hud = HudRenderer::new(window.renderer(), &atlas)?;
+        let panorama =
+            horizon_native_panorama::Panorama::new(window.renderer(), faces.size, &faces.pixels)?;
+        let entities = horizon_native_entities::d3d11::EntityRenderer::new(&atlas);
         Ok(Self {
             window,
             atlas,
             hud,
+            panorama,
+            entities,
             viewport,
             scene: None,
             layout: ColumnLayout::VANILLA,
             #[cfg(feature = "native-d3d11-readback")]
-            probed: false,
+            probed: !diagnostics,
             #[cfg(feature = "native-d3d11-readback")]
-            probed_world: false,
+            probed_world: !diagnostics,
             #[cfg(feature = "native-d3d11-readback")]
             world_probe_frames: 0,
+            #[cfg(feature = "native-d3d11-readback")]
+            timings: diagnostics.then(NativeTimings::default),
         })
     }
 
@@ -80,6 +163,8 @@ impl NativeRenderer {
     }
 
     pub fn present(&mut self, frame: &Frame<'_>) -> crate::Result<bool> {
+        #[cfg(feature = "native-d3d11-readback")]
+        let mut sample = (!frame.title && self.timings.is_some()).then(NativeFrameSample::new);
         let converted = self.atlas.convert_horizon(frame.hud)?;
         let color = if frame.title {
             [0.0, 0.0, 0.0]
@@ -89,9 +174,17 @@ impl NativeRenderer {
         self.window
             .renderer()
             .begin_frame([color[0], color[1], color[2], 1.0])?;
-        if !frame.title
-            && let Some(scene) = &self.scene
-        {
+        if frame.title {
+            self.panorama.draw(
+                self.window.renderer(),
+                self.viewport,
+                frame.yaw,
+                frame.pitch,
+            )?;
+        }
+        let world_view = if frame.title {
+            None
+        } else {
             let aspect = self.viewport[0] as f32 / self.viewport[1].max(1) as f32;
             let projection = glam::Mat4::perspective_rh(
                 frame.fov_degrees.to_radians(),
@@ -99,15 +192,24 @@ impl NativeRenderer {
                 frame.depth_far,
                 0.05,
             );
-            let transform = projection
-                * frame.bob
-                * frame.spin
-                * horizon_client_render::camera::view_matrix(frame.yaw, frame.pitch);
-            scene.draw(
-                self.window.renderer(),
-                transform.to_cols_array_2d(),
-                frame.camera.to_array(),
-            );
+            Some(
+                (projection
+                    * frame.bob
+                    * frame.spin
+                    * horizon_client_render::camera::view_matrix(frame.yaw, frame.pitch))
+                .to_cols_array_2d(),
+            )
+        };
+        #[cfg(feature = "native-d3d11-readback")]
+        if let Some(sample) = &mut sample {
+            sample.mark(0);
+        }
+        if let (Some(scene), Some(view)) = (&self.scene, world_view) {
+            scene.draw_opaque(self.window.renderer(), view, frame.camera.to_array());
+        }
+        #[cfg(feature = "native-d3d11-readback")]
+        if let Some(sample) = &mut sample {
+            sample.mark(1);
         }
         #[cfg(feature = "native-d3d11-readback")]
         if !frame.title && !self.probed_world {
@@ -134,6 +236,44 @@ impl NativeRenderer {
                 }
             }
         }
+        #[cfg(feature = "native-d3d11-readback")]
+        if let Some(sample) = &mut sample {
+            sample.restart();
+        }
+        if !frame.title {
+            self.entities.draw_entities(
+                self.window.renderer(),
+                &self.atlas,
+                &converted.patches,
+                frame,
+                self.viewport,
+            )?;
+            #[cfg(feature = "native-d3d11-readback")]
+            if let Some(sample) = &mut sample {
+                sample.mark(2);
+            }
+            if let (Some(scene), Some(view)) = (&self.scene, world_view) {
+                scene.draw_translucent(self.window.renderer(), view, frame.camera.to_array());
+            }
+            #[cfg(feature = "native-d3d11-readback")]
+            if let Some(sample) = &mut sample {
+                sample.mark(3);
+            }
+            if !frame.hand.is_empty() {
+                self.window.renderer().clear_depth()?;
+                self.entities.draw_hand(
+                    self.window.renderer(),
+                    &self.atlas,
+                    &converted.patches,
+                    frame,
+                    self.viewport,
+                )?;
+            }
+        }
+        #[cfg(feature = "native-d3d11-readback")]
+        if let Some(sample) = &mut sample {
+            sample.mark(4);
+        }
         self.hud.draw_supported(
             self.window.renderer(),
             &self.atlas,
@@ -142,6 +282,10 @@ impl NativeRenderer {
             self.viewport,
             converted.scale,
         )?;
+        #[cfg(feature = "native-d3d11-readback")]
+        if let Some(sample) = &mut sample {
+            sample.mark(5);
+        }
         #[cfg(feature = "native-d3d11-readback")]
         if frame.title && !self.probed {
             self.probed = true;
@@ -153,20 +297,38 @@ impl NativeRenderer {
                 Err(error) => log::warn!("Horizon: native title readback failed: {error}"),
             }
         }
+        #[cfg(feature = "native-d3d11-readback")]
+        if let Some(sample) = &mut sample {
+            sample.restart();
+        }
         self.window.renderer().present()?;
+        #[cfg(feature = "native-d3d11-readback")]
+        if let (Some(mut sample), Some(timings)) = (sample, &mut self.timings) {
+            sample.mark(6);
+            let counts = if timings.frames == 119 {
+                match (&self.scene, world_view) {
+                    (Some(scene), Some(view)) => scene.visible_counts(view, frame.camera.to_array()),
+                    _ => (0, 0, 0),
+                }
+            } else { (0, 0, 0) };
+            timings.record(sample, counts);
+        }
         Ok(true)
     }
 }
 
 impl TerrainBackend for NativeRenderer {
     fn upload_section(&mut self, key: SectionKey, mesh: &SectionMesh) -> crate::Result<()> {
+        #[cfg(feature = "native-d3d11-readback")]
+        let started = self.timings.as_ref().map(|_| std::time::Instant::now());
         let mesh = native_terrain::from_section(mesh);
         let origin = [
             key.0 as f64 * 16.0,
             self.layout.min_y() as f64 + key.1 as f64 * 16.0,
             key.2 as f64 * 16.0,
         ];
-        self.scene
+        let result = self
+            .scene
             .as_mut()
             .ok_or("native terrain is not initialized")?
             .upload(
@@ -175,7 +337,13 @@ impl TerrainBackend for NativeRenderer {
                 origin,
                 &mesh.solid,
                 &mesh.translucent,
-            )
+            );
+        #[cfg(feature = "native-d3d11-readback")]
+        if let (Some(started), Some(timings)) = (started, &mut self.timings) {
+            timings.uploads += 1;
+            timings.upload_time += started.elapsed();
+        }
+        result
     }
     fn clear_sections(&mut self, layout: ColumnLayout) {
         if let Some(scene) = &mut self.scene {

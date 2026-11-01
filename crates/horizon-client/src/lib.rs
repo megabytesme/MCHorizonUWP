@@ -18,7 +18,22 @@ pub fn run_uwp(resources: &std::path::Path, game_dir: &std::path::Path) -> Resul
         "--game-dir".to_owned(),
         game_dir.to_string_lossy().into_owned(),
     ];
-    game::run_with_args(args)
+    // The diagnostic marker is honored only by the opt-in readback build.
+    // Its game directory is separate, so ordinary worlds remain untouched.
+    #[cfg(feature = "native-d3d11-readback")]
+    let args = if game_dir.join("native-world-smoke.enable").is_file() {
+        let mut args = args;
+        let isolated = game_dir.join("native-world-smoke");
+        args[3] = isolated.to_string_lossy().into_owned();
+        args.extend(["--world".to_owned(), "NativeSmoke".to_owned(), "--creative".to_owned()]);
+        log::info!("Horizon: native world smoke enabled in {}", isolated.display());
+        args
+    } else {
+        args
+    };
+    let smoke_diagnostics = cfg!(feature = "native-d3d11-readback")
+        && game_dir.join("native-world-smoke.enable").is_file();
+    game::run_with_args(args, smoke_diagnostics)
 }
 #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
 pub mod native_renderer;
