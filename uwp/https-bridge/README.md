@@ -17,3 +17,16 @@ A Windows UWP x64 harness has tested a successful real Mojang HTTPS GET, failure
 for a deliberately expired certificate, and failure when the body exceeds its
 limit. The bridge has compiled with the ARM32 15063 SDK, but the complete game
 path and Lumia TLS behavior still need device validation.
+
+The separate `request` API supports HTTPS GET and bounded POST for future
+account flows. It returns HTTP error statuses and bodies, accepts an optional
+Authorization header and content type (including form and JSON), and never
+follows redirects. It rejects plaintext schemes, CR/LF in headers, request
+bodies over 1 MiB and response bodies over the caller's bound. It does not log
+request headers or bodies. Call it on a background thread.
+
+`probe/Auth.cpp` exercises live HTTPS JSON and form POST using dummy values,
+non-2xx response handling, expiry rejection, plaintext rejection, redirects,
+body limits and header injection. A desktop UWP execution passed all these
+checks. Its ARM32 executable passed the 15063 strict link audit with the native
+request function retained. The account flow and phone runtime remain untested.
