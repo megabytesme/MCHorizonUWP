@@ -13542,6 +13542,8 @@ impl Game<'_> {
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         if self.title.is_none() && matches!(self.screen, Screen::Playing | Screen::Inventory | Screen::Creative) {
             self.touch.inventory_visible = matches!(self.screen, Screen::Inventory | Screen::Creative);
+            #[cfg(feature = "native-touch-mod")]
+            self.sync_touch_mod();
             self.touch.draw(&mut hud, &self.gui.atlas);
             #[cfg(feature = "native-touch-mod")]
             self.release_failed_touch_module();
@@ -17915,6 +17917,12 @@ fn run_loading(
     let (receiver, loader) =
         startup_menu::spawn_loader(&options, &settings, &vanilla_root, started, &progress)?;
     let menu = startup_menu::StartupMenu::new(&options, pack_error.as_deref())?;
+    #[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+    let settings = {
+        let mut settings = settings;
+        mods::register_touch_mod_in_title(&mut settings.mods);
+        settings
+    };
     let loading = Loading {
         window: None,
         renderer: None,

@@ -425,7 +425,7 @@ impl Game<'_> {
                 ],
             );
         }
-        #[cfg(feature = "native-d3d11")]
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         if let Some(r) = self.native_renderer.as_ref() {
             static CPU: std::sync::OnceLock<String> = std::sync::OnceLock::new();
             d.group(

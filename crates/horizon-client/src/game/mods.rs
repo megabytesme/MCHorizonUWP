@@ -150,6 +150,26 @@ fn not_built(dir: &std::path::Path, built: &str, rows: &[Installed]) -> Vec<Inst
     out
 }
 
+/// The title menu appears before Game and its native hook registry exist.
+#[cfg(all(any(target_vendor = "uwp", test), feature = "native-touch-mod"))]
+pub(super) fn register_touch_mod_in_title(mods: &mut mod_list::ModList) {
+    if mods
+        .installed
+        .iter()
+        .any(|m| m.id == horizon_touch_native::MOD_ID)
+    {
+        return;
+    }
+    mods.installed.push(Installed {
+        id: horizon_touch_native::MOD_ID.to_owned(),
+        title: horizon_touch_native::MOD_TITLE.to_owned(),
+        description: horizon_touch_native::MOD_DESCRIPTION.to_owned(),
+        problem: None,
+        dev: false,
+        native: Some(mod_list::NativePage::default()),
+    });
+}
+
 /// A WebAssembly code mod's row on the Mods page.
 const STOPPED: &str = "Doesn't run any more: needs a native port";
 /// The player was told once about the WebAssembly mods that stopped (`horizon-mods/<this>`).
@@ -232,6 +252,24 @@ impl Game<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "native-touch-mod")]
+    #[test]
+    fn touch_mod_title_entry_is_visible_toggleable_and_not_duplicated() {
+        let mut list = mod_list::ModList::default();
+        register_touch_mod_in_title(&mut list);
+        register_touch_mod_in_title(&mut list);
+        assert_eq!(list.installed.len(), 1);
+        assert_eq!(list.installed[0].id, horizon_touch_native::MOD_ID);
+        assert!(list.installed[0].native.is_some());
+        assert!(list.is_on(0));
+        list.toggle(0);
+        assert!(!list.is_on(0));
+        assert!(list.disabled.contains(horizon_touch_native::MOD_ID));
+        list.toggle(0);
+        assert!(list.is_on(0));
+    }
+
     use std::io::Write;
 
     /// A minimal `.hnmod` the registry accepts: its manifest and its mixin's.

@@ -2,6 +2,11 @@
 //! This native source mod owns the control layout and touch state; it does not
 //! load code at runtime or depend on the game renderer or windowing APIs.
 #![forbid(unsafe_code)]
+/// Stable ID shared with the game mod list and builder.
+pub const MOD_ID: &str = "horizon_touch";
+pub const MOD_TITLE: &str = "Touch Controls 0.1.0";
+pub const MOD_DESCRIPTION: &str = "Touchscreen controls built into this game.";
+
 const MOVE_X: i32 = 1;
 const MOVE_Y: i32 = 2;
 const LOOK_X: i32 = 3;

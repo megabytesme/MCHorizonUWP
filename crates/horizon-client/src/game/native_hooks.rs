@@ -782,6 +782,13 @@ impl Game<'_> {
     }
     /// Options > Mods lists the native mods: push yours.
     pub(super) fn native_mods(&mut self, mods: &mut Vec<NativeMod>) {
+        #[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+        mods.push(NativeMod {
+            id: horizon_touch_native::MOD_ID.to_owned(),
+            title: horizon_touch_native::MOD_TITLE.to_owned(),
+            description: horizon_touch_native::MOD_DESCRIPTION.to_owned(),
+            keys: Vec::new(),
+        });
         let _ = mods;
     }
     /// The buttons of mod `mod_id`'s settings page, under its keys: push

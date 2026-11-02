@@ -1,7 +1,7 @@
 //! Multitouch controls for the UWP CoreWindow backend.
 use horizon_client::hud::{HudAtlas, HudBatch, rgba};
 #[cfg(all(
-    target_vendor = "uwp",
+    any(target_vendor = "uwp", test),
     feature = "native-d3d11",
     feature = "native-touch-mod"
 ))]
@@ -50,25 +50,31 @@ pub(super) struct TouchControls {
     pub(super) movement: Option<[f32; 2]>,
     used: bool,
     #[cfg(all(
-        target_vendor = "uwp",
+        any(target_vendor = "uwp", test),
         feature = "native-d3d11",
         feature = "native-touch-mod"
     ))]
     module: Option<touch_module::TouchModule>,
     #[cfg(all(
-        target_vendor = "uwp",
+        any(target_vendor = "uwp", test),
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
+    mod_enabled: bool,
+    #[cfg(all(
+        any(target_vendor = "uwp", test),
         feature = "native-d3d11",
         feature = "native-touch-mod"
     ))]
     release_after_failure: bool,
-    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    #[cfg(all(any(target_vendor = "uwp", test), feature = "native-d3d11"))]
     pub(super) inventory_visible: bool,
 }
 
 impl Default for TouchControls {
     fn default() -> Self {
         #[cfg(all(
-            target_vendor = "uwp",
+            any(target_vendor = "uwp", test),
             feature = "native-d3d11",
             feature = "native-touch-mod"
         ))]
@@ -81,18 +87,24 @@ impl Default for TouchControls {
             movement: None,
             used: false,
             #[cfg(all(
-                target_vendor = "uwp",
+                any(target_vendor = "uwp", test),
                 feature = "native-d3d11",
                 feature = "native-touch-mod"
             ))]
             module,
             #[cfg(all(
-                target_vendor = "uwp",
+                any(target_vendor = "uwp", test),
+                feature = "native-d3d11",
+                feature = "native-touch-mod"
+            ))]
+            mod_enabled: true,
+            #[cfg(all(
+                any(target_vendor = "uwp", test),
                 feature = "native-d3d11",
                 feature = "native-touch-mod"
             ))]
             release_after_failure: false,
-            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            #[cfg(all(any(target_vendor = "uwp", test), feature = "native-d3d11"))]
             inventory_visible: false,
         }
     }
@@ -127,6 +139,37 @@ fn distance(a: [f32; 2], b: [f32; 2]) -> f32 {
 }
 
 impl TouchControls {
+    /// On disable, release any held gameplay inputs before resetting touch state.
+    #[cfg(all(
+        any(target_vendor = "uwp", test),
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
+    fn set_mod_enabled(&mut self, enabled: bool) -> Vec<Action> {
+        if self.mod_enabled == enabled {
+            return Vec::new();
+        }
+        self.mod_enabled = enabled;
+        self.contacts.clear();
+        self.primary = None;
+        self.primary_claimed = false;
+        self.suppressed = 0;
+        self.movement = None;
+        self.release_after_failure = false;
+        self.module = enabled.then(touch_module::TouchModule::new);
+        if enabled {
+            Vec::new()
+        } else {
+            vec![
+                Action::Jump(false),
+                Action::Attack(false),
+                Action::Use(false),
+                Action::Sprint(false),
+                Action::Sneak(false),
+            ]
+        }
+    }
+
     fn update(
         &mut self,
         id: u64,
@@ -136,7 +179,15 @@ impl TouchControls {
         playing: bool,
     ) -> Vec<Action> {
         #[cfg(all(
-            target_vendor = "uwp",
+            any(target_vendor = "uwp", test),
+            feature = "native-d3d11",
+            feature = "native-touch-mod"
+        ))]
+        if !self.mod_enabled {
+            return Vec::new();
+        }
+        #[cfg(all(
+            any(target_vendor = "uwp", test),
             feature = "native-d3d11",
             feature = "native-touch-mod"
         ))]
@@ -200,7 +251,7 @@ impl TouchControls {
         }
         let mut actions = self.update_builtin(id, phase, p, size, playing);
         #[cfg(all(
-            target_vendor = "uwp",
+            any(target_vendor = "uwp", test),
             feature = "native-d3d11",
             feature = "native-touch-mod"
         ))]
@@ -323,7 +374,7 @@ impl TouchControls {
         }
     }
     #[cfg(all(
-        target_vendor = "uwp",
+        any(target_vendor = "uwp", test),
         feature = "native-d3d11",
         feature = "native-touch-mod"
     ))]
@@ -355,7 +406,7 @@ impl TouchControls {
         output
     }
     #[cfg(all(
-        target_vendor = "uwp",
+        any(target_vendor = "uwp", test),
         feature = "native-d3d11",
         feature = "native-touch-mod"
     ))]
@@ -374,12 +425,20 @@ impl TouchControls {
         }
     }
     pub(super) fn draw(&mut self, hud: &mut HudBatch, atlas: &HudAtlas) {
+        #[cfg(all(
+            any(target_vendor = "uwp", test),
+            feature = "native-d3d11",
+            feature = "native-touch-mod"
+        ))]
+        if !self.mod_enabled {
+            return;
+        }
         if !self.used && !cfg!(target_arch = "arm") {
             return;
         }
         let size = [hud.width, hud.height];
         #[cfg(all(
-            target_vendor = "uwp",
+            any(target_vendor = "uwp", test),
             feature = "native-d3d11",
             feature = "native-touch-mod"
         ))]
@@ -435,7 +494,7 @@ impl TouchControls {
                 }
             }
         }
-        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        #[cfg(all(any(target_vendor = "uwp", test), feature = "native-d3d11"))]
         if self.inventory_visible {
             return;
         }
@@ -472,6 +531,8 @@ impl TouchControls {
 #[cfg(target_vendor = "uwp")]
 impl super::Game<'_> {
     pub(super) fn touch_event(&mut self, touch: Touch) {
+        #[cfg(all(feature = "native-d3d11", feature = "native-touch-mod"))]
+        self.sync_touch_mod();
         let Some(size) = self.renderer_viewport() else {
             return;
         };
@@ -491,6 +552,13 @@ impl super::Game<'_> {
             [size[0] as f32, size[1] as f32],
             playing,
         );
+        self.apply_touch_actions(actions);
+    }
+
+    #[cfg(all(feature = "native-d3d11", feature = "native-touch-mod"))]
+    pub(super) fn sync_touch_mod(&mut self) {
+        let enabled = self.native_on(horizon_touch_native::MOD_ID);
+        let actions = self.touch.set_mod_enabled(enabled);
         self.apply_touch_actions(actions);
     }
 
@@ -534,6 +602,31 @@ impl super::Game<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "native-touch-mod")]
+    #[test]
+    fn disabling_touch_mod_releases_held_controls_and_reenabling_resets_state() {
+        let mut controls = TouchControls::default();
+        let size = [1000., 600.];
+        controls.update(1, TouchPhase::Started, [108., 492.], size, true);
+        controls.update(1, TouchPhase::Moved, [150., 440.], size, true);
+        assert!(controls.movement.is_some());
+        let releases = controls.set_mod_enabled(false);
+        assert_eq!(controls.movement, None);
+        assert!(releases.contains(&Action::Attack(false)));
+        assert!(releases.contains(&Action::Jump(false)));
+        assert!(
+            controls
+                .update(2, TouchPhase::Started, [934., 516.], size, true)
+                .is_empty()
+        );
+        assert!(controls.set_mod_enabled(true).is_empty());
+        assert_eq!(
+            controls.update(2, TouchPhase::Started, [934., 516.], size, true),
+            vec![Action::Jump(true)]
+        );
+    }
+
     #[test]
     fn movement_and_look_are_independent_and_cancellation_releases() {
         let mut c = TouchControls::default();
@@ -549,10 +642,16 @@ mod tests {
         );
         assert!(c.movement.unwrap()[1] > 0.9);
         c.update(2, TouchPhase::Started, [600., 300.], size, true);
-        assert_eq!(
-            c.update(2, TouchPhase::Moved, [630., 312.], size, true),
-            vec![Action::Look(60., 24.)]
-        );
+        let actions = c.update(2, TouchPhase::Moved, [630., 312.], size, true);
+        let mut look = (0., 0.);
+        for action in actions {
+            let Action::Look(x, y) = action else {
+                panic!("unexpected touch action");
+            };
+            look.0 += x;
+            look.1 += y;
+        }
+        assert_eq!(look, (60., 24.));
         c.update(1, TouchPhase::Cancelled, stick, size, true);
         assert_eq!(c.movement, None);
         assert!(c.contacts.contains_key(&2));
