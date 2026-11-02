@@ -66,7 +66,8 @@ distribution signature can later replace the test-signing workflow.
 
 ## Resource framework and mods
 
-Proposed design, pending actual desktop and Lumia dependency tests:
+Proposed design, with the desktop dependency path verified and Lumia testing
+still pending:
 
 - Generate a read-only base-resource framework once per Minecraft version.
   Use a distinct, deterministic package identity per game version, so package
@@ -86,10 +87,15 @@ Proposed design, pending actual desktop and Lumia dependency tests:
   cannot be assumed loadable from arbitrary writable locations in UWP.
 
 Framework files are not automatically shareable across app identities merely
-because they are installed: prove dependency discovery, read access, version
-selection, update and removal behavior on Windows 10 Mobile 15063/16241. The
-current framework probe uses synthetic data and does not yet prove this on the
-Lumia. Microsoft documents package dependency-graph loading and framework
+because they are installed. A synthetic x64 UWP probe now installs a signed
+framework and a separately signed client that declares it as a dependency in
+Windows Sandbox. The client enumerates `Package::Current->Dependencies`, opens
+the framework's `InstalledLocation`, and successfully reads a marker file.
+This proves the desktop package graph and read path. The probe also builds and
+signs ARM32 packages against SDK 15063, but the Lumia has not yet run them;
+dependency discovery, read access, version selection, updates and removal still
+need device validation. The test uses synthetic data only, not Minecraft
+assets. Microsoft documents package dependency-graph loading and framework
 version selection; older device behavior still needs tests.
 
 ## Accounts, renderers and devices
