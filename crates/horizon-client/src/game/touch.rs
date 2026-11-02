@@ -35,6 +35,7 @@ enum Action {
     Hotbar(bool),
     Look(f32, f32),
     ImportModule,
+    Back,
 }
 
 pub(super) struct TouchControls {
@@ -48,6 +49,8 @@ pub(super) struct TouchControls {
     module: Option<horizon_touch_mod_runtime::TouchModule>,
     #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
     release_after_failure: bool,
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    pub(super) inventory_visible: bool,
 }
 
 impl Default for TouchControls {
@@ -97,6 +100,8 @@ impl Default for TouchControls {
             module,
             #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
             release_after_failure: false,
+            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            inventory_visible: false,
         }
     }
 }
@@ -140,7 +145,11 @@ impl TouchControls {
         playing: bool,
     ) -> Vec<Action> {
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-        if self.module.is_some() && (playing || self.contacts.contains_key(&id)) {
+        if self.module.as_ref().is_some_and(|m| {
+            playing
+                || (self.inventory_visible && m.supports_menu())
+                || self.contacts.contains_key(&id)
+        }) {
             if let Ok(id32) = i32::try_from(id) {
                 let phase32 = match phase {
                     TouchPhase::Started => 0,
@@ -148,12 +157,11 @@ impl TouchControls {
                     TouchPhase::Ended => 2,
                     TouchPhase::Cancelled => 3,
                 };
-                match self
-                    .module
-                    .as_mut()
-                    .unwrap()
-                    .touch(id32, phase32, p[0], p[1], size[0], size[1])
-                {
+                let module = self.module.as_mut().unwrap();
+                let result = module
+                    .set_context(self.inventory_visible)
+                    .and_then(|_| module.touch(id32, phase32, p[0], p[1], size[0], size[1]));
+                match result {
                     Ok((true, guest_actions)) => {
                         self.used = true;
                         match phase {
@@ -341,6 +349,7 @@ impl TouchControls {
                 11 => output.push(Action::Sneak(down)),
                 12 if down => output.push(Action::Hotbar(false)),
                 13 if down => output.push(Action::Hotbar(true)),
+                14 if down => output.push(Action::Back),
                 _ => {}
             }
         }
@@ -368,7 +377,13 @@ impl TouchControls {
         let size = [hud.width, hud.height];
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         if let Some(module) = &mut self.module {
-            match module.draw(size[0], size[1]) {
+            if self.inventory_visible && !module.supports_menu() {
+                return;
+            }
+            match module
+                .set_context(self.inventory_visible)
+                .and_then(|_| module.draw(size[0], size[1]))
+            {
                 Ok(controls) => {
                     let bg = rgba(25, 25, 25, 115);
                     let fg = rgba(255, 255, 255, 220);
@@ -383,6 +398,7 @@ impl TouchControls {
                             11 => "SNEAK",
                             12 => "<",
                             13 => ">",
+                            14 => "BACK",
                             21 => "MOVE",
                             _ => continue,
                         };
@@ -411,6 +427,10 @@ impl TouchControls {
                     self.release_after_failure = true;
                 }
             }
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if self.inventory_visible {
+            return;
         }
         let (r, buttons, stick) = layout(size);
         let bg = rgba(25, 25, 25, 115);
@@ -454,6 +474,13 @@ impl super::Game<'_> {
         };
         let playing =
             self.title.is_none() && self.screen == super::Screen::Playing && self.player.is_some();
+        #[cfg(feature = "native-d3d11")]
+        {
+            self.touch.inventory_visible = matches!(
+                self.screen,
+                super::Screen::Inventory | super::Screen::Creative
+            );
+        }
         let actions = self.touch.update(
             touch.id,
             touch.phase,
@@ -501,6 +528,7 @@ impl super::Game<'_> {
                     }
                     Ok(())
                 }
+                Action::Back => self.pad_back(),
             };
             if let Err(e) = result {
                 log::warn!("Horizon: touch action failed: {e}");

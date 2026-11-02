@@ -13539,11 +13539,15 @@ impl Game<'_> {
             Vec::new()
         };
         let mut hud = horizon_client::spans::time("hud", || self.hud(size));
-        #[cfg(target_vendor = "uwp")]
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if self.title.is_none() && matches!(self.screen, Screen::Playing | Screen::Inventory | Screen::Creative) {
+            self.touch.inventory_visible = matches!(self.screen, Screen::Inventory | Screen::Creative);
+            self.touch.draw(&mut hud, &self.gui.atlas);
+            self.release_failed_touch_module();
+        }
+        #[cfg(all(target_vendor = "uwp", not(feature = "native-d3d11")))]
         if self.title.is_none() && self.screen == Screen::Playing {
             self.touch.draw(&mut hud, &self.gui.atlas);
-            #[cfg(feature = "native-d3d11")]
-            self.release_failed_touch_module();
         }
         self.flush_ime(&mut hud);
         // LevelLoadingScreen (Reason.OTHER) draws the title's panorama.

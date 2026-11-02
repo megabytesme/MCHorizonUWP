@@ -18,6 +18,7 @@ const SPRINT: i32 = 10;
 const SNEAK: i32 = 11;
 const PREV: i32 = 12;
 const NEXT: i32 = 13;
+const BACK: i32 = 14;
 const LOOK: i32 = 20;
 const STICK: i32 = 21;
 #[derive(Clone, Copy)]
@@ -34,6 +35,7 @@ const EMPTY: Finger = Finger {
     y: 0.0,
 };
 static mut FINGERS: [Finger; 16] = [EMPTY; 16];
+static mut INVENTORY_CONTEXT: bool = false;
 fn emit(code: i32, value: f32) {
     unsafe { action(code, value) }
 }
@@ -56,7 +58,14 @@ fn geometry(w: f32, h: f32) -> [(i32, f32, f32); 10] {
 pub extern "C" fn mod_api_version() -> i32 {
     1
 }
-/// Host calls only for gameplay. phase: 0=start, 1=move, 2=end, 3=cancel.
+/// Optional v1 extension: 0 = gameplay, 1 = inventory.
+#[no_mangle]
+pub extern "C" fn set_context(context: i32) {
+    unsafe {
+        INVENTORY_CONTEXT = context == 1;
+    }
+}
+/// phase: 0=start, 1=move, 2=end, 3=cancel.
 /// Returns 1 if claimed, 0 if invalid/capacity exceeded.
 #[no_mangle]
 pub extern "C" fn touch(id: i32, phase: i32, x: f32, y: f32, w: f32, h: f32) -> i32 {
@@ -72,6 +81,23 @@ pub extern "C" fn touch(id: i32, phase: i32, x: f32, y: f32, w: f32, h: f32) -> 
             0 => {
                 if existing.is_some() {
                     return 0;
+                }
+                if INVENTORY_CONTEXT {
+                    let (bx, by) = (s * 0.08, s * 0.08);
+                    if (x - bx).powi(2) + (y - by).powi(2) > (radius * 1.25).powi(2) {
+                        return 0;
+                    }
+                    let Some(slot) = (0..16).find(|&i| FINGERS[i].id < 0) else {
+                        return 0;
+                    };
+                    FINGERS[slot] = Finger {
+                        id,
+                        role: BACK,
+                        x,
+                        y,
+                    };
+                    emit(BACK, 1.0);
+                    return 1;
                 }
                 let Some(slot) = (0..16).find(|&i| FINGERS[i].id < 0) else {
                     return 0;
@@ -153,6 +179,10 @@ pub extern "C" fn draw(w: f32, h: f32) {
         return;
     }
     let radius = w.min(h) * 0.075;
+    if unsafe { INVENTORY_CONTEXT } {
+        unsafe { control(BACK, w.min(h) * 0.08, w.min(h) * 0.08, radius) };
+        return;
+    }
     for (id, x, y) in geometry(w, h) {
         unsafe { control(id, x, y, radius) }
     }

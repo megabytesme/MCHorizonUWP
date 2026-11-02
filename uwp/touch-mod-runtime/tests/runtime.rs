@@ -22,6 +22,17 @@ fn separately_built_guest_controls_and_cancellation() {
     assert_eq!(a.len(), 2);
     assert!(a.iter().all(|v| v.value == 0.));
     assert!(m.touch(1, 0, f32::NAN, 1., 1000., 600.).is_err());
+    assert!(m.supports_menu());
+    m.set_context(true).unwrap();
+    let controls = m.draw(1000., 600.).unwrap();
+    assert_eq!(controls.len(), 1);
+    assert_eq!(controls[0].id, 14);
+    assert!(!m.touch(8, 0, 500., 300., 1000., 600.).unwrap().0);
+    let (claimed, actions) = m.touch(9, 0, 48., 48., 1000., 600.).unwrap();
+    assert!(claimed);
+    assert_eq!(actions[0].id, 14);
+    m.set_context(false).unwrap();
+    assert!(m.touch(9, 2, 48., 48., 1000., 600.).unwrap().0);
 }
 
 fn guest_with_touch(body: &str) -> Vec<u8> {
@@ -49,4 +60,15 @@ fn traps_exhausted_fuel_and_rejects_invalid_actions() {
     ))
     .unwrap();
     assert!(m.touch(1, 0, 1., 1., 100., 100.).is_err());
+}
+#[test]
+#[ignore = "requires earlier separate guest passed by HORIZON_TOUCH_LEGACY_MODULE"]
+fn older_v1_guest_remains_usable_without_menu_extension() {
+    let path = std::env::var("HORIZON_TOUCH_LEGACY_MODULE").unwrap();
+    let bytes = std::fs::read(path).unwrap();
+    let mut m = TouchModule::load(&bytes).unwrap();
+    assert!(!m.supports_menu());
+    m.set_context(false).unwrap();
+    assert_eq!(m.draw(1000., 600.).unwrap().len(), 10);
+    assert!(m.touch(3, 0, 934., 516., 1000., 600.).unwrap().0);
 }

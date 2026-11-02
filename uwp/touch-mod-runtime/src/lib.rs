@@ -31,6 +31,32 @@ pub struct TouchModule {
     issued: u64,
 }
 impl TouchModule {
+    /// Whether the optional v1 menu-context extension is implemented.
+    pub fn supports_menu(&self) -> bool {
+        self.instance
+            .get_typed_func::<i32, ()>(&self.store, "set_context")
+            .is_ok()
+    }
+
+    /// Tell a guest whether it is drawing gameplay (0) or an inventory (1).
+    /// Older v1 modules do not receive inventory events.
+    pub fn set_context(&mut self, inventory: bool) -> Result<(), String> {
+        if !self.supports_menu() {
+            return Ok(());
+        }
+        self.budget()?;
+        let f = self
+            .instance
+            .get_typed_func::<i32, ()>(&self.store, "set_context")
+            .map_err(|e| e.to_string())?;
+        f.call(&mut self.store, i32::from(inventory))
+            .map_err(|e| e.to_string())?;
+        let s = self.store.data();
+        if s.invalid || !s.actions.is_empty() || !s.controls.is_empty() {
+            return Err("invalid guest context output".into());
+        }
+        Ok(())
+    }
     pub fn load(bytes: &[u8]) -> Result<Self, String> {
         if bytes.is_empty() || bytes.len() > MAX_MODULE {
             return Err("invalid module size".into());
@@ -65,7 +91,7 @@ impl TouchModule {
                 |mut c: Caller<'_, State>, id: i32, value: F32| {
                     let value: f32 = value.into();
                     let s = c.data_mut();
-                    if !(1..=13).contains(&id)
+                    if !(1..=14).contains(&id)
                         || !value.is_finite()
                         || value.abs() > 4096.0
                         || s.actions.len() >= MAX_OUTPUT
@@ -84,7 +110,7 @@ impl TouchModule {
                 |mut c: Caller<'_, State>, id: i32, x: F32, y: F32, radius: F32| {
                     let (x, y, radius): (f32, f32, f32) = (x.into(), y.into(), radius.into());
                     let s = c.data_mut();
-                    if !(1..=13).contains(&id) && id != 21
+                    if !(1..=14).contains(&id) && id != 21
                         || ![x, y, radius]
                             .iter()
                             .all(|v| v.is_finite() && v.abs() <= 32768.0)
