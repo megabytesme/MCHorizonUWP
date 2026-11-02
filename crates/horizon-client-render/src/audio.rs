@@ -146,7 +146,9 @@ fn attach(mixer: &Mutex<Mixer>, channel: ChannelId, samples: Samples, looping: b
 /// need libasound) never has one.
 #[cfg(feature = "audio")]
 type Stream = cpal::Stream;
-#[cfg(not(feature = "audio"))]
+#[cfg(all(not(feature = "audio"), feature = "uwp-audio", target_vendor = "uwp"))]
+type Stream = horizon_uwp_xaudio_stream::Stream;
+#[cfg(not(any(feature = "audio", all(feature = "uwp-audio", target_vendor = "uwp"))))]
 type Stream = std::convert::Infallible;
 pub struct Audio {
     _stream: Option<Stream>,
@@ -497,7 +499,7 @@ fn mix(mixer: &mut Mixer, data: &mut [f32], channels: usize, rate: u32) {
 /// `HORIZON_NO_AUDIO`, or a virtual screen (`vscreen`), where agents and
 /// harnesses run the game and must stay off the user's speakers.
 /// `HORIZON_AUDIO=1` opens the output anyway (testing into a null sink).
-#[cfg(any(feature = "audio", test))]
+#[cfg(any(feature = "audio", all(feature = "uwp-audio", target_vendor = "uwp"), test))]
 fn output_disabled(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<String> {
     if var("HORIZON_NO_AUDIO").is_some() {
         return Some("audio off: HORIZON_NO_AUDIO is set".into());
@@ -679,9 +681,21 @@ impl Audio {
             device_ticks: 0,
         }
     }
-    #[cfg(not(feature = "audio"))]
+    #[cfg(not(any(feature = "audio", all(feature = "uwp-audio", target_vendor = "uwp"))))]
     fn open_named(_: Arc<Mutex<Mixer>>, _: &str) -> Result<Stream> {
         Err("this build has no sound output (built without the `audio` feature)".into())
+    }
+    #[cfg(all(not(feature = "audio"), feature = "uwp-audio", target_vendor = "uwp"))]
+    fn open_named(mixer: Arc<Mutex<Mixer>>, _target: &str) -> Result<Stream> {
+        if let Some(reason) = output_disabled(|name| std::env::var_os(name)) {
+            return Err(reason.into());
+        }
+        let stream = horizon_uwp_xaudio_stream::Stream::open(move |output| {
+            if let Ok(mut m) = mixer.lock() { mix(&mut m, output, 2, 48_000); }
+            else { output.fill(0.0); }
+        })?;
+        log::info!("Horizon: XAudio2 default output (48000 Hz, stereo)");
+        Ok(stream)
     }
     #[cfg(feature = "audio")]
     fn open_named(mixer: Arc<Mutex<Mixer>>, target: &str) -> Result<Stream> {

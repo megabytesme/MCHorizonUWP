@@ -16,6 +16,7 @@ horizon-core = { path = "../horizon-core" }
 horizon-hdr = { path = "../horizon-hdr" }
 horizon-items = { path = "../horizon-items" }
 horizon-native-terrain = { path = "../../uwp/native-terrain", optional = true }
+horizon-uwp-xaudio-stream = { path = "../../uwp/xaudio-stream", optional = true }
 horizon-protocol = { path = "../horizon-protocol" }
 horizon-shader-api = { path = "../horizon-shader-api" }
 horizon-shaders = { path = "../horizon-shaders" }
@@ -63,6 +64,7 @@ wgpu = { version = "30.0.1", default-features = false, features = ["gles"] }
 native-d3d11 = ["dep:horizon-native-terrain"]
 # Sound output: horizon-client's `audio` feature.
 audio = ["dep:cpal"]
+uwp-audio = ["dep:horizon-uwp-xaudio-stream"]
 # Helpers horizon-client's tests build their fixtures with.
 test-support = []
 

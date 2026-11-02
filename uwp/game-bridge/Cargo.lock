@@ -1067,6 +1067,7 @@ dependencies = [
  "horizon-telemetry",
  "horizon-theme",
  "horizon-threads",
+ "horizon-uwp-xaudio-stream",
  "horizon-world",
  "log",
  "miniz_oxide 0.8.9",
@@ -1295,6 +1296,10 @@ version = "0.1.0"
 dependencies = [
  "horizon-client",
 ]
+
+[[package]]
+name = "horizon-uwp-xaudio-stream"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-world"

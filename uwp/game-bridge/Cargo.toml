@@ -12,6 +12,7 @@ crate-type = ["staticlib"]
 [features]
 native-d3d11 = ["horizon-client/native-d3d11"]
 native-d3d11-readback = ["horizon-client/native-d3d11-readback"]
+uwp-audio = ["horizon-client/uwp-audio"]
 
 [dependencies]
 horizon-client = { path = "../../crates/horizon-client", default-features = false }

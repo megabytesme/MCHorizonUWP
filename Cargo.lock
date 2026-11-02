@@ -1224,6 +1224,7 @@ dependencies = [
  "horizon-telemetry",
  "horizon-theme",
  "horizon-threads",
+ "horizon-uwp-xaudio-stream",
  "horizon-world",
  "log",
  "miniz_oxide 0.8.9",
@@ -1509,6 +1510,10 @@ dependencies = [
  "bytemuck",
  "windows 0.62.2",
 ]
+
+[[package]]
+name = "horizon-uwp-xaudio-stream"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-world"
