@@ -96,6 +96,19 @@ if (args.Contains("--scan"))
 }
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
+Require(selection.ValidatedPackageVersion == "1.0.10.0", "default package version");
+Require(new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.9.0").ValidatedPackageVersion == "1.0.9.0", "version above phone test");
+var manifestTest = System.Xml.Linq.XDocument.Parse("<Package xmlns='http://schemas.microsoft.com/appx/manifest/foundation/windows10'><Identity Name='HorizonUWPPrototype' Publisher='CN=HorizonUWPPrototype' Version='1.0.1.0'/></Package>");
+LocalRecipe.ConfigureManifest(manifestTest, new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.9.0"));
+Require(manifestTest.Root!.Elements().Single().Attribute("Version")!.Value == "1.0.9.0", "manifest receives selected version");
+var wrongManifest = System.Xml.Linq.XDocument.Parse("<Package><Identity Name='other' Publisher='CN=HorizonUWPPrototype' Version='1.0.1.0'/></Package>");
+try { LocalRecipe.ConfigureManifest(wrongManifest, selection); throw new Exception("wrong package identity accepted"); }
+catch (InvalidDataException) { }
+foreach (var bad in new[] { "1.0.1", "1.0.0.9", "1.0.65536.0", "1.0.-1.0", "1.0.01.0", "1.0.1.0 & echo bad" })
+{
+    try { _ = new BuildSelection(TargetProfile.WindowsMobile, true, bad).ValidatedPackageVersion; throw new Exception("invalid package version accepted"); }
+    catch (ArgumentException) { }
+}
 var testHome = Path.Combine(Path.GetTempPath(), "horizon-builder-test-home");
 Require(LocalBuildRunner.ResourcesContainWorkspace(testHome, Path.Combine(testHome, ".huwp", "b")), "resource ancestor rejected");
 Require(!LocalBuildRunner.ResourcesContainWorkspace(Path.Combine(testHome, "resources"), Path.Combine(testHome, ".huwp", "b")), "separate resources accepted");
@@ -134,6 +147,8 @@ var repeated = BuildInputs.Create(selection, commit.ToUpperInvariant(), hash.ToU
 Require(inputs.Sha256() == repeated.Sha256(), "canonical input hash");
 var withoutTouch = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, false), commit, hash, hash, hash, hash, null, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() != withoutTouch.Sha256(), "touch selection changes input hash");
+var nextVersion = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.11.0"), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(inputs.Sha256() != nextVersion.Sha256(), "package version changes input hash");
 try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, null, "stable", "14.44", "10.0.15063.0"); throw new Exception("missing touch digest accepted"); }
 catch (ArgumentException) { }
 try { _ = BuildInputs.Create(selection, commit, "not-a-hash", hash, hash, hash, hash, "stable", "14.44", "10.0.15063.0"); throw new Exception("invalid digest accepted"); }

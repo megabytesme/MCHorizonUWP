@@ -53,6 +53,10 @@ at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
 override and has no HTTPS; the output uses the prototype publisher identity.
 One ARM32 native-touch package was strictly linked and packaged from this
 runner, but that specific output has not been installed or tested on a phone.
+The package-version field changes only the isolated manifest and cannot be
+lower than the pinned source version. Choose a version newer than the package
+with the same identity already installed on the target; the builder cannot
+yet inspect that device or guarantee an upgrade preserves data.
 
 The framework probe uses the installed Windows SDK MakeAppx to create unsigned
 x64 and ARM framework packages containing only a synthetic marker in new

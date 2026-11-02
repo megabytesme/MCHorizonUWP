@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Formats.Tar;
+using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
 
@@ -69,6 +70,10 @@ public static class LocalBuildRunner
 
         var executable = Path.Combine(snapshot, "uwp", "host", "build", "game-" + arch, "HorizonUWP.exe");
         var packageDir = Path.Combine(root, "package");
+        var manifestPath = Path.Combine(snapshot, "uwp", "host", "AppxManifest.xml");
+        var manifest = XDocument.Load(manifestPath);
+        LocalRecipe.ConfigureManifest(manifest, selection);
+        manifest.Save(manifestPath);
         progress?.Report("Packaging the unsigned client with the selected resources.");
         await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir, "-Resources", Path.GetFullPath(resources)]);

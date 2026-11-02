@@ -16,6 +16,8 @@
       <ComboBoxItem Content="Windows 10 Mobile (ARM32, 15063)" />
     </ComboBox>
     <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" />
+    <TextBlock Text="Package version (choose a version newer than the one installed on the target)" TextWrapping="Wrap" />
+    <TextBox x:Name="PackageVersion" Text="1.0.10.0" />
     <TextBlock Text="The selected source mod is compiled into the client using the pinned local recipe." TextWrapping="Wrap" />
     <Button Content="Check setup" Click="CheckSetup_Click" />
     <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />

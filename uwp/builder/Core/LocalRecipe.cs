@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
 
@@ -14,11 +15,24 @@ public static class LocalRecipe
     public const string SourceCommit = "5a103f769c8fe00ec38844003ad18b7878e24dfc";
     public const string RustVersion = "1.99.1";
     public const string MinecraftVersion = "26.3";
+    public const string SourceManifestVersion = "1.0.1.0";
+
+    public static void ConfigureManifest(XDocument manifest, BuildSelection selection)
+    {
+        var identity = manifest.Root?.Element(manifest.Root.Name.Namespace + "Identity")
+            ?? throw new InvalidDataException("The pinned package manifest has no identity.");
+        if ((string?)identity.Attribute("Name") != "HorizonUWPPrototype"
+            || (string?)identity.Attribute("Publisher") != "CN=HorizonUWPPrototype"
+            || (string?)identity.Attribute("Version") != SourceManifestVersion)
+            throw new InvalidDataException("The pinned package identity or version did not match the recipe.");
+        identity.SetAttributeValue("Version", selection.ValidatedPackageVersion);
+    }
 
     public static LocalBuildPlan Plan(BuildSelection selection)
     {
         if (selection.Target == TargetProfile.SurfaceProX)
             throw new NotSupportedException("The pinned local recipe currently covers x64 and ARM32 only.");
+        var packageVersion = selection.ValidatedPackageVersion;
         var arm = selection.Target == TargetProfile.WindowsMobile;
         var arch = arm ? "arm" : "x64";
         var steps = new List<RecipeStep>
@@ -37,6 +51,7 @@ public static class LocalRecipe
             "-Executable", $"uwp/host/build/game-{arch}/HorizonUWP.exe", "-OutputDirectory", ".local/builder-output", "-Resources", "<selected-resources>"]));
         var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
             "The resulting APPX is unsigned and requires matching dependencies and a user-controlled signing identity.",
+            $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
             "At least 10 GiB free space and a populated Cargo dependency cache are required; the game-bridge build runs offline.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
         if (arm) notes.Add("ARM32 uses the existing offline override: HTTPS and authenticated online services are unavailable.");

@@ -40,7 +40,7 @@ public sealed partial class MainWindow : Window
         {
             if (sourceDirectory is null || resourceDirectory is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text);
             var plan = LocalRecipe.Plan(selection);
             LocalRecipe.ValidateResources(resourceDirectory);
             var probe = new SystemProbe();
@@ -64,7 +64,7 @@ public sealed partial class MainWindow : Window
         {
             if (sourceDirectory is null || resourceDirectory is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var result = await LocalBuildRunner.RunAsync(sourceDirectory, resourceDirectory, selection, new SystemProbe(), progress);
             RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";

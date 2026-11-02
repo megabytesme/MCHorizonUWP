@@ -1,10 +1,23 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod)
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = "1.0.10.0")
 {
     public const string TouchModId = "horizon_touch";
     public IReadOnlyList<string> ModIds => NativeTouchMod ? [TouchModId] : [];
+    public string ValidatedPackageVersion
+    {
+        get
+        {
+            var parts = PackageVersion.Split('.');
+            if (parts.Length != 4 || parts.Any(part => part.Length == 0 || (part.Length > 1 && part[0] == '0')
+                || !ushort.TryParse(part, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out _)))
+                throw new ArgumentException("Package version must contain four numeric components from 0 to 65535.");
+            if (new Version(PackageVersion) < new Version(LocalRecipe.SourceManifestVersion))
+                throw new ArgumentException($"Package version cannot be lower than the pinned source version {LocalRecipe.SourceManifestVersion}.");
+            return PackageVersion;
+        }
+    }
     public string RustTarget => Target switch
     {
         TargetProfile.DesktopX64 => "x86_64-uwp-windows-msvc",
