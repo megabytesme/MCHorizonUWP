@@ -15,8 +15,12 @@
     <TextBlock Text="The selected source mod is compiled into the client. It requires a compatible verified recipe and is not built by this preview yet." TextWrapping="Wrap" />
     <Button Content="Check setup" Click="CheckSetup_Click" />
     <TextBlock Text="This scan reads local tool and SDK locations. It does not install software or verify recipe compatibility." TextWrapping="Wrap" />
-    <TextBlock Text="Rustup can be installed with Windows Package Manager. Its interactive installer may ask you to review a license or approve elevation; it uses your configured winget source." TextWrapping="Wrap" />
-    <Button x:Name="InstallRustup" Content="Install Rustup with WinGet" Click="InstallRustup_Click" />
+    <TextBlock Text="Install tools using Windows Package Manager. Its interactive installers may ask you to review a license or approve elevation; they use your configured winget source." TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button x:Name="InstallRustup" Content="Install Rustup" Click="InstallTool_Click" />
+      <Button x:Name="InstallGit" Content="Install Git" Click="InstallTool_Click" />
+      <Button x:Name="InstallPython" Content="Install Python" Click="InstallTool_Click" />
+    </StackPanel>
     <TextBlock x:Name="InstallStatus" TextWrapping="Wrap" />
     <StackPanel x:Name="Results" Spacing="12" />
   </StackPanel></ScrollViewer>

@@ -6,7 +6,7 @@ selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
 on a Lumia in its separate branch; this preview still needs an integrated
 recipe before it can run a build. It links to official setup instructions for
 missing tools. On request it can invoke the system Windows Package Manager for
-the fixed Rustup package, with interactive license/elevation prompts and normal
+fixed Rustup, Git and Python packages, with interactive license/elevation prompts and normal
 package verification. It does not access Minecraft files, configure signing,
 build Horizon, or create game packages. Tool presence does not establish version or recipe
 compatibility; the required UWP Rust patches and build recipes still need a

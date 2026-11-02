@@ -2,7 +2,7 @@ using Horizon.Builder.Core;
 
 if (args.Contains("--expect-missing-winget"))
 {
-    try { await WindowsPackageManager.InstallRustupAsync(new SystemProbe()); throw new Exception("missing WinGet accepted"); }
+    try { await WindowsPackageManager.InstallAsync(new SystemProbe(), InstallableTool.Rustup); throw new Exception("missing WinGet accepted"); }
     catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
     Console.WriteLine("Missing Windows Package Manager reported without installing anything.");
     return;
@@ -57,8 +57,12 @@ if (args.Contains("--scan"))
 }
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
-Require(WindowsPackageManager.RustupArguments.SequenceEqual(["install", "--id", "Rustlang.Rustup", "--exact", "--source", "winget", "--interactive", "--no-upgrade"]), "fixed interactive Rustup install");
-try { await WindowsPackageManager.InstallRustupAsync(new FakeProbe()); throw new Exception("missing WinGet accepted"); }
+Require(WindowsPackageManager.Arguments(InstallableTool.Rustup).SequenceEqual(["install", "--id", "Rustlang.Rustup", "--exact", "--source", "winget", "--interactive", "--no-upgrade"]), "fixed interactive Rustup install");
+Require(WindowsPackageManager.Arguments(InstallableTool.Git)[2] == "Git.Git", "fixed Git package");
+Require(WindowsPackageManager.Arguments(InstallableTool.Python)[2] == "Python.Python.3.13", "fixed Python package");
+try { _ = WindowsPackageManager.Arguments((InstallableTool)99); throw new Exception("invalid package accepted"); }
+catch (ArgumentOutOfRangeException) { }
+try { await WindowsPackageManager.InstallAsync(new FakeProbe(), InstallableTool.Rustup); throw new Exception("missing WinGet accepted"); }
 catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
 Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod"]), "native touch feature selection");

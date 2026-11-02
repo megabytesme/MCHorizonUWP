@@ -7,20 +7,26 @@ namespace Horizon.Builder.App;
 public sealed partial class MainWindow : Window
 {
     public MainWindow() { InitializeComponent(); }
-    private async void InstallRustup_Click(object sender, RoutedEventArgs e)
+    private async void InstallTool_Click(object sender, RoutedEventArgs e)
     {
         InstallRustup.IsEnabled = false;
+        InstallGit.IsEnabled = false;
+        InstallPython.IsEnabled = false;
         InstallStatus.Text = "Windows Package Manager is running. Follow its prompts.";
         try
         {
-            await WindowsPackageManager.InstallRustupAsync(new SystemProbe());
+            var tool = ReferenceEquals(sender, InstallRustup) ? InstallableTool.Rustup
+                : ReferenceEquals(sender, InstallGit) ? InstallableTool.Git
+                : ReferenceEquals(sender, InstallPython) ? InstallableTool.Python
+                : throw new InvalidOperationException("Unknown tool selection.");
+            await WindowsPackageManager.InstallAsync(new SystemProbe(), tool);
             InstallStatus.Text = "WinGet completed. Restart the builder, then check setup again.";
         }
         catch (Exception error)
         {
-            InstallStatus.Text = $"Rustup was not installed: {error.Message}";
+            InstallStatus.Text = $"The tool was not installed: {error.Message}";
         }
-        finally { InstallRustup.IsEnabled = true; }
+        finally { InstallRustup.IsEnabled = true; InstallGit.IsEnabled = true; InstallPython.IsEnabled = true; }
     }
     private void CheckSetup_Click(object sender, RoutedEventArgs e)
     {
