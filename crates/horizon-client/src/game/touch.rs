@@ -145,6 +145,22 @@ impl TouchControls {
         playing: bool,
     ) -> Vec<Action> {
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if self.module.is_some() {
+            let (radius, buttons, _) = layout(size);
+            let import = buttons
+                .iter()
+                .find(|(button, _)| *button == Button::Import)
+                .unwrap()
+                .1;
+            let existing_import =
+                matches!(self.contacts.get(&id), Some(Role::Button(Button::Import)));
+            if existing_import
+                || (playing && phase == TouchPhase::Started && distance(import, p) <= radius * 1.25)
+            {
+                return self.update_builtin(id, phase, p, size, playing);
+            }
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         if self.module.as_ref().is_some_and(|m| {
             playing
                 || (self.inventory_visible && m.supports_menu())
@@ -412,6 +428,24 @@ impl TouchControls {
                             bg,
                         );
                         hud.text(atlas, label, c.x - c.radius * 0.65, c.y - 4., fg, false);
+                    }
+                    // Import is host UI, retained even after a module loads so
+                    // separately installed modules can be updated or replaced.
+                    if !self.inventory_visible {
+                        let (radius, buttons, _) = layout(size);
+                        let (_, p) = buttons
+                            .iter()
+                            .find(|(button, _)| *button == Button::Import)
+                            .unwrap();
+                        hud.fill(
+                            atlas,
+                            p[0] - radius,
+                            p[1] - radius,
+                            radius * 2.,
+                            radius * 2.,
+                            bg,
+                        );
+                        hud.text(atlas, "MOD", p[0] - radius * 0.65, p[1] - 4., fg, false);
                     }
                     return;
                 }
