@@ -34,6 +34,8 @@ catch (ArgumentException) { }
 
 var missing = new SetupChecker(new FakeProbe()).Scan(TargetProfile.WindowsMobile);
 Require(missing.Single(c => c.Name == "Git").Status == CheckStatus.Missing, "missing Git");
+Require(missing.Single(c => c.Name == "Git").Instructions?.Host == "git-scm.com", "official Git instructions");
+Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Instructions?.Host == "learn.microsoft.com", "official SDK instructions");
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("15063"), "mobile SDK required");
 Require(missing.Any(c => c.Status == CheckStatus.Review && c.Name == "Rust UWP standard library"), "unverified UWP std");
 

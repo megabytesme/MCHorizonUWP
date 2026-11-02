@@ -22,6 +22,8 @@ public sealed partial class MainWindow : Window
             var panel = new StackPanel { Spacing = 4 };
             panel.Children.Add(new TextBlock { Text = $"{check.Name} — {check.Status}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             panel.Children.Add(new TextBlock { Text = check.Detail, TextWrapping = TextWrapping.Wrap });
+            if (check.Instructions is { } instructions)
+                panel.Children.Add(new HyperlinkButton { Content = "Open publisher instructions", NavigateUri = instructions });
             Results.Children.Add(panel);
         }
     }

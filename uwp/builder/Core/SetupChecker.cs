@@ -2,7 +2,7 @@ namespace Horizon.Builder.Core;
 
 public enum TargetProfile { DesktopX64, SurfaceProX, WindowsMobile }
 public enum CheckStatus { Found, Missing, Review }
-public sealed record SetupCheck(string Name, CheckStatus Status, string Detail);
+public sealed record SetupCheck(string Name, CheckStatus Status, string Detail, Uri? Instructions = null);
 
 // A scan is evidence of file presence, not a compatibility or build guarantee.
 public interface IProbe
@@ -18,10 +18,10 @@ public sealed class SetupChecker(IProbe probe)
     public IReadOnlyList<SetupCheck> Scan(TargetProfile profile)
     {
         var checks = new List<SetupCheck>();
-        CheckPath(checks, "Git", "git.exe", "Install Git for Windows from its official publisher.");
-        CheckPath(checks, "Rustup", "rustup.exe", "Install Rust using the official Rustup installer.");
-        CheckPath(checks, "Cargo", "cargo.exe", "Install Cargo with Rustup.");
-        CheckPath(checks, "Python", "python.exe", "Install Python from its official publisher.");
+        CheckPath(checks, "Git", "git.exe", "Install Git for Windows from its official publisher.", "https://git-scm.com/install/windows");
+        CheckPath(checks, "Rustup", "rustup.exe", "Install Rust using the official Rustup installer.", "https://rust-lang.org/learn/get-started/");
+        CheckPath(checks, "Cargo", "cargo.exe", "Install Cargo with Rustup.", "https://rust-lang.org/learn/get-started/");
+        CheckPath(checks, "Python", "python.exe", "Install Python from its official publisher.", "https://www.python.org/downloads/windows/");
 
         var kitsRoot = Path.Combine(probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)", "Windows Kits", "10");
         var sdkVersion = profile == TargetProfile.WindowsMobile ? "10.0.15063.0" : null;
@@ -34,7 +34,8 @@ public sealed class SetupChecker(IProbe probe)
             && probe.FileExists(Path.Combine(kitsRoot, "Include", Path.GetFileName(path), "um", "Windows.h")));
         checks.Add(sdk is null
             ? new("Windows SDK and packaging tools", CheckStatus.Missing,
-                sdkVersion is null ? "No SDK with headers, MakeAppx and SignTool was found in Windows Kits/10. Install a compatible Windows SDK." : $"Windows SDK {sdkVersion} with headers, MakeAppx and SignTool was not found. Its availability and licensing still require verification.")
+                sdkVersion is null ? "No SDK with headers, MakeAppx and SignTool was found in Windows Kits/10. Install a compatible Windows SDK." : $"Windows SDK {sdkVersion} with headers, MakeAppx and SignTool was not found. Its availability and licensing still require verification.",
+                new Uri("https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads"))
             : new("Windows SDK and packaging tools", CheckStatus.Found, $"Found headers and packaging tools for {Path.GetFileName(sdk)}. Compatibility with the selected recipe is not yet verified."));
 
         var vsRoots = new[] { probe.EnvironmentValue("ProgramFiles(x86)"), probe.EnvironmentValue("ProgramFiles") }
@@ -46,7 +47,8 @@ public sealed class SetupChecker(IProbe probe)
             .FirstOrDefault(toolset => probe.FileExists(Path.Combine(toolset, "bin", "Hostx64", arch, "cl.exe"))
                 && probe.FileExists(Path.Combine(toolset, "lib", arch, "store", "vcruntime.lib")));
         checks.Add(msvc is null
-            ? new("Visual C++ UWP tools", CheckStatus.Missing, $"No x64-hosted {arch} compiler and UWP libraries found in standard Visual Studio locations. Install the matching C++ UWP workload and target tools.")
+            ? new("Visual C++ UWP tools", CheckStatus.Missing, $"No x64-hosted {arch} compiler and UWP libraries found in standard Visual Studio locations. Install the matching C++ UWP workload and target tools.",
+                new Uri("https://learn.microsoft.com/en-us/windows/apps/winui/winui2/getting-started"))
             : new("Visual C++ UWP tools", CheckStatus.Found, $"Found {arch} compiler and UWP libraries. The recipe must still validate its required toolset version."));
         checks.Add(new("Rust UWP standard library", CheckStatus.Review,
             "The UWP build requires a recipe-specific Rust standard-library patch and target build. Presence and compatibility have not yet been verified."));
@@ -55,10 +57,10 @@ public sealed class SetupChecker(IProbe probe)
         return checks;
     }
 
-    private void CheckPath(List<SetupCheck> checks, string label, string name, string missing)
+    private void CheckPath(List<SetupCheck> checks, string label, string name, string missing, string instructions)
     {
         var path = probe.FindOnPath(name);
-        checks.Add(path is null ? new(label, CheckStatus.Missing, missing)
+        checks.Add(path is null ? new(label, CheckStatus.Missing, missing, new Uri(instructions))
             : new(label, CheckStatus.Found, $"Found on PATH. Version and recipe compatibility have not been checked."));
     }
 }
