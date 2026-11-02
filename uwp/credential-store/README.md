@@ -14,3 +14,8 @@ an 8,192-character value, replacement, removal and missing again. The ARM32
 probe passed SDK 15063 strict linking; the user confirmed an earlier short-value
 Credential Locker round trip on Lumia. Long values and this adapter remain to be
 tested on the phone.
+
+The Rust facade was also exercised end-to-end in an x64 UWP host with a
+synthetic 8,192-character value, replacement, removal and Debug redaction.
+That host passed the SDK 15063 strict link audit. Its source is under
+`probe/rust` and `probe/RustApp.cpp`; no real token was used.
