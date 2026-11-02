@@ -5,6 +5,21 @@ unsafe extern "C" {
     fn horizon_uwp_report_error(text: *const u8, len: usize);
 }
 
+/// Store a module selected explicitly by the user in the app's private data.
+#[cfg(target_vendor = "uwp")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_save_touch_mod(data: *const u8, len: usize) -> i32 {
+    if data.is_null() || len == 0 || len > 1024 * 1024 {
+        return 0;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+    let dir = horizon_client::logging::game_home().join("mods");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return 0;
+    }
+    i32::from(std::fs::write(dir.join("touch-controls.wasm"), bytes).is_ok())
+}
+
 #[cfg(target_vendor = "uwp")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_run(

@@ -13542,6 +13542,8 @@ impl Game<'_> {
         #[cfg(target_vendor = "uwp")]
         if self.title.is_none() && self.screen == Screen::Playing {
             self.touch.draw(&mut hud, &self.gui.atlas);
+            #[cfg(feature = "native-d3d11")]
+            self.release_failed_touch_module();
         }
         self.flush_ime(&mut hud);
         // LevelLoadingScreen (Reason.OTHER) draws the title's panorama.

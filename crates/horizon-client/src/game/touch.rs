@@ -14,6 +14,7 @@ enum Button {
     Sneak,
     Previous,
     Next,
+    Import,
 }
 #[derive(Clone, Copy, Debug)]
 enum Role {
@@ -33,9 +34,9 @@ enum Action {
     Sneak(bool),
     Hotbar(bool),
     Look(f32, f32),
+    ImportModule,
 }
 
-#[derive(Default)]
 pub(super) struct TouchControls {
     contacts: HashMap<u64, Role>,
     primary: Option<u64>,
@@ -43,9 +44,64 @@ pub(super) struct TouchControls {
     suppressed: u8,
     pub(super) movement: Option<[f32; 2]>,
     used: bool,
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    module: Option<horizon_touch_mod_runtime::TouchModule>,
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    release_after_failure: bool,
 }
 
-fn layout(size: [f32; 2]) -> (f32, [(Button, [f32; 2]); 9], [f32; 2]) {
+impl Default for TouchControls {
+    fn default() -> Self {
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let module = {
+            use std::io::Read;
+            let path = horizon_client::logging::game_home()
+                .join("mods")
+                .join("touch-controls.wasm");
+            match std::fs::File::open(&path) {
+                Ok(file) => {
+                    let mut bytes = Vec::new();
+                    match file
+                        .take(1024 * 1024 + 1)
+                        .read_to_end(&mut bytes)
+                        .map_err(|e| e.to_string())
+                        .and_then(|_| horizon_touch_mod_runtime::TouchModule::load(&bytes))
+                    {
+                        Ok(module) => {
+                            log::info!("Horizon: loaded separate touch module {}", path.display());
+                            Some(module)
+                        }
+                        Err(error) => {
+                            log::warn!(
+                                "Horizon: touch module unavailable ({error}); using built-in controls"
+                            );
+                            None
+                        }
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => {
+                    log::warn!("Horizon: cannot open touch module ({e}); using built-in controls");
+                    None
+                }
+            }
+        };
+        Self {
+            contacts: HashMap::new(),
+            primary: None,
+            primary_claimed: false,
+            suppressed: 0,
+            movement: None,
+            used: false,
+            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            module,
+            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            release_after_failure: false,
+        }
+    }
+}
+
+fn layout(size: [f32; 2]) -> (f32, [(Button, [f32; 2]); 10], [f32; 2]) {
     let s = size[0].min(size[1]);
     (
         s * 0.075,
@@ -65,6 +121,7 @@ fn layout(size: [f32; 2]) -> (f32, [(Button, [f32; 2]); 9], [f32; 2]) {
                 Button::Next,
                 [size[0] * 0.5 + s * 0.20, size[1] - s * 0.075],
             ),
+            (Button::Import, [size[0] * 0.5, s * 0.08]),
         ],
         [s * 0.18, size[1] - s * 0.18],
     )
@@ -75,6 +132,76 @@ fn distance(a: [f32; 2], b: [f32; 2]) -> f32 {
 
 impl TouchControls {
     fn update(
+        &mut self,
+        id: u64,
+        phase: TouchPhase,
+        p: [f32; 2],
+        size: [f32; 2],
+        playing: bool,
+    ) -> Vec<Action> {
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if self.module.is_some() && (playing || self.contacts.contains_key(&id)) {
+            if let Ok(id32) = i32::try_from(id) {
+                let phase32 = match phase {
+                    TouchPhase::Started => 0,
+                    TouchPhase::Moved => 1,
+                    TouchPhase::Ended => 2,
+                    TouchPhase::Cancelled => 3,
+                };
+                match self
+                    .module
+                    .as_mut()
+                    .unwrap()
+                    .touch(id32, phase32, p[0], p[1], size[0], size[1])
+                {
+                    Ok((true, guest_actions)) => {
+                        self.used = true;
+                        match phase {
+                            TouchPhase::Started => {
+                                if self.contacts.is_empty() {
+                                    self.primary = Some(id);
+                                    self.primary_claimed = true;
+                                }
+                                self.contacts.insert(id, Role::Menu);
+                            }
+                            TouchPhase::Ended | TouchPhase::Cancelled => {
+                                self.contacts.remove(&id);
+                            }
+                            TouchPhase::Moved => {}
+                        }
+                        if self.primary == Some(id) {
+                            self.suppressed = if phase == TouchPhase::Moved { 1 } else { 2 };
+                        }
+                        if matches!(phase, TouchPhase::Ended | TouchPhase::Cancelled)
+                            && self.primary == Some(id)
+                        {
+                            self.primary = None;
+                            self.primary_claimed = false;
+                        }
+                        return self.translate_guest_actions(guest_actions);
+                    }
+                    Ok((false, _)) => {}
+                    Err(error) => {
+                        log::warn!(
+                            "Horizon: touch module failed ({error}); using built-in controls"
+                        );
+                        self.module = None;
+                        self.contacts.clear();
+                        self.primary = None;
+                        self.primary_claimed = false;
+                        self.movement = None;
+                        self.release_after_failure = true;
+                    }
+                }
+            }
+        }
+        let mut actions = self.update_builtin(id, phase, p, size, playing);
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        actions.splice(0..0, self.take_failure_actions());
+        actions
+    }
+
+    fn update_builtin(
         &mut self,
         id: u64,
         phase: TouchPhase,
@@ -93,10 +220,10 @@ impl TouchControls {
                 }
                 let role = if !playing {
                     Role::Menu
-                } else if let Some((button, _)) = buttons
-                    .iter()
-                    .find(|(_, c)| distance(*c, p) <= radius * 1.25)
-                {
+                } else if let Some((button, _)) = buttons.iter().find(|(button, c)| {
+                    (*button != Button::Import || cfg!(feature = "native-d3d11"))
+                        && distance(*c, p) <= radius * 1.25
+                }) {
                     Role::Button(*button)
                 } else if distance(stick, p) <= radius * 2.2
                     && !self.contacts.values().any(|r| matches!(r, Role::Move))
@@ -118,6 +245,7 @@ impl TouchControls {
                     Role::Button(Button::Sneak) => result.push(Action::Sneak(true)),
                     Role::Button(Button::Previous) => result.push(Action::Hotbar(false)),
                     Role::Button(Button::Next) => result.push(Action::Hotbar(true)),
+                    Role::Button(Button::Import) => result.push(Action::ImportModule),
                     Role::Move => self.movement = Some([0., 0.]),
                     _ => {}
                 }
@@ -188,11 +316,102 @@ impl TouchControls {
             false
         }
     }
-    pub(super) fn draw(&self, hud: &mut HudBatch, atlas: &HudAtlas) {
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    fn translate_guest_actions(
+        &mut self,
+        actions: Vec<horizon_touch_mod_runtime::Action>,
+    ) -> Vec<Action> {
+        let mut output = Vec::new();
+        for a in actions {
+            let down = a.value > 0.5;
+            match a.id {
+                1 | 2 => {
+                    let mut v = self.movement.unwrap_or([0., 0.]);
+                    v[(a.id - 1) as usize] = a.value.clamp(-1., 1.);
+                    self.movement = if v == [0., 0.] { None } else { Some(v) };
+                }
+                3 => output.push(Action::Look(a.value, 0.)),
+                4 => output.push(Action::Look(0., a.value)),
+                5 => output.push(Action::Jump(down)),
+                6 => output.push(Action::Attack(down)),
+                7 => output.push(Action::Use(down)),
+                8 if down => output.push(Action::Inventory),
+                9 if down => output.push(Action::Pause),
+                10 => output.push(Action::Sprint(down)),
+                11 => output.push(Action::Sneak(down)),
+                12 if down => output.push(Action::Hotbar(false)),
+                13 if down => output.push(Action::Hotbar(true)),
+                _ => {}
+            }
+        }
+        output
+    }
+    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    fn take_failure_actions(&mut self) -> Vec<Action> {
+        if std::mem::take(&mut self.release_after_failure) {
+            self.movement = None;
+            vec![
+                Action::Jump(false),
+                Action::Attack(false),
+                Action::Use(false),
+                Action::Sprint(false),
+                Action::Sneak(false),
+            ]
+        } else {
+            Vec::new()
+        }
+    }
+    pub(super) fn draw(&mut self, hud: &mut HudBatch, atlas: &HudAtlas) {
         if !self.used && !cfg!(target_arch = "arm") {
             return;
         }
         let size = [hud.width, hud.height];
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(module) = &mut self.module {
+            match module.draw(size[0], size[1]) {
+                Ok(controls) => {
+                    let bg = rgba(25, 25, 25, 115);
+                    let fg = rgba(255, 255, 255, 220);
+                    for c in controls {
+                        let label = match c.id {
+                            5 => "JUMP",
+                            6 => "HIT",
+                            7 => "USE",
+                            8 => "INV",
+                            9 => "II",
+                            10 => "SPR",
+                            11 => "SNEAK",
+                            12 => "<",
+                            13 => ">",
+                            21 => "MOVE",
+                            _ => continue,
+                        };
+                        let scale = if c.id == 21 { 1.7 } else { 1. };
+                        hud.fill(
+                            atlas,
+                            c.x - c.radius * scale,
+                            c.y - c.radius * scale,
+                            c.radius * 2. * scale,
+                            c.radius * 2. * scale,
+                            bg,
+                        );
+                        hud.text(atlas, label, c.x - c.radius * 0.65, c.y - 4., fg, false);
+                    }
+                    return;
+                }
+                Err(error) => {
+                    log::warn!(
+                        "Horizon: touch module draw failed ({error}); using built-in controls"
+                    );
+                    self.module = None;
+                    self.contacts.clear();
+                    self.primary = None;
+                    self.primary_claimed = false;
+                    self.movement = None;
+                    self.release_after_failure = true;
+                }
+            }
+        }
         let (r, buttons, stick) = layout(size);
         let bg = rgba(25, 25, 25, 115);
         let fg = rgba(255, 255, 255, 220);
@@ -206,6 +425,9 @@ impl TouchControls {
         );
         hud.text(atlas, "MOVE", stick[0] - r, stick[1] - 4., fg, false);
         for (b, p) in buttons {
+            if b == Button::Import && !cfg!(feature = "native-d3d11") {
+                continue;
+            }
             hud.fill(atlas, p[0] - r, p[1] - r, r * 2., r * 2., bg);
             let label = match b {
                 Button::Jump => "JUMP",
@@ -217,6 +439,7 @@ impl TouchControls {
                 Button::Sneak => "SNEAK",
                 Button::Previous => "<",
                 Button::Next => ">",
+                Button::Import => "MOD",
             };
             hud.text(atlas, label, p[0] - r * 0.65, p[1] - 4., fg, false);
         }
@@ -238,6 +461,16 @@ impl super::Game<'_> {
             [size[0] as f32, size[1] as f32],
             playing,
         );
+        self.apply_touch_actions(actions);
+    }
+
+    #[cfg(feature = "native-d3d11")]
+    pub(super) fn release_failed_touch_module(&mut self) {
+        let actions = self.touch.take_failure_actions();
+        self.apply_touch_actions(actions);
+    }
+
+    fn apply_touch_actions(&mut self, actions: Vec<Action>) {
         for action in actions {
             let result = match action {
                 Action::Jump(down) => self.mapped_key(winit::keyboard::KeyCode::Space, down, false),
@@ -257,6 +490,15 @@ impl super::Game<'_> {
                 }
                 Action::Look(x, y) => {
                     self.turn_player(f64::from(x), f64::from(y));
+                    Ok(())
+                }
+                Action::ImportModule => {
+                    #[cfg(feature = "native-d3d11")]
+                    {
+                        if !horizon_native_window::import_touch_mod() {
+                            log::warn!("Horizon: touch mod picker unavailable");
+                        }
+                    }
                     Ok(())
                 }
             };
