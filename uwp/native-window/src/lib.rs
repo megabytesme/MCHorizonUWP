@@ -11,12 +11,6 @@ use windows::{
 unsafe extern "C" {
     /// The host returns a borrowed CoreWindow only from the owning UI thread.
     fn horizon_uwp_window_handle() -> *mut c_void;
-    fn horizon_uwp_import_touch_mod() -> i32;
-}
-
-/// Requests the host's file picker; it verifies UI-thread ownership.
-pub fn import_touch_mod() -> bool {
-    unsafe { horizon_uwp_import_touch_mod() != 0 }
 }
 
 /// Renderer that keeps the CoreWindow alive, and cannot cross threads.

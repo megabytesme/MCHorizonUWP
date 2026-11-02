@@ -5,6 +5,3 @@ edition = "2021"
 publish = false
 
 [workspace]
-
-[dev-dependencies]
-horizon-touch-mod-runtime = { path = "../../uwp/touch-mod-runtime" }

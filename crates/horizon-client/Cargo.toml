@@ -74,7 +74,6 @@ horizon-native-entities = { path = "../../uwp/native-entities", optional = true 
 horizon-native-scene = { path = "../../uwp/native-scene", optional = true }
 horizon-native-window = { path = "../../uwp/native-window", optional = true }
 horizon-native-terrain = { path = "../../uwp/native-terrain", optional = true }
-horizon-touch-mod-runtime = { path = "../../uwp/touch-mod-runtime", optional = true }
 horizon-touch-native = { path = "../../mods/horizon-touch-native", optional = true }
 horizon-uwp-d3d11 = { path = "../../uwp/d3d11-backend", optional = true }
 
@@ -104,7 +103,7 @@ winresource = "0.1"
 
 [features]
 default = ["audio", "controllers"]
-native-d3d11 = ["dep:horizon-native-panorama", "dep:horizon-native-entities", "dep:horizon-native-hud", "dep:horizon-native-scene", "dep:horizon-native-window", "dep:horizon-native-terrain", "dep:horizon-uwp-d3d11", "dep:horizon-touch-mod-runtime", "horizon-client-render/native-d3d11"]
+native-d3d11 = ["dep:horizon-native-panorama", "dep:horizon-native-entities", "dep:horizon-native-hud", "dep:horizon-native-scene", "dep:horizon-native-window", "dep:horizon-native-terrain", "dep:horizon-uwp-d3d11", "horizon-client-render/native-d3d11"]
 native-d3d11-readback = ["native-d3d11", "horizon-uwp-d3d11/readback-probe"]
 native-touch-mod = ["native-d3d11", "dep:horizon-touch-native"]
 # Sound output. Without it (and `controllers`) the program links neither libasound nor libudev on

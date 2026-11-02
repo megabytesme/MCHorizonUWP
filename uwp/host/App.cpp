@@ -9,11 +9,6 @@
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
 #include <windows.ui.viewmanagement.h>
-#include <windows.storage.pickers.h>
-#include <windows.storage.streams.h>
-#include <windows.storage.fileproperties.h>
-#include <windows.ui.popups.h>
-#include <ppltasks.h>
 
 static Windows::UI::Core::CoreWindow^ current_window;
 static std::atomic<DWORD> current_window_thread{0};
@@ -64,54 +59,7 @@ extern "C" void __cdecl horizon_uwp_set_ime_allowed(int allowed) {
         // InputPane is optional on devices without a touch keyboard.
     }
 }
-#ifdef HORIZON_UWP_TOUCH_MOD_IMPORT
-extern "C" int __cdecl horizon_uwp_save_touch_mod(const unsigned char*, size_t);
-static std::atomic<bool> touch_import_busy{false};
-// The selected module remains an external data file; no Wasm guest is shipped
-// in the game package. Import is only requested by an explicit in-game tap.
-extern "C" int __cdecl horizon_uwp_import_touch_mod() {
-    if (!current_window || !current_window->Dispatcher->HasThreadAccess) return 0;
-    if (touch_import_busy.exchange(true)) return 0;
-    try {
-        using namespace Windows::Storage;
-        using namespace Windows::Storage::Pickers;
-        using namespace Windows::Storage::Streams;
-        auto dispatcher = current_window->Dispatcher;
-        auto picker = ref new FileOpenPicker();
-        picker->SuggestedStartLocation = PickerLocationId::Downloads;
-        picker->FileTypeFilter->Append(L".wasm");
-        concurrency::create_task(picker->PickSingleFileAsync()).then([](StorageFile^ file) -> concurrency::task<IBuffer^> {
-            if (!file) return concurrency::task_from_result<IBuffer^>(nullptr);
-            return concurrency::create_task(file->GetBasicPropertiesAsync()).then([file](Windows::Storage::FileProperties::BasicProperties^ properties) -> concurrency::task<IBuffer^> {
-                if (properties->Size == 0 || properties->Size > 1024 * 1024) throw ref new Platform::FailureException();
-                return concurrency::create_task(FileIO::ReadBufferAsync(file));
-            });
-        }).then([dispatcher](concurrency::task<IBuffer^> pending) {
-            bool ok = false, cancelled = false;
-            try {
-                auto buffer = pending.get();
-                if (!buffer) cancelled = true;
-                else if (buffer->Length > 0 && buffer->Length <= 1024 * 1024) {
-                    auto bytes = ref new Platform::Array<unsigned char>(buffer->Length);
-                    DataReader::FromBuffer(buffer)->ReadBytes(bytes);
-                    ok = horizon_uwp_save_touch_mod(bytes->Data, bytes->Length) != 0;
-                }
-            } catch (...) {}
-            touch_import_busy.store(false);
-            if (!cancelled) {
-                try {
-                    dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal,
-                        ref new Windows::UI::Core::DispatchedHandler([ok]() {
-                            auto message = ok ? L"Touch mod imported. Restart Horizon to activate it." : L"Unable to import the touch mod.";
-                            (ref new Windows::UI::Popups::MessageDialog(ref new Platform::String(message), L"Touch mod"))->ShowAsync();
-                        }));
-                } catch (Platform::Exception^) {}
-            }
-        });
-        return 1;
-    } catch (Platform::Exception^) { touch_import_busy.store(false); return 0; }
-}
-#endif
+
 extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
     if (!current_window || !current_window->Dispatcher->HasThreadAccess) return 0;
     const double scale = Windows::Graphics::Display::DisplayInformation::GetForCurrentView()->LogicalDpi / 96.0;

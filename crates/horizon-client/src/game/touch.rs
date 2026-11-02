@@ -1,10 +1,12 @@
 //! Multitouch controls for the UWP CoreWindow backend.
 use horizon_client::hud::{HudAtlas, HudBatch, rgba};
-use std::collections::HashMap;
-#[cfg(all(target_vendor = "uwp", feature = "native-d3d11", feature = "native-touch-mod"))]
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "native-d3d11",
+    feature = "native-touch-mod"
+))]
 use horizon_touch_native as touch_module;
-#[cfg(all(target_vendor = "uwp", feature = "native-d3d11", not(feature = "native-touch-mod")))]
-use horizon_touch_mod_runtime as touch_module;
+use std::collections::HashMap;
 use winit::event::{Touch, TouchPhase, WindowEvent};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -18,7 +20,6 @@ enum Button {
     Sneak,
     Previous,
     Next,
-    Import,
 }
 #[derive(Clone, Copy, Debug)]
 enum Role {
@@ -38,7 +39,6 @@ enum Action {
     Sneak(bool),
     Hotbar(bool),
     Look(f32, f32),
-    ImportModule,
     Back,
 }
 
@@ -49,9 +49,17 @@ pub(super) struct TouchControls {
     suppressed: u8,
     pub(super) movement: Option<[f32; 2]>,
     used: bool,
-    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    #[cfg(all(
+        target_vendor = "uwp",
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
     module: Option<touch_module::TouchModule>,
-    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    #[cfg(all(
+        target_vendor = "uwp",
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
     release_after_failure: bool,
     #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
     pub(super) inventory_visible: bool,
@@ -59,42 +67,12 @@ pub(super) struct TouchControls {
 
 impl Default for TouchControls {
     fn default() -> Self {
-        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11", feature = "native-touch-mod"))]
+        #[cfg(all(
+            target_vendor = "uwp",
+            feature = "native-d3d11",
+            feature = "native-touch-mod"
+        ))]
         let module = Some(touch_module::TouchModule::new());
-        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11", not(feature = "native-touch-mod")))]
-        let module = {
-            use std::io::Read;
-            let path = horizon_client::logging::game_home()
-                .join("mods")
-                .join("touch-controls.wasm");
-            match std::fs::File::open(&path) {
-                Ok(file) => {
-                    let mut bytes = Vec::new();
-                    match file
-                        .take(1024 * 1024 + 1)
-                        .read_to_end(&mut bytes)
-                        .map_err(|e| e.to_string())
-                        .and_then(|_| touch_module::TouchModule::load(&bytes))
-                    {
-                        Ok(module) => {
-                            log::info!("Horizon: loaded separate touch module {}", path.display());
-                            Some(module)
-                        }
-                        Err(error) => {
-                            log::warn!(
-                                "Horizon: touch module unavailable ({error}); using built-in controls"
-                            );
-                            None
-                        }
-                    }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-                Err(e) => {
-                    log::warn!("Horizon: cannot open touch module ({e}); using built-in controls");
-                    None
-                }
-            }
-        };
         Self {
             contacts: HashMap::new(),
             primary: None,
@@ -102,9 +80,17 @@ impl Default for TouchControls {
             suppressed: 0,
             movement: None,
             used: false,
-            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            #[cfg(all(
+                target_vendor = "uwp",
+                feature = "native-d3d11",
+                feature = "native-touch-mod"
+            ))]
             module,
-            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+            #[cfg(all(
+                target_vendor = "uwp",
+                feature = "native-d3d11",
+                feature = "native-touch-mod"
+            ))]
             release_after_failure: false,
             #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
             inventory_visible: false,
@@ -112,7 +98,7 @@ impl Default for TouchControls {
     }
 }
 
-fn layout(size: [f32; 2]) -> (f32, [(Button, [f32; 2]); 10], [f32; 2]) {
+fn layout(size: [f32; 2]) -> (f32, [(Button, [f32; 2]); 9], [f32; 2]) {
     let s = size[0].min(size[1]);
     (
         s * 0.075,
@@ -132,7 +118,6 @@ fn layout(size: [f32; 2]) -> (f32, [(Button, [f32; 2]); 10], [f32; 2]) {
                 Button::Next,
                 [size[0] * 0.5 + s * 0.20, size[1] - s * 0.075],
             ),
-            (Button::Import, [size[0] * 0.5, s * 0.08]),
         ],
         [s * 0.18, size[1] - s * 0.18],
     )
@@ -150,23 +135,11 @@ impl TouchControls {
         size: [f32; 2],
         playing: bool,
     ) -> Vec<Action> {
-        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11", not(feature = "native-touch-mod")))]
-        if self.module.is_some() {
-            let (radius, buttons, _) = layout(size);
-            let import = buttons
-                .iter()
-                .find(|(button, _)| *button == Button::Import)
-                .unwrap()
-                .1;
-            let existing_import =
-                matches!(self.contacts.get(&id), Some(Role::Button(Button::Import)));
-            if existing_import
-                || (playing && phase == TouchPhase::Started && distance(import, p) <= radius * 1.25)
-            {
-                return self.update_builtin(id, phase, p, size, playing);
-            }
-        }
-        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        #[cfg(all(
+            target_vendor = "uwp",
+            feature = "native-d3d11",
+            feature = "native-touch-mod"
+        ))]
         if self.module.as_ref().is_some_and(|m| {
             playing
                 || (self.inventory_visible && m.supports_menu())
@@ -184,7 +157,7 @@ impl TouchControls {
                     .set_context(self.inventory_visible)
                     .and_then(|_| module.touch(id32, phase32, p[0], p[1], size[0], size[1]));
                 match result {
-                    Ok((true, guest_actions)) => {
+                    Ok((true, mod_actions)) => {
                         self.used = true;
                         match phase {
                             TouchPhase::Started => {
@@ -208,7 +181,7 @@ impl TouchControls {
                             self.primary = None;
                             self.primary_claimed = false;
                         }
-                        return self.translate_guest_actions(guest_actions);
+                        return self.translate_mod_actions(mod_actions);
                     }
                     Ok((false, _)) => {}
                     Err(error) => {
@@ -226,7 +199,11 @@ impl TouchControls {
             }
         }
         let mut actions = self.update_builtin(id, phase, p, size, playing);
-        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        #[cfg(all(
+            target_vendor = "uwp",
+            feature = "native-d3d11",
+            feature = "native-touch-mod"
+        ))]
         actions.splice(0..0, self.take_failure_actions());
         actions
     }
@@ -250,10 +227,10 @@ impl TouchControls {
                 }
                 let role = if !playing {
                     Role::Menu
-                } else if let Some((button, _)) = buttons.iter().find(|(button, c)| {
-                    (*button != Button::Import || (cfg!(feature = "native-d3d11") && !cfg!(feature = "native-touch-mod")))
-                        && distance(*c, p) <= radius * 1.25
-                }) {
+                } else if let Some((button, _)) = buttons
+                    .iter()
+                    .find(|(_, c)| distance(*c, p) <= radius * 1.25)
+                {
                     Role::Button(*button)
                 } else if distance(stick, p) <= radius * 2.2
                     && !self.contacts.values().any(|r| matches!(r, Role::Move))
@@ -275,7 +252,6 @@ impl TouchControls {
                     Role::Button(Button::Sneak) => result.push(Action::Sneak(true)),
                     Role::Button(Button::Previous) => result.push(Action::Hotbar(false)),
                     Role::Button(Button::Next) => result.push(Action::Hotbar(true)),
-                    Role::Button(Button::Import) => result.push(Action::ImportModule),
                     Role::Move => self.movement = Some([0., 0.]),
                     _ => {}
                 }
@@ -346,11 +322,12 @@ impl TouchControls {
             false
         }
     }
-    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-    fn translate_guest_actions(
-        &mut self,
-        actions: Vec<touch_module::Action>,
-    ) -> Vec<Action> {
+    #[cfg(all(
+        target_vendor = "uwp",
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
+    fn translate_mod_actions(&mut self, actions: Vec<touch_module::Action>) -> Vec<Action> {
         let mut output = Vec::new();
         for a in actions {
             let down = a.value > 0.5;
@@ -377,7 +354,11 @@ impl TouchControls {
         }
         output
     }
-    #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+    #[cfg(all(
+        target_vendor = "uwp",
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
     fn take_failure_actions(&mut self) -> Vec<Action> {
         if std::mem::take(&mut self.release_after_failure) {
             self.movement = None;
@@ -397,7 +378,11 @@ impl TouchControls {
             return;
         }
         let size = [hud.width, hud.height];
-        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        #[cfg(all(
+            target_vendor = "uwp",
+            feature = "native-d3d11",
+            feature = "native-touch-mod"
+        ))]
         if let Some(module) = &mut self.module {
             if self.inventory_visible && !module.supports_menu() {
                 return;
@@ -435,25 +420,6 @@ impl TouchControls {
                         );
                         hud.text(atlas, label, c.x - c.radius * 0.65, c.y - 4., fg, false);
                     }
-                    // Import is host UI, retained even after a module loads so
-                    // separately installed modules can be updated or replaced.
-                    #[cfg(not(feature = "native-touch-mod"))]
-                    if !self.inventory_visible {
-                        let (radius, buttons, _) = layout(size);
-                        let (_, p) = buttons
-                            .iter()
-                            .find(|(button, _)| *button == Button::Import)
-                            .unwrap();
-                        hud.fill(
-                            atlas,
-                            p[0] - radius,
-                            p[1] - radius,
-                            radius * 2.,
-                            radius * 2.,
-                            bg,
-                        );
-                        hud.text(atlas, "MOD", p[0] - radius * 0.65, p[1] - 4., fg, false);
-                    }
                     return;
                 }
                 Err(error) => {
@@ -486,9 +452,6 @@ impl TouchControls {
         );
         hud.text(atlas, "MOVE", stick[0] - r, stick[1] - 4., fg, false);
         for (b, p) in buttons {
-            if b == Button::Import && (!cfg!(feature = "native-d3d11") || cfg!(feature = "native-touch-mod")) {
-                continue;
-            }
             hud.fill(atlas, p[0] - r, p[1] - r, r * 2., r * 2., bg);
             let label = match b {
                 Button::Jump => "JUMP",
@@ -500,7 +463,6 @@ impl TouchControls {
                 Button::Sneak => "SNEAK",
                 Button::Previous => "<",
                 Button::Next => ">",
-                Button::Import => "MOD",
             };
             hud.text(atlas, label, p[0] - r * 0.65, p[1] - 4., fg, false);
         }
@@ -532,7 +494,7 @@ impl super::Game<'_> {
         self.apply_touch_actions(actions);
     }
 
-    #[cfg(feature = "native-d3d11")]
+    #[cfg(all(feature = "native-d3d11", feature = "native-touch-mod"))]
     pub(super) fn release_failed_touch_module(&mut self) {
         let actions = self.touch.take_failure_actions();
         self.apply_touch_actions(actions);
@@ -558,15 +520,6 @@ impl super::Game<'_> {
                 }
                 Action::Look(x, y) => {
                     self.turn_player(f64::from(x), f64::from(y));
-                    Ok(())
-                }
-                Action::ImportModule => {
-                    #[cfg(all(feature = "native-d3d11", not(feature = "native-touch-mod")))]
-                    {
-                        if !horizon_native_window::import_touch_mod() {
-                            log::warn!("Horizon: touch mod picker unavailable");
-                        }
-                    }
                     Ok(())
                 }
                 Action::Back => self.pad_back(),

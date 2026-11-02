@@ -33,7 +33,7 @@ if not exist "%FXC%" exit /b 1
 if errorlevel 1 exit /b 1
 "%FXC%" /nologo /T ps_4_0_level_9_1 /E PSMain /Vn g_phone_probe_ps /Fh "%OUTDIR%\PhoneProbePS.h" "%~dp0..\dx11\PhoneProbe.hlsl"
 if errorlevel 1 exit /b 1
-set "FRAME_DEFINE=/DHORIZON_UWP_TOUCH_MOD_IMPORT"
+set "FRAME_DEFINE="
 if defined HORIZON_UWP_FRAME_PROBE set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_FRAME_PROBE"
 pushd "%OUTDIR%"
 cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /DHORIZON_UWP_GAME_BRIDGE %FRAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" /I"%OUTDIR%" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" "%~dp0..\window-bridge\CoreWindowEvents.cpp"

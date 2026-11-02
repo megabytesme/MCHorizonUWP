@@ -13543,6 +13543,7 @@ impl Game<'_> {
         if self.title.is_none() && matches!(self.screen, Screen::Playing | Screen::Inventory | Screen::Creative) {
             self.touch.inventory_visible = matches!(self.screen, Screen::Inventory | Screen::Creative);
             self.touch.draw(&mut hud, &self.gui.atlas);
+            #[cfg(feature = "native-touch-mod")]
             self.release_failed_touch_module();
         }
         #[cfg(all(target_vendor = "uwp", not(feature = "native-d3d11")))]
