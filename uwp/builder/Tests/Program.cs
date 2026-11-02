@@ -1,5 +1,13 @@
 using Horizon.Builder.Core;
 
+if (args.Contains("--expect-missing-winget"))
+{
+    try { await WindowsPackageManager.InstallRustupAsync(new SystemProbe()); throw new Exception("missing WinGet accepted"); }
+    catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
+    Console.WriteLine("Missing Windows Package Manager reported without installing anything.");
+    return;
+}
+
 if (args.Contains("--expect-missing-framework-sdk"))
 {
     var output = Path.Combine(Path.GetTempPath(), "HorizonBuilderMissingSdk-" + Guid.NewGuid().ToString("N"));
@@ -49,6 +57,9 @@ if (args.Contains("--scan"))
 }
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
+Require(WindowsPackageManager.RustupArguments.SequenceEqual(["install", "--id", "Rustlang.Rustup", "--exact", "--source", "winget", "--interactive", "--no-upgrade"]), "fixed interactive Rustup install");
+try { await WindowsPackageManager.InstallRustupAsync(new FakeProbe()); throw new Exception("missing WinGet accepted"); }
+catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
 Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod"]), "native touch feature selection");
 Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");

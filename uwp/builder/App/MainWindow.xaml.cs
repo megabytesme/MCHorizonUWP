@@ -7,6 +7,21 @@ namespace Horizon.Builder.App;
 public sealed partial class MainWindow : Window
 {
     public MainWindow() { InitializeComponent(); }
+    private async void InstallRustup_Click(object sender, RoutedEventArgs e)
+    {
+        InstallRustup.IsEnabled = false;
+        InstallStatus.Text = "Windows Package Manager is running. Follow its prompts.";
+        try
+        {
+            await WindowsPackageManager.InstallRustupAsync(new SystemProbe());
+            InstallStatus.Text = "WinGet completed. Restart the builder, then check setup again.";
+        }
+        catch (Exception error)
+        {
+            InstallStatus.Text = $"Rustup was not installed: {error.Message}";
+        }
+        finally { InstallRustup.IsEnabled = true; }
+    }
     private void CheckSetup_Click(object sender, RoutedEventArgs e)
     {
         Results.Children.Clear();

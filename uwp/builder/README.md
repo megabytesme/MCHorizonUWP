@@ -5,8 +5,10 @@ records a target and optional native touch source-mod selection. The touch
 selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
 on a Lumia in its separate branch; this preview still needs an integrated
 recipe before it can run a build. It links to official setup instructions for
-missing tools. It does not download or run installers, access Minecraft files,
-configure signing, build Horizon, or create game packages. Tool presence does not establish version or recipe
+missing tools. On request it can invoke the system Windows Package Manager for
+the fixed Rustup package, with interactive license/elevation prompts and normal
+package verification. It does not access Minecraft files, configure signing,
+build Horizon, or create game packages. Tool presence does not establish version or recipe
 compatibility; the required UWP Rust patches and build recipes still need a
 verified implementation. Visual Studio detection checks common installation
 locations and may miss custom locations.
