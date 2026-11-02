@@ -19,6 +19,19 @@ Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqu
 try { _ = new BuildSelection((TargetProfile)99, false).RustTarget; throw new Exception("invalid target accepted"); }
 catch (ArgumentOutOfRangeException) { }
 
+string hash = new('a', 64), commit = new('b', 40);
+var inputs = BuildInputs.Create(selection, commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+var repeated = BuildInputs.Create(selection, commit.ToUpperInvariant(), hash.ToUpperInvariant(), hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(inputs.Sha256() == repeated.Sha256(), "canonical input hash");
+var withoutTouch = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, false), commit, hash, hash, hash, hash, null, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(inputs.Sha256() != withoutTouch.Sha256(), "touch selection changes input hash");
+try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, null, "stable", "14.44", "10.0.15063.0"); throw new Exception("missing touch digest accepted"); }
+catch (ArgumentException) { }
+try { _ = BuildInputs.Create(selection, commit, "not-a-hash", hash, hash, hash, hash, "stable", "14.44", "10.0.15063.0"); throw new Exception("invalid digest accepted"); }
+catch (ArgumentException) { }
+try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, hash, "C:\\secret", "14.44", "10.0.15063.0"); throw new Exception("path accepted as toolchain"); }
+catch (ArgumentException) { }
+
 var missing = new SetupChecker(new FakeProbe()).Scan(TargetProfile.WindowsMobile);
 Require(missing.Single(c => c.Name == "Git").Status == CheckStatus.Missing, "missing Git");
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("15063"), "mobile SDK required");

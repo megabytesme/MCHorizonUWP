@@ -26,3 +26,9 @@ publish and clean-machine installation remain unverified. See Microsoft's
 This is a development build, not a tested clean-machine installer. The full
 plan and unresolved device and licensing requirements are in
 [BUILDER-DESIGN.md](../BUILDER-DESIGN.md).
+
+The core includes a canonical input record with hashes for the recipe, source
+revision, lockfile, patched Rust standard library, resource inventory and
+selected touch mod, plus toolchain versions. It contains no file paths or keys.
+This is groundwork only: callers must verify each input, and the current list
+is not a complete reproducibility guarantee or a verified recipe.
