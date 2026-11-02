@@ -1067,6 +1067,7 @@ dependencies = [
  "horizon-telemetry",
  "horizon-theme",
  "horizon-threads",
+ "horizon-uwp-https-bridge",
  "horizon-uwp-xaudio-stream",
  "horizon-world",
  "log",
@@ -1293,6 +1294,10 @@ version = "0.1.0"
 dependencies = [
  "horizon-client",
 ]
+
+[[package]]
+name = "horizon-uwp-https-bridge"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-uwp-xaudio-stream"

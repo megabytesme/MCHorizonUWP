@@ -11,6 +11,7 @@ crate-type = ["staticlib"]
 
 [features]
 native-d3d11 = ["horizon-client/native-d3d11"]
+uwp-https = ["horizon-client/uwp-https"]
 native-d3d11-readback = ["horizon-client/native-d3d11-readback"]
 native-touch-mod = ["horizon-client/native-touch-mod"]
 uwp-audio = ["horizon-client/uwp-audio"]
