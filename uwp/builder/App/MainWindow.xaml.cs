@@ -1,0 +1,22 @@
+using Horizon.Builder.Core;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+
+namespace Horizon.Builder.App;
+
+public sealed partial class MainWindow : Window
+{
+    public MainWindow() { InitializeComponent(); }
+    private void CheckSetup_Click(object sender, RoutedEventArgs e)
+    {
+        Results.Children.Clear();
+        var profile = (TargetProfile)Profile.SelectedIndex;
+        foreach (var check in new SetupChecker(new SystemProbe()).Scan(profile))
+        {
+            var panel = new StackPanel { Spacing = 4 };
+            panel.Children.Add(new TextBlock { Text = $"{check.Name} — {check.Status}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            panel.Children.Add(new TextBlock { Text = check.Detail, TextWrapping = TextWrapping.Wrap });
+            Results.Children.Add(panel);
+        }
+    }
+}
