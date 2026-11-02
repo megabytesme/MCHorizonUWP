@@ -1,5 +1,31 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 4 && args[0] == "--build-local")
+{
+    try
+    {
+        var profile = args[3] switch { "x64" => TargetProfile.DesktopX64, "arm" => TargetProfile.WindowsMobile, _ => throw new ArgumentException("Expected x64 or arm.") };
+        var result = await LocalBuildRunner.RunAsync(args[1], args[2], new BuildSelection(profile, true), new SystemProbe(), new ConsoleProgress());
+        Console.WriteLine($"Unsigned package: {result.UnsignedPackage}");
+    }
+    catch (Exception error) { Console.Error.WriteLine(error.Message); Environment.ExitCode = 1; }
+    return;
+}
+
+if (args.Length == 2 && args[0] == "--snapshot-local")
+{
+    try
+    {
+        var root = await LocalBuildRunner.CreateSnapshotAsync(args[1], new SystemProbe());
+        Require(File.Exists(Path.Combine(root, "source", "mods", "horizon-touch-native", "Cargo.toml")), "touch mod present in snapshot");
+        Require(File.Exists(Path.Combine(root, "source", "uwp", "host", "build-game.cmd")), "checked-in host script present");
+        Require(!Directory.Exists(Path.Combine(root, "source", ".git")), "snapshot has no Git metadata");
+        Console.WriteLine($"Pinned source snapshot verified: {root}");
+    }
+    catch (Exception error) { Console.Error.WriteLine(error.Message); Environment.ExitCode = 1; }
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--validate-local")
 {
     var probe = new SystemProbe();
@@ -70,6 +96,9 @@ if (args.Contains("--scan"))
 }
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
+var testHome = Path.Combine(Path.GetTempPath(), "horizon-builder-test-home");
+Require(LocalBuildRunner.ResourcesContainWorkspace(testHome, Path.Combine(testHome, ".huwp", "b")), "resource ancestor rejected");
+Require(!LocalBuildRunner.ResourcesContainWorkspace(Path.Combine(testHome, "resources"), Path.Combine(testHome, ".huwp", "b")), "separate resources accepted");
 var recipe = LocalRecipe.Plan(selection);
 Require(recipe.SourceCommit == LocalRecipe.SourceCommit && recipe.Target == "thumbv7a-uwp-windows-msvc", "pinned ARM recipe");
 Require(recipe.Steps.Any(step => step.Name == "Prepare ARM32 overrides" && step.Arguments.Contains("--offline-arm32")), "ARM offline override selected");
@@ -159,4 +188,8 @@ sealed class FakeProbe : IProbe
     public bool FileExists(string path) => Files.Contains(path);
     public IEnumerable<string> Directories(string path) => directories.TryGetValue(path, out var value) ? value : [];
     public string? EnvironmentValue(string name) => Root;
+}
+sealed class ConsoleProgress : IProgress<string>
+{
+    public void Report(string value) => Console.WriteLine(value);
 }

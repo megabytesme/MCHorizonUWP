@@ -8,10 +8,10 @@ public sealed record LocalBuildPlan(string SourceCommit, string Target, IReadOnl
     IReadOnlyList<RecipeStep> Steps, IReadOnlyList<string> Notes);
 public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 
-/// <summary>Recipe for one locally available, device-tested source revision.</summary>
+/// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "4949c501ce137dd22fd6d21e30c4ff081a6f19c3";
+    public const string SourceCommit = "5a103f769c8fe00ec38844003ad18b7878e24dfc";
     public const string RustVersion = "1.99.1";
     public const string MinecraftVersion = "26.3";
 
@@ -37,6 +37,7 @@ public static class LocalRecipe
             "-Executable", $"uwp/host/build/game-{arch}/HorizonUWP.exe", "-OutputDirectory", ".local/builder-output", "-Resources", "<selected-resources>"]));
         var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
             "The resulting APPX is unsigned and requires matching dependencies and a user-controlled signing identity.",
+            "At least 10 GiB free space and a populated Cargo dependency cache are required; the game-bridge build runs offline.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
         if (arm) notes.Add("ARM32 uses the existing offline override: HTTPS and authenticated online services are unavailable.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());

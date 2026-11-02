@@ -47,7 +47,7 @@ public sealed partial class MainWindow : Window
             await LocalRecipe.ValidateSourceAsync(sourceDirectory, probe);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
             RecipeStatus.Text = blockers.Count == 0
-                ? "Pinned source revision and required tool locations were found. Build execution and signing are not yet available."
+                ? "Pinned source revision and required tool locations were found. The offline Cargo cache is not verified; signing is not yet available."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
             foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name, TextWrapping = TextWrapping.Wrap });
@@ -55,6 +55,22 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception error) { RecipeStatus.Text = $"Could not validate the recipe: {error.Message}"; }
         finally { CheckRecipe.IsEnabled = true; }
+    }
+
+    private async void RunRecipe_Click(object sender, RoutedEventArgs e)
+    {
+        RunRecipe.IsEnabled = false;
+        try
+        {
+            if (sourceDirectory is null || resourceDirectory is null)
+                throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true);
+            var progress = new Progress<string>(message => RecipeStatus.Text = message);
+            var result = await LocalBuildRunner.RunAsync(sourceDirectory, resourceDirectory, selection, new SystemProbe(), progress);
+            RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
+        }
+        catch (Exception error) { RecipeStatus.Text = $"{RecipeStatus.Text} Build failed: {error.Message}"; }
+        finally { RunRecipe.IsEnabled = true; }
     }
     private async void InstallTool_Click(object sender, RoutedEventArgs e)
     {

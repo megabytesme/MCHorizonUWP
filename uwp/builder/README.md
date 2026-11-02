@@ -3,12 +3,12 @@
 This desktop WinUI 3 preview checks a small set of build prerequisites and
 records a target and optional native touch source-mod selection. The touch
 selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
-on a Lumia in its separate branch; this preview still needs an integrated
-recipe before it can run a build. It links to official setup instructions for
+on a Lumia in its separate branch. The local recipe builds from a pinned source
+snapshot and links to official setup instructions for
 missing tools. On request it can invoke the system Windows Package Manager for
 fixed Rustup, Git and Python packages, with interactive license/elevation prompts and normal
-package verification. It does not access Minecraft files, configure signing,
-build Horizon, or create game packages. Tool presence does not establish version or recipe
+package verification. The local recipe copies user-selected prepared resources
+into private package output, but does not sign or install packages. Tool presence does not establish version or recipe
 compatibility; the required UWP Rust patches and build recipes still need a
 verified implementation. Visual Studio detection checks common installation
 locations and may miss custom locations.
@@ -41,12 +41,18 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`4949c501ce137dd22fd6d21e30c4ff081a6f19c3`, Rust 1.99.1 and Minecraft
+`5a103f769c8fe00ec38844003ad18b7878e24dfc`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
-preview displays x64 and ARM32 plans; ARM32 uses the existing offline override
-and has no HTTPS. It does not yet execute those plans or sign their output.
+preview runs x64 and ARM32 plans in fresh builder-owned folders under
+`%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
+Cargo build uses the existing offline cache; dependency acquisition, signing,
+framework packaging and installation are not yet integrated. A build requires
+at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
+override and has no HTTPS; the output uses the prototype publisher identity.
+One ARM32 native-touch package was strictly linked and packaged from this
+runner, but that specific output has not been installed or tested on a phone.
 
 The framework probe uses the installed Windows SDK MakeAppx to create unsigned
 x64 and ARM framework packages containing only a synthetic marker in new
