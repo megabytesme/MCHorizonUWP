@@ -108,6 +108,7 @@ native-d3d11-readback = ["native-d3d11", "horizon-uwp-d3d11/readback-probe"]
 # Sound output. Without it (and `controllers`) the program links neither libasound nor libudev on
 # Linux: the server build (`--no-default-features`, released as horizon-engine; docs/server.md).
 audio = ["horizon-client-render/audio"]
+uwp-https = ["horizon-client-render/uwp-https"]
 # Controllers: gilrs, and the DualSense's own output. Without it only `horizon-ctl pad`'s virtual pad.
 controllers = ["dep:gilrs", "dep:horizon-dualsense", "horizon-client-input/controllers"]
 # Records the call sites of mob random draws (`mob_ai_probe` traces).

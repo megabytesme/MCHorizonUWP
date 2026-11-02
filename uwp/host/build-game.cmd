@@ -38,6 +38,10 @@ if defined HORIZON_UWP_FRAME_PROBE set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UW
 pushd "%OUTDIR%"
 cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /DHORIZON_UWP_GAME_BRIDGE %FRAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" /I"%OUTDIR%" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" "%~dp0..\window-bridge\CoreWindowEvents.cpp"
 if errorlevel 1 (popd & exit /b 1)
+if defined HORIZON_UWP_HTTP (
+    cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\https-bridge\host\HttpBridge.cpp"
+    if errorlevel 1 (popd & exit /b 1)
+)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0strict-game-link.ps1"
 set "RESULT=%errorlevel%"
 popd
