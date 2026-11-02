@@ -1,5 +1,18 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 3 && args[0] == "--validate-local")
+{
+    var probe = new SystemProbe();
+    var localSelection = new BuildSelection(TargetProfile.WindowsMobile, true);
+    await LocalRecipe.ValidateSourceAsync(args[1], probe);
+    LocalRecipe.ValidateResources(args[2]);
+    var blockers = LocalRecipe.ToolchainBlockers(localSelection, probe, await LocalRecipe.InspectRustAsync(probe));
+    foreach (var blocker in blockers) Console.WriteLine(blocker);
+    foreach (var step in LocalRecipe.Plan(localSelection).Steps) Console.WriteLine(step.Name);
+    Console.WriteLine($"Prerequisite blockers: {blockers.Count}");
+    return;
+}
+
 if (args.Contains("--expect-missing-winget"))
 {
     try { await WindowsPackageManager.InstallAsync(new SystemProbe(), InstallableTool.Rustup); throw new Exception("missing WinGet accepted"); }
@@ -57,6 +70,18 @@ if (args.Contains("--scan"))
 }
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
+var recipe = LocalRecipe.Plan(selection);
+Require(recipe.SourceCommit == LocalRecipe.SourceCommit && recipe.Target == "thumbv7a-uwp-windows-msvc", "pinned ARM recipe");
+Require(recipe.Steps.Any(step => step.Name == "Prepare ARM32 overrides" && step.Arguments.Contains("--offline-arm32")), "ARM offline override selected");
+Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
+Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod"), "touch build features");
+var desktopRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false));
+Require(desktopRecipe.Steps.All(step => !step.Arguments.Contains("--offline-arm32")), "desktop excludes ARM override");
+try { _ = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false)); throw new Exception("unverified ARM64 recipe accepted"); }
+catch (NotSupportedException) { }
+var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
+Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");
+Require(missingToolchain.Any(blocker => blocker.Contains("rust-src")), "rust-src checked");
 Require(WindowsPackageManager.Arguments(InstallableTool.Rustup).SequenceEqual(["install", "--id", "Rustlang.Rustup", "--exact", "--source", "winget", "--interactive", "--no-upgrade"]), "fixed interactive Rustup install");
 Require(WindowsPackageManager.Arguments(InstallableTool.Git)[2] == "Git.Git", "fixed Git package");
 Require(WindowsPackageManager.Arguments(InstallableTool.Python)[2] == "Python.Python.3.13", "fixed Python package");

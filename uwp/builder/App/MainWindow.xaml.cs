@@ -1,12 +1,61 @@
 using Horizon.Builder.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace Horizon.Builder.App;
 
 public sealed partial class MainWindow : Window
 {
     public MainWindow() { InitializeComponent(); }
+    private string? sourceDirectory;
+    private string? resourceDirectory;
+
+    private async Task<string?> PickFolderAsync()
+    {
+        var picker = new FolderPicker();
+        picker.FileTypeFilter.Add("*");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        return (await picker.PickSingleFolderAsync())?.Path;
+    }
+
+    private async void ChooseSource_Click(object sender, RoutedEventArgs e)
+    {
+        var chosen = await PickFolderAsync();
+        if (chosen is not null) { sourceDirectory = chosen; SourcePath.Text = chosen; }
+    }
+
+    private async void ChooseResources_Click(object sender, RoutedEventArgs e)
+    {
+        var chosen = await PickFolderAsync();
+        if (chosen is not null) { resourceDirectory = chosen; ResourcesPath.Text = chosen; }
+    }
+
+    private async void CheckRecipe_Click(object sender, RoutedEventArgs e)
+    {
+        CheckRecipe.IsEnabled = false;
+        RecipeSteps.Children.Clear();
+        try
+        {
+            if (sourceDirectory is null || resourceDirectory is null)
+                throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true);
+            var plan = LocalRecipe.Plan(selection);
+            LocalRecipe.ValidateResources(resourceDirectory);
+            var probe = new SystemProbe();
+            await LocalRecipe.ValidateSourceAsync(sourceDirectory, probe);
+            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
+            RecipeStatus.Text = blockers.Count == 0
+                ? "Pinned source revision and required tool locations were found. Build execution and signing are not yet available."
+                : "The recipe has missing prerequisites:";
+            foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
+            foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name, TextWrapping = TextWrapping.Wrap });
+            foreach (var note in plan.Notes) RecipeSteps.Children.Add(new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap });
+        }
+        catch (Exception error) { RecipeStatus.Text = $"Could not validate the recipe: {error.Message}"; }
+        finally { CheckRecipe.IsEnabled = true; }
+    }
     private async void InstallTool_Click(object sender, RoutedEventArgs e)
     {
         InstallRustup.IsEnabled = false;

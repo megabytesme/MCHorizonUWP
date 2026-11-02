@@ -4,7 +4,11 @@
     Title="Horizon UWP Builder">
   <ScrollViewer><StackPanel Padding="28" Spacing="16" MaxWidth="820" HorizontalAlignment="Stretch">
     <TextBlock Text="Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" />
-    <TextBlock Text="Check this PC before building for a device. This early preview only checks for tools; package creation is not available yet." TextWrapping="Wrap" />
+    <TextBlock Text="Choose a local Horizon checkout and prepared resources, then inspect the pinned build recipe. Build execution is not available yet." TextWrapping="Wrap" />
+    <Button Content="Choose Horizon source" Click="ChooseSource_Click" />
+    <TextBlock x:Name="SourcePath" Text="No source selected" TextWrapping="Wrap" />
+    <Button Content="Choose prepared resources" Click="ChooseResources_Click" />
+    <TextBlock x:Name="ResourcesPath" Text="No resources selected" TextWrapping="Wrap" />
     <TextBlock Text="Target device" Style="{StaticResource BodyStrongTextBlockStyle}" />
     <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch">
       <ComboBoxItem Content="Windows desktop (x64)" />
@@ -14,6 +18,9 @@
     <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" />
     <TextBlock Text="The selected source mod is compiled into the client. It requires a compatible verified recipe and is not built by this preview yet." TextWrapping="Wrap" />
     <Button Content="Check setup" Click="CheckSetup_Click" />
+    <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />
+    <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
+    <StackPanel x:Name="RecipeSteps" Spacing="6" />
     <TextBlock Text="This scan reads local tool and SDK locations. It does not install software or verify recipe compatibility." TextWrapping="Wrap" />
     <TextBlock Text="Install tools using Windows Package Manager. Its interactive installers may ask you to review a license or approve elevation; they use your configured winget source." TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" Spacing="8">
