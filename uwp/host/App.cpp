@@ -6,6 +6,7 @@
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
 #include <windows.applicationmodel.h>
+#include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
 #include <windows.ui.viewmanagement.h>
 
@@ -187,7 +188,25 @@ public:
     virtual void Uninitialize() {}
 private:
     void Check(HRESULT hr) { if (FAILED(hr)) throw Platform::Exception::CreateException(hr); }
-    void Activated(CoreApplicationView^, IActivatedEventArgs^) { window_->Activate(); }
+    void Activated(CoreApplicationView^, IActivatedEventArgs^) {
+        window_->Activate();
+#if defined(HORIZON_UWP_GAME_BRIDGE) && defined(_M_ARM)
+        // Mobile already occupies a full window, but full-screen mode also
+        // asks the shell to hide its status/navigation bars. The shell may
+        // decline; in that case the normal CoreWindow remains usable.
+        if (attempted_mobile_fullscreen_) return;
+        attempted_mobile_fullscreen_ = true;
+        try {
+            if (Windows::Foundation::Metadata::ApiInformation::IsApiContractPresent(
+                    L"Windows.Phone.PhoneContract", 1)) {
+                Windows::UI::ViewManagement::ApplicationView::GetForCurrentView()
+                    ->TryEnterFullScreenMode();
+            }
+        } catch (Platform::Exception^) {
+            // Continue windowed when the phone shell doesn't support it.
+        }
+#endif
+    }
     void Closed(CoreWindow^, CoreWindowEventArgs^) { closed_ = true; }
     void VisibilityChanged(CoreWindow^, VisibilityChangedEventArgs^ args) { visible_ = args->Visible; }
     void SizeChanged(CoreWindow^, WindowSizeChangedEventArgs^) {
@@ -197,6 +216,9 @@ private:
     }
     CoreWindow^ window_;
     horizon_uwp::Dx11Renderer* renderer_;
+#if defined(HORIZON_UWP_GAME_BRIDGE) && defined(_M_ARM)
+    bool attempted_mobile_fullscreen_ = false;
+#endif
 #ifdef HORIZON_UWP_GAME_BRIDGE
     horizon_uwp::CoreWindowEvents^ window_events_;
 #endif
