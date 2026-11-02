@@ -52,6 +52,26 @@ template <class T> T await_with_timeout(IAsyncOperation<T> ^ op) {
     throw;
   }
 }
+std::vector<unsigned char> read_body(HttpResponseMessage ^ response,
+                                     size_t limit) {
+  std::vector<unsigned char> bytes;
+  if (!response->Content)
+    return bytes;
+  auto input = await_with_timeout(response->Content->ReadAsInputStreamAsync());
+  for (;;) {
+    auto chunk = await_with_timeout(input->ReadAsync(
+        ref new Buffer(65536), 65536, InputStreamOptions::Partial));
+    unsigned int count = chunk->Length;
+    if (!count)
+      break;
+    if (count > limit - bytes.size())
+      throw ref new Platform::FailureException();
+    auto array = ref new Platform::Array<unsigned char>(count);
+    DataReader::FromBuffer(chunk)->ReadBytes(array);
+    bytes.insert(bytes.end(), array->begin(), array->end());
+  }
+  return bytes;
+}
 } // namespace
 extern "C" int __cdecl horizon_uwp_http_get(const unsigned char *url,
                                             size_t url_len, size_t limit,
@@ -101,21 +121,7 @@ extern "C" int __cdecl horizon_uwp_http_get(const unsigned char *url,
     }
     if (!response || !response->IsSuccessStatusCode)
       throw ref new Platform::FailureException();
-    auto input =
-        await_with_timeout(response->Content->ReadAsInputStreamAsync());
-    std::vector<unsigned char> bytes;
-    for (;;) {
-      auto chunk = await_with_timeout(input->ReadAsync(
-          ref new Buffer(65536), 65536, InputStreamOptions::Partial));
-      unsigned int count = chunk->Length;
-      if (!count)
-        break;
-      if (count > limit - bytes.size())
-        throw ref new Platform::FailureException();
-      auto array = ref new Platform::Array<unsigned char>(count);
-      DataReader::FromBuffer(chunk)->ReadBytes(array);
-      bytes.insert(bytes.end(), array->begin(), array->end());
-    }
+    auto bytes = read_body(response, limit);
     auto data =
         static_cast<unsigned char *>(malloc(std::max<size_t>(1, bytes.size())));
     if (!data)
@@ -208,21 +214,7 @@ extern "C" int __cdecl horizon_uwp_http_request(
     auto response = await_with_timeout(client->SendRequestAsync(
         request, HttpCompletionOption::ResponseHeadersRead));
     *http_status = static_cast<unsigned int>(response->StatusCode);
-    auto input =
-        await_with_timeout(response->Content->ReadAsInputStreamAsync());
-    std::vector<unsigned char> bytes;
-    for (;;) {
-      auto chunk = await_with_timeout(input->ReadAsync(
-          ref new Buffer(65536), 65536, InputStreamOptions::Partial));
-      auto count = chunk->Length;
-      if (!count)
-        break;
-      if (count > limit - bytes.size())
-        throw ref new Platform::FailureException();
-      auto array = ref new Platform::Array<unsigned char>(count);
-      DataReader::FromBuffer(chunk)->ReadBytes(array);
-      bytes.insert(bytes.end(), array->begin(), array->end());
-    }
+    auto bytes = read_body(response, limit);
     auto data =
         static_cast<unsigned char *>(malloc(std::max<size_t>(1, bytes.size())));
     if (!data)

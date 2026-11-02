@@ -171,6 +171,7 @@ pub fn discovery_url() -> String {
         .unwrap_or_else(|| DEFAULT_DISCOVERY.to_owned())
 }
 
+#[cfg(not(all(feature = "uwp-https", target_vendor = "uwp")))]
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(15))
@@ -179,6 +180,7 @@ fn agent() -> ureq::Agent {
 }
 
 /// The discovery document, fetched once per game (a failure is retried next time).
+#[cfg(not(all(feature = "uwp-https", target_vendor = "uwp")))]
 pub(crate) fn discovery() -> Result<Arc<serde_json::Value>, JoinError> {
     static CACHE: Mutex<Option<Arc<serde_json::Value>>> = Mutex::new(None);
     if let Some(d) = CACHE.lock().unwrap().clone() {
@@ -196,6 +198,43 @@ pub(crate) fn discovery() -> Result<Arc<serde_json::Value>, JoinError> {
     Ok(doc)
 }
 
+#[cfg(all(feature = "uwp-https", target_vendor = "uwp"))]
+fn uwp_http(
+    url: &str,
+    body: Option<&str>,
+    authorization: Option<&str>,
+) -> Result<(u16, String), JoinError> {
+    let response = horizon_uwp_https_bridge::request(
+        url,
+        body.map(str::as_bytes),
+        body.map(|_| "application/json; charset=utf-8"),
+        authorization,
+        1024 * 1024,
+    )
+    .ok_or(JoinError::Unavailable)?;
+    Ok((
+        response.status as u16,
+        String::from_utf8_lossy(&response.body).into_owned(),
+    ))
+}
+
+#[cfg(all(feature = "uwp-https", target_vendor = "uwp"))]
+pub(crate) fn discovery() -> Result<Arc<serde_json::Value>, JoinError> {
+    static CACHE: Mutex<Option<Arc<serde_json::Value>>> = Mutex::new(None);
+    if let Some(d) = CACHE.lock().unwrap().clone() {
+        return Ok(d);
+    }
+    let (status, body) = uwp_http(&discovery_url(), None, None)?;
+    if !(200..300).contains(&status) {
+        return Err(JoinError::Unavailable);
+    }
+    let doc = Arc::new(
+        serde_json::from_str::<serde_json::Value>(&body).map_err(|_| JoinError::Unavailable)?,
+    );
+    *CACHE.lock().unwrap() = Some(doc.clone());
+    Ok(doc)
+}
+
 /// MinecraftServicesDiscoveryService.getUrl(service, endpoint).
 pub fn endpoint(doc: &serde_json::Value, service: &str, name: &str) -> Option<String> {
     doc.pointer(&format!("/discovery/{service}/endpoints/{name}/uri"))
@@ -208,6 +247,7 @@ pub fn endpoint(doc: &serde_json::Value, service: &str, name: &str) -> Option<St
 /// `SessionService.fetchProfile(uuid, true)` (`getProfileById`). A failed
 /// attributes call falls back to the offline properties, a failed profile call
 /// to no actions, as vanilla does. Blocks: call it off the main thread.
+#[cfg(not(all(feature = "uwp-https", target_vendor = "uwp")))]
 pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::AccountStatus {
     use crate::ban_notice::{AccountStatus, parse_profile_actions, parse_properties};
     let Ok(doc) = discovery() else {
@@ -243,6 +283,36 @@ pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::Account
     }
 }
 
+#[cfg(all(feature = "uwp-https", target_vendor = "uwp"))]
+pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::AccountStatus {
+    use crate::ban_notice::{AccountStatus, parse_profile_actions, parse_properties};
+    let Ok(doc) = discovery() else {
+        return AccountStatus::default();
+    };
+    let properties = endpoint(&doc, "player", "getAttributes")
+        .and_then(|url| {
+            uwp_http(
+                &url,
+                None,
+                Some(&format!("Bearer {}", session.access_token)),
+            )
+            .ok()
+        })
+        .filter(|(status, _)| (200..300).contains(status))
+        .and_then(|(_, body)| parse_properties(&body))
+        .unwrap_or_default();
+    let actions = endpoint(&doc, "session", "getProfileById")
+        .map(|url| url.replace("{profileId}", &format!("{:032x}", session.uuid)))
+        .and_then(|url| uwp_http(&format!("{url}?unsigned=true"), None, None).ok())
+        .filter(|(status, _)| (200..300).contains(status))
+        .map(|(_, body)| parse_profile_actions(&body))
+        .unwrap_or_default();
+    AccountStatus {
+        properties,
+        actions,
+    }
+}
+
 /// The JoinMinecraftServerRequest body; `selectedProfile` is the undashed UUID.
 pub fn join_request(session: &AuthSession, server_hash: &str) -> String {
     serde_json::json!({
@@ -255,6 +325,7 @@ pub fn join_request(session: &AuthSession, server_hash: &str) -> String {
 
 /// MinecraftServicesSessionService.joinServer: tell the session service this
 /// account is joining the server whose hash is `server_hash`.
+#[cfg(not(all(feature = "uwp-https", target_vendor = "uwp")))]
 pub fn join_server(session: &AuthSession, server_hash: &str) -> Result<(), JoinError> {
     let doc = discovery()?;
     let url = endpoint(&doc, "session", "join").ok_or(JoinError::Unavailable)?;
@@ -270,6 +341,14 @@ pub fn join_server(session: &AuthSession, server_hash: &str) -> Result<(), JoinE
         )),
         Err(ureq::Error::Transport(_)) => Err(JoinError::Unavailable),
     }
+}
+
+#[cfg(all(feature = "uwp-https", target_vendor = "uwp"))]
+pub fn join_server(session: &AuthSession, server_hash: &str) -> Result<(), JoinError> {
+    let doc = discovery()?;
+    let url = endpoint(&doc, "session", "join").ok_or(JoinError::Unavailable)?;
+    let (status, body) = uwp_http(&url, Some(&join_request(session, server_hash)), None)?;
+    uwp_join_result(status, &body)
 }
 
 /// What the session service says about a player joining this server
@@ -299,6 +378,7 @@ fn url_encode(text: &str) -> String {
 /// whether `name` joined with `server_hash` (and from `ip`, when the server
 /// prevents proxy connections). `Ok(None)`: it didn't, or the service said
 /// no; `Err(Unavailable)`: no answer.
+#[cfg(not(all(feature = "uwp-https", target_vendor = "uwp")))]
 pub fn has_joined(
     name: &str,
     server_hash: &str,
@@ -330,6 +410,52 @@ pub fn has_joined(
     Ok(parse_joined(&body))
 }
 
+#[cfg(all(feature = "uwp-https", target_vendor = "uwp"))]
+pub fn has_joined(
+    name: &str,
+    server_hash: &str,
+    ip: Option<std::net::IpAddr>,
+) -> Result<Option<JoinedProfile>, JoinError> {
+    let doc = discovery()?;
+    let url = endpoint(&doc, "session", "verify").ok_or(JoinError::Unavailable)?;
+    let mut query = format!(
+        "username={}&serverId={}",
+        url_encode(name),
+        url_encode(server_hash)
+    );
+    if let Some(ip) = ip {
+        query.push_str(&format!("&ip={}", url_encode(&ip.to_string())));
+    }
+    let separator = if url.contains('?') { '&' } else { '?' };
+    let (status, body) = uwp_http(&format!("{url}{separator}{query}"), None, None)?;
+    uwp_verify_result(status, &body)
+}
+
+#[cfg(any(test, all(feature = "uwp-https", target_vendor = "uwp")))]
+fn uwp_join_result(status: u16, body: &str) -> Result<(), JoinError> {
+    if (200..300).contains(&status) {
+        Ok(())
+    } else if status < 400 {
+        Err(JoinError::Unavailable)
+    } else {
+        Err(JoinError::from_response(status, body))
+    }
+}
+
+#[cfg(any(test, all(feature = "uwp-https", target_vendor = "uwp")))]
+fn uwp_verify_result(status: u16, body: &str) -> Result<Option<JoinedProfile>, JoinError> {
+    if (200..300).contains(&status) {
+        return Ok(parse_joined(body));
+    }
+    if status < 400 {
+        return Err(JoinError::Unavailable);
+    }
+    match JoinError::from_response(status, body) {
+        JoinError::Unavailable => Err(JoinError::Unavailable),
+        _ => Ok(None),
+    }
+}
+
 /// HasJoinedMinecraftServerResponse: `id` and `properties`; no id is no profile.
 pub fn parse_joined(body: &str) -> Option<JoinedProfile> {
     let v: serde_json::Value = serde_json::from_str(body).ok()?;
@@ -355,6 +481,17 @@ pub fn parse_joined(body: &str) -> Option<JoinedProfile> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn uwp_session_http_statuses() {
+        use super::{JoinError, uwp_join_result, uwp_verify_result};
+        assert_eq!(uwp_join_result(204, ""), Ok(()));
+        assert_eq!(uwp_join_result(302, ""), Err(JoinError::Unavailable));
+        assert_eq!(uwp_join_result(401, ""), Err(JoinError::InvalidSession));
+        assert_eq!(uwp_join_result(503, ""), Err(JoinError::Unavailable));
+        assert_eq!(uwp_verify_result(204, ""), Ok(None));
+        assert_eq!(uwp_verify_result(401, ""), Ok(None));
+        assert_eq!(uwp_verify_result(503, ""), Err(JoinError::Unavailable));
+    }
     use super::*;
 
     const UUID: u128 = 0x069a79f444e94726a5befca90e38aaf5;

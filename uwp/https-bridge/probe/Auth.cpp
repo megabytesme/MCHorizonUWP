@@ -168,6 +168,18 @@ ref class HttpsProbeView sealed : IFrameworkView {
       if (out)
         horizon_uwp_http_free(out);
       text += L"\nInjected header result: " + std::to_wstring(result);
+      url = "https://httpbin.org/status/204";
+      out = nullptr;
+      n = 0;
+      status = 0;
+      result = horizon_uwp_http_request((const unsigned char *)url, strlen(url),
+                                        0, nullptr, 0, nullptr, 0, nullptr, 0,
+                                        1048576, &status, &out, &n);
+      if (out)
+        horizon_uwp_http_free(out);
+      text += L"\nEmpty 204 result: " + std::to_wstring(result) +
+              L", status: " + std::to_wstring(status) + L", bytes: " +
+              std::to_wstring(n);
       return text;
     })
         .then(

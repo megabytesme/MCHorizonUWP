@@ -9,9 +9,10 @@ The bridge uses the system certificate store and default validation without
 adding ignored certificate errors. Redirects are limited to five, and a request
 that started as HTTPS cannot redirect to HTTP. Response bodies are streamed with
 a 16 MiB upper bound and network operations time out after 15 seconds. Only
-successful 2xx responses are returned. This does not yet route account/session
-HTTP calls, telemetry or server resource packs through the bridge, and does not
-implement Microsoft sign-in.
+successful 2xx responses are returned. When the feature is enabled, existing Minecraft account-status, session
+discovery and online-server join/verification calls also use this bridge.
+Telemetry and server resource packs are not yet routed through it. The bridge
+does not implement Microsoft sign-in.
 
 A Windows UWP x64 harness has tested a successful real Mojang HTTPS GET, failure
 for a deliberately expired certificate, and failure when the body exceeds its
@@ -30,3 +31,8 @@ non-2xx response handling, expiry rejection, plaintext rejection, redirects,
 body limits and header injection. A desktop UWP execution passed all these
 checks. Its ARM32 executable passed the 15063 strict link audit with the native
 request function retained. The account flow and phone runtime remain untested.
+
+The game session-service wiring passed status-mapping tests for 204, 302, 401
+and 503, plus the ARM32 SDK 15063 strict link audit. A desktop UWP bridge probe
+verified an empty 204 response. Live sign-in and online server joins have not
+been tested on the phone.
