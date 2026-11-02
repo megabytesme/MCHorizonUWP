@@ -1,6 +1,9 @@
 # Horizon UWP Builder preview
 
-This desktop WinUI 3 preview checks a small set of build prerequisites. It does
+This desktop WinUI 3 preview checks a small set of build prerequisites and
+records a target and optional native touch source-mod selection. The touch
+selection maps to the planned `native-touch-mod` Cargo feature; the feature and
+its recipe must be verified before the builder can run a build. It does
 not download or run installers, access Minecraft files, configure signing, build
 Horizon, or create packages. Tool presence does not establish version or recipe
 compatibility; the required UWP Rust patches and build recipes still need a

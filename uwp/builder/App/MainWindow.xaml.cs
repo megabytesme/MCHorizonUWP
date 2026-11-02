@@ -11,6 +11,12 @@ public sealed partial class MainWindow : Window
     {
         Results.Children.Clear();
         var profile = (TargetProfile)Profile.SelectedIndex;
+        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true);
+        Results.Children.Add(new TextBlock
+        {
+            Text = $"Requested target: {selection.RustTarget} | Features: {string.Join(", ", selection.Features)}",
+            TextWrapping = TextWrapping.Wrap
+        });
         foreach (var check in new SetupChecker(new SystemProbe()).Scan(profile))
         {
             var panel = new StackPanel { Spacing = 4 };

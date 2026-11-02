@@ -11,6 +11,8 @@
       <ComboBoxItem Content="Surface Pro X (ARM64)" />
       <ComboBoxItem Content="Windows 10 Mobile (ARM32, 15063)" />
     </ComboBox>
+    <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" />
+    <TextBlock Text="The selected source mod is compiled into the client. It requires a compatible verified recipe and is not built by this preview yet." TextWrapping="Wrap" />
     <Button Content="Check setup" Click="CheckSetup_Click" />
     <TextBlock Text="This scan reads local tool and SDK locations. It does not install software or verify recipe compatibility." TextWrapping="Wrap" />
     <StackPanel x:Name="Results" Spacing="12" />

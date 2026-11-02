@@ -11,6 +11,14 @@ if (args.Contains("--scan"))
     return;
 }
 
+var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
+Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
+Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod"]), "native touch feature selection");
+Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");
+Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11"]), "touch can be omitted");
+try { _ = new BuildSelection((TargetProfile)99, false).RustTarget; throw new Exception("invalid target accepted"); }
+catch (ArgumentOutOfRangeException) { }
+
 var missing = new SetupChecker(new FakeProbe()).Scan(TargetProfile.WindowsMobile);
 Require(missing.Single(c => c.Name == "Git").Status == CheckStatus.Missing, "missing Git");
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("15063"), "mobile SDK required");
