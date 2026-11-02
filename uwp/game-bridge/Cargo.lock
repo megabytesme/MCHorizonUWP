@@ -1002,6 +1002,7 @@ dependencies = [
  "horizon-theme",
  "horizon-threads",
  "horizon-touch-mod-runtime",
+ "horizon-touch-native",
  "horizon-uwp-d3d11",
  "horizon-world",
  "log",
@@ -1280,6 +1281,10 @@ version = "0.1.0"
 dependencies = [
  "wasmi",
 ]
+
+[[package]]
+name = "horizon-touch-native"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-uwp-d3d11"

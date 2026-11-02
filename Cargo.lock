@@ -1176,6 +1176,7 @@ dependencies = [
  "winresource",
  "zip",
  "horizon-touch-mod-runtime",
+ "horizon-touch-native",
 ]
 
 [[package]]
@@ -1501,6 +1502,10 @@ dependencies = [
  "mimalloc",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "horizon-touch-native"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-uwp-d3d11"

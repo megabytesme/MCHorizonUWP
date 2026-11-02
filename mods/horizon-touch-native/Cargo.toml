@@ -1,0 +1,10 @@
+[package]
+name = "horizon-touch-native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dev-dependencies]
+horizon-touch-mod-runtime = { path = "../../uwp/touch-mod-runtime" }

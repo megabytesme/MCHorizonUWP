@@ -10,7 +10,7 @@ extern crate self as horizon_client;
 mod game;
 
 /// Validate a user-selected external touch module before replacing the old one.
-#[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+#[cfg(all(target_vendor = "uwp", feature = "native-d3d11", not(feature = "native-touch-mod")))]
 pub fn validate_uwp_touch_module(bytes: &[u8]) -> bool {
     horizon_touch_mod_runtime::TouchModule::load(bytes).is_ok()
 }

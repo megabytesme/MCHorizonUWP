@@ -6,7 +6,7 @@ unsafe extern "C" {
 }
 
 /// Store a module selected explicitly by the user in the app's private data.
-#[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+#[cfg(all(target_vendor = "uwp", feature = "native-d3d11", not(feature = "native-touch-mod")))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_save_touch_mod(data: *const u8, len: usize) -> i32 {
     if data.is_null() || len == 0 || len > 1024 * 1024 {
@@ -29,7 +29,7 @@ pub unsafe extern "C" fn horizon_uwp_save_touch_mod(data: *const u8, len: usize)
     i32::from(std::fs::rename(pending, dir.join("touch-controls.wasm")).is_ok())
 }
 
-#[cfg(all(target_vendor = "uwp", not(feature = "native-d3d11")))]
+#[cfg(all(target_vendor = "uwp", any(not(feature = "native-d3d11"), feature = "native-touch-mod")))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_save_touch_mod(_data: *const u8, _len: usize) -> i32 {
     0
