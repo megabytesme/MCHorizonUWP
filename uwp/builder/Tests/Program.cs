@@ -1,5 +1,42 @@
 using Horizon.Builder.Core;
 
+if (args.Contains("--expect-missing-framework-sdk"))
+{
+    var output = Path.Combine(Path.GetTempPath(), "HorizonBuilderMissingSdk-" + Guid.NewGuid().ToString("N"));
+    try { await SyntheticFrameworkPacker.PackAsync(output, "26.3", TargetProfile.DesktopX64); throw new Exception("missing SDK accepted"); }
+    catch (FileNotFoundException) { Require(!Directory.Exists(output), "missing SDK must not create staging"); }
+    Console.WriteLine("Missing SDK reported without creating a package.");
+    return;
+}
+
+if (args.Contains("--framework-probe"))
+{
+    try { _ = SyntheticFrameworkPacker.PackageName("../invalid"); throw new Exception("invalid version accepted"); }
+    catch (ArgumentException) { }
+    var root = Path.Combine(Path.GetTempPath(), "HorizonBuilderFrameworkProbe-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    foreach (var (target, architecture) in new[] { (TargetProfile.DesktopX64, "x64"), (TargetProfile.WindowsMobile, "arm") })
+    {
+        var output = Path.Combine(root, architecture);
+        var package = await SyntheticFrameworkPacker.PackAsync(output, "26.3", target);
+        using var zip = System.IO.Compression.ZipFile.OpenRead(package);
+        var entry = zip.GetEntry("AppxManifest.xml") ?? throw new Exception("missing framework manifest");
+        using var stream = entry.Open();
+        var manifest = System.Xml.Linq.XDocument.Load(stream);
+        var ns = manifest.Root!.Name.Namespace;
+        var identity = manifest.Root.Element(ns + "Identity")!;
+        Require(identity.Attribute("Name")!.Value == "Horizon.Synthetic.Minecraft26-3", "version identity");
+        Require(identity.Attribute("ProcessorArchitecture")!.Value == architecture, "framework architecture");
+        Require(manifest.Root.Element(ns + "Properties")!.Element(ns + "Framework")!.Value == "true", "framework property");
+        Require(zip.GetEntry("Payload/marker.txt") is not null, "synthetic marker");
+        Require(zip.GetEntry("AppxSignature.p7x") is null, "package must be unsigned");
+        try { await SyntheticFrameworkPacker.PackAsync(output, "26.3", target); throw new Exception("existing output accepted"); }
+        catch (IOException) { }
+        Console.WriteLine($"Verified unsigned synthetic {architecture} framework: {package}");
+    }
+    return;
+}
+
 if (args.Contains("--scan"))
 {
     foreach (var profile in Enum.GetValues<TargetProfile>())

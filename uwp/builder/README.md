@@ -6,8 +6,7 @@ selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
 on a Lumia in its separate branch; this preview still needs an integrated
 recipe before it can run a build. It links to official setup instructions for
 missing tools. It does not download or run installers, access Minecraft files,
-configure signing, build
-Horizon, or create packages. Tool presence does not establish version or recipe
+configure signing, build Horizon, or create game packages. Tool presence does not establish version or recipe
 compatibility; the required UWP Rust patches and build recipes still need a
 verified implementation. Visual Studio detection checks common installation
 locations and may miss custom locations.
@@ -20,6 +19,7 @@ Studio's AppxPackage build tasks (the script looks in standard install locations
 .\build.ps1 -Publish
 dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release
 dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release -- --scan
+dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release -- --framework-probe
 ```
 
 The normal build bundles the Windows App SDK but requires the .NET 8 runtime.
@@ -37,3 +37,11 @@ revision, lockfile, patched Rust standard library, resource inventory and
 selected touch mod, plus toolchain versions. It contains no file paths or keys.
 This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
+
+The framework probe uses the installed Windows SDK MakeAppx to create unsigned
+x64 and ARM framework packages containing only a synthetic marker in new
+temporary directories. It validates their manifests and content and never
+reads Minecraft resources or signs packages. The separate x64 Sandbox package
+dependency probe established that a client can discover and read an installed
+synthetic framework. ARM32 framework installation and dependency access on
+Windows 10 Mobile remain untested.
