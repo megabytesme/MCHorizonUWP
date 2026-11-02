@@ -2,6 +2,7 @@ param(
     [ValidateSet('x64', 'arm64', 'arm')][string]$Architecture = 'x64',
     [string]$AngleBin,
     [switch]$RequireAngle,
+    [switch]$Game,
     [string]$Executable,
     [string]$OutputDirectory,
     [string]$Resources,
@@ -27,7 +28,10 @@ $hostDir = $PSScriptRoot
 $build = Join-Path $hostDir 'build'
 if ($Architecture -ne 'x64') { $build = Join-Path $build $Architecture }
 if ($OutputDirectory) { $build = [IO.Path]::GetFullPath($OutputDirectory) }
-if (-not $Executable) { $Executable = Join-Path $build 'HorizonUWP.exe' }
+if (-not $Executable) {
+    if ($Game) { $Executable = Join-Path (Join-Path (Join-Path $hostDir 'build') "game-$Architecture") 'HorizonUWP.exe' }
+    else { $Executable = Join-Path $build 'HorizonUWP.exe' }
+}
 if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { throw "Missing executable: $Executable" }
 Assert-PEArchitecture $Executable $Architecture
 $stage = Join-Path $build 'package'

@@ -1,0 +1,134 @@
+using System.Diagnostics;
+using System.Text.Json;
+using System.Xml.Linq;
+
+namespace Horizon.Builder.Core;
+
+public sealed record RecipeStep(string Name, string Executable, IReadOnlyList<string> Arguments);
+public sealed record LocalBuildPlan(string SourceCommit, string Target, IReadOnlyList<string> Features,
+    IReadOnlyList<RecipeStep> Steps, IReadOnlyList<string> Notes);
+public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
+
+/// <summary>Recipe for one locally available source revision.</summary>
+public static class LocalRecipe
+{
+    public const string SourceCommit = "5a103f769c8fe00ec38844003ad18b7878e24dfc";
+    public const string RustVersion = "1.99.1";
+    public const string MinecraftVersion = "26.3";
+    public const string SourceManifestVersion = "1.0.1.0";
+
+    public static void ConfigureManifest(XDocument manifest, BuildSelection selection)
+    {
+        var identity = manifest.Root?.Element(manifest.Root.Name.Namespace + "Identity")
+            ?? throw new InvalidDataException("The pinned package manifest has no identity.");
+        if ((string?)identity.Attribute("Name") != "HorizonUWPPrototype"
+            || (string?)identity.Attribute("Publisher") != "CN=HorizonUWPPrototype"
+            || (string?)identity.Attribute("Version") != SourceManifestVersion)
+            throw new InvalidDataException("The pinned package identity or version did not match the recipe.");
+        identity.SetAttributeValue("Version", selection.ValidatedPackageVersion);
+    }
+
+    public static LocalBuildPlan Plan(BuildSelection selection)
+    {
+        if (selection.Target == TargetProfile.SurfaceProX)
+            throw new NotSupportedException("The pinned local recipe currently covers x64 and ARM32 only.");
+        var packageVersion = selection.ValidatedPackageVersion;
+        var arm = selection.Target == TargetProfile.WindowsMobile;
+        var arch = arm ? "arm" : "x64";
+        var steps = new List<RecipeStep>
+        {
+            new("Snapshot pinned source", "git", ["archive", "--format=tar", SourceCommit]),
+            new("Prepare Rust source copy", "powershell", ["-NoProfile", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", "stable"]),
+        };
+        if (arm) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
+        var cargo = new List<string> { "+stable" };
+        if (arm) cargo.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
+        cargo.AddRange(["build", "--offline", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--features", string.Join(',', selection.Features),
+            "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", ".local/builder-target"]);
+        steps.Add(new("Build game bridge", "cargo", cargo.AsReadOnly()));
+        steps.Add(new("Strict-link host", "cmd", ["/d", "/c", "uwp/host/build-game.cmd", arch]));
+        steps.Add(new("Create unsigned client package", "powershell", ["-NoProfile", "-File", "uwp/host/package.ps1", "-Architecture", arch,
+            "-Executable", $"uwp/host/build/game-{arch}/HorizonUWP.exe", "-OutputDirectory", ".local/builder-output", "-Resources", "<selected-resources>"]));
+        var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
+            "The resulting APPX is unsigned and requires matching dependencies and a user-controlled signing identity.",
+            $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
+            "At least 10 GiB free space and a populated Cargo dependency cache are required; the game-bridge build runs offline.",
+            "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
+        if (arm) notes.Add("ARM32 uses the existing offline override: HTTPS and authenticated online services are unavailable.");
+        return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
+    }
+
+    public static async Task ValidateSourceAsync(string sourceDirectory, IProbe probe)
+    {
+        var root = Path.GetFullPath(sourceDirectory);
+        if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Choose an existing Horizon source directory.");
+        var git = probe.FindOnPath("git.exe") ?? throw new InvalidOperationException("Git is required to inspect the selected source.");
+        var start = new ProcessStartInfo(git) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var arg in new[] { "-C", root, "-c", "core.fsmonitor=false", "cat-file", "-e", SourceCommit + "^{commit}" }) start.ArgumentList.Add(arg);
+        start.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
+        start.Environment["GIT_CONFIG_GLOBAL"] = "NUL";
+        start.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        start.Environment["GIT_OPTIONAL_LOCKS"] = "0";
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start Git.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        await Task.WhenAll(stdout, stderr); // Git output can contain local paths; do not log it.
+        if (process.ExitCode != 0) throw new InvalidOperationException("The selected Git repository does not contain the pinned Horizon revision.");
+    }
+
+    public static void ValidateResources(string resourcesDirectory)
+    {
+        var manifest = Path.Combine(Path.GetFullPath(resourcesDirectory), "horizon-resources.json");
+        var file = new FileInfo(manifest);
+        if (!file.Exists || file.Length > 1024 * 1024) throw new InvalidDataException("Select prepared resources with a valid Horizon manifest.");
+        using var document = JsonDocument.Parse(File.ReadAllBytes(manifest));
+        if (!document.RootElement.TryGetProperty("minecraft", out var version) || version.ValueKind != JsonValueKind.String || version.GetString() != MinecraftVersion)
+            throw new InvalidDataException("The selected resources are not for Minecraft 26.3.");
+    }
+
+    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust)
+    {
+        var blockers = new List<string>();
+        foreach (var tool in new[] { "git.exe", "rustup.exe", "cargo.exe", "python.exe" })
+            if (probe.FindOnPath(tool) is null) blockers.Add($"{tool} was not found on PATH.");
+        if (!rust.Version.StartsWith("rustc " + RustVersion + " ", StringComparison.Ordinal))
+            blockers.Add($"The recipe requires stable rustc {RustVersion} and matching rust-src.");
+        if (!rust.SourceAvailable) blockers.Add("The stable toolchain does not contain rust-src.");
+        var pf = probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files";
+        var pfx86 = probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)";
+        var arch = selection.Target == TargetProfile.WindowsMobile ? "arm" : "x64";
+        var vc = arch == "arm"
+            ? Path.Combine(pfx86, "Microsoft Visual Studio", "2017", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
+            : Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");
+        if (!probe.FileExists(vc)) blockers.Add($"The checked-in {arch} host script's Visual Studio installation was not found.");
+        if (arch == "arm" && !probe.FileExists(Path.Combine(pf, "LLVM", "bin", "clang.exe")))
+            blockers.Add("The ARM32 recipe requires clang.exe in the standard LLVM installation.");
+        var sdk = Path.Combine(pfx86, "Windows Kits", "10", "bin");
+        if (!probe.FileExists(Path.Combine(sdk, "10.0.15063.0", "x64", "fxc.exe")))
+            blockers.Add("The host script requires Windows SDK 10.0.15063.0 fxc.exe.");
+        if (!probe.FileExists(Path.Combine(sdk, "10.0.26100.0", "x64", "makeappx.exe")))
+            blockers.Add("The package script requires Windows SDK 10.0.26100.0 MakeAppx.exe.");
+        return blockers.AsReadOnly();
+    }
+
+    public static async Task<RustToolchainFacts> InspectRustAsync(IProbe probe)
+    {
+        var rustup = probe.FindOnPath("rustup.exe");
+        if (rustup is null) return new("", false);
+        async Task<string> Run(params string[] args)
+        {
+            var start = new ProcessStartInfo(rustup) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var arg in args) start.ArgumentList.Add(arg);
+            using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not inspect the Rust toolchain.");
+            var output = process.StandardOutput.ReadToEndAsync();
+            var error = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            await Task.WhenAll(output, error);
+            return process.ExitCode == 0 ? (await output).Trim() : "";
+        }
+        var version = await Run("run", "stable", "rustc", "--version");
+        var sysroot = await Run("run", "stable", "rustc", "--print", "sysroot");
+        return new(version, !string.IsNullOrWhiteSpace(sysroot) && probe.FileExists(Path.Combine(sysroot, "lib", "rustlib", "src", "rust", "library", "Cargo.toml")));
+    }
+}

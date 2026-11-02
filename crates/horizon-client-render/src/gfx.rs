@@ -2776,10 +2776,9 @@ impl Renderer {
         let multi_draw = device
             .features()
             .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
-            && adapter
-                .get_downlevel_capabilities()
-                .flags
-                .contains(wgpu::DownlevelFlags::INDIRECT_EXECUTION);
+            && adapter.get_downlevel_capabilities().flags.contains(
+                wgpu::DownlevelFlags::INDIRECT_EXECUTION | wgpu::DownlevelFlags::BASE_VERTEX,
+            );
         // Without indirect draws (OpenGL before 4.3 without compute shaders)
         // even creating an indirect buffer fails; one draw per section reads
         // `draws` on the CPU instead.
@@ -3376,6 +3375,11 @@ impl Renderer {
         count: u32,
     ) {
         let (draws, pages) = (&self.draws[..], &self.draw_pages[..]);
+        let base_vertex = self
+            .adapter
+            .get_downlevel_capabilities()
+            .flags
+            .contains(wgpu::DownlevelFlags::BASE_VERTEX);
         let (mut i, end) = (first as usize, (first + count) as usize);
         while i < end {
             let (page, index_page) = pages[i];
@@ -3391,7 +3395,13 @@ impl Renderer {
                 pass.multi_draw_indexed_indirect(indirect, offset, run as u32);
             } else {
                 for d in &draws[i..i + run] {
-                    pass.draw_indexed(d[2]..d[2] + d[0], d[3] as i32, d[4]..d[4] + 1);
+                    if base_vertex {
+                        pass.draw_indexed(d[2]..d[2] + d[0], d[3] as i32, d[4]..d[4] + 1);
+                    } else {
+                        let offset = u64::from(d[3]) * std::mem::size_of::<TerrainVertex>() as u64;
+                        pass.set_vertex_buffer(0, self.arena.buffer(page).slice(offset..));
+                        pass.draw_indexed(d[2]..d[2] + d[0], 0, d[4]..d[4] + 1);
+                    }
                 }
             }
             i += run;
@@ -5924,12 +5934,20 @@ impl Renderer {
             pass.set_pipeline(&self.entity_pipeline);
             pass.set_bind_group(0, &self.hand_group, &[]);
             pass.set_index_buffer(self.indices.slice(..), wgpu::IndexFormat::Uint32);
-            pass.set_vertex_buffer(0, self.entity_buffer.slice(..));
-            pass.draw_indexed(
-                0..hand_quads * 6,
-                ((world_quads + additive_quads) * 4) as i32,
-                0..1,
-            );
+            let hand_start = (world_quads + additive_quads) * 4;
+            let base_vertex = self
+                .adapter
+                .get_downlevel_capabilities()
+                .flags
+                .contains(wgpu::DownlevelFlags::BASE_VERTEX);
+            if base_vertex {
+                pass.set_vertex_buffer(0, self.entity_buffer.slice(..));
+                pass.draw_indexed(0..hand_quads * 6, hand_start as i32, 0..1);
+            } else {
+                let offset = u64::from(hand_start) * std::mem::size_of::<Vertex>() as u64;
+                pass.set_vertex_buffer(0, self.entity_buffer.slice(offset..));
+                pass.draw_indexed(0..hand_quads * 6, 0, 0..1);
+            }
             drop(pass);
             if let Some(hdr) = &self.hdr {
                 hdr.mark_hand(&mut encoder);
