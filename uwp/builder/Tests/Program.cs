@@ -66,13 +66,16 @@ try { await WindowsPackageManager.InstallAsync(new FakeProbe(), InstallableTool.
 catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
 Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod"]), "native touch feature selection");
+Require(selection.ModIds.SequenceEqual(["horizon_touch"]), "stable native touch mod ID");
 Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");
 Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11"]), "touch can be omitted");
+Require(new BuildSelection(TargetProfile.DesktopX64, false).ModIds.Count == 0, "omitted mod ID");
 try { _ = new BuildSelection((TargetProfile)99, false).RustTarget; throw new Exception("invalid target accepted"); }
 catch (ArgumentOutOfRangeException) { }
 
 string hash = new('a', 64), commit = new('b', 40);
 var inputs = BuildInputs.Create(selection, commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(inputs.ModIds.SequenceEqual(["horizon_touch"]), "input record includes stable mod ID");
 var repeated = BuildInputs.Create(selection, commit.ToUpperInvariant(), hash.ToUpperInvariant(), hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() == repeated.Sha256(), "canonical input hash");
 var withoutTouch = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, false), commit, hash, hash, hash, hash, null, "stable-1.91.0", "14.44.35207", "10.0.15063.0");

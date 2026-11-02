@@ -3,6 +3,8 @@ namespace Horizon.Builder.Core;
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
 public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod)
 {
+    public const string TouchModId = "horizon_touch";
+    public IReadOnlyList<string> ModIds => NativeTouchMod ? [TouchModId] : [];
     public string RustTarget => Target switch
     {
         TargetProfile.DesktopX64 => "x86_64-uwp-windows-msvc",

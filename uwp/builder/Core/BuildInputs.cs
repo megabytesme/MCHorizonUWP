@@ -10,6 +10,7 @@ public sealed class BuildInputs
     public string Schema { get; private init; } = "";
     public string Target { get; private init; } = "";
     public IReadOnlyList<string> Features { get; private init; } = Array.Empty<string>();
+    public IReadOnlyList<string> ModIds { get; private init; } = Array.Empty<string>();
     public string SourceCommit { get; private init; } = "";
     public string RecipeSha256 { get; private init; } = "";
     public string CargoLockSha256 { get; private init; } = "";
@@ -36,7 +37,8 @@ public sealed class BuildInputs
         return new BuildInputs
         {
             Schema = "horizon-uwp-inputs-v1", Target = selection.RustTarget,
-            Features = Array.AsReadOnly(selection.Features.ToArray()), SourceCommit = Hex(sourceCommit, 40),
+            Features = Array.AsReadOnly(selection.Features.ToArray()),
+            ModIds = Array.AsReadOnly(selection.ModIds.ToArray()), SourceCommit = Hex(sourceCommit, 40),
             RecipeSha256 = Hex(recipeSha256, 64), CargoLockSha256 = Hex(cargoLockSha256, 64),
             RustStdPatchSha256 = Hex(rustStdPatchSha256, 64),
             ResourceInventorySha256 = Hex(resourceInventorySha256, 64),
