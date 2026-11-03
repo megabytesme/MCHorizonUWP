@@ -74,7 +74,9 @@ horizon-native-scene = { path = "../../uwp/native-scene", optional = true }
 horizon-native-window = { path = "../../uwp/native-window", optional = true }
 horizon-native-terrain = { path = "../../uwp/native-terrain", optional = true }
 horizon-touch-native = { path = "../../mods/horizon-touch-native", optional = true }
+horizon-device-vibration-native = { path = "../../mods/horizon-device-vibration-native", optional = true }
 horizon-uwp-d3d11 = { path = "../../uwp/d3d11-backend", optional = true }
+horizon-uwp-gamepad = { path = "../../uwp/gamepad-bridge", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 # The server thread's CPU time per tick (`HORIZON_SPIKES`, spans.rs).
@@ -106,11 +108,13 @@ default = ["audio", "controllers"]
 native-d3d11 = ["dep:horizon-native-panorama", "dep:horizon-native-entities", "dep:horizon-native-hud", "dep:horizon-native-scene", "dep:horizon-native-window", "dep:horizon-native-terrain", "dep:horizon-uwp-d3d11", "horizon-client-render/native-d3d11"]
 native-d3d11-readback = ["native-d3d11", "horizon-uwp-d3d11/readback-probe"]
 native-touch-mod = ["native-d3d11", "dep:horizon-touch-native"]
+native-device-vibration-mod = ["dep:horizon-device-vibration-native"]
 # Sound output. Without it (and `controllers`) the program links neither libasound nor libudev on
 # Linux: the server build (`--no-default-features`, released as horizon-engine; docs/server.md).
 audio = ["horizon-client-render/audio"]
 uwp-audio = ["horizon-client-render/uwp-audio"]
 uwp-https = ["horizon-client-render/uwp-https"]
+uwp-controller = ["dep:horizon-uwp-gamepad"]
 # Controllers: gilrs, and the DualSense's own output. Without it only `horizon-ctl pad`'s virtual pad.
 controllers = ["dep:gilrs", "dep:horizon-dualsense", "horizon-client-input/controllers"]
 # Records the call sites of mob random draws (`mob_ai_probe` traces).

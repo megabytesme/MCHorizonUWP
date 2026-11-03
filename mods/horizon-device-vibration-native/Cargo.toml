@@ -1,0 +1,10 @@
+[package]
+name = "horizon-device-vibration-native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[target.'cfg(target_vendor = "uwp")'.dependencies]
+horizon-uwp-device-vibration = { path = "../../uwp/device-vibration-bridge" }

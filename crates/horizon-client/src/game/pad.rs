@@ -26,7 +26,10 @@ pub(super) const HELP: &[&str] = &[
 #[derive(Default)]
 pub(super) struct Pads {
     /// The real controllers and the DualSense's output.
-    #[cfg(feature = "controllers")]
+    #[cfg(any(
+        feature = "controllers",
+        all(target_vendor = "uwp", feature = "uwp-controller")
+    ))]
     devices: hardware::Devices,
     /// The virtual pad of `horizon-ctl pad`.
     injected: PadState,
@@ -51,14 +54,26 @@ pub(super) struct Pads {
     last_rumble: Option<(&'static str, gamepad::Pulse)>,
     /// The player's health between polls (a drop is damage taken).
     health: HealthWatch,
+    #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+    device_vibration_enabled: bool,
 }
 
-#[cfg(feature = "controllers")]
+#[cfg(all(
+    feature = "controllers",
+    not(all(target_vendor = "uwp", feature = "uwp-controller"))
+))]
+mod hardware;
+
+#[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+#[path = "pad/uwp.rs"]
 mod hardware;
 
 /// A build without the `controllers` feature (the server build, which must not need libudev): no
 /// hardware pads, only `horizon-ctl pad`'s virtual one.
-#[cfg(not(feature = "controllers"))]
+#[cfg(not(any(
+    feature = "controllers",
+    all(target_vendor = "uwp", feature = "uwp-controller")
+)))]
 mod hardware {
     use super::{super::Game, Pads};
     use horizon_client::gamepad::{PadState, Pulse, Rumble};
@@ -92,8 +107,27 @@ impl Pads {
 impl Game<'_> {
     /// Once per loop iteration: read the pads and act on button changes.
     pub(super) fn poll_pads(&mut self, event_loop: &ActiveEventLoop) {
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        {
+            let enabled = self.native_on(horizon_device_vibration_native::MOD_ID);
+            if self.pad.device_vibration_enabled && !enabled {
+                horizon_device_vibration_native::cancel();
+            }
+            self.pad.device_vibration_enabled = enabled;
+        }
         let settings = &self.settings.controller;
         if !settings.enabled {
+            #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+            {
+                let health = self
+                    .player
+                    .as_ref()
+                    .filter(|_| self.title.is_none())
+                    .map(|p| p.health.health());
+                if let Some(damage) = self.pad.health.observe(health) {
+                    self.pad_rumble(Rumble::Hurt(damage));
+                }
+            }
             self.pad_output_off();
             if self.pad.state != PadState::default() {
                 self.pad.state = PadState::default();
@@ -299,13 +333,17 @@ impl Game<'_> {
     /// Vibrate the active pad, when vibration is on and the pad is the one
     /// playing (a pad lying idle while the mouse plays stays still).
     pub(super) fn pad_rumble(&mut self, rumble: Rumble) {
+        let Some(pulse) = rumble.pulse() else {
+            return;
+        };
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        if self.focused && self.device_vibration_on() {
+            horizon_device_vibration_native::vibrate(pulse.strong.max(pulse.weak), pulse.millis);
+        }
         let settings = &self.settings.controller;
         if !settings.enabled || !settings.vibration || !self.pad.in_use {
             return;
         }
-        let Some(pulse) = rumble.pulse() else {
-            return;
-        };
         self.pad.last_rumble = Some((rumble.name(), pulse));
         self.pad_vibrate(rumble, pulse);
     }

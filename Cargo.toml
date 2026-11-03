@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["launcher", "crates/horizon-telemetry-server", "crates/horizon-mod-registry", "third_party/wgpu-hal", "third_party/winit", "uwp/native-terrain", "uwp/native-hud", "uwp/d3d11-backend", "uwp/native-scene", "uwp/native-window", "uwp/native-panorama", "uwp/native-entities", "mods/horizon-touch-native", "uwp/xaudio-stream", "uwp/https-bridge", "uwp/credential-store"]
+exclude = ["launcher", "crates/horizon-telemetry-server", "crates/horizon-mod-registry", "third_party/wgpu-hal", "third_party/winit", "uwp/native-terrain", "uwp/native-hud", "uwp/d3d11-backend", "uwp/native-scene", "uwp/native-window", "uwp/native-panorama", "uwp/native-entities", "mods/horizon-touch-native", "mods/horizon-device-vibration-native", "uwp/xaudio-stream", "uwp/https-bridge", "uwp/credential-store", "uwp/gamepad-bridge", "uwp/device-vibration-bridge"]
 members = [
     "crates/horizon-core",
     "crates/horizon-dualsense",

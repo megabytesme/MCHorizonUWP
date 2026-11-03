@@ -14613,6 +14613,10 @@ impl ApplicationHandler for Game<'_> {
         if let WindowEvent::Focused(false) = &event {
             self.physical_keys.clear();
             self.physical_buttons.clear();
+            #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+            self.pad_output_off();
+            #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+            horizon_device_vibration_native::cancel();
         }
         if let WindowEvent::ModifiersChanged(m) = &event {
             self.modifiers = m.state();
@@ -15738,6 +15742,8 @@ impl ApplicationHandler for Game<'_> {
     /// window turns it into a window close, so Minecraft.stop saves the world.
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
         self.pad_close_output();
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        horizon_device_vibration_native::cancel();
         if let Err(e) = self.save_for_exit() {
             log::warn!("Horizon: failed to save the world on exit: {e}");
         }

@@ -984,6 +984,7 @@ dependencies = [
  "horizon-client-render",
  "horizon-command",
  "horizon-core",
+ "horizon-device-vibration-native",
  "horizon-friends",
  "horizon-hdr",
  "horizon-items",
@@ -1003,6 +1004,7 @@ dependencies = [
  "horizon-threads",
  "horizon-touch-native",
  "horizon-uwp-d3d11",
+ "horizon-uwp-gamepad",
  "horizon-world",
  "log",
  "miniz_oxide 0.8.9",
@@ -1102,6 +1104,13 @@ name = "horizon-core"
 version = "0.1.0"
 dependencies = [
  "libm",
+]
+
+[[package]]
+name = "horizon-device-vibration-native"
+version = "0.1.0"
+dependencies = [
+ "horizon-uwp-device-vibration",
 ]
 
 [[package]]
@@ -1289,11 +1298,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "horizon-uwp-device-vibration"
+version = "0.1.0"
+
+[[package]]
 name = "horizon-uwp-game-bridge"
 version = "0.1.0"
 dependencies = [
  "horizon-client",
 ]
+
+[[package]]
+name = "horizon-uwp-gamepad"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-uwp-https-bridge"

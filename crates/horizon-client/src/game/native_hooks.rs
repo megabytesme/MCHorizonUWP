@@ -789,16 +789,49 @@ impl Game<'_> {
             description: horizon_touch_native::MOD_DESCRIPTION.to_owned(),
             keys: Vec::new(),
         });
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        mods.push(NativeMod {
+            id: horizon_device_vibration_native::MOD_ID.to_owned(),
+            title: horizon_device_vibration_native::MOD_TITLE.to_owned(),
+            description: horizon_device_vibration_native::MOD_DESCRIPTION.to_owned(),
+            keys: Vec::new(),
+        });
         let _ = mods;
     }
     /// The buttons of mod `mod_id`'s settings page, under its keys: push
     /// their labels when it is yours. Asked again each time the page opens
     /// and after each click.
     pub(super) fn native_settings(&mut self, mod_id: &str, buttons: &mut Vec<String>) {
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        if mod_id == horizon_device_vibration_native::MOD_ID {
+            let on = horizon_device_vibration_native::enabled(
+                self.native_setting(mod_id, horizon_device_vibration_native::ENABLED_KEY)
+                    .as_deref(),
+            );
+            buttons.push(format!(
+                "Device vibrations: {}",
+                if on { "On" } else { "Off" }
+            ));
+        }
         let _ = (mod_id, buttons);
     }
     /// Button `button` of mod `mod_id`'s settings page was clicked.
     pub(super) fn native_settings_click(&mut self, mod_id: &str, button: usize) {
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        if mod_id == horizon_device_vibration_native::MOD_ID && button == 0 {
+            let on = horizon_device_vibration_native::enabled(
+                self.native_setting(mod_id, horizon_device_vibration_native::ENABLED_KEY)
+                    .as_deref(),
+            );
+            self.native_set_setting(
+                mod_id,
+                horizon_device_vibration_native::ENABLED_KEY,
+                if on { "false" } else { "true" },
+            );
+            if on {
+                horizon_device_vibration_native::cancel();
+            }
+        }
         let _ = (mod_id, button);
     }
     /// The player did `event` on mod `mod_id`'s panel (`native_panel_items`):
@@ -1353,6 +1386,15 @@ impl Game<'_> {
     /// launcher's next build leaves it out.
     pub(super) fn native_on(&self, mod_id: &str) -> bool {
         !self.settings.mods.disabled.contains(mod_id)
+    }
+    #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+    pub(super) fn device_vibration_on(&self) -> bool {
+        let id = horizon_device_vibration_native::MOD_ID;
+        self.native_on(id)
+            && horizon_device_vibration_native::enabled(
+                self.native_setting(id, horizon_device_vibration_native::ENABLED_KEY)
+                    .as_deref(),
+            )
     }
     /// Sets a block in the current authoritative level through `Level.setBlock`.
     /// Returns false for another dimension, an invalid state, or no change.
