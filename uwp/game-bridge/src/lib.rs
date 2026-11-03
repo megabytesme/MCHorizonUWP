@@ -21,6 +21,11 @@ static PREPARED_SESSION: std::sync::Mutex<Option<xaml_pregame::Selection>> =
 pub extern "C" fn horizon_uwp_release_label(buffer: *mut u8, capacity: usize) -> usize {
     let label = horizon_core::release::nightly_label()
         .unwrap_or_else(|| format!("Horizon {}", horizon_core::release::VERSION));
+    copy_build_label(buffer, capacity, &label)
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+fn copy_build_label(buffer: *mut u8, capacity: usize, label: &str) -> usize {
     let bytes = label.as_bytes();
     if buffer.is_null() || bytes.len() > capacity {
         return 0;
@@ -28,6 +33,36 @@ pub extern "C" fn horizon_uwp_release_label(buffer: *mut u8, capacity: usize) ->
     // SAFETY: the C++ caller provides a writable buffer of `capacity` bytes.
     unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer, bytes.len()) };
     bytes.len()
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_upstream_ref(buffer: *mut u8, capacity: usize) -> usize {
+    copy_build_label(
+        buffer,
+        capacity,
+        option_env!("HORIZON_UPSTREAM_COMMIT").unwrap_or("not recorded"),
+    )
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_upstream_release(buffer: *mut u8, capacity: usize) -> usize {
+    copy_build_label(
+        buffer,
+        capacity,
+        option_env!("HORIZON_VERSION").unwrap_or("not recorded"),
+    )
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_port_ref(buffer: *mut u8, capacity: usize) -> usize {
+    copy_build_label(
+        buffer,
+        capacity,
+        option_env!("HORIZON_UWP_PORT_REF").unwrap_or("not recorded"),
+    )
 }
 
 #[cfg(target_vendor = "uwp")]

@@ -64,6 +64,8 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
         vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
         vcEnvironment["HORIZON_NIGHTLY"] = LocalRecipe.UpstreamNightly;
+        vcEnvironment["HORIZON_UPSTREAM_COMMIT"] = LocalRecipe.UpstreamNightlyCommit;
+        vcEnvironment["HORIZON_UWP_PORT_REF"] = LocalRecipe.SourceCommit;
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";

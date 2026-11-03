@@ -26,8 +26,12 @@ pub trait Speech {
 /// `Narrator.getNarrator`: the platform's speech, or why there is none
 /// (`Narrator.EMPTY`).
 fn open() -> Result<Box<dyn Speech>, String> {
-    #[cfg(windows)]
+    #[cfg(all(windows, not(target_vendor = "uwp")))]
     return windows::Sapi::open().map(|s| Box::new(s) as Box<dyn Speech>);
+    // SAPI's SpVoice class is not registered in the UWP app container. Keep
+    // narrator unavailable there without logging a misleading COM failure.
+    #[cfg(target_vendor = "uwp")]
+    return Err("Narrator speech is unavailable in this UWP app container".into());
     #[cfg(target_os = "macos")]
     return mac::Synthesizer::open().map(|s| Box::new(s) as Box<dyn Speech>);
     #[cfg(target_os = "linux")]
@@ -81,7 +85,10 @@ fn run(silent: bool, opened: &Sender<bool>, commands: &Receiver<Command>) {
         match open() {
             Ok(speech) => speech,
             Err(e) => {
+                #[cfg(not(target_vendor = "uwp"))]
                 log::error!("Error while loading the narrator: {e}");
+                #[cfg(target_vendor = "uwp")]
+                let _ = e;
                 let _ = opened.send(false);
                 return;
             }

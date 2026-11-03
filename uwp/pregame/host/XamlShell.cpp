@@ -12,6 +12,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.applicationmodel.activation.h>
 #include <windows.applicationmodel.core.h>
 #include <windows.data.json.h>
+#include <windows.data.xml.dom.h>
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
 #include <windows.graphics.imaging.h>
@@ -24,7 +25,10 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.ui.core.h>
 #include <windows.ui.text.h>
 #include <windows.ui.viewmanagement.h>
+#include <windows.ui.notifications.h>
+#include <windows.system.h>
 #include <windows.ui.xaml.h>
+#include <windows.ui.xaml.input.h>
 #include <windows.ui.xaml.controls.h>
 #include <windows.ui.xaml.markup.h>
 #include <windows.ui.xaml.media.h>
@@ -39,6 +43,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace Windows::ApplicationModel::Activation;
@@ -50,13 +55,16 @@ using namespace Windows::Graphics::Imaging;
 using namespace Windows::Storage;
 using namespace Windows::Storage::Streams;
 using namespace Windows::Data::Json;
+using namespace Windows::Data::Xml::Dom;
 using namespace Windows::System::Threading;
 using namespace Windows::Security::Credentials;
 using namespace Windows::UI;
 using namespace Windows::UI::Core;
 using namespace Windows::UI::ViewManagement;
+using namespace Windows::UI::Notifications;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
+using namespace Windows::UI::Xaml::Input;
 using namespace Windows::UI::Xaml::Media;
 using namespace Windows::UI::Xaml::Media::Imaging;
 using namespace Windows::Web::Http;
@@ -70,6 +78,9 @@ extern "C" int __cdecl horizon_uwp_prepare(const uint16_t*, size_t);
 extern "C" int __cdecl horizon_uwp_pick_files(const wchar_t*, size_t, unsigned);
 extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsigned);
 extern "C" size_t __cdecl horizon_uwp_release_label(unsigned char*, size_t);
+extern "C" size_t __cdecl horizon_uwp_upstream_release(unsigned char*, size_t);
+extern "C" size_t __cdecl horizon_uwp_upstream_ref(unsigned char*, size_t);
+extern "C" size_t __cdecl horizon_uwp_port_ref(unsigned char*, size_t);
 extern "C" int __cdecl horizon_uwp_probe_renderer(void*, unsigned, unsigned, unsigned);
 
 namespace {
@@ -151,13 +162,19 @@ bool show_logs = false;
 bool show_news = false;
 bool has_winui = false;
 unsigned profile_kind = 0;
+unsigned live_tile_mode = 0;
+bool tile_skin_available = false;
 UISettings^ ui_settings;
 AccessibilitySettings^ accessibility;
 
 void refresh();
+Button^ action_button(Platform::String^ label, RoutedEventHandler^ handler);
 void update_navigation_surface(DependencyObject^ node);
 void update_profile_navigation();
 Platform::String^ decode(const unsigned char* bytes, size_t length);
+void update_live_tile();
+void persist_tile_skin(WriteableBitmap^ image, unsigned generation);
+void clear_tile_skin();
 
 Platform::String^ installed_release() {
     unsigned char buffer[256];
@@ -216,12 +233,55 @@ void load_installed_notes(TextBlock^ output) {
             try {
                 auto body = pending.get();
                 std::wstring clean; clean.reserve((std::min)(body->Length(), 32000u));
-                bool tag = false;
-                for (unsigned i = 0; i < body->Length() && clean.size() < 32000; ++i) {
-                    const wchar_t ch = body->Data()[i];
-                    if (ch == L'<') { tag = true; continue; }
-                    if (ch == L'>') { tag = false; continue; }
-                    if (!tag) clean.push_back(ch);
+                const std::wstring markdown(body->Data(), body->Length());
+                bool code = false;
+                for (size_t i = 0; i < markdown.size() && clean.size() < 32000;) {
+                    const wchar_t ch = markdown[i];
+                    if (ch == L'`') { code = !code; ++i; continue; }
+                    if (!code && ch == L'<') {
+                        const auto tag_end = markdown.find(L'>', i + 1);
+                        if (tag_end != std::wstring::npos && tag_end - i < 40) {
+                            std::wstring tag = markdown.substr(i, tag_end - i + 1);
+                            if (tag.find(L"<br") == 0 || tag.find(L"</p") == 0 || tag.find(L"</li") == 0 ||
+                                tag.find(L"</summary") == 0 || tag.find(L"</details") == 0 || tag.find(L"<li") == 0)
+                                clean.append(L"\n");
+                            i = tag_end + 1;
+                            continue;
+                        }
+                    }
+                    if (!code && ch == L'[') {
+                        const auto label_end = markdown.find(L"](", i + 1);
+                        const auto url_end = label_end == std::wstring::npos ? label_end : markdown.find(L')', label_end + 2);
+                        if (url_end != std::wstring::npos) {
+                            clean.append(markdown, i + 1, label_end - i - 1);
+                            i = url_end + 1;
+                            continue;
+                        }
+                    }
+                    if (!code && (ch == L'*' || ch == L'_' || ch == L'~')) { ++i; continue; }
+                    if (!code && ch == L'#' && (i == 0 || markdown[i - 1] == L'\n')) {
+                        while (i < markdown.size() && markdown[i] == L'#') ++i;
+                        if (i < markdown.size() && markdown[i] == L' ') ++i;
+                        continue;
+                    }
+                    if (!code && ch == L'-' && i + 1 < markdown.size() && markdown[i + 1] == L' ') {
+                        clean.append(L"\u2022 "); i += 2; continue;
+                    }
+                    if (!code && ch == L'&') {
+                        const auto entity_end = markdown.find(L';', i + 1);
+                        if (entity_end != std::wstring::npos && entity_end - i < 12) {
+                            const auto entity = markdown.substr(i, entity_end - i + 1);
+                            if (entity == L"&amp;") clean.push_back(L'&');
+                            else if (entity == L"&lt;") clean.push_back(L'<');
+                            else if (entity == L"&gt;") clean.push_back(L'>');
+                            else if (entity == L"&quot;") clean.push_back(L'\"');
+                            else if (entity == L"&#39;" || entity == L"&apos;") clean.push_back(L'\'');
+                            else { clean.append(entity); i = entity_end + 1; continue; }
+                            i = entity_end + 1;
+                            continue;
+                        }
+                    }
+                    clean.push_back(ch); ++i;
                 }
                 output->Text = ref new Platform::String(clean.data(), static_cast<unsigned>(clean.size()));
             } catch (...) { output->Text = L"Release notes were not included with this build."; }
@@ -344,6 +404,10 @@ Border^ profile_card() {
         placeholder->FontSize = 24; placeholder->Opacity = 0.5; icon = placeholder;
     }
     icon->Width = 48; icon->Height = 48;
+    icon->IsTapEnabled = true;
+    icon->Tapped += ref new TappedEventHandler([](Platform::Object^, TappedRoutedEventArgs^) {
+        choose(2, displayed_generation);
+    });
     layout->Children->Append(icon);
     auto labels = ref new StackPanel(); labels->Margin = Thickness(12, 0, 0, 0); labels->VerticalAlignment = VerticalAlignment::Center;
     auto title = text(profile_kind ? profile : L"Not Signed In", 14);
@@ -382,6 +446,138 @@ bool valid_skin_url(Platform::String^ value) {
         if (!((c >= L'0' && c <= L'9') || (c >= L'a' && c <= L'f') || (c >= L'A' && c <= L'F'))) return false;
     }
     return true;
+}
+
+std::wstring xml_escape(const std::wstring& value) {
+    std::wstring escaped;
+    escaped.reserve(value.size());
+    for (const auto ch : value) {
+        switch (ch) {
+        case L'&': escaped.append(L"&amp;"); break;
+        case L'<': escaped.append(L"&lt;"); break;
+        case L'>': escaped.append(L"&gt;"); break;
+        case L'\"': escaped.append(L"&quot;"); break;
+        case L'\'': escaped.append(L"&apos;"); break;
+        default: escaped.push_back(ch); break;
+        }
+    }
+    return escaped;
+}
+
+std::wstring tile_markup(const std::wstring& title, const std::wstring& detail, bool use_skin) {
+    std::wstring content = L"<text hint-style=\"subtitle\">" + xml_escape(title) + L"</text>";
+    if (!detail.empty()) content += L"<text hint-style=\"captionSubtle\">" + xml_escape(detail) + L"</text>";
+    if (use_skin) content += L"<image placement=\"inline\" src=\"ms-appdata:///local/horizon-profile-tile.png\" hint-crop=\"circle\"/>";
+    std::wstring xml = L"<tile><visual version=\"3\">";
+    for (const auto* size : { L"TileMedium", L"TileWide", L"TileLarge" })
+        xml += L"<binding template=\"" + std::wstring(size) + L"\" branding=\"name\">" + content + L"</binding>";
+    xml += L"</visual></tile>";
+    return xml;
+}
+
+std::vector<std::wstring> recent_world_names(const std::wstring& save_root) {
+    struct World { std::wstring name; FILETIME modified; };
+    std::vector<World> worlds;
+    const auto pattern = save_root + L"\\*";
+    WIN32_FIND_DATAW entry = {};
+    HANDLE find = FindFirstFileW(pattern.c_str(), &entry);
+    if (find == INVALID_HANDLE_VALUE) return {};
+    do {
+        if (!(entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
+            (entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ||
+            !wcscmp(entry.cFileName, L".") || !wcscmp(entry.cFileName, L"..")) continue;
+        worlds.push_back({ entry.cFileName, entry.ftLastWriteTime });
+    } while (FindNextFileW(find, &entry));
+    FindClose(find);
+    std::sort(worlds.begin(), worlds.end(), [](const World& left, const World& right) {
+        return CompareFileTime(&left.modified, &right.modified) > 0;
+    });
+    std::vector<std::wstring> names;
+    for (size_t i = 0; i < worlds.size() && i < 4; ++i) names.push_back(worlds[i].name);
+    return names;
+}
+
+void update_live_tile() {
+    const unsigned mode = live_tile_mode;
+    const unsigned kind = profile_kind;
+    const bool has_skin = tile_skin_available;
+    const std::wstring account_name = profile ? std::wstring(profile->Data(), profile->Length()) : L"Profile";
+    const auto local = ApplicationData::Current->LocalFolder->Path;
+    if (mode == 0) {
+        try {
+            auto updater = TileUpdateManager::CreateTileUpdaterForApplication();
+            updater->EnableNotificationQueue(false);
+            updater->Clear();
+        } catch (...) {}
+        return;
+    }
+    ThreadPool::RunAsync(ref new WorkItemHandler([mode, kind, has_skin, account_name, local](IAsyncAction^) {
+        try {
+            std::vector<std::wstring> updates;
+            const bool include_worlds = mode == 1 || mode == 3;
+            const bool include_account = mode == 2 || mode == 3;
+            if (include_account) {
+                const std::wstring title = kind ? account_name : L"Sign in to Horizon";
+                const auto detail = kind == 1 || kind == 3 ? L"Minecraft account" :
+                    kind == 2 ? L"Offline account" : L"Minecraft: Java Edition";
+                const bool use_skin = has_skin && (kind == 1 || kind == 3);
+                updates.push_back(tile_markup(title, detail, use_skin));
+            }
+            if (include_worlds) {
+                const auto save_root = std::wstring(local->Data(), local->Length()) + L"\\game\\saves";
+                const auto worlds = recent_world_names(save_root);
+                if (worlds.empty()) updates.push_back(tile_markup(L"No worlds yet", L"Start a world in Horizon", false));
+                else for (const auto& world : worlds)
+                    updates.push_back(tile_markup(world, L"Recent world", false));
+            }
+            if (updates.empty()) return;
+            auto updater = TileUpdateManager::CreateTileUpdaterForApplication();
+            updater->EnableNotificationQueue(updates.size() > 1);
+            updater->Clear();
+            for (const auto& markup : updates) {
+                auto document = ref new XmlDocument();
+                document->LoadXml(ref new Platform::String(markup.c_str()));
+                updater->Update(ref new TileNotification(document));
+            }
+        } catch (...) { /* Live tiles are optional and must not block the launcher. */ }
+    }));
+}
+
+void persist_tile_skin(WriteableBitmap^ image, unsigned generation) {
+    if (!image) return;
+    try {
+        auto context = task_continuation_context::use_current();
+        create_task(ApplicationData::Current->LocalFolder->CreateFileAsync(
+            L"horizon-profile-tile.png", CreationCollisionOption::ReplaceExisting)).then([image](StorageFile^ file) {
+                return create_task(file->OpenAsync(FileAccessMode::ReadWrite)).then([image](IRandomAccessStream^ stream) {
+                    return create_task(BitmapEncoder::CreateAsync(BitmapEncoder::PngEncoderId, stream)).then([image, stream](BitmapEncoder^ encoder) {
+                        auto reader = DataReader::FromBuffer(image->PixelBuffer);
+                        auto pixels = ref new Platform::Array<unsigned char>(reader->UnconsumedBufferLength);
+                        reader->ReadBytes(pixels);
+                        encoder->SetPixelData(BitmapPixelFormat::Bgra8, BitmapAlphaMode::Premultiplied,
+                            image->PixelWidth, image->PixelHeight, 96.0, 96.0, pixels);
+                        return encoder->FlushAsync();
+                    });
+                });
+            }, context).then([generation](task<void> pending) {
+                try {
+                    pending.get();
+                    if (generation != skin_generation.load()) return;
+                    tile_skin_available = true;
+                    update_live_tile();
+                } catch (...) { tile_skin_available = false; update_live_tile(); }
+            }, context);
+    } catch (...) { tile_skin_available = false; }
+}
+
+void clear_tile_skin() {
+    tile_skin_available = false;
+    try {
+        auto path = Platform::String::Concat(ApplicationData::Current->LocalFolder->Path,
+            L"\\horizon-profile-tile.png");
+        DeleteFileW(path->Data());
+    } catch (...) { update_live_tile(); }
+    update_live_tile();
 }
 
 void load_profile_skin(Platform::String^ value, unsigned generation) {
@@ -425,6 +621,7 @@ void load_profile_skin(Platform::String^ value, unsigned generation) {
                 image->Invalidate();
                 profile_skin = image;
                 update_profile_navigation();
+                persist_tile_skin(image, generation);
                 if (prompt_kind == 0) refresh();
             } catch (...) { /* Keep the fallback icon when skin loading fails. */ }
         }, context);
@@ -511,6 +708,80 @@ void show_message(Platform::String^ title, Platform::String^ message) {
     dialog->ShowAsync();
 }
 
+using BuildLabelReader = size_t(__cdecl*)(unsigned char*, size_t);
+Platform::String^ build_label(BuildLabelReader reader) {
+    unsigned char buffer[256];
+    const auto length = reader(buffer, sizeof(buffer));
+    return length && length <= sizeof(buffer) ? decode(buffer, length) : ref new Platform::String(L"Not recorded");
+}
+Platform::String^ package_architecture() {
+    switch (static_cast<unsigned>(Windows::ApplicationModel::Package::Current->Id->Architecture)) {
+    case 0: return L"x86";
+    case 5: return L"ARM32";
+    case 9: return L"x64";
+    case 11: return L"Neutral";
+    case 12: return L"ARM64";
+    default: return L"Unknown";
+    }
+}
+std::wstring windows_version_label() {
+    const auto packed_text = Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamilyVersion;
+    const auto packed = _wcstoui64(packed_text->Data(), nullptr, 10);
+    wchar_t version[128];
+    swprintf_s(version, L"%s %llu.%llu.%llu.%llu",
+        Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamily->Data(),
+        static_cast<unsigned long long>((packed >> 48) & 0xffff),
+        static_cast<unsigned long long>((packed >> 32) & 0xffff),
+        static_cast<unsigned long long>((packed >> 16) & 0xffff),
+        static_cast<unsigned long long>(packed & 0xffff));
+    return version;
+}
+void open_web_link(const std::wstring& address) {
+    try {
+        create_task(Windows::System::Launcher::LaunchUriAsync(ref new Uri(ref new Platform::String(address.c_str()))));
+    } catch (...) {}
+}
+std::wstring upstream_release_url() {
+    auto release = build_label(horizon_uwp_upstream_release);
+    std::wstring tag(release->Data(), release->Length());
+    for (auto& ch : tag) if (ch == L' ') ch = L'-';
+    return L"https://github.com/horizon-rust/horizon/releases/tag/" + tag;
+}
+void show_about() {
+    const auto package_version = Windows::ApplicationModel::Package::Current->Id->Version;
+    wchar_t version[64];
+    swprintf_s(version, L"%u.%u.%u.%u", package_version.Major, package_version.Minor,
+        package_version.Build, package_version.Revision);
+    std::wstring details = L"Architecture: " + std::wstring(package_architecture()->Data()) +
+        L"\nMinecraft version: 26.3\nWindows: " + windows_version_label() +
+        L"\nHorizon release: " + std::wstring(installed_release()->Data()) +
+        L"\nHorizon upstream commit: " + std::wstring(build_label(horizon_uwp_upstream_ref)->Data()) +
+        L"\nUWP port commit: " + std::wstring(build_label(horizon_uwp_port_ref)->Data()) +
+        L"\nApp package version: " + version;
+    auto body = ref new StackPanel();
+    body->Children->Append(text(L"Unofficial UWP client for Horizon and Minecraft: Java Edition.", 15));
+    auto information = ref new TextBox();
+    information->Text = ref new Platform::String(details.c_str());
+    information->IsReadOnly = true;
+    information->AcceptsReturn = true;
+    information->TextWrapping = TextWrapping::Wrap;
+    information->MinHeight = 180;
+    body->Children->Append(information);
+    for (const auto& entry : std::vector<std::pair<const wchar_t*, std::wstring>>{
+        { L"Horizon source", L"https://github.com/horizon-rust/horizon" },
+        { L"Report an issue", L"https://github.com/horizon-rust/horizon/issues" },
+        { L"Horizon license", L"https://github.com/horizon-rust/horizon/blob/main/LICENSE" },
+        { L"Installed release notes", upstream_release_url() } }) {
+        body->Children->Append(action_button(ref new Platform::String(entry.first),
+            ref new RoutedEventHandler([url = entry.second](Platform::Object^, RoutedEventArgs^) { open_web_link(url); })));
+    }
+    auto dialog = ref new ContentDialog();
+    dialog->Title = L"About Horizon UWP";
+    dialog->Content = body;
+    dialog->CloseButtonText = L"Close";
+    dialog->ShowAsync();
+}
+
 void import_content(unsigned kind) {
     try {
         auto context = task_continuation_context::use_current();
@@ -582,6 +853,7 @@ void count_content(Platform::String^ name, TextBlock^ output) {
 }
 Button^ action_button(Platform::String^ label, RoutedEventHandler^ handler);
 void refresh_save_list(StackPanel^ output) {
+    if (live_tile_mode != 0) update_live_tile();
     output->Children->Clear();
     output->Children->Append(text(L"Calculating save sizes…", 14));
     auto local = ApplicationData::Current->LocalFolder->Path;
@@ -705,6 +977,8 @@ void confirm_reset_data() {
     auto result = dialog->ShowAsync();
     result->Completed = ref new Windows::Foundation::AsyncOperationCompletedHandler<ContentDialogResult>([](IAsyncOperation<ContentDialogResult>^ pending, Windows::Foundation::AsyncStatus status) {
         if (status != Windows::Foundation::AsyncStatus::Completed || pending->GetResults() != ContentDialogResult::Primary) return;
+        live_tile_mode = 0;
+        update_live_tile();
         ThreadPool::RunAsync(ref new WorkItemHandler([](IAsyncAction^) {
             if (!reset_owned_data()) {
                 try { dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([]() {
@@ -844,6 +1118,24 @@ void refresh() {
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
+        auto tile_card = ref new StackPanel();
+        tile_card->Children->Append(text(L"Live tile", 18));
+        auto tile_modes = ref new ComboBox(); tile_modes->Header = L"Show on the Start tile";
+        for (auto label : { L"Disabled", L"Recent worlds", L"Account profile", L"Account + worlds (rotating)" }) {
+            auto item = ref new ComboBoxItem(); item->Content = ref new Platform::String(label);
+            tile_modes->Items->Append(item);
+        }
+        tile_modes->SelectedIndex = static_cast<int>(live_tile_mode);
+        tile_modes->SelectionChanged += ref new SelectionChangedEventHandler([tile_modes](Platform::Object^, SelectionChangedEventArgs^) {
+            if (tile_modes->SelectedIndex < 0 || tile_modes->SelectedIndex > 3) return;
+            live_tile_mode = static_cast<unsigned>(tile_modes->SelectedIndex);
+            ApplicationData::Current->LocalSettings->Values->Insert(L"live-tile-mode", PropertyValue::CreateInt32(tile_modes->SelectedIndex));
+            update_live_tile();
+        });
+        tile_card->Children->Append(tile_modes);
+        tile_card->Children->Append(text(L"World tiles use the most recently changed save folders. Account tiles show the selected profile and its Minecraft face when available.", 14));
+        tile_card->Children->Append(action_button(L"Update tile now", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { update_live_tile(); })));
+        panel->Children->Append(card(tile_card));
         panel->Children->Append(text(L"Storage", 18));
         auto worlds_card = ref new StackPanel();
         worlds_card->Children->Append(text(L"Worlds and saves", 16));
@@ -873,14 +1165,7 @@ void refresh() {
         panel->Children->Append(card(storage_card)); refresh_app_storage(storage_total);
         auto about_card = ref new StackPanel();
         about_card->Children->Append(text(L"About", 18));
-        about_card->Children->Append(action_button(L"About Horizon UWP", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
-            const auto version = Windows::ApplicationModel::Package::Current->Id->Version;
-            auto release = installed_release();
-            wchar_t message[512];
-            swprintf_s(message, L"Horizon UWP\n%s\nPackage version %u.%u.%u.%u\n\nAn unofficial UWP port of Horizon for Minecraft: Java Edition.",
-                release->Data(), version.Major, version.Minor, version.Build, version.Revision);
-            show_message(L"About Horizon UWP", ref new Platform::String(message));
-        })));
+        about_card->Children->Append(action_button(L"About Horizon UWP", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_about(); })));
         panel->Children->Append(card(about_card));
     } else if (show_logs && prompt_kind == 0) {
         panel->Children->Append(text(L"Logs", 28));
@@ -896,6 +1181,7 @@ void refresh() {
         auto notes = text(L"Loading release notes\u2026", 14);
         panel->Children->Append(notes);
         load_installed_notes(notes);
+        panel->Children->Append(action_button(L"Open this Horizon release", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { open_web_link(upstream_release_url()); })));
     } else if (prompt_kind == 0) {
         auto logo = ref new Image();
         auto logo_bitmap = ref new BitmapImage();
@@ -955,6 +1241,11 @@ protected:
         if (stored < 0 || stored > 3) stored = 0;
         selected_appearance = static_cast<AppAppearance>(stored);
         startup_appearance = selected_appearance;
+        int saved_tile_mode = 0;
+        auto saved_tile = values->HasKey(L"live-tile-mode") ? values->Lookup(L"live-tile-mode") : nullptr;
+        if (saved_tile) { try { saved_tile_mode = safe_cast<IPropertyValue^>(saved_tile)->GetInt32(); } catch (Platform::Exception^) {} }
+        if (saved_tile_mode < 0 || saved_tile_mode > 3) saved_tile_mode = 0;
+        live_tile_mode = static_cast<unsigned>(saved_tile_mode);
         PROBE_STAGE(L"Before WinUI");
         try {
 #ifdef HORIZON_UWP_SHELL_PLAIN_PROBE
@@ -1039,6 +1330,7 @@ protected:
         PROBE_STAGE(L"Theme ready");
         window->Content = page;
         window->Activate();
+        update_live_tile();
         ui_settings->ColorValuesChanged += ref new TypedEventHandler<UISettings^, Platform::Object^>(
             [](UISettings^, Platform::Object^) {
                 try { dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([]() { apply_theme(); if (prompt_kind == 0) refresh(); })); }
@@ -1119,7 +1411,12 @@ extern "C" void __cdecl horizon_uwp_page_profile(const unsigned char* bytes, siz
         auto value = length ? decode(bytes, length) : ref new Platform::String(L"Profile");
         const unsigned current_kind = length && kind <= 3 ? kind : 0;
         if (value && dispatcher) dispatcher->RunAsync(CoreDispatcherPriority::Normal,
-            ref new DispatchedHandler([value, current_kind]() { profile = value; profile_kind = current_kind; update_profile_navigation(); if (prompt_kind == 0) refresh(); }));
+            ref new DispatchedHandler([value, current_kind]() {
+                profile = value; profile_kind = current_kind; update_profile_navigation();
+                if (current_kind != 1 && current_kind != 3) { profile_skin = nullptr; clear_tile_skin(); }
+                else { tile_skin_available = false; update_live_tile(); }
+                if (prompt_kind == 0) refresh();
+            }));
     } catch (...) {}
 }
 extern "C" void __cdecl horizon_uwp_page_skin(const unsigned char* bytes, size_t length) {
@@ -1130,14 +1427,22 @@ extern "C" void __cdecl horizon_uwp_page_skin(const unsigned char* bytes, size_t
             ref new DispatchedHandler([value, generation]() {
                 if (generation != skin_generation.load()) return;
                 profile_skin = nullptr;
+                tile_skin_available = false;
                 update_profile_navigation();
                 if (prompt_kind == 0) refresh();
-                if (value) load_profile_skin(value, generation);
+                if (value) load_profile_skin(value, generation); else clear_tile_skin();
+                update_live_tile();
             }));
     } catch (...) {}
 }
 extern "C" void __cdecl horizon_uwp_page_accounts(const unsigned char* bytes, size_t length) {
     try { account_labels = decode(bytes, length); } catch (...) { account_labels = nullptr; }
+}
+extern "C" void __cdecl horizon_uwp_page_refresh_tile() {
+    try {
+        if (dispatcher) dispatcher->RunAsync(CoreDispatcherPriority::Normal,
+            ref new DispatchedHandler([]() { update_live_tile(); }));
+    } catch (...) {}
 }
 extern "C" size_t __cdecl horizon_uwp_dialog_text(unsigned char* buffer, size_t capacity) {
     const size_t length = offline_input.size();
