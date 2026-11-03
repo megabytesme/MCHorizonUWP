@@ -70,7 +70,7 @@ public static class SyntheticFrameworkPacker
         return package;
     }
 
-    private static string FindMakeAppx()
+    internal static string FindMakeAppx()
     {
         var kits = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Windows Kits", "10", "bin");
         if (!Directory.Exists(kits)) throw new FileNotFoundException("Install the Windows SDK packaging tools to create a framework.");

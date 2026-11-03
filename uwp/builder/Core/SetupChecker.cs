@@ -53,7 +53,9 @@ public sealed class SetupChecker(IProbe probe)
         checks.Add(new("Rust UWP standard library", CheckStatus.Review,
             "The UWP build requires a recipe-specific Rust standard-library patch and target build. Presence and compatibility have not yet been verified."));
         checks.Add(new("Build recipe and signing", CheckStatus.Review,
-            "No verified build recipe, signing identity, game resources or installable package is configured yet."));
+            profile == TargetProfile.SurfaceProX
+                ? "An ARM64 build recipe is not yet available."
+                : "A pinned local build recipe is available; validate the selected source and resources separately. Its packages require signing before installation."));
         return checks;
     }
 

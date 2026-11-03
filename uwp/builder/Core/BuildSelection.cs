@@ -1,7 +1,7 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = "1.0.10.0", bool PrepareSounds = false)
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = "1.0.10.0", bool PrepareSounds = false, bool UseResourceFramework = false)
 {
     public const string TouchModId = "horizon_touch";
     public IReadOnlyList<string> ModIds => NativeTouchMod ? [TouchModId] : [];

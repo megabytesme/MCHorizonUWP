@@ -36,13 +36,20 @@ where they conflict with this update; their safeguards and remaining scope still
   trusted Ben-Desktop key from `192.168.1.121`. Normal verified localhost SSH
   works; the original known-hosts file is backed up as
   `C:/Users/ben/.ssh/known_hosts.before-codex-7339caa402cc402fac1874681114e178`.
-- The builder's pinned client source is `2ce3d73dbc9e82634b73d65606b3cb14a4e63347`.
+- The builder's pinned client source is `2b0df3b55786186db71008e35de619a0f85b2342`.
   It fetches target and x64-host Cargo dependencies before an offline build,
   and can prepare missing sounds in a private snapshot from a selected Minecraft
   installation. Fresh-cache offline checks passed for x64 and ARM32; the sound
   preparation step was exercised on the user's local installation without
-  changing the selected resources. The full updated builder recipe has not yet
-  been run end to end from a clean Windows installation.
+  changing the selected resources. The full x64 and ARM32 recipes ran
+  successfully on this PC through the Rust build, strict link, framework and
+  client packaging. Their unsigned results are under
+  `C:/Users/ben/.huwp/b/ff4fcd97a73644bc/` (x64) and
+  `C:/Users/ben/.huwp/b/7e177e46f2d0484c/` (ARM32). Both frameworks have the
+  same content-based identity. These clients use the default
+  `HorizonUWPPrototype` identity and were not installed; they could replace
+  an existing package of that identity. The recipe has not yet been run end to
+  end from a clean Windows installation.
 - A self-contained builder publish is at
   `.local/client-builder-integration/uwp/builder/App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/publish/`.
   Keep the publish folder together. It is a development build, not an installer.
@@ -52,10 +59,33 @@ where they conflict with this update; their safeguards and remaining scope still
   point that rejects a second active account and ignores inherited session files;
   focused tests pass. The pre-game UI and native host wiring to the account
   worker are **not implemented**, and no real sign-in has been tested.
-- Real versioned asset-framework packaging and package-graph lookup are not
-  implemented. The synthetic framework proof remains the only framework test.
-  Renderer selection beyond the native D3D11 recipe, ARM64, clean-machine setup,
-  signing, Sandbox validation and device checks also remain open.
+- The builder can package a prepared resource tree as a separate unsigned,
+  architecture-neutral framework and create a client with a matching package
+  dependency. The identity includes the Minecraft version and a digest of the
+  staged files, so distinct resource trees get distinct identities. The packer
+  accepts other numeric versions, while the client recipe remains pinned to
+  26.3. x64 and ARM32 hosts with framework lookup passed strict UWP links;
+  synthetic packaging and dependency checks passed. Runtime framework lookup
+  has **not** been tested on a device.
+- A private 26.3 framework and dependent clients were packaged and verified
+  without installation or signing. They contain the user's resources and
+  must not be committed, uploaded or redistributed. The two client executables
+  were linked from the previously built bridges and predate the session-handoff
+  work; their identities differ from the earlier signed test packages:
+  - Framework: `C:/Users/ben/.huwp/b/resource-framework-0c470957614241f7817078a365b95cb2/Horizon.Asset.26-3.321aa1f73c8a1a627df3642f1dcee0.appx`,
+    SHA-256 `25a342b858ccc082df2483373f85897823195efd455015fc90448a833d380974`.
+  - x64 client: `C:/Users/ben/.huwp/b/resource-framework-0c470957614241f7817078a365b95cb2/client-x64/HorizonUWP-x64.appx`,
+    SHA-256 `8403ee5fe19db4bb258c1447743c81dac422cbb8aa581c0047605cefde46c411`.
+  - ARM32 client: `C:/Users/ben/.huwp/b/resource-framework-0c470957614241f7817078a365b95cb2/client-arm/HorizonUWP-arm.appx`,
+    SHA-256 `893daed6209539c6b05fc8a4a5312ca56b087b1ca9fb05cd45d9a1ae5deb7ad8`.
+  All three passed ZIP and manifest checks; the framework contains 4,961 Ogg
+  sounds and matching sound metadata. They require signing and publisher trust.
+- A public-only export of the prototype signing certificate is at
+  `C:/Users/ben/.huwp/b/resource-framework-0c470957614241f7817078a365b95cb2/HorizonUWPPrototype-public.cer`.
+  Its thumbprint is `22A7D038213EF31853EEE277B7C1FAFD576A70AB`; it was checked
+  to contain no private key. No certificate trust store was changed.
+- Renderer selection beyond the native D3D11 recipe, ARM64, clean-machine
+  setup, builder signing, Sandbox validation and device checks remain open.
 - An automatic approval review blocked the command to create the
   certificate-store signing implementation, with the stated reason "blocked by
   policy". Do not bypass that review. The user separately authorized signing

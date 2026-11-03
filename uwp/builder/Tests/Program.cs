@@ -1,5 +1,43 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 3 && args[0] == "--pack-resources")
+{
+    var framework = await ResourceFrameworkPacker.PackAsync(args[1], args[2]);
+    Console.WriteLine($"Unsigned resource framework: {framework.Package}");
+    Console.WriteLine($"Framework identity: {framework.Name}");
+    return;
+}
+
+if (args.Length == 2 && args[0] == "--framework-client-probe")
+{
+    var root = Path.Combine(Path.GetTempPath(), "HorizonFrameworkClientProbe-" + Guid.NewGuid().ToString("N"));
+    var resources = Path.Combine(root, "source");
+    Directory.CreateDirectory(resources);
+    File.WriteAllText(Path.Combine(resources, "horizon-resources.json"), "{\"minecraft\":\"26.3\"}");
+    File.WriteAllText(Path.Combine(resources, "fixture.txt"), "synthetic fixture");
+    var framework = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "framework-output"));
+    var output = Path.Combine(root, "client-output");
+    var start = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true };
+    foreach (var arg in new[] { "-NoProfile", "-File", Path.GetFullPath("uwp/host/package.ps1"), "-Architecture", "x64",
+        "-Executable", Path.GetFullPath(args[1]), "-OutputDirectory", output, "-ResourceFrameworkName", framework.Name })
+        start.ArgumentList.Add(arg);
+    using (var process = System.Diagnostics.Process.Start(start) ?? throw new Exception("package script did not start"))
+    {
+        await process.WaitForExitAsync();
+        Require(process.ExitCode == 0, "client packaging succeeded");
+    }
+    using var zip = System.IO.Compression.ZipFile.OpenRead(Path.Combine(output, "HorizonUWP-x64.appx"));
+    using var manifestStream = (zip.GetEntry("AppxManifest.xml") ?? throw new Exception("client manifest missing")).Open();
+    var manifest = System.Xml.Linq.XDocument.Load(manifestStream);
+    var ns = manifest.Root!.Name.Namespace;
+    var dependency = manifest.Root.Element(ns + "Dependencies")!.Elements(ns + "PackageDependency")
+        .Single(element => (string?)element.Attribute("Name") == framework.Name);
+    Require((string?)dependency.Attribute("Publisher") == ResourceFrameworkPacker.Publisher, "framework dependency publisher");
+    Require(zip.GetEntry("resources/fixture.txt") is null, "resources are separate from the client");
+    Console.WriteLine("Verified framework and dependent client packaging using synthetic resources.");
+    return;
+}
+
 if (args.Length == 4 && args[0] == "--prepare-sounds")
 {
     try
@@ -14,13 +52,16 @@ if (args.Length == 4 && args[0] == "--prepare-sounds")
     return;
 }
 
-if (args.Length == 4 && args[0] == "--build-local")
+if (args.Length == 4 && (args[0] == "--build-local" || args[0] == "--build-local-framework"))
 {
     try
     {
         var profile = args[3] switch { "x64" => TargetProfile.DesktopX64, "arm" => TargetProfile.WindowsMobile, _ => throw new ArgumentException("Expected x64 or arm.") };
-        var result = await LocalBuildRunner.RunAsync(args[1], args[2], new BuildSelection(profile, true), new SystemProbe(), new ConsoleProgress());
+        var result = await LocalBuildRunner.RunAsync(args[1], args[2],
+            new BuildSelection(profile, true, UseResourceFramework: args[0] == "--build-local-framework"),
+            new SystemProbe(), new ConsoleProgress());
         Console.WriteLine($"Unsigned package: {result.UnsignedPackage}");
+        if (result.ResourceFrameworkPackage is { } framework) Console.WriteLine($"Unsigned resource framework: {framework}");
         if (result.SoundWarning is not null) Console.WriteLine(result.SoundWarning);
     }
     catch (Exception error) { Console.Error.WriteLine(error.Message); Environment.ExitCode = 1; }
@@ -68,6 +109,47 @@ if (args.Contains("--expect-missing-framework-sdk"))
     try { await SyntheticFrameworkPacker.PackAsync(output, "26.3", TargetProfile.DesktopX64); throw new Exception("missing SDK accepted"); }
     catch (FileNotFoundException) { Require(!Directory.Exists(output), "missing SDK must not create staging"); }
     Console.WriteLine("Missing SDK reported without creating a package.");
+    return;
+}
+
+if (args.Contains("--resource-framework-probe"))
+{
+    var root = Path.Combine(Path.GetTempPath(), "HorizonResourceFrameworkProbe-" + Guid.NewGuid().ToString("N"));
+    var resources = Path.Combine(root, "source");
+    Directory.CreateDirectory(Path.Combine(resources, "assets", "minecraft"));
+    File.WriteAllText(Path.Combine(resources, "horizon-resources.json"), "{\"minecraft\":\"26.3\"}");
+    var marker = Path.Combine(resources, "assets", "minecraft", "fixture.txt");
+    File.WriteAllText(marker, "synthetic fixture");
+    var first = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "one"));
+    var second = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "two"));
+    Require(first.Name == second.Name, "identical resources use the same framework identity");
+    using (var zip = System.IO.Compression.ZipFile.OpenRead(first.Package))
+    {
+        var entry = zip.GetEntry("AppxManifest.xml") ?? throw new Exception("missing framework manifest");
+        using var stream = entry.Open();
+        var manifest = System.Xml.Linq.XDocument.Load(stream);
+        var ns = manifest.Root!.Name.Namespace;
+        var identity = manifest.Root.Element(ns + "Identity")!;
+        Require(identity.Attribute("Name")!.Value == first.Name, "framework identity");
+        Require(identity.Attribute("Publisher")!.Value == ResourceFrameworkPacker.Publisher, "framework publisher");
+        Require(identity.Attribute("ProcessorArchitecture")!.Value == "neutral", "framework architecture");
+        Require(manifest.Root.Element(ns + "Properties")!.Element(ns + "Framework")!.Value == "true", "framework property");
+        Require(zip.GetEntry("resources/assets/minecraft/fixture.txt") is not null, "resource payload");
+        Require(zip.GetEntry("AppxSignature.p7x") is null, "framework must be unsigned");
+    }
+    try { await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "one")); throw new Exception("existing output accepted"); }
+    catch (IOException) { }
+    try { await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(resources, "nested")); throw new Exception("nested output accepted"); }
+    catch (InvalidDataException) { }
+    Require(!Directory.Exists(Path.Combine(resources, "nested")), "selected resources left untouched");
+    File.WriteAllText(marker, "changed synthetic fixture");
+    var third = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "three"));
+    Require(first.Name != third.Name, "different resources use different framework identities");
+    File.WriteAllText(Path.Combine(resources, "horizon-resources.json"), "{\"minecraft\":\"1.20.4\"}");
+    var otherVersion = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "other-version"));
+    Require(otherVersion.Name.StartsWith("Horizon.Asset.1-20-4.", StringComparison.Ordinal)
+        && otherVersion.Name.Length <= 50, "another Minecraft version has a valid identity");
+    Console.WriteLine("Verified reusable unsigned resource frameworks using synthetic resources.");
     return;
 }
 
@@ -163,6 +245,12 @@ Require(prepareRecipe.Steps.Single(step => step.Name == "Build resource preparer
     && prepareRecipe.Steps.Any(step => step.Name == "Prepare sound assets"), "optional sound preparation uses the desktop host target");
 var desktopRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false));
 Require(desktopRecipe.Steps.All(step => !step.Arguments.Contains("--offline-arm32")), "desktop excludes ARM override");
+Require(LocalBuildRunner.CargoJobCount(32, 32L * 1024 * 1024 * 1024) == 8, "parallelism fits memory");
+Require(LocalBuildRunner.CargoJobCount(4, 64L * 1024 * 1024 * 1024) == 4, "parallelism uses available CPUs");
+Require(LocalBuildRunner.CargoJobCount(32, 1) == 1, "parallelism has a minimum of one");
+var frameworkRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, UseResourceFramework: true));
+Require(frameworkRecipe.Steps.Any(step => step.Name == "Package reusable resources")
+    && frameworkRecipe.Steps.Single(step => step.Name == "Create unsigned client package").Arguments.Contains("-ResourceFrameworkName"), "framework recipe includes dependency");
 try { _ = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false)); throw new Exception("unverified ARM64 recipe accepted"); }
 catch (NotSupportedException) { }
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
@@ -197,6 +285,8 @@ var nextVersion = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMob
 Require(inputs.Sha256() != nextVersion.Sha256(), "package version changes input hash");
 var withSounds = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, PrepareSounds: true), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() != withSounds.Sha256(), "sound preparation changes input hash");
+var withFramework = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, UseResourceFramework: true), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(inputs.Sha256() != withFramework.Sha256(), "framework selection changes input hash");
 try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, null, "stable", "14.44", "10.0.15063.0"); throw new Exception("missing touch digest accepted"); }
 catch (ArgumentException) { }
 try { _ = BuildInputs.Create(selection, commit, "not-a-hash", hash, hash, hash, hash, "stable", "14.44", "10.0.15063.0"); throw new Exception("invalid digest accepted"); }
@@ -210,6 +300,8 @@ Require(missing.Single(c => c.Name == "Git").Instructions?.Host == "git-scm.com"
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Instructions?.Host == "learn.microsoft.com", "official SDK instructions");
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("15063"), "mobile SDK required");
 Require(missing.Any(c => c.Status == CheckStatus.Review && c.Name == "Rust UWP standard library"), "unverified UWP std");
+Require(missing.Single(c => c.Name == "Build recipe and signing").Detail.Contains("pinned local build recipe"), "available mobile recipe reported");
+Require(new SetupChecker(new FakeProbe()).Scan(TargetProfile.SurfaceProX).Single(c => c.Name == "Build recipe and signing").Detail.Contains("not yet available"), "unavailable ARM64 recipe reported");
 
 var modernOnly = new FakeProbe();
 var modernKits = Path.Combine(modernOnly.Root, "Windows Kits", "10");

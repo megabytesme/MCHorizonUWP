@@ -4,12 +4,16 @@ using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
 
-public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, string? SoundWarning);
+public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, string? SoundWarning, string? ResourceFrameworkPackage = null);
 
 /// <summary>Runs only the pinned local recipe in a fresh, builder-owned workspace.</summary>
 public static class LocalBuildRunner
 {
     public const long MinimumFreeBytes = 10L * 1024 * 1024 * 1024;
+    // Large Rust crates have exhausted memory when every logical CPU was used.
+    // Keep as much parallelism as the machine's memory budget can sustain.
+    public static int CargoJobCount(int processors, long memoryBytes) =>
+        (int)Math.Clamp(memoryBytes / (4L * 1024 * 1024 * 1024), 1, Math.Max(1, processors));
 
     public static async Task<LocalBuildResult> RunAsync(string source, string resources, BuildSelection selection,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
@@ -53,7 +57,9 @@ public static class LocalBuildRunner
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
-        vcEnvironment["CARGO_BUILD_JOBS"] = Environment.ProcessorCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var jobs = CargoJobCount(Environment.ProcessorCount, GC.GetGCMemoryInfo().TotalAvailableMemoryBytes);
+        vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        progress?.Report($"Using {jobs} parallel Cargo jobs within the available memory budget.");
         if (arm)
         {
             vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
@@ -98,12 +104,19 @@ public static class LocalBuildRunner
         var manifest = XDocument.Load(manifestPath);
         LocalRecipe.ConfigureManifest(manifest, selection);
         manifest.Save(manifestPath);
-        progress?.Report("Packaging the unsigned client with the selected resources.");
+        ResourceFramework? framework = null;
+        if (selection.UseResourceFramework)
+        {
+            progress?.Report("Packaging a reusable resource framework from a private snapshot.");
+            framework = await ResourceFrameworkPacker.PackAsync(packageResources, Path.Combine(root, "resource-framework"), progress);
+        }
+        progress?.Report("Packaging the unsigned client.");
         await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
-            "-Executable", executable, "-OutputDirectory", packageDir, "-Resources", packageResources]);
+            "-Executable", executable, "-OutputDirectory", packageDir,
+            framework is null ? "-Resources" : "-ResourceFrameworkName", framework?.Name ?? packageResources]);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
-        return new(root, package, LocalRecipe.SoundWarning(Path.Combine(packageDir, "package", "resources")));
+        return new(root, package, LocalRecipe.SoundWarning(packageResources), framework?.Package);
     }
 
     public static async Task<string> CreateSnapshotAsync(string source, IProbe probe)

@@ -11,6 +11,7 @@ public sealed class BuildInputs
     public string Target { get; private init; } = "";
     public string PackageVersion { get; private init; } = "";
     public bool PrepareSounds { get; private init; }
+    public bool UseResourceFramework { get; private init; }
     public IReadOnlyList<string> Features { get; private init; } = Array.Empty<string>();
     public IReadOnlyList<string> ModIds { get; private init; } = Array.Empty<string>();
     public string SourceCommit { get; private init; } = "";
@@ -38,8 +39,9 @@ public sealed class BuildInputs
             throw new ArgumentException("MSVC and Windows SDK versions must be numeric versions.");
         return new BuildInputs
         {
-            Schema = "horizon-uwp-inputs-v3", Target = selection.RustTarget, PackageVersion = selection.ValidatedPackageVersion,
+            Schema = "horizon-uwp-inputs-v4", Target = selection.RustTarget, PackageVersion = selection.ValidatedPackageVersion,
             PrepareSounds = selection.PrepareSounds,
+            UseResourceFramework = selection.UseResourceFramework,
             Features = Array.AsReadOnly(selection.Features.ToArray()),
             ModIds = Array.AsReadOnly(selection.ModIds.ToArray()), SourceCommit = Hex(sourceCommit, 40),
             RecipeSha256 = Hex(recipeSha256, 64), CargoLockSha256 = Hex(cargoLockSha256, 64),

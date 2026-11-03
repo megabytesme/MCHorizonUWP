@@ -12,6 +12,7 @@
     <Button Content="Choose Minecraft installation (for missing sounds)" Click="ChooseMinecraft_Click" />
     <TextBlock x:Name="MinecraftPath" Text="No Minecraft installation selected" TextWrapping="Wrap" />
     <CheckBox x:Name="PrepareSounds" Content="Prepare missing sounds from this installation in the build workspace" />
+    <CheckBox x:Name="PackageFramework" Content="Build a separate reusable framework for these prepared resources" />
     <TextBlock Text="Target device" Style="{StaticResource BodyStrongTextBlockStyle}" />
     <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch">
       <ComboBoxItem Content="Windows desktop (x64)" />

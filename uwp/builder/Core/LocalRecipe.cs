@@ -12,7 +12,7 @@ public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 /// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "2ce3d73dbc9e82634b73d65606b3cb14a4e63347";
+    public const string SourceCommit = "2b0df3b55786186db71008e35de619a0f85b2342";
     public const string RustVersion = "1.99.1";
     public const string MinecraftVersion = "26.3";
     public const string SourceManifestVersion = "1.0.1.0";
@@ -58,14 +58,19 @@ public static class LocalRecipe
             "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", ".local/builder-target"]);
         steps.Add(new("Build game bridge", "cargo", cargo.AsReadOnly()));
         steps.Add(new("Strict-link host", "cmd", ["/d", "/c", "uwp/host/build-game.cmd", arch]));
+        if (selection.UseResourceFramework)
+            steps.Add(new("Package reusable resources", "MakeAppx", ["<prepared-resources>", "<framework-output>"]));
         steps.Add(new("Create unsigned client package", "powershell", ["-NoProfile", "-File", "uwp/host/package.ps1", "-Architecture", arch,
-            "-Executable", $"uwp/host/build/game-{arch}/HorizonUWP.exe", "-OutputDirectory", ".local/builder-output", "-Resources", "<selected-resources>"]));
+            "-Executable", $"uwp/host/build/game-{arch}/HorizonUWP.exe", "-OutputDirectory", ".local/builder-output",
+            selection.UseResourceFramework ? "-ResourceFrameworkName" : "-Resources",
+            selection.UseResourceFramework ? "<framework-name>" : "<selected-resources>"]));
         var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
             "The resulting APPX is unsigned and requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
-            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build.",
+            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and limits parallel jobs to fit memory.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
         if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
+        if (selection.UseResourceFramework) notes.Add("The separate unsigned resource framework contains your private prepared resources; retain it for clients using the same content and install it as a dependency.");
         if (arm) notes.Add("ARM32 uses the offline TLS dependency override; skin and Minecraft session requests use the WinRT HTTPS adapter. Microsoft sign-in is not yet implemented.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
     }

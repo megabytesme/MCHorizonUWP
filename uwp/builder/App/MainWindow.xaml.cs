@@ -50,7 +50,7 @@ public sealed partial class MainWindow : Window
             var minecraft = minecraftDirectory;
             if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true);
             var plan = LocalRecipe.Plan(selection);
             LocalRecipe.ValidateResources(resources);
             if (selection.PrepareSounds) LocalRecipe.ValidateSoundPreparation(resources, minecraft);
@@ -80,10 +80,12 @@ public sealed partial class MainWindow : Window
             var minecraft = minecraftDirectory;
             if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var result = await LocalBuildRunner.RunAsync(source, resources, selection, new SystemProbe(), progress, minecraft);
             RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
+            if (result.ResourceFrameworkPackage is { } framework)
+                RecipeStatus.Text += $" Unsigned resource framework: {framework}. Sign it with the same publisher and install it as a dependency. It contains private Minecraft resources.";
             if (result.SoundWarning is { } warning)
                 RecipeStatus.Text += " " + warning;
         }
@@ -115,7 +117,7 @@ public sealed partial class MainWindow : Window
     {
         Results.Children.Clear();
         var profile = (TargetProfile)Profile.SelectedIndex;
-        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true);
+        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true);
         Results.Children.Add(new TextBlock
         {
             Text = $"Requested target: {selection.RustTarget} | Features: {string.Join(", ", selection.Features)}",
