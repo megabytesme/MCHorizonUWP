@@ -13,6 +13,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.applicationmodel.core.h>
 #include <windows.data.json.h>
 #include <windows.data.xml.dom.h>
+#include <windows.devices.sensors.h>
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
 #include <windows.graphics.imaging.h>
@@ -30,6 +31,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.ui.xaml.h>
 #include <windows.ui.xaml.input.h>
 #include <windows.ui.xaml.controls.h>
+#include <windows.ui.xaml.controls.primitives.h>
 #include <windows.ui.xaml.markup.h>
 #include <windows.ui.xaml.media.h>
 #include <windows.ui.xaml.media.imaging.h>
@@ -64,6 +66,7 @@ using namespace Windows::UI::ViewManagement;
 using namespace Windows::UI::Notifications;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
+using namespace Windows::UI::Xaml::Controls::Primitives;
 using namespace Windows::UI::Xaml::Input;
 using namespace Windows::UI::Xaml::Media;
 using namespace Windows::UI::Xaml::Media::Imaging;
@@ -82,6 +85,9 @@ extern "C" size_t __cdecl horizon_uwp_upstream_release(unsigned char*, size_t);
 extern "C" size_t __cdecl horizon_uwp_upstream_ref(unsigned char*, size_t);
 extern "C" size_t __cdecl horizon_uwp_port_ref(unsigned char*, size_t);
 extern "C" int __cdecl horizon_uwp_probe_renderer(void*, unsigned, unsigned, unsigned);
+#ifdef HORIZON_UWP_TOUCH_MOD
+extern "C" int __cdecl horizon_uwp_gyro_available();
+#endif
 
 namespace {
 #ifdef HORIZON_UWP_SHELL_PROBE
@@ -119,6 +125,14 @@ unsigned displayed_generation = 0;
 bool renderer_known = false;
 bool renderer_available = false;
 TextBlock^ renderer_status;
+#ifdef HORIZON_UWP_TOUCH_MOD
+std::mutex gyro_settings_mutex;
+bool gyro_supported = false;
+bool gyro_enabled = false;
+double gyro_sensitivity = 1.0;
+double touch_sensitivity = 1.0;
+double touch_control_scale = 1.0;
+#endif
 
 int probe_native_renderer(CoreWindow^ window) {
     if (!window) return 0;
@@ -1118,6 +1132,84 @@ void refresh() {
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
+#ifdef HORIZON_UWP_TOUCH_MOD
+        auto touch_card = ref new StackPanel();
+        touch_card->Children->Append(text(L"Touch controls", 18));
+        auto gyro = ref new ToggleSwitch();
+        gyro->Header = L"Gyroscope aiming";
+        gyro->OnContent = L"On";
+        gyro->OffContent = L"Off";
+        gyro->IsOn = gyro_enabled;
+        gyro->IsEnabled = gyro_supported;
+        auto gyro_sensitivity_slider = ref new Slider();
+        gyro_sensitivity_slider->Minimum = 0.25;
+        gyro_sensitivity_slider->Maximum = 3.0;
+        gyro_sensitivity_slider->StepFrequency = 0.05;
+        gyro_sensitivity_slider->Value = gyro_sensitivity;
+        gyro_sensitivity_slider->IsEnabled = gyro_supported && gyro_enabled;
+        touch_card->Children->Append(gyro);
+        touch_card->Children->Append(text(gyro_supported
+            ? L"Turn the device to aim while playing. This uses the device gyrometer, not a controller sensor."
+            : L"This device does not report a gyrometer.", 14));
+        touch_card->Children->Append(text(L"Gyroscope sensitivity", 14));
+        touch_card->Children->Append(gyro_sensitivity_slider);
+        gyro->Toggled += ref new RoutedEventHandler([gyro, gyro_sensitivity_slider](Platform::Object^, RoutedEventArgs^) {
+            bool enabled = false;
+            {
+                std::lock_guard<std::mutex> guard(gyro_settings_mutex);
+                gyro_enabled = gyro->IsOn && gyro_supported;
+                enabled = gyro_enabled;
+            }
+            gyro_sensitivity_slider->IsEnabled = enabled;
+            ApplicationData::Current->LocalSettings->Values->Insert(
+                L"touch-gyro-enabled", PropertyValue::CreateBoolean(enabled));
+        });
+        gyro_sensitivity_slider->ValueChanged += ref new RangeBaseValueChangedEventHandler(
+            [gyro_sensitivity_slider](Platform::Object^, RangeBaseValueChangedEventArgs^) {
+                const double value = std::clamp(gyro_sensitivity_slider->Value, 0.25, 3.0);
+                {
+                    std::lock_guard<std::mutex> guard(gyro_settings_mutex);
+                    gyro_sensitivity = value;
+                }
+                ApplicationData::Current->LocalSettings->Values->Insert(
+                    L"touch-gyro-sensitivity", PropertyValue::CreateDouble(value));
+            });
+        auto look_sensitivity = ref new Slider();
+        look_sensitivity->Minimum = 0.25;
+        look_sensitivity->Maximum = 3.0;
+        look_sensitivity->StepFrequency = 0.05;
+        look_sensitivity->Value = touch_sensitivity;
+        touch_card->Children->Append(text(L"Touch look sensitivity", 14));
+        touch_card->Children->Append(look_sensitivity);
+        look_sensitivity->ValueChanged += ref new RangeBaseValueChangedEventHandler(
+            [look_sensitivity](Platform::Object^, RangeBaseValueChangedEventArgs^) {
+                const double value = std::clamp(look_sensitivity->Value, 0.25, 3.0);
+                {
+                    std::lock_guard<std::mutex> guard(gyro_settings_mutex);
+                    touch_sensitivity = value;
+                }
+                ApplicationData::Current->LocalSettings->Values->Insert(
+                    L"touch-look-sensitivity", PropertyValue::CreateDouble(value));
+            });
+        auto control_size = ref new Slider();
+        control_size->Minimum = 0.6;
+        control_size->Maximum = 1.5;
+        control_size->StepFrequency = 0.05;
+        control_size->Value = touch_control_scale;
+        touch_card->Children->Append(text(L"Touch control size", 14));
+        touch_card->Children->Append(control_size);
+        control_size->ValueChanged += ref new RangeBaseValueChangedEventHandler(
+            [control_size](Platform::Object^, RangeBaseValueChangedEventArgs^) {
+                const double value = std::clamp(control_size->Value, 0.6, 1.5);
+                {
+                    std::lock_guard<std::mutex> guard(gyro_settings_mutex);
+                    touch_control_scale = value;
+                }
+                ApplicationData::Current->LocalSettings->Values->Insert(
+                    L"touch-control-size", PropertyValue::CreateDouble(value));
+            });
+        panel->Children->Append(card(touch_card));
+#endif
         auto tile_card = ref new StackPanel();
         tile_card->Children->Append(text(L"Live tile", 18));
         auto tile_modes = ref new ComboBox(); tile_modes->Header = L"Show on the Start tile";
@@ -1235,6 +1327,40 @@ protected:
         ui_settings = ref new UISettings();
         accessibility = ref new AccessibilitySettings();
         auto values = ApplicationData::Current->LocalSettings->Values;
+#ifdef HORIZON_UWP_TOUCH_MOD
+        bool saved_gyro_enabled = false;
+        double saved_gyro_sensitivity = 1.0;
+        double saved_touch_sensitivity = 1.0;
+        double saved_touch_control_size = 1.0;
+        const bool supports_gyro = horizon_uwp_gyro_available() != 0;
+        if (values->HasKey(L"touch-gyro-enabled")) {
+            try { saved_gyro_enabled = safe_cast<IPropertyValue^>(values->Lookup(L"touch-gyro-enabled"))->GetBoolean(); }
+            catch (Platform::Exception^) {}
+        }
+        if (values->HasKey(L"touch-gyro-sensitivity")) {
+            try { saved_gyro_sensitivity = safe_cast<IPropertyValue^>(values->Lookup(L"touch-gyro-sensitivity"))->GetDouble(); }
+            catch (Platform::Exception^) {}
+        }
+        if (values->HasKey(L"touch-look-sensitivity")) {
+            try { saved_touch_sensitivity = safe_cast<IPropertyValue^>(values->Lookup(L"touch-look-sensitivity"))->GetDouble(); }
+            catch (Platform::Exception^) {}
+        }
+        if (values->HasKey(L"touch-control-size")) {
+            try { saved_touch_control_size = safe_cast<IPropertyValue^>(values->Lookup(L"touch-control-size"))->GetDouble(); }
+            catch (Platform::Exception^) {}
+        }
+        if (!std::isfinite(saved_gyro_sensitivity)) saved_gyro_sensitivity = 1.0;
+        if (!std::isfinite(saved_touch_sensitivity)) saved_touch_sensitivity = 1.0;
+        if (!std::isfinite(saved_touch_control_size)) saved_touch_control_size = 1.0;
+        {
+            std::lock_guard<std::mutex> guard(gyro_settings_mutex);
+            gyro_supported = supports_gyro;
+            gyro_enabled = saved_gyro_enabled && supports_gyro;
+            gyro_sensitivity = std::clamp(saved_gyro_sensitivity, 0.25, 3.0);
+            touch_sensitivity = std::clamp(saved_touch_sensitivity, 0.25, 3.0);
+            touch_control_scale = std::clamp(saved_touch_control_size, 0.6, 1.5);
+        }
+#endif
         auto saved = values->HasKey(L"pregame-theme") ? values->Lookup(L"pregame-theme") : nullptr;
         int stored = 0;
         if (saved) { try { stored = safe_cast<IPropertyValue^>(saved)->GetInt32(); } catch (Platform::Exception^) {} }
@@ -1374,6 +1500,21 @@ protected:
     }
 };
 }
+
+#ifdef HORIZON_UWP_TOUCH_MOD
+extern "C" int __cdecl horizon_uwp_touch_settings(
+    int* enabled, float* gyro, float* touch, float* control_scale) {
+    if (enabled == nullptr || gyro == nullptr || touch == nullptr || control_scale == nullptr) return 0;
+    try {
+        std::lock_guard<std::mutex> guard(gyro_settings_mutex);
+        *enabled = gyro_enabled && gyro_supported ? 1 : 0;
+        *gyro = static_cast<float>(std::clamp(gyro_sensitivity, 0.25, 3.0));
+        *touch = static_cast<float>(std::clamp(touch_sensitivity, 0.25, 3.0));
+        *control_scale = static_cast<float>(std::clamp(touch_control_scale, 0.6, 1.5));
+        return 1;
+    } catch (...) { return 0; }
+}
+#endif
 
 extern "C" int __cdecl horizon_uwp_dialog_show(const unsigned char* bytes, size_t length, unsigned kind) {
     try {

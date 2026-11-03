@@ -48,6 +48,10 @@ extern "C" void __cdecl horizon_uwp_attach_shell(Windows::UI::Core::CoreWindow^ 
 #endif
 static HorizonUwpEvent pending_events[4096];
 static uint32_t event_read, event_write;
+#ifdef HORIZON_UWP_TOUCH_MOD
+extern "C" int __cdecl horizon_uwp_gyro_enable(int enabled);
+extern "C" void __cdecl horizon_uwp_gyro_set_visible(int visible);
+#endif
 
 static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
 #ifdef HORIZON_UWP_ACCOUNT
@@ -416,11 +420,18 @@ private:
 #endif
     }
     void Closed(CoreWindow^, CoreWindowEventArgs^) { closed_ = true;
+#ifdef HORIZON_UWP_TOUCH_MOD
+        horizon_uwp_gyro_set_visible(0);
+        horizon_uwp_gyro_enable(0);
+#endif
 #ifdef HORIZON_UWP_ACCOUNT
         account_window_closed.store(true);
 #endif
     }
     void VisibilityChanged(CoreWindow^, VisibilityChangedEventArgs^ args) { visible_ = args->Visible;
+#ifdef HORIZON_UWP_TOUCH_MOD
+        horizon_uwp_gyro_set_visible(args->Visible ? 1 : 0);
+#endif
 #ifdef HORIZON_UWP_ACCOUNT
         account_window_visible.store(args->Visible);
 #endif

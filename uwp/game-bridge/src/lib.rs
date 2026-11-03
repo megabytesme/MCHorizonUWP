@@ -77,6 +77,69 @@ unsafe extern "C" {
     fn horizon_uwp_discard_pregame_input();
 }
 
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    feature = "native-touch-mod"
+))]
+unsafe extern "C" {
+    fn horizon_uwp_touch_settings(
+        gyro_enabled: *mut i32,
+        gyro_sensitivity: *mut f32,
+        touch_sensitivity: *mut f32,
+        control_scale: *mut f32,
+    ) -> i32;
+}
+
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    feature = "native-touch-mod"
+))]
+fn save_touch_settings(game_dir: &std::path::Path) -> Result<(), std::io::Error> {
+    let (mut enabled, mut gyro_sensitivity, mut touch_sensitivity, mut control_scale) =
+        (0, 1.0, 1.0, 1.0);
+    if unsafe {
+        horizon_uwp_touch_settings(
+            &mut enabled,
+            &mut gyro_sensitivity,
+            &mut touch_sensitivity,
+            &mut control_scale,
+        )
+    } == 0
+    {
+        return Err(std::io::Error::other("touch settings were unavailable"));
+    }
+    std::fs::create_dir_all(game_dir)?;
+    std::fs::write(
+        game_dir.join("touch-settings.txt"),
+        format!(
+            "gyro_enabled={}\ngyro_sensitivity={gyro_sensitivity:.2}\ntouch_sensitivity={touch_sensitivity:.2}\ncontrol_scale={control_scale:.2}\n",
+            u8::from(enabled != 0)
+        ),
+    )
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+unsafe extern "C" {
+    fn horizon_uwp_gyro_enable(enabled: i32) -> i32;
+    fn horizon_uwp_gyro_take(x: *mut f32, y: *mut f32, rotation: *mut i32) -> i32;
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+fn enable_touch_gyro(enabled: bool) -> bool {
+    unsafe { horizon_uwp_gyro_enable(i32::from(enabled)) != 0 }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+fn take_touch_gyro() -> Option<(f32, f32, i32)> {
+    let (mut x, mut y, mut rotation) = (0.0, 0.0, 0);
+    (unsafe { horizon_uwp_gyro_take(&mut x, &mut y, &mut rotation) != 0 }
+        && x.is_finite()
+        && y.is_finite())
+    .then_some((x, y, rotation))
+}
+
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_probe_renderer(
@@ -201,6 +264,11 @@ pub unsafe extern "C" fn horizon_uwp_prepare(game_dir: *const u16, game_dir_len:
     configure_isolated_test(&game_dir);
     match xaml_pregame::start() {
         Some(session) => {
+            #[cfg(feature = "native-touch-mod")]
+            if save_touch_settings(&game_dir).is_err() {
+                report_failure("Horizon could not save the touch-control settings.");
+                return -1;
+            }
             let mut slot = PREPARED_SESSION
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -265,6 +333,8 @@ unsafe fn run(
     let game_dir = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
     let resources = PathBuf::from(std::ffi::OsString::from_wide(resources));
     let game_dir = PathBuf::from(std::ffi::OsString::from_wide(game_dir));
+    #[cfg(feature = "native-touch-mod")]
+    horizon_client::game::install_touch_gyro_adapter(enable_touch_gyro, take_touch_gyro);
     // The shell does this before starting its account worker. The legacy host
     // reaches it here before starting any game or account worker threads.
     if !prepared {

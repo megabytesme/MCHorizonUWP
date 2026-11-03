@@ -23,6 +23,7 @@ set "PROBE_DEFINE="
 if defined HORIZON_UWP_SHELL_PROBE set "PROBE_DEFINE=/DHORIZON_UWP_SHELL_PROBE"
 if defined HORIZON_UWP_NATIVE_D3D11 set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_NATIVE_D3D11"
 if defined HORIZON_UWP_DX12 set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_DX12"
+if defined HORIZON_UWP_TOUCH_MOD set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_TOUCH_MOD"
 rem The caller may already be in a different Visual Studio environment. Reset
 rem only this child process so the ARM32 compiler and 16299 SDK can be selected.
 set "VSCMD_VER="

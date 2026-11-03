@@ -330,6 +330,10 @@ mod tnt;
 mod totem;
 #[cfg(any(target_vendor = "uwp", test))]
 mod touch;
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+pub fn install_touch_gyro_adapter(enable: fn(bool) -> bool, take: fn() -> Option<(f32, f32, i32)>) {
+    touch::install_gyro_adapter(enable, take);
+}
 mod trading;
 mod transient_blocks;
 mod trial_spawner;
@@ -15702,6 +15706,8 @@ impl Game<'_> {
         } else {
             Vec::new()
         };
+        #[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+        self.touch_gyro_frame();
         let mut hud = horizon_client::spans::time("hud", || self.hud(size));
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         if self.title.is_none()

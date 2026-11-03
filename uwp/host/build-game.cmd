@@ -45,6 +45,7 @@ if defined HORIZON_UWP_FRAME_PROBE set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UW
 if defined HORIZON_UWP_ACCOUNT set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_ACCOUNT"
 if defined HORIZON_UWP_XAML_SHELL set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_XAML_SHELL"
 if defined HORIZON_UWP_NATIVE_D3D11 set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_NATIVE_D3D11"
+if defined HORIZON_UWP_TOUCH_MOD set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_TOUCH_MOD"
 if defined HORIZON_UWP_DX12 set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_DX12"
 pushd "%OUTDIR%"
 cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /DHORIZON_UWP_GAME_BRIDGE %FRAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" /I"%OUTDIR%" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" "%~dp0..\window-bridge\CoreWindowEvents.cpp"
@@ -59,6 +60,10 @@ if defined HORIZON_UWP_HTTP (
 )
 if defined HORIZON_UWP_GAMEPAD (
     cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\gamepad-bridge\host\Gamepad.cpp"
+    if errorlevel 1 (popd & exit /b 1)
+)
+if defined HORIZON_UWP_TOUCH_MOD (
+    cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\gyro-bridge\host\Gyrometer.cpp"
     if errorlevel 1 (popd & exit /b 1)
 )
 cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\network-bridge\host\Srv.cpp"

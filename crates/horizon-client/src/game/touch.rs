@@ -9,6 +9,27 @@ use horizon_touch_native as touch_module;
 use std::collections::HashMap;
 use winit::event::{Touch, TouchPhase, WindowEvent};
 
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+pub(super) type GyroEnable = fn(bool) -> bool;
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+pub(super) type GyroTake = fn() -> Option<(f32, f32, i32)>;
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+static GYRO_ADAPTER: std::sync::Mutex<Option<(GyroEnable, GyroTake)>> = std::sync::Mutex::new(None);
+
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+pub(super) fn install_gyro_adapter(enable: GyroEnable, take: GyroTake) {
+    *GYRO_ADAPTER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some((enable, take));
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+fn gyro_adapter() -> Option<(GyroEnable, GyroTake)> {
+    *GYRO_ADAPTER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Button {
     Jump,
@@ -67,6 +88,18 @@ pub(super) struct TouchControls {
         feature = "native-touch-mod"
     ))]
     release_after_failure: bool,
+    #[cfg(all(
+        any(target_vendor = "uwp", test),
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
+    gyro_requested: bool,
+    #[cfg(all(
+        any(target_vendor = "uwp", test),
+        feature = "native-d3d11",
+        feature = "native-touch-mod"
+    ))]
+    gyro_active: bool,
     #[cfg(all(any(target_vendor = "uwp", test), feature = "native-d3d11"))]
     pub(super) inventory_visible: bool,
 }
@@ -78,7 +111,7 @@ impl Default for TouchControls {
             feature = "native-d3d11",
             feature = "native-touch-mod"
         ))]
-        let module = Some(touch_module::TouchModule::new());
+        let module = Some(create_touch_module());
         Self {
             contacts: HashMap::new(),
             primary: None,
@@ -104,10 +137,45 @@ impl Default for TouchControls {
                 feature = "native-touch-mod"
             ))]
             release_after_failure: false,
+            #[cfg(all(
+                any(target_vendor = "uwp", test),
+                feature = "native-d3d11",
+                feature = "native-touch-mod"
+            ))]
+            gyro_requested: false,
+            #[cfg(all(
+                any(target_vendor = "uwp", test),
+                feature = "native-d3d11",
+                feature = "native-touch-mod"
+            ))]
+            gyro_active: false,
             #[cfg(all(any(target_vendor = "uwp", test), feature = "native-d3d11"))]
             inventory_visible: false,
         }
     }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "native-touch-mod"))]
+fn create_touch_module() -> touch_module::TouchModule {
+    let mut module = touch_module::TouchModule::new();
+    let home = horizon_client::logging::game_home();
+    let path = home.join("touch-settings.txt");
+    let saved = std::fs::read_to_string(path)
+        .or_else(|_| std::fs::read_to_string(home.join("touch-gyro-settings.txt")));
+    if let Ok(saved) = saved {
+        if let Some(settings) = touch_module::GyroSettings::parse(&saved) {
+            module.set_gyro_settings(settings);
+        }
+        if let Some(settings) = touch_module::TouchSettings::parse(&saved) {
+            module.set_touch_settings(settings);
+        }
+    }
+    module
+}
+
+#[cfg(all(not(target_vendor = "uwp"), test, feature = "native-touch-mod"))]
+fn create_touch_module() -> touch_module::TouchModule {
+    touch_module::TouchModule::new()
 }
 
 fn layout(size: [f32; 2]) -> (f32, [(Button, [f32; 2]); 9], [f32; 2]) {
@@ -156,7 +224,9 @@ impl TouchControls {
         self.suppressed = 0;
         self.movement = None;
         self.release_after_failure = false;
-        self.module = enabled.then(touch_module::TouchModule::new);
+        self.gyro_active = false;
+        self.gyro_requested = false;
+        self.module = enabled.then(create_touch_module);
         if enabled {
             Vec::new()
         } else {
@@ -530,6 +600,50 @@ impl TouchControls {
 
 #[cfg(target_vendor = "uwp")]
 impl super::Game<'_> {
+    #[cfg(feature = "native-touch-mod")]
+    pub(super) fn touch_gyro_frame(&mut self) {
+        let settings = self
+            .touch
+            .module
+            .as_ref()
+            .map(touch_module::TouchModule::gyro_settings)
+            .unwrap_or_default();
+        let wanted = self.touch.mod_enabled
+            && settings.enabled
+            && self.title.is_none()
+            && self.screen == super::Screen::Playing
+            && self.player.is_some();
+
+        if wanted != self.touch.gyro_requested {
+            self.touch.gyro_requested = wanted;
+            // A missing or disabled device sensor simply leaves touch look available.
+            self.touch.gyro_active =
+                gyro_adapter().is_some_and(|(enable, _)| enable(wanted) && wanted);
+            if wanted && !self.touch.gyro_active {
+                log::info!("Horizon: no gyrometer is available for touch aiming");
+            }
+        }
+        if !self.touch.gyro_active {
+            return;
+        }
+
+        let Some((x, y, rotation)) = gyro_adapter().and_then(|(_, take)| take()) else {
+            return;
+        };
+        if !x.is_finite() || !y.is_finite() {
+            return;
+        }
+        let [yaw, pitch] = touch_module::gyro_turn([x, y], rotation);
+        if !yaw.is_finite() || !pitch.is_finite() {
+            return;
+        }
+        let sensitivity = settings.sensitivity.clamp(0.25, 3.0);
+        self.turn_player(
+            f64::from(yaw.clamp(-45.0, 45.0) / 0.15 * sensitivity),
+            f64::from(pitch.clamp(-45.0, 45.0) / 0.15 * sensitivity),
+        );
+    }
+
     pub(super) fn touch_event(&mut self, touch: Touch) {
         #[cfg(all(feature = "native-d3d11", feature = "native-touch-mod"))]
         self.sync_touch_mod();

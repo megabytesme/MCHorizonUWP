@@ -4,8 +4,11 @@ This desktop WinUI 3 preview checks a small set of build prerequisites and
 records a target, renderer build, and optional native touch and device-vibration
 source-mod selections.
 The latter has its own in-game setting, separate from controller vibration.
-The touch selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
-on a Lumia in its separate branch. The local recipe builds from a pinned source
+The touch selection maps to the `native-touch-mod` Cargo feature and includes
+touch-look sensitivity and on-screen control-size sliders, plus optional
+gyroscope aiming when the device exposes a Windows gyrometer. Gyro aiming is
+off by default and is separate from controller input. The touch mod has been
+tested on a Lumia in its separate branch. The local recipe builds from a pinned source
 snapshot and links to official setup instructions for
 missing tools. On request it can invoke the system Windows Package Manager for
 fixed Rustup, Git and Python packages, with interactive license/elevation prompts and normal
