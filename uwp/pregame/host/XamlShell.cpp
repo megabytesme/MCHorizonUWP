@@ -13,6 +13,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.applicationmodel.core.h>
 #include <windows.data.json.h>
 #include <windows.foundation.metadata.h>
+#include <windows.graphics.display.h>
 #include <windows.graphics.imaging.h>
 #include <windows.storage.h>
 #include <windows.storage.streams.h>
@@ -34,6 +35,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <wrl/client.h>
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -42,6 +44,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 using namespace Windows::ApplicationModel::Activation;
 using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Foundation;
+using namespace Windows::Graphics::Display;
 using namespace Windows::Graphics::Imaging;
 
 using namespace Windows::Storage;
@@ -67,6 +70,7 @@ extern "C" int __cdecl horizon_uwp_prepare(const uint16_t*, size_t);
 extern "C" int __cdecl horizon_uwp_pick_files(const wchar_t*, size_t, unsigned);
 extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsigned);
 extern "C" size_t __cdecl horizon_uwp_release_label(unsigned char*, size_t);
+extern "C" int __cdecl horizon_uwp_probe_renderer(void*, unsigned, unsigned, unsigned);
 
 namespace {
 #ifdef HORIZON_UWP_SHELL_PROBE
@@ -164,6 +168,8 @@ Platform::String^ installed_release() {
 Platform::String^ renderer_label() {
 #ifdef HORIZON_UWP_NATIVE_D3D11
     return L"Direct3D 11 (native, feature level 9_1)";
+#elif defined(HORIZON_UWP_DX12)
+    return L"Direct3D 12 (WGPU)";
 #else
     return L"OpenGL ES 3.0 (ANGLE)";
 #endif
@@ -834,7 +840,7 @@ void refresh() {
         renderers->SelectedIndex = 0;
         launch_card->Children->Append(renderers);
         renderer_status = text(renderer_known
-            ? (renderer_available ? L"The client opened the renderer and presentation surface used by this build." : L"The client could not open a compatible graphics device on this device.")
+            ? (renderer_available ? L"The client configured and presented through this renderer on this device." : L"The client could not open a compatible graphics device and presentation surface on this device.")
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
@@ -1049,7 +1055,22 @@ protected:
         renderer_available = probe_native_renderer(CoreWindow::GetForCurrentThread()) != 0;
         if (!renderer_available)
             show_message(L"Graphics compatibility", L"This device could not open Horizon's native Direct3D 11 feature level 9_1 renderer.");
+#else
+        renderer_known = true;
+#ifdef HORIZON_UWP_DX12
+        constexpr unsigned renderer_backend = 2;
+#else
+        constexpr unsigned renderer_backend = 1;
 #endif
+        auto coreWindow = CoreWindow::GetForCurrentThread();
+        auto bounds = coreWindow->Bounds;
+        const double scale = DisplayInformation::GetForCurrentView()->RawPixelsPerViewPixel;
+        const auto width = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Width * scale)));
+        const auto height = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Height * scale)));
+        renderer_available = horizon_uwp_probe_renderer(
+            reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(coreWindow)), renderer_backend, width, height) != 0;
+#endif
+        if (prompt_kind == 0) refresh();
         ThreadPool::RunAsync(ref new WorkItemHandler([](IAsyncAction^) {
             PROBE_STAGE(L"Worker started");
             auto local = ApplicationData::Current->LocalFolder->Path;
@@ -1117,16 +1138,6 @@ extern "C" void __cdecl horizon_uwp_page_skin(const unsigned char* bytes, size_t
 }
 extern "C" void __cdecl horizon_uwp_page_accounts(const unsigned char* bytes, size_t length) {
     try { account_labels = decode(bytes, length); } catch (...) { account_labels = nullptr; }
-}
-extern "C" void __cdecl horizon_uwp_page_renderer(int supported) {
-    try {
-        if (dispatcher) dispatcher->RunAsync(CoreDispatcherPriority::Normal,
-            ref new DispatchedHandler([supported]() {
-                renderer_known = true;
-                renderer_available = supported != 0;
-                if (prompt_kind == 0) refresh();
-            }));
-    } catch (...) {}
 }
 extern "C" size_t __cdecl horizon_uwp_dialog_text(unsigned char* buffer, size_t capacity) {
     const size_t length = offline_input.size();

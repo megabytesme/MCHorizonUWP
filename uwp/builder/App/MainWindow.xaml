@@ -25,12 +25,13 @@
       <ComboBoxItem Content="Windows 10 Mobile (ARM32, 15063)" />
     </ComboBox>
     <TextBlock Text="Renderer build" Style="{StaticResource BodyStrongTextBlockStyle}" />
-    <ComboBox x:Name="Renderer" SelectedIndex="0" HorizontalAlignment="Stretch">
+    <ComboBox x:Name="Renderer" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="Renderer_SelectionChanged">
       <ComboBoxItem Content="Native Direct3D 11 (feature level 9_1)" />
       <ComboBoxItem Content="ANGLE (OpenGL ES 3.0)" />
+      <ComboBoxItem Content="Direct3D 12 (WGPU)" />
     </ComboBox>
-    <TextBlock Text="The client probes the selected renderer and presentation surface at runtime. It only enables Start game when the built renderer can open on that device." TextWrapping="Wrap" />
-    <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" IsChecked="True" />
+    <TextBlock Text="Renderer build choices reflect the backends and runtime DLLs available for each architecture. The client probes the selected renderer against the live presentation surface on launch and only enables Start game when it opens on that device." TextWrapping="Wrap" />
+    <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls (native Direct3D 11 renderer only)" IsChecked="True" />
     <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration as a separate native mod" IsChecked="True" />
     <TextBlock Text="Microsoft application (client) ID — defaults to Fluent Launcher’s public ID; replace it with yours when approved" TextWrapping="Wrap" />
     <TextBox x:Name="MicrosoftClientId" PlaceholderText="00000000-0000-0000-0000-000000000000" />

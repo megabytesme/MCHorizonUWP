@@ -1,13 +1,14 @@
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
 
 use parking_lot::RwLock;
 use windows::Win32::{Foundation, Graphics::Dxgi};
+use windows::core::{IUnknown, Interface};
 
 use super::SurfaceTarget;
 use crate::{
     auxil,
     dx12::{
-        device_creation::DeviceFactory, shader_compilation::CompilerContainer, D3D12Lib, DCompLib,
+        D3D12Lib, DCompLib, device_creation::DeviceFactory, shader_compilation::CompilerContainer,
     },
 };
 
@@ -136,6 +137,24 @@ impl crate::Instance for super::Instance {
             raw_window_handle::RawDisplayHandle::Windows(_)
         ));
         match window_handle {
+            raw_window_handle::RawWindowHandle::WinRt(handle) => {
+                let raw_core_window = handle.core_window.as_ptr();
+                let core_window = unsafe { IUnknown::from_raw_borrowed(&raw_core_window) }
+                    .ok_or_else(|| {
+                        crate::InstanceError::new("UWP CoreWindow handle is null".into())
+                    })?
+                    .to_owned();
+
+                Ok(super::Surface {
+                    factory: self.factory.clone(),
+                    factory_media: self.factory_media.clone(),
+                    target: SurfaceTarget::CoreWindow(core_window),
+                    supports_allow_tearing: self.supports_allow_tearing,
+                    swap_chain: RwLock::new(None),
+                    options: self.options.clone(),
+                    hdr_source: None,
+                })
+            }
             raw_window_handle::RawWindowHandle::Win32(handle) => {
                 // https://github.com/rust-windowing/raw-window-handle/issues/171
                 let handle = Foundation::HWND(handle.hwnd.get() as *mut _);

@@ -16,24 +16,6 @@ mod xaml_pregame;
 static PREPARED_SESSION: std::sync::Mutex<Option<xaml_pregame::Selection>> =
     std::sync::Mutex::new(None);
 
-#[cfg(all(
-    target_vendor = "uwp",
-    feature = "xaml-shell",
-    not(feature = "native-d3d11")
-))]
-fn uwp_renderer_available() -> bool {
-    let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
-    descriptor.backends = wgpu::Backends::GL;
-    let instance = wgpu::Instance::new(descriptor);
-    pollster::block_on(instance.enumerate_adapters(wgpu::Backends::GL))
-        .into_iter()
-        .any(|adapter| {
-            adapter.get_info().backend == wgpu::Backend::Gl
-                && pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-                    .is_ok()
-        })
-}
-
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn horizon_uwp_release_label(buffer: *mut u8, capacity: usize) -> usize {
@@ -56,12 +38,71 @@ unsafe extern "C" {
     fn horizon_uwp_is_ui_thread() -> i32;
     fn horizon_uwp_pump_events();
     fn horizon_uwp_is_local_test() -> i32;
-    #[cfg(all(feature = "xaml-shell", not(feature = "native-d3d11")))]
-    fn horizon_uwp_page_renderer(supported: i32);
     #[cfg(feature = "uwp-account")]
     fn horizon_uwp_discard_pregame_input();
 }
 
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_probe_renderer(
+    core_window: *mut std::ffi::c_void,
+    renderer: u32,
+    width: u32,
+    height: u32,
+) -> i32 {
+    install_panic_reporter();
+    let Some(core_window) = std::ptr::NonNull::new(core_window) else {
+        return 0;
+    };
+    let (backend, expected_backend) = match renderer {
+        1 => (wgpu::Backends::GL, wgpu::Backend::Gl),
+        2 => (wgpu::Backends::DX12, wgpu::Backend::Dx12),
+        _ => return 0,
+    };
+    let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+    descriptor.backends = backend;
+    let instance = wgpu::Instance::new(descriptor);
+    let target = wgpu::SurfaceTargetUnsafe::RawHandle {
+        raw_display_handle: Some(raw_window_handle::RawDisplayHandle::Windows(
+            raw_window_handle::WindowsDisplayHandle::new(),
+        )),
+        raw_window_handle: raw_window_handle::RawWindowHandle::WinRt(
+            raw_window_handle::WinRtWindowHandle::new(core_window),
+        ),
+    };
+    let Ok(surface) = (unsafe { instance.create_surface_unsafe(target) }) else {
+        return 0;
+    };
+    let Ok(adapter) = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        compatible_surface: Some(&surface),
+        ..Default::default()
+    })) else {
+        return 0;
+    };
+    if adapter.get_info().backend != expected_backend {
+        return 0;
+    }
+    let limits = adapter.limits();
+    let Ok((device, queue)) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        required_limits: limits,
+        ..Default::default()
+    })) else {
+        return 0;
+    };
+    device.on_uncaptured_error(std::sync::Arc::new(|_| {}));
+    let Some(configuration) = surface.get_default_config(&adapter, width.max(1), height.max(1))
+    else {
+        return 0;
+    };
+    surface.configure(&device, &configuration);
+    let frame = match surface.get_current_texture() {
+        wgpu::CurrentSurfaceTexture::Success(frame)
+        | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
+        _ => return 0,
+    };
+    queue.present(frame);
+    1
+}
 #[cfg(target_vendor = "uwp")]
 fn report_failure(message: &str) {
     use std::time::{Duration, Instant};
@@ -120,8 +161,6 @@ pub unsafe extern "C" fn horizon_uwp_prepare(game_dir: *const u16, game_dir_len:
         return -1;
     }
     install_panic_reporter();
-    #[cfg(not(feature = "native-d3d11"))]
-    unsafe { horizon_uwp_page_renderer(i32::from(uwp_renderer_available())) };
     let game_dir = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
     let game_dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(game_dir));
     configure_isolated_test(&game_dir);
@@ -159,6 +198,14 @@ pub unsafe extern "C" fn horizon_uwp_run_prepared(
     game_dir: *const u16,
     game_dir_len: usize,
 ) -> i32 {
+    #[cfg(feature = "uwp-dx12-renderer")]
+    unsafe {
+        std::env::set_var("WGPU_BACKEND", "dx12")
+    };
+    #[cfg(all(not(feature = "uwp-dx12-renderer"), not(feature = "native-d3d11")))]
+    unsafe {
+        std::env::set_var("WGPU_BACKEND", "gl")
+    };
     unsafe { run(resources, resources_len, game_dir, game_dir_len, true) }
 }
 

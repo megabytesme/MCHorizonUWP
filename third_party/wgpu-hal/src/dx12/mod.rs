@@ -621,6 +621,7 @@ struct SwapChain {
 enum SurfaceTarget {
     /// Borrowed, lifetime externally managed
     WndHandle(Foundation::HWND),
+    CoreWindow(windows::core::IUnknown),
     /// `handle` is borrowed, lifetime externally managed
     VisualFromWndHandle {
         handle: Foundation::HWND,
@@ -1545,11 +1546,15 @@ impl crate::Surface for Surface {
                     },
                     BufferUsage: Dxgi::DXGI_USAGE_RENDER_TARGET_OUTPUT,
                     BufferCount: swap_chain_buffer,
-                    Scaling: Dxgi::DXGI_SCALING_STRETCH,
+                    Scaling: if matches!(&self.target, SurfaceTarget::CoreWindow(_)) {
+                        Dxgi::DXGI_SCALING_NONE
+                    } else {
+                        Dxgi::DXGI_SCALING_STRETCH
+                    },
                     SwapEffect: Dxgi::DXGI_SWAP_EFFECT_FLIP_DISCARD,
                     Flags: flags.0 as u32,
                 };
-                let swap_chain1 = match self.target {
+                let swap_chain1 = match &self.target {
                     SurfaceTarget::Visual(_)
                     | SurfaceTarget::VisualFromWndHandle { .. }
                     | SurfaceTarget::SwapChainPanel(_) => {
@@ -1572,10 +1577,21 @@ impl crate::Surface for Surface {
                                 .ok_or(crate::SurfaceError::Other("IDXGIFactoryMedia not found"))?
                                 .CreateSwapChainForCompositionSurfaceHandle(
                                     &device.present_queue,
-                                    Some(handle),
+                                    Some(*handle),
                                     &desc,
                                     None,
                                 )
+                        }
+                    }
+                    SurfaceTarget::CoreWindow(core_window) => {
+                        profiling::scope!("IDXGIFactory2::CreateSwapChainForCoreWindow");
+                        unsafe {
+                            self.factory.CreateSwapChainForCoreWindow(
+                                &device.present_queue,
+                                core_window,
+                                &desc,
+                                None,
+                            )
                         }
                     }
                     SurfaceTarget::WndHandle(hwnd) => {
@@ -1583,7 +1599,7 @@ impl crate::Surface for Surface {
                         unsafe {
                             self.factory.CreateSwapChainForHwnd(
                                 &device.present_queue,
-                                hwnd,
+                                *hwnd,
                                 &desc,
                                 None,
                                 None,
@@ -1598,7 +1614,9 @@ impl crate::Surface for Surface {
                 })?;
 
                 match &self.target {
-                    SurfaceTarget::WndHandle(_) | SurfaceTarget::SurfaceHandle(_) => {}
+                    SurfaceTarget::WndHandle(_)
+                    | SurfaceTarget::CoreWindow(_)
+                    | SurfaceTarget::SurfaceHandle(_) => {}
                     SurfaceTarget::VisualFromWndHandle {
                         handle,
                         dcomp_state,
@@ -1683,6 +1701,7 @@ impl crate::Surface for Surface {
             SurfaceTarget::Visual(_)
             | SurfaceTarget::VisualFromWndHandle { .. }
             | SurfaceTarget::SurfaceHandle(_)
+            | SurfaceTarget::CoreWindow(_)
             | SurfaceTarget::SwapChainPanel(_) => {}
         }
 

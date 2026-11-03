@@ -1481,6 +1481,7 @@ dependencies = [
  "horizon-core",
  "horizon-threads",
  "pollster",
+ "raw-window-handle",
  "wgpu",
 ]
 

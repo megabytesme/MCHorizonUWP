@@ -16,6 +16,8 @@ if /i "%ARCH%"=="arm" (
     set "SDK=10.0.15063.0"
 )
 if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="arm" exit /b 1
+if defined HORIZON_UWP_DX12 if /i not "%ARCH%"=="x64" exit /b 1
+
 if not defined HORIZON_UWP_GAME_LIB (
     echo Set HORIZON_UWP_GAME_LIB to the Rust game bridge static library.
     exit /b 1
@@ -43,36 +45,37 @@ if defined HORIZON_UWP_FRAME_PROBE set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UW
 if defined HORIZON_UWP_ACCOUNT set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_ACCOUNT"
 if defined HORIZON_UWP_XAML_SHELL set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_XAML_SHELL"
 if defined HORIZON_UWP_NATIVE_D3D11 set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_NATIVE_D3D11"
+if defined HORIZON_UWP_DX12 set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_DX12"
 pushd "%OUTDIR%"
-cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /DHORIZON_UWP_GAME_BRIDGE %FRAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" /I"%OUTDIR%" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" "%~dp0..\window-bridge\CoreWindowEvents.cpp"
+cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /DHORIZON_UWP_GAME_BRIDGE %FRAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" /I"%OUTDIR%" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" "%~dp0..\window-bridge\CoreWindowEvents.cpp"
 if errorlevel 1 (popd & exit /b 1)
 if defined HORIZON_UWP_XAUDIO (
-    cl /nologo /c /EHsc /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 "%~dp0..\xaudio-stream\host\XAudioStream.cpp"
+    cl /nologo /MP /c /EHsc /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 "%~dp0..\xaudio-stream\host\XAudioStream.cpp"
     if errorlevel 1 (popd & exit /b 1)
 )
 if defined HORIZON_UWP_HTTP (
-    cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\https-bridge\host\HttpBridge.cpp"
+    cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\https-bridge\host\HttpBridge.cpp"
     if errorlevel 1 (popd & exit /b 1)
 )
 if defined HORIZON_UWP_GAMEPAD (
-    cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\gamepad-bridge\host\Gamepad.cpp"
+    cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\gamepad-bridge\host\Gamepad.cpp"
     if errorlevel 1 (popd & exit /b 1)
 )
-cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\network-bridge\host\Srv.cpp"
+cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\network-bridge\host\Srv.cpp"
 if errorlevel 1 (popd & exit /b 1)
-cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\picker\host\Picker.cpp"
+cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\picker\host\Picker.cpp"
 if errorlevel 1 (popd & exit /b 1)
 if defined HORIZON_UWP_DEVICE_VIBRATION (
-    cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\device-vibration-bridge\host\DeviceVibration.cpp"
+    cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\device-vibration-bridge\host\DeviceVibration.cpp"
     if errorlevel 1 (popd & exit /b 1)
 )
 if defined HORIZON_UWP_ACCOUNT (
-    cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\credential-store\host\CredentialStore.cpp"
+    cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\credential-store\host\CredentialStore.cpp"
     if errorlevel 1 (popd & exit /b 1)
     if defined HORIZON_UWP_XAML_SHELL (
         cmd /d /c ""%~dp0..\pregame\host\build-shell.cmd" "%ARCH%" "%OUTDIR%""
     ) else (
-        cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\pregame\host\NativeDialog.cpp"
+        cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\pregame\host\NativeDialog.cpp"
     )
     if errorlevel 1 (popd & exit /b 1)
 )

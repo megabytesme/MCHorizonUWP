@@ -7,8 +7,9 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     public const string FluentLauncherClientId = "0844e754-1d2e-4861-8e2b-18059609badb";
     public const string TouchModId = "horizon_touch";
     public const string DeviceVibrationModId = "horizon_device_vibration";
+    public bool IncludesNativeTouchMod => NativeTouchMod && ValidatedRenderer == "native-d3d11";
     public IReadOnlyList<string> ModIds => new[]
-        { NativeTouchMod ? TouchModId : null, NativeDeviceVibration ? DeviceVibrationModId : null }
+        { IncludesNativeTouchMod ? TouchModId : null, NativeDeviceVibration ? DeviceVibrationModId : null }
         .Where(id => id is not null).Select(id => id!).ToArray();
     public string ValidatedPackageVersion
     {
@@ -47,14 +48,17 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     {
         "native-d3d11" => Renderer,
         "angle" when Target == TargetProfile.DesktopX64 => Renderer,
-        "angle" => throw new NotSupportedException("ANGLE builds are currently available for x64; ARM32 uses the native Direct3D 11 renderer."),
+        "angle" => throw new NotSupportedException("The current package recipe contains ANGLE runtime DLLs for x64 only; this is a package build constraint, not a device capability check."),
+        "dx12" when Target == TargetProfile.DesktopX64 => Renderer,
+        "dx12" => throw new NotSupportedException("The Direct3D 12 CoreWindow backend currently builds only for x64; the Windows bindings fail to compile for ARM32."),
         _ => throw new ArgumentException("Choose a supported renderer."),
     };
 
     // These features are recorded as individual tokens; no user-supplied shell
     // fragments or paths are interpolated. Execution requires a verified recipe.
     public IReadOnlyList<string> Features => new[]
-        { ValidatedRenderer == "native-d3d11" ? "native-d3d11" : null, NativeTouchMod ? "native-touch-mod" : null,
+        { ValidatedRenderer == "native-d3d11" ? "native-d3d11" : null,
+          ValidatedRenderer == "dx12" ? "uwp-dx12-renderer" : null, IncludesNativeTouchMod ? "native-touch-mod" : null,
           NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell" }
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();
 }

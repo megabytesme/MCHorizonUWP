@@ -107,6 +107,7 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_ACCOUNT"] = "1";
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = selection.ValidatedRenderer == "native-d3d11" ? "1" : "";
+        vcEnvironment["HORIZON_UWP_DX12"] = selection.ValidatedRenderer == "dx12" ? "1" : "";
         vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
         var hostOutput = Path.Combine(root, "native-host", "game-" + arch);

@@ -1524,11 +1524,6 @@ fn instance_descriptor(
             .remove(wgpu::InstanceFlags::VALIDATION_INDIRECT_CALL);
     }
     let mut descriptor = descriptor.with_env();
-    // UWP uses ANGLE's D3D11 renderer; ignore desktop backend overrides.
-    #[cfg(target_vendor = "uwp")]
-    {
-        descriptor.backends = wgpu::Backends::GL;
-    }
     if allow_nonconformant {
         descriptor
             .flags
@@ -1567,7 +1562,14 @@ impl wgpu::rwh::HasDisplayHandle for WindowDisplay {
 fn backend_order(api: GraphicsApi, os: &str, wgpu_backend: bool) -> Vec<wgpu::Backends> {
     use wgpu::Backends;
     if cfg!(target_vendor = "uwp") {
-        return vec![Backends::GL];
+        // The UWP shell sets WGPU_BACKEND after probing the selected backend
+        // against the live CoreWindow surface. Keep GL as the default for
+        // older ANGLE packages without overriding a successful DX12 probe.
+        return if wgpu_backend {
+            vec![Backends::default()]
+        } else {
+            vec![Backends::GL]
+        };
     }
     if os == "macos" || wgpu_backend {
         return vec![Backends::default()];

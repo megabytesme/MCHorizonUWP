@@ -107,12 +107,14 @@ never pass credentials on the command line or write them to build logs. The
 15063 ARM32 HTTPS and Credential Locker paths are separate device tests; their
 availability does not by itself implement account sign-in.
 
-Make renderer choices reflect real availability: the native FL9_1 renderer
-is the current Windows Mobile fallback; ANGLE and future wgpu DX11/DX12 paths
-must only be offered after their actual architecture, runtime and device
-capabilities are checked. Select before graphics initialization; recover from
-a failed choice and retain a known working fallback. Match visual behavior as
-closely as possible across renderers and expose meaningful diagnostics.
+Make renderer choices reflect build availability, then check the actual device
+at launch. The native FL9_1 renderer is the tested Windows Mobile path; ANGLE
+ships with the x64 package, and the WGPU Direct3D 12 CoreWindow path currently
+builds for x64. On the live CoreWindow, the client creates a compatible
+surface, requests a device, configures a swap chain and presents a frame before
+enabling Start game. It must not infer GPU support from the selected
+architecture. Retain the native D3D11 phone path and expose meaningful
+diagnostics when a renderer cannot present.
 
 Audio, network access, controller input and phone vibration need platform
 adapters and device tests; a successful build does not establish availability.

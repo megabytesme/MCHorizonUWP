@@ -1,7 +1,8 @@
 # Horizon UWP Builder preview
 
 This desktop WinUI 3 preview checks a small set of build prerequisites and
-records a target and optional native touch and device-vibration source-mod selections.
+records a target, renderer build, and optional native touch and device-vibration
+source-mod selections.
 The latter has its own in-game setting, separate from controller vibration.
 The touch selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
 on a Lumia in its separate branch. The local recipe builds from a pinned source
@@ -58,9 +59,15 @@ public nightly release metadata and reports when its source differs; a failed
 check does not prevent an offline build from the pinned source. The check
 does not download or execute the new release. Minecraft resource framework versions
 remain tied to the Minecraft resources, not to the Horizon nightly date.
-The
-preview uses the native D3D11 renderer and runs x64 and ARM32 plans in fresh
-builder-owned folders under
+The renderer build choices vary only with available runtime and compiler inputs:
+native D3D11 is built for x64 and ARM32, ANGLE is packaged for x64, and the
+Direct3D 12 CoreWindow backend currently builds for x64. The ARM32 DX12 build
+fails in the upstream Windows bindings before linking; ANGLE has no ARM32 DLL
+set in this recipe. These are build-input constraints, not assumptions about
+the device GPU. At launch the client checks the selected backend against its
+live CoreWindow surface and only enables Start game when it can configure and
+present a frame. The preview runs x64 and ARM32 plans in fresh builder-owned
+folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
 Cargo fetches missing dependencies for the selected target and x64 build host
 from configured registries before the offline build. It can also create a reusable
