@@ -62,6 +62,8 @@ public static class LocalBuildRunner
         await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Build game bridge").Arguments, vcEnvironment);
 
         var arch = arm ? "arm" : "x64";
+        vcEnvironment["HORIZON_UWP_XAUDIO"] = "1";
+        vcEnvironment["HORIZON_UWP_HTTP"] = "1";
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
         progress?.Report("Strict-linking the UWP host.");
         // cmd.exe is required for the checked-in .cmd file. Its command is fixed;

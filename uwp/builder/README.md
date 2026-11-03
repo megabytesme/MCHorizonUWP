@@ -41,18 +41,19 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`5a103f769c8fe00ec38844003ad18b7878e24dfc`, Rust 1.99.1 and Minecraft
+`2ce3d73dbc9e82634b73d65606b3cb14a4e63347`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
-preview runs x64 and ARM32 plans in fresh builder-owned folders under
+preview uses the native D3D11 renderer and runs x64 and ARM32 plans in fresh
+builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
 Cargo build uses the existing offline cache; dependency acquisition, signing,
 framework packaging and installation are not yet integrated. A build requires
 at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
-override and has no HTTPS; the output uses the prototype publisher identity.
-One ARM32 native-touch package was strictly linked and packaged from this
-runner, but that specific output has not been installed or tested on a phone.
+dependency override; skins and Minecraft session requests use WinRT HTTPS. Microsoft sign-in is not yet implemented.
+The output uses the prototype publisher identity.
+The combined recipe has not yet been validated on a phone.
 The package-version field changes only the isolated manifest and cannot be
 lower than the pinned source version. Choose a version newer than the package
 with the same identity already installed on the target; the builder cannot

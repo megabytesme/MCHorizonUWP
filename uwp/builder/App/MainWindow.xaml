@@ -15,13 +15,14 @@
       <ComboBoxItem Content="Surface Pro X (ARM64)" />
       <ComboBoxItem Content="Windows 10 Mobile (ARM32, 15063)" />
     </ComboBox>
+    <TextBlock Text="Renderer: Native D3D11 (feature level 9_1). This recipe has no other verified renderer choices." TextWrapping="Wrap" />
     <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" />
     <TextBlock Text="Package version (choose a version newer than the one installed on the target)" TextWrapping="Wrap" />
     <TextBox x:Name="PackageVersion" Text="1.0.10.0" />
     <TextBlock Text="The selected source mod is compiled into the client using the pinned local recipe." TextWrapping="Wrap" />
     <Button Content="Check setup" Click="CheckSetup_Click" />
     <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />
-    <TextBlock Text="The ARM32 recipe is offline: HTTPS and authenticated online services are unavailable. Output uses the prototype publisher and must be signed before installation." TextWrapping="Wrap" />
+    <TextBlock Text="The client includes native audio and HTTPS for skins and Minecraft session requests. Microsoft sign-in is not yet available. Output uses the prototype publisher and must be signed before installation." TextWrapping="Wrap" />
     <Button x:Name="RunRecipe" Content="Build unsigned client" Click="RunRecipe_Click" />
     <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
     <StackPanel x:Name="RecipeSteps" Spacing="6" />

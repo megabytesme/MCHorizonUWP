@@ -12,7 +12,7 @@ public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 /// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "5a103f769c8fe00ec38844003ad18b7878e24dfc";
+    public const string SourceCommit = "2ce3d73dbc9e82634b73d65606b3cb14a4e63347";
     public const string RustVersion = "1.99.1";
     public const string MinecraftVersion = "26.3";
     public const string SourceManifestVersion = "1.0.1.0";
@@ -54,7 +54,7 @@ public static class LocalRecipe
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
             "At least 10 GiB free space and a populated Cargo dependency cache are required; the game-bridge build runs offline.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
-        if (arm) notes.Add("ARM32 uses the existing offline override: HTTPS and authenticated online services are unavailable.");
+        if (arm) notes.Add("ARM32 uses the offline TLS dependency override; skin and Minecraft session requests use the WinRT HTTPS adapter. Microsoft sign-in is not yet implemented.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
     }
 
