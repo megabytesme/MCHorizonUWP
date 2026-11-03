@@ -447,13 +447,26 @@ impl Options {
     }
 
     fn read_from(args: impl Iterator<Item = String>) -> Result<Option<Self>> {
+        Self::read_with_session(args, None, false)
+    }
+
+    fn read_with_session(
+        args: impl Iterator<Item = String>,
+        supplied_session: Option<horizon_client::auth::AuthSession>,
+        use_supplied_session: bool,
+    ) -> Result<Option<Self>> {
         let Some(mut o) = Self::parse(args).map_err(|e| launch_api::UsageError(e.to_string()))?
         else {
             return Ok(None);
         };
         // The launcher's account: online-mode servers need it. A bad file
         // only leaves the game offline.
-        let session = if o.session_stdin {
+        let session = if use_supplied_session {
+            // A hosted launch must not consume an inherited session file or stdin.
+            o.session_file = None;
+            o.session_stdin = false;
+            Ok(supplied_session)
+        } else if o.session_stdin {
             let mut text = String::new();
             std::io::Read::read_to_string(&mut std::io::stdin(), &mut text)
                 .map_err(|e| e.to_string())
@@ -468,8 +481,16 @@ impl Options {
         };
         match session {
             Ok(Some(session)) => {
-                o.player_name = Some(session.name.clone());
-                horizon_client::auth::set_current(session);
+                let name = session.name.clone();
+                if use_supplied_session {
+                    horizon_client::auth::try_set_current(session)?;
+                } else {
+                    horizon_client::auth::set_current(session);
+                }
+                o.player_name = Some(name);
+            }
+            Ok(None) if use_supplied_session && horizon_client::auth::current().is_some() => {
+                return Err("an account is already active in this process".into());
             }
             Ok(None) => {}
             Err(e) => eprintln!("Horizon: not signed in: {e}"),
@@ -17976,8 +17997,12 @@ pub fn run() -> Result<()> {
 }
 
 #[cfg(target_vendor = "uwp")]
-pub fn run_with_args(args: Vec<String>, smoke_diagnostics: bool) -> Result<()> {
-    let mut options = Options::read_from(args.into_iter())?;
+pub fn run_with_args(
+    args: Vec<String>,
+    smoke_diagnostics: bool,
+    session: Option<horizon_client::auth::AuthSession>,
+) -> Result<()> {
+    let mut options = Options::read_with_session(args.into_iter(), session, true)?;
     if smoke_diagnostics && let Some(options) = &mut options {
         options.spikes = Some(33.0);
     }
@@ -18338,6 +18363,31 @@ pub(crate) fn closest_space_nudge(
 mod tests {
     use super::*;
     use horizon_client::container_screen::{Button, Clicks, Release, Target};
+
+    #[test]
+    fn hosted_launch_does_not_consume_a_session_file() {
+        let path = std::env::temp_dir().join(format!(
+            "horizon-hosted-session-test-{}-{}.json",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut file = std::fs::File::create_new(&path).unwrap();
+        std::io::Write::write_all(&mut file, b"leave this alone").unwrap();
+        drop(file);
+        let args = vec![
+            "--session-file".to_owned(),
+            path.to_string_lossy().into_owned(),
+        ];
+        let options = Options::read_with_session(args.into_iter(), None, true)
+            .unwrap()
+            .unwrap();
+        assert!(options.session_file.is_none());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "leave this alone");
+        std::fs::remove_file(path).unwrap();
+    }
 
     /// Snuffing a candle or a candle cake draws one smoke per
     /// `getParticleOffsets`: by `candles` for a candle, a block up for a cake.

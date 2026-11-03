@@ -107,7 +107,20 @@ static CURRENT: OnceLock<Arc<AuthSession>> = OnceLock::new();
 
 /// The account this game was started with (set once at start).
 pub fn set_current(session: AuthSession) {
-    let _ = CURRENT.set(Arc::new(session));
+    let _ = try_set_current(session);
+}
+
+/// Install an account once, refusing to silently retain a previous account.
+pub fn try_set_current(session: AuthSession) -> Result<(), &'static str> {
+    install_session(&CURRENT, session)
+}
+
+fn install_session(
+    slot: &OnceLock<Arc<AuthSession>>,
+    session: AuthSession,
+) -> Result<(), &'static str> {
+    slot.set(Arc::new(session))
+        .map_err(|_| "an account is already active in this process")
 }
 pub fn current() -> Option<Arc<AuthSession>> {
     CURRENT.get().cloned()
@@ -495,6 +508,17 @@ mod tests {
     use super::*;
 
     const UUID: u128 = 0x069a79f444e94726a5befca90e38aaf5;
+
+    #[test]
+    fn installing_a_second_account_fails_without_exposing_tokens() {
+        let slot = OnceLock::new();
+        install_session(&slot, AuthSession::new("First", UUID, "first-secret")).unwrap();
+        let error =
+            install_session(&slot, AuthSession::new("Second", UUID, "second-secret")).unwrap_err();
+        assert!(!error.contains("secret"));
+        assert_eq!(slot.get().unwrap().name, "First");
+        assert!(!format!("{:?}", slot.get().unwrap()).contains("first-secret"));
+    }
 
     fn write(dir: &Path, text: &str, mode: u32) -> std::path::PathBuf {
         let path = dir.join("session.json");

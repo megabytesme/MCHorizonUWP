@@ -28,9 +28,10 @@ where they conflict with this update; their safeguards and remaining scope still
     SHA-256 `125b7b5be518818dab44b1ed3bdb6a6f349041ef7ce65fdbb6d73ebbc8e8b66a`.
   - ARM32: `C:/Users/ben/.huwp/b/0e7ac4615b164865/combined-arm-unsigned/HorizonUWP-arm-with-sound-signed.appx`,
     SHA-256 `8beb685bde49e8eec8810e43b4a0c5504f8545a82ea99b3d9010f77d48233a81`.
-  ZIP integrity and signature entries were checked. Windows SignTool reports
-  the self-signed root is untrusted on this PC; installation and target-device
-  trust remain to be checked by the user. The signed copies contain private assets.
+  ZIP integrity, signature entries and CMS signature cryptography were checked.
+  Windows SignTool reports the self-signed root is untrusted on this PC;
+  installation and target-device trust remain to be checked by the user. The
+  signed copies contain private assets and predate the session-handoff work below.
 - The stale `localhost` SSH host-key record was replaced with the already
   trusted Ben-Desktop key from `192.168.1.121`. Normal verified localhost SSH
   works; the original known-hosts file is backed up as
@@ -47,8 +48,10 @@ where they conflict with this update; their safeguards and remaining scope still
   Keep the publish folder together. It is a development build, not an installer.
 - The shared account protocol, Credential Locker storage and cancellable
   sign-in/restore worker are committed. Synthetic tests pass and the account
-  crate type-checks for x64 UWP; the pre-game UI, native host wiring and session
-  handoff are **not implemented**, and no real sign-in has been tested.
+  crate type-checks for x64 UWP. The client has an in-memory hosted session entry
+  point that rejects a second active account and ignores inherited session files;
+  focused tests pass. The pre-game UI and native host wiring to the account
+  worker are **not implemented**, and no real sign-in has been tested.
 - Real versioned asset-framework packaging and package-graph lookup are not
   implemented. The synthetic framework proof remains the only framework test.
   Renderer selection beyond the native D3D11 recipe, ARM64, clean-machine setup,

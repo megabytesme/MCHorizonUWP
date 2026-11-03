@@ -12,6 +12,17 @@ mod game;
 /// Run the game in a UWP host with explicit resource and writable data paths.
 #[cfg(target_vendor = "uwp")]
 pub fn run_uwp(resources: &std::path::Path, game_dir: &std::path::Path) -> Result<()> {
+    run_uwp_with_session(resources, game_dir, None)
+}
+
+/// Run with a session supplied in memory by the UWP host. The session is not
+/// passed through an environment variable, command line, stdin, or file.
+#[cfg(target_vendor = "uwp")]
+pub fn run_uwp_with_session(
+    resources: &std::path::Path,
+    game_dir: &std::path::Path,
+    session: Option<auth::AuthSession>,
+) -> Result<()> {
     let args = vec![
         "--resources".to_owned(),
         resources.to_string_lossy().into_owned(),
@@ -33,7 +44,7 @@ pub fn run_uwp(resources: &std::path::Path, game_dir: &std::path::Path) -> Resul
     };
     let smoke_diagnostics = cfg!(feature = "native-d3d11-readback")
         && game_dir.join("native-world-smoke.enable").is_file();
-    game::run_with_args(args, smoke_diagnostics)
+    game::run_with_args(args, smoke_diagnostics, session)
 }
 #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
 pub mod native_renderer;
