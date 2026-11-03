@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <windows.storage.h>
 #include <cstdio>
+#include <cstring>
 #include <atomic>
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
@@ -9,6 +10,7 @@
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
 #include <windows.ui.viewmanagement.h>
+#include <windows.ui.popups.h>
 
 static Windows::UI::Core::CoreWindow^ current_window;
 static std::atomic<DWORD> current_window_thread{0};
@@ -16,6 +18,8 @@ static std::atomic<DWORD> current_window_thread{0};
 static std::atomic<bool> account_window_closed{false};
 static std::atomic<bool> account_window_visible{false};
 static bool pregame_input = true;
+extern "C" void __cdecl horizon_uwp_page_event(const HorizonUwpEvent* event);
+extern "C" void __cdecl horizon_uwp_page_shutdown();
 extern "C" int __cdecl horizon_uwp_window_closed() { return account_window_closed.load() ? 1 : 0; }
 extern "C" int __cdecl horizon_uwp_window_visible() { return account_window_visible.load() ? 1 : 0; }
 #endif
@@ -24,8 +28,11 @@ static uint32_t event_read, event_write;
 
 static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
 #ifdef HORIZON_UWP_ACCOUNT
-    // Modal account input belongs to the shell dialog, not to the game queue.
-    if (pregame_input && event->kind >= HORIZON_UWP_KEY_DOWN) return;
+    // The native startup page owns its input until the game is started.
+    if (pregame_input) {
+        horizon_uwp_page_event(event);
+        if (event->kind >= HORIZON_UWP_KEY_DOWN) return;
+    }
 #endif
     const uint32_t next = (event_write + 1) % 4096;
     if (next == event_read) event_read = (event_read + 1) % 4096;
@@ -34,6 +41,7 @@ static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
 }
 #ifdef HORIZON_UWP_ACCOUNT
 extern "C" void __cdecl horizon_uwp_discard_pregame_input() {
+    horizon_uwp_page_shutdown();
     // Preserve resize, focus, visibility and close events. Dialog input must not
     // be replayed into the game, where it could activate an unintended action.
     uint32_t read = event_read, write = event_read;
@@ -97,20 +105,86 @@ extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
     } catch (Platform::Exception^) { return 0; }
 }
 extern "C" int32_t __cdecl horizon_uwp_run(const uint16_t*, size_t, const uint16_t*, size_t);
+extern "C" int __cdecl horizon_uwp_is_local_test() {
+    try {
+        auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
+        auto marker = Platform::String::Concat(installed, ref new Platform::String(L"\\horizon-isolated-test.flag"));
+        HANDLE h = CreateFile2(marker->Data(), GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, nullptr);
+        if (h == INVALID_HANDLE_VALUE) return 0;
+        CloseHandle(h);
+        return 1;
+    } catch (...) { return 0; }
+}
 extern "C" void __cdecl horizon_uwp_report_error(const uint8_t* text, size_t len) {
     if (!text && len != 0) return;
-    auto base = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
-    auto file = Platform::String::Concat(base, ref new Platform::String(L"\\horizon-startup-error.txt"));
-    HANDLE h = CreateFile2(file->Data(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return;
-    while (len != 0) {
-        const DWORD chunk = len > MAXDWORD ? MAXDWORD : static_cast<DWORD>(len);
-        DWORD written = 0;
-        if (!WriteFile(h, text, chunk, &written, nullptr) || written == 0) break;
-        text += written;
-        len -= written;
-    }
-    CloseHandle(h);
+    try {
+        auto base = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+        SYSTEMTIME now;
+        GetSystemTime(&now);
+        for (unsigned int attempt = 0; attempt < 100; ++attempt) {
+            wchar_t name[128];
+            swprintf_s(name, L"\\horizon-error-%04u%02u%02u-%02u%02u%02u-%03u-%u-%u.txt",
+                now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond,
+                now.wMilliseconds, GetCurrentThreadId(), attempt);
+            auto file = Platform::String::Concat(base, ref new Platform::String(name));
+            HANDLE h = CreateFile2(file->Data(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_NEW, nullptr);
+            if (h == INVALID_HANDLE_VALUE) continue;
+            while (len != 0) {
+                const DWORD chunk = len > MAXDWORD ? MAXDWORD : static_cast<DWORD>(len);
+                DWORD written = 0;
+                if (!WriteFile(h, text, chunk, &written, nullptr) || written == 0) break;
+                text += written;
+                len -= written;
+            }
+            CloseHandle(h);
+            break;
+        }
+    } catch (...) {}
+}
+static std::atomic<bool> fatal_done{true};
+static Windows::Foundation::IAsyncOperation<Windows::UI::Popups::IUICommand^>^ fatal_dialog;
+static void show_fatal(Platform::String^ text) {
+    try {
+        auto dialog = ref new Windows::UI::Popups::MessageDialog(text, L"Horizon error");
+        fatal_dialog = dialog->ShowAsync();
+        fatal_dialog->Completed = ref new Windows::Foundation::AsyncOperationCompletedHandler<Windows::UI::Popups::IUICommand^>(
+            [](Windows::Foundation::IAsyncOperation<Windows::UI::Popups::IUICommand^>^, Windows::Foundation::AsyncStatus) {
+                fatal_done.store(true);
+            });
+    } catch (...) { fatal_done.store(true); }
+}
+extern "C" int __cdecl horizon_uwp_is_ui_thread() {
+    const DWORD owner = current_window_thread.load(std::memory_order_acquire);
+    return owner && owner == GetCurrentThreadId();
+}
+extern "C" int __cdecl horizon_uwp_fatal_done() { return fatal_done.load() ? 1 : 0; }
+extern "C" void __cdecl horizon_uwp_fatal_begin(const uint8_t* text, size_t len) {
+    try {
+        if (!text || !len || len > 4096 || !current_window) return;
+        int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+            reinterpret_cast<const char*>(text), static_cast<int>(len), nullptr, 0);
+        if (count <= 0 || count > 4096) return;
+        wchar_t buffer[4097] = {};
+        if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+            reinterpret_cast<const char*>(text), static_cast<int>(len), buffer, count)) return;
+        auto body = ref new Platform::String(buffer, count);
+        bool expected = true;
+        if (!fatal_done.compare_exchange_strong(expected, false)) return;
+        if (horizon_uwp_is_ui_thread()) show_fatal(body);
+        else current_window->Dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::High,
+            ref new Windows::UI::Core::DispatchedHandler([body]() { show_fatal(body); }));
+    } catch (...) { fatal_done.store(true); }
+}
+static void report_native_failure(const char* message) {
+    const auto text = reinterpret_cast<const uint8_t*>(message);
+    const size_t length = strlen(message);
+    horizon_uwp_report_error(text, length);
+    horizon_uwp_fatal_begin(text, length);
+    try {
+        while (!horizon_uwp_fatal_done() && horizon_uwp_is_ui_thread() && current_window)
+            current_window->Dispatcher->ProcessEvents(
+                Windows::UI::Core::CoreProcessEventsOption::ProcessOneAndAllPending);
+    } catch (...) {}
 }
 #ifdef HORIZON_UWP_FRAME_PROBE
 extern "C" void __cdecl horizon_uwp_frame_presented() {
@@ -185,6 +259,7 @@ public:
     virtual void Load(Platform::String^) {}
     virtual void Run() {
 #ifdef HORIZON_UWP_GAME_BRIDGE
+        try {
         auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
         auto resources = Platform::String::Concat(local_path, ref new Platform::String(L"\\resources"));
         // Prefer prepared, writable local resources; a sideloaded phone package
@@ -221,7 +296,16 @@ public:
 #endif
         const int32_t result = horizon_uwp_run(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                                                reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
-        if (result != 0) throw ref new Platform::FailureException();
+        // The Rust bridge reports an error before returning a failure.
+        (void)result;
+        } catch (Platform::Exception^ error) {
+            char message[160];
+            sprintf_s(message, "Horizon encountered a Windows error (0x%08X). A diagnostic was saved in app storage.",
+                static_cast<unsigned>(error->HResult));
+            report_native_failure(message);
+        } catch (...) {
+            report_native_failure("Horizon encountered a native error. A diagnostic was saved in app storage.");
+        }
 #else
         while (!closed_) {
             if (visible_) {
@@ -289,7 +373,22 @@ public:
 
 [Platform::MTAThread]
 int main(Platform::Array<Platform::String^>^) {
+#ifdef HORIZON_UWP_GAME_BRIDGE
+    try {
+#endif
     CoreApplication::Run(ref new AppViewSource());
+#ifdef HORIZON_UWP_GAME_BRIDGE
+    } catch (Platform::Exception^ error) {
+        char message[160];
+        sprintf_s(message, "Horizon failed to initialize (0x%08X). A diagnostic was saved in app storage.",
+            static_cast<unsigned>(error->HResult));
+        report_native_failure(message);
+        return 1;
+    } catch (...) {
+        report_native_failure("Horizon failed to initialize. A diagnostic was saved in app storage.");
+        return 1;
+    }
+#endif
     return 0;
 }
 

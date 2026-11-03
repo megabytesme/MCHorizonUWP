@@ -16,6 +16,7 @@ unsafe extern "C" {
     fn horizon_uwp_window_closed() -> i32;
     fn horizon_uwp_window_visible() -> i32;
     fn horizon_uwp_pump_events();
+    fn horizon_uwp_page_tick();
 }
 
 const MENU: u32 = 0;
@@ -31,13 +32,25 @@ fn closed() -> bool {
 }
 fn pump() {
     unsafe { horizon_uwp_pump_events() };
+    unsafe { horizon_uwp_page_tick() };
     std::thread::sleep(Duration::from_millis(20));
 }
 fn show(text: &str, kind: u32) -> bool {
-    unsafe { horizon_uwp_dialog_show(text.as_ptr(), text.len(), kind) == 0 }
+    if unsafe { horizon_uwp_dialog_show(text.as_ptr(), text.len(), kind) == 0 } {
+        true
+    } else {
+        crate::report_failure("Horizon could not display the startup page.");
+        false
+    }
 }
 fn poll() -> i32 {
-    unsafe { horizon_uwp_dialog_poll() }
+    let result = unsafe { horizon_uwp_dialog_poll() };
+    if result == -2 {
+        crate::report_failure("The Horizon startup page stopped responding.");
+        -1
+    } else {
+        result
+    }
 }
 fn dismiss() -> bool {
     unsafe { horizon_uwp_dialog_cancel() };

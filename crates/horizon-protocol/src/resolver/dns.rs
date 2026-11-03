@@ -20,7 +20,7 @@ pub(super) fn system_name_servers() -> Vec<SocketAddr> {
         .map_or_else(|_| Vec::new(), |conf| name_servers(&conf))
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, not(target_vendor = "uwp")))]
 pub(super) fn system_name_servers() -> Vec<SocketAddr> {
     let mut servers = Vec::new();
     for adapter in ipconfig::get_adapters().unwrap_or_default() {

@@ -1,5 +1,48 @@
 # Codex prompt: Horizon UWP client and AppX builder
 
+## Native page and networking update — 3 November 2026
+
+The user reported a crash at the account-service waiting dialog and asked for
+a native page and visible diagnostics. The phone was unreachable over SSH, so
+the underlying crash has not yet been identified. The UWP host now uses a
+CoreWindow/Direct2D startup page instead of a sequence of modal dialogs, with
+touch, keyboard and controller input. The ARM32 target aborts on panic; a
+panic hook saves a new app-local diagnostic and attempts to show it before
+termination. Caught native initialization and run errors are also reported.
+Fatal OS failures and forced termination cannot be guaranteed a dialog.
+
+The user also reported the official SMP timing out. Its current SRV record is
+`play.playhorizon.dev:24454`; a status request succeeded from the build PC.
+The UWP resolver uses WinRT service resolution instead of adapter enumeration.
+The native picker mod imports selected .hmod and .zip files without overwriting;
+reopen the game screen to refresh. In-game resource-pack reload is still
+unsupported by the native renderer; choose packs before entering a world.
+
+The signed ARM32 client is
+`C:/Users/ben/.huwp/b/latest-page-arm-20261103a/HorizonUWP-ARM32-signed.appx`,
+SHA-256 `D2CC9C3A2BF191B4ACA4B3F5863D8C4D84B3584C3AA1A400CE14B84B13E5C3CE`.
+It uses the same signed 26.3 framework listed below and the separate identity
+`HorizonUWPLatestPreview`. Its block map and CMS signature were verified.
+ARM32 and x64 release bridges and strict UWP links passed; the account and
+resolver tests passed. User testing of the page, real account sign-in, network,
+pickers and hardware remains outstanding.
+
+At the user's request, a separate x64 developer-mode package named
+`HorizonUWPDesktopPage20261103` was registered and opened on the build PC.
+Its private asset snapshot and loose package are under
+`C:/Users/ben/.huwp/b/desktop-uwp-test-20261103a/`. The marker in that loose
+package isolates its game paths and disables audio. Do not delete its app data
+or inspect the user's credentials. No certificate trust was changed.
+
+The updated source includes upstream Horizon through
+`eb545bab38934988f5ed6ff79064663c240e743d`. It is in the isolated
+`codex/uwp-upstream-refresh-2e0a6957` worktree. The builder still pins the
+earlier source and must be updated after the new source is committed and
+validated; the previously reported builder-signing approval block still applies.
+The native renderer's custom glint and live pack reload and the split-screen
+multi-controller route remain incomplete. Historical notes below are
+superseded where they conflict with this section.
+
 ## Latest account and ARM32 update
 
 The user explicitly authorized the public Fluent Launcher application ID

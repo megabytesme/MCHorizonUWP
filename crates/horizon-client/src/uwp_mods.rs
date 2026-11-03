@@ -1,6 +1,30 @@
 //! Built-in UWP source mods registered through Horizon's native hook API.
 use crate::mod_api::{self, Hooks, Host, ModsEvent, NativeMod, SettingsClickEvent, SettingsEvent};
 
+pub(crate) const PICKER_ID: &str = "horizon_uwp_picker";
+struct Picker;
+impl Hooks for Picker {
+    fn mods(&self, _: &mut dyn Host, event: &mut ModsEvent<'_>) {
+        event.mods.push(NativeMod {
+            id: PICKER_ID.into(),
+            title: "UWP File Picker".into(),
+            description: "Import content mods and resource packs using the Windows file picker."
+                .into(),
+            keys: Vec::new(),
+        });
+    }
+}
+
+/// The platform folder action enters the built-in native picker mod.
+pub(crate) fn open_folder(path: &std::path::Path) -> bool {
+    let kind = match path.file_name().and_then(|name| name.to_str()) {
+        Some("horizon-mods") => 1,
+        Some("resourcepacks") | Some("datapacks") => 2,
+        _ => return false,
+    };
+    horizon_uwp_picker::pick(path, kind)
+}
+
 #[cfg(feature = "native-touch-mod")]
 struct Touch;
 #[cfg(feature = "native-touch-mod")]
@@ -58,7 +82,7 @@ impl Hooks for DeviceVibration {
 }
 
 pub(crate) fn install() -> crate::Result<()> {
-    let mut mods: Vec<Box<dyn Hooks>> = Vec::new();
+    let mut mods: Vec<Box<dyn Hooks>> = vec![Box::new(Picker)];
     #[cfg(feature = "native-touch-mod")]
     mods.push(Box::new(Touch));
     #[cfg(feature = "native-device-vibration-mod")]
@@ -67,6 +91,7 @@ pub(crate) fn install() -> crate::Result<()> {
         .set(mods.into())
         .map_err(|_| "native UWP mods are already installed")?;
     mod_api::name_mods(&[
+        PICKER_ID,
         #[cfg(feature = "native-touch-mod")]
         horizon_touch_native::MOD_ID,
         #[cfg(feature = "native-device-vibration-mod")]

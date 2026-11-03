@@ -541,9 +541,26 @@ impl Loading {
                     self.menu.reload_packs = true;
                 }
                 Event::OpenPackFolder => {
+                    #[cfg(target_vendor = "uwp")]
+                    if self
+                        .settings
+                        .mods
+                        .disabled
+                        .contains(crate::uwp_mods::PICKER_ID)
+                    {
+                        continue;
+                    }
                     let dir = packs::packs_dir();
                     let _ = std::fs::create_dir_all(&dir);
                     packs::open_folder(&dir);
+                }
+                Event::DownloadPack(i) => {
+                    let dir = packs::packs_dir();
+                    if let Some(screen) = &mut self.menu.options.pack_screen
+                        && let Some(browser) = &mut screen.browser
+                    {
+                        browser.download(i, &dir, horizon_core::VANILLA_VERSION);
+                    }
                 }
                 Event::DataPacks(ids) => {
                     let resources = self.vanilla_root.clone();
@@ -552,10 +569,28 @@ impl Loading {
                     }
                 }
                 Event::OpenDataPackFolder(dir) => {
+                    #[cfg(target_vendor = "uwp")]
+                    if self
+                        .settings
+                        .mods
+                        .disabled
+                        .contains(crate::uwp_mods::PICKER_ID)
+                    {
+                        continue;
+                    }
                     let _ = std::fs::create_dir_all(&dir);
                     packs::open_folder(&dir);
                 }
                 Event::OpenModFolder => {
+                    #[cfg(target_vendor = "uwp")]
+                    if self
+                        .settings
+                        .mods
+                        .disabled
+                        .contains(crate::uwp_mods::PICKER_ID)
+                    {
+                        continue;
+                    }
                     let dir = Game::game_dir().join(horizon_client::mod_list::DIR);
                     let _ = std::fs::create_dir_all(&dir);
                     packs::open_folder(&dir);
@@ -606,6 +641,11 @@ impl Loading {
                     self.settings.narrator(),
                     &mut self.menu.narrator_toast,
                 ),
+                // The startup menu has no screen stack for ConfirmLinkScreen;
+                // the link opens directly, as the menu's other links do.
+                Event::AccessibilityHelp => {
+                    super::packs::open_uri(super::options::ACCESSIBILITY_HELP_LINK)
+                }
                 // Mods' settings pages open only in a running game.
                 Event::NativeSettings(_) | Event::NativeButton(..) => {}
                 // The startup menu runs before the game opens a control socket,
@@ -1158,10 +1198,17 @@ impl Loading {
 
     #[cfg(target_vendor = "uwp")]
     pub(super) fn sync_menu_ime(&mut self) {
-        let want = !self.menu.options_open && self.menu.pending.is_none()
-            && self.menu.title.as_mut().is_some_and(|title| title.focused_field().is_some());
+        let want = !self.menu.options_open
+            && self.menu.pending.is_none()
+            && self
+                .menu
+                .title
+                .as_mut()
+                .is_some_and(|title| title.focused_field().is_some());
         if want != self.menu.ime_allowed {
-            if let Some(window) = &self.window { window.set_ime_allowed(want); }
+            if let Some(window) = &self.window {
+                window.set_ime_allowed(want);
+            }
             self.menu.ime_allowed = want;
         }
     }

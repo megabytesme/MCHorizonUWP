@@ -571,17 +571,31 @@ impl super::Game<'_> {
     fn apply_touch_actions(&mut self, actions: Vec<Action>) {
         for action in actions {
             let result = match action {
-                Action::Jump(down) => self.mapped_key(winit::keyboard::KeyCode::Space, down, false),
+                Action::Jump(down) => self.mapped_key(
+                    winit::keyboard::KeyCode::Space,
+                    down,
+                    false,
+                    winit::keyboard::KeyCode::Space,
+                ),
                 Action::Attack(down) => self.play_mouse(winit::event::MouseButton::Left, down),
                 Action::Use(down) => self.play_mouse(winit::event::MouseButton::Right, down),
-                Action::Inventory => self.key_pressed(winit::keyboard::KeyCode::KeyE),
+                Action::Inventory => self.key_pressed(
+                    winit::keyboard::KeyCode::KeyE,
+                    winit::keyboard::KeyCode::KeyE,
+                ),
                 Action::Pause => self.pad_back(),
-                Action::Sprint(down) => {
-                    self.mapped_key(winit::keyboard::KeyCode::ControlLeft, down, false)
-                }
-                Action::Sneak(down) => {
-                    self.mapped_key(winit::keyboard::KeyCode::ShiftLeft, down, false)
-                }
+                Action::Sprint(down) => self.mapped_key(
+                    winit::keyboard::KeyCode::ControlLeft,
+                    down,
+                    false,
+                    winit::keyboard::KeyCode::ControlLeft,
+                ),
+                Action::Sneak(down) => self.mapped_key(
+                    winit::keyboard::KeyCode::ShiftLeft,
+                    down,
+                    false,
+                    winit::keyboard::KeyCode::ShiftLeft,
+                ),
                 Action::Hotbar(next) => {
                     self.selected = horizon_client::gamepad::hotbar_step(self.selected, next);
                     Ok(())

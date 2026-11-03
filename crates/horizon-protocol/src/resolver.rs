@@ -5,6 +5,7 @@
 use crate::{Error, Result};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 
+#[cfg(any(not(target_vendor = "uwp"), test))]
 mod dns;
 
 #[derive(Debug)]
@@ -62,6 +63,11 @@ pub fn server_redirect(host: &str, port: u16) -> (String, u16) {
 }
 
 fn srv_redirect(name: &str) -> Option<(String, u16)> {
+    #[cfg(target_vendor = "uwp")]
+    {
+        return horizon_uwp_network::srv(name);
+    }
+    #[cfg(not(target_vendor = "uwp"))]
     dns::query_srv(name, &dns::system_name_servers(), dns::SERVER_TIMEOUT)
 }
 

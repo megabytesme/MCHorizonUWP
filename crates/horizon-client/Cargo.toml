@@ -87,6 +87,7 @@ horizon-native-window = { path = "../../uwp/native-window", optional = true }
 horizon-native-terrain = { path = "../../uwp/native-terrain", optional = true }
 horizon-touch-native = { path = "../../mods/horizon-touch-native", optional = true }
 horizon-device-vibration-native = { path = "../../mods/horizon-device-vibration-native", optional = true }
+horizon-uwp-picker = { path = "../../uwp/picker" }
 horizon-uwp-gamepad = { path = "../../uwp/gamepad-bridge", optional = true }
 horizon-uwp-d3d11 = { path = "../../uwp/d3d11-backend", optional = true }
 
