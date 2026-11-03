@@ -20,6 +20,7 @@ public sealed class BuildInputs
     public string RustStdPatchSha256 { get; private init; } = "";
     public string ResourceInventorySha256 { get; private init; } = "";
     public string? TouchModSha256 { get; private init; }
+    public string? DeviceVibrationModSha256 { get; private init; }
     public string RustToolchain { get; private init; } = "";
     public string MsvcVersion { get; private init; } = "";
     public string WindowsSdkVersion { get; private init; } = "";
@@ -29,17 +30,19 @@ public sealed class BuildInputs
     public static BuildInputs Create(BuildSelection selection, string sourceCommit,
         string recipeSha256, string cargoLockSha256, string rustStdPatchSha256,
         string resourceInventorySha256, string? touchModSha256, string rustToolchain,
-        string msvcVersion, string windowsSdkVersion)
+        string msvcVersion, string windowsSdkVersion, string? deviceVibrationModSha256 = null)
     {
         if (selection.NativeTouchMod != (touchModSha256 is not null))
             throw new ArgumentException("A selected touch mod needs exactly one content digest.");
+        if (selection.NativeDeviceVibration != (deviceVibrationModSha256 is not null))
+            throw new ArgumentException("A selected device vibration mod needs exactly one content digest.");
         if (!Regex.IsMatch(rustToolchain, "^[a-zA-Z0-9._+-]{1,64}$", RegexOptions.CultureInvariant))
             throw new ArgumentException("Invalid Rust toolchain identifier.");
         if (!Version.TryParse(msvcVersion, out _) || !Version.TryParse(windowsSdkVersion, out _))
             throw new ArgumentException("MSVC and Windows SDK versions must be numeric versions.");
         return new BuildInputs
         {
-            Schema = "horizon-uwp-inputs-v4", Target = selection.RustTarget, PackageVersion = selection.ValidatedPackageVersion,
+            Schema = "horizon-uwp-inputs-v5", Target = selection.RustTarget, PackageVersion = selection.ValidatedPackageVersion,
             PrepareSounds = selection.PrepareSounds,
             UseResourceFramework = selection.UseResourceFramework,
             Features = Array.AsReadOnly(selection.Features.ToArray()),
@@ -48,6 +51,7 @@ public sealed class BuildInputs
             RustStdPatchSha256 = Hex(rustStdPatchSha256, 64),
             ResourceInventorySha256 = Hex(resourceInventorySha256, 64),
             TouchModSha256 = touchModSha256 is null ? null : Hex(touchModSha256, 64),
+            DeviceVibrationModSha256 = deviceVibrationModSha256 is null ? null : Hex(deviceVibrationModSha256, 64),
             RustToolchain = rustToolchain, MsvcVersion = msvcVersion, WindowsSdkVersion = windowsSdkVersion,
         };
     }

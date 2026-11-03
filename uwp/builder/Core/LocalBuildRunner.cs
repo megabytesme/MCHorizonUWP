@@ -92,6 +92,8 @@ public static class LocalBuildRunner
         var arch = arm ? "arm" : "x64";
         vcEnvironment["HORIZON_UWP_XAUDIO"] = "1";
         vcEnvironment["HORIZON_UWP_HTTP"] = "1";
+        vcEnvironment["HORIZON_UWP_GAMEPAD"] = "1";
+        if (selection.NativeDeviceVibration) vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = "1";
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
         progress?.Report("Strict-linking the UWP host.");
         // cmd.exe is required for the checked-in .cmd file. Its command is fixed;

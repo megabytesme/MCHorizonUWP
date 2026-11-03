@@ -101,6 +101,32 @@ Paste the prompt below into the new Codex instance.
 
 ---
 
+## Integration update (2026-11-03)
+
+This update supersedes older branch-status statements below. The active integration
+worktree is `.local/client-builder-integration` on `uwp-client-builder-integration`.
+It combines the phone-tested touch, XAudio and WinRT HTTPS adapters, shared account
+protocol and Credential Locker core, and asset-framework builder work. Microsoft
+sign-in and the native UWP pre-game UI are not yet connected. The combined signed
+ARM32 and x64 sound packages are being tested by the user; do not overwrite them.
+
+The integration branch removes Wasm parsing from the UWP dependency graph. The
+Windows.Gaming.Input bridge and optional `horizon_device_vibration` native mod
+are in commit `03c0832c5354b3522b24f564bf843ffc37368953`; their combined
+x64 and ARM32 release bridges and strict UWP host links succeeded. Its persistent in-game setting is independent of controller
+vibration. The phone vibration API was previously tested as a probe; the combined
+mod and generic tablet haptics still need physical-device testing.
+
+A separate uncommitted merge of upstream `origin/main` at
+`ccf8f453fb55e146f48964d4cd11d350cb586d53` is in
+`C:\Users\ben\.huwp\b\upstream-2e0a6957` on branch
+`codex/uwp-upstream-refresh-2e0a6957`. It is incomplete and has unresolved
+conflicts; preserve that worktree and do not replace the stable integration branch
+with it until the update is reconciled and tested. Upstream split the client
+library and made major renderer, account and game changes. Keep UWP functionality
+in native mods or small platform adapters where possible, without losing upstream
+features.
+
 You are continuing the Horizon UWP client and desktop AppX builder project. The user wants a polished WinUI 3 desktop app that can prepare and build a Horizon UWP client and its optional asset-framework package, with a pre-game client experience for Microsoft/Minecraft account sign-in, renderer choice, and later platform features.
 
 ## Scope

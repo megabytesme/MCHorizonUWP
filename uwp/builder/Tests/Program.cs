@@ -239,7 +239,10 @@ Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("t
     && fetchStep.Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml"), "fetch uses target, host and overrides");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
-Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https"), "touch build features");
+Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https,uwp-controller"), "touch and controller build features");
+var withDevice = new BuildSelection(TargetProfile.WindowsMobile, true, NativeDeviceVibration: true);
+Require(withDevice.ModIds.Contains(BuildSelection.DeviceVibrationModId)
+    && withDevice.Features.Contains("native-device-vibration-mod"), "device vibration is an optional native mod");
 var prepareRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
 Require(prepareRecipe.Steps.Single(step => step.Name == "Build resource preparer").Arguments.Contains("x86_64-pc-windows-msvc")
     && prepareRecipe.Steps.Any(step => step.Name == "Prepare sound assets"), "optional sound preparation uses the desktop host target");
@@ -266,10 +269,10 @@ catch (ArgumentOutOfRangeException) { }
 try { await WindowsPackageManager.InstallAsync(new FakeProbe(), InstallableTool.Rustup); throw new Exception("missing WinGet accepted"); }
 catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
-Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https"]), "native touch feature selection");
+Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller"]), "native touch feature selection");
 Require(selection.ModIds.SequenceEqual(["horizon_touch"]), "stable native touch mod ID");
 Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");
-Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-audio", "uwp-https"]), "touch can be omitted");
+Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-audio", "uwp-https", "uwp-controller"]), "touch can be omitted");
 Require(new BuildSelection(TargetProfile.DesktopX64, false).ModIds.Count == 0, "omitted mod ID");
 try { _ = new BuildSelection((TargetProfile)99, false).RustTarget; throw new Exception("invalid target accepted"); }
 catch (ArgumentOutOfRangeException) { }
@@ -287,6 +290,10 @@ var withSounds = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobi
 Require(inputs.Sha256() != withSounds.Sha256(), "sound preparation changes input hash");
 var withFramework = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, UseResourceFramework: true), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() != withFramework.Sha256(), "framework selection changes input hash");
+var withVibration = BuildInputs.Create(withDevice, commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0", hash);
+Require(inputs.Sha256() != withVibration.Sha256(), "device vibration changes input hash");
+try { _ = BuildInputs.Create(withDevice, commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0"); throw new Exception("missing vibration digest accepted"); }
+catch (ArgumentException) { }
 try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, null, "stable", "14.44", "10.0.15063.0"); throw new Exception("missing touch digest accepted"); }
 catch (ArgumentException) { }
 try { _ = BuildInputs.Create(selection, commit, "not-a-hash", hash, hash, hash, hash, "stable", "14.44", "10.0.15063.0"); throw new Exception("invalid digest accepted"); }

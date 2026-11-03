@@ -12,7 +12,7 @@ public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 /// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "2b0df3b55786186db71008e35de619a0f85b2342";
+    public const string SourceCommit = "03c0832c5354b3522b24f564bf843ffc37368953";
     public const string RustVersion = "1.99.1";
     public const string MinecraftVersion = "26.3";
     public const string SourceManifestVersion = "1.0.1.0";
@@ -71,6 +71,7 @@ public static class LocalRecipe
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
         if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
         if (selection.UseResourceFramework) notes.Add("The separate unsigned resource framework contains your private prepared resources; retain it for clients using the same content and install it as a dependency.");
+        if (selection.NativeDeviceVibration) notes.Add("Device vibration is an optional native mod with its own setting, separate from controller vibration; unsupported devices are ignored.");
         if (arm) notes.Add("ARM32 uses the offline TLS dependency override; skin and Minecraft session requests use the WinRT HTTPS adapter. Microsoft sign-in is not yet implemented.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
     }

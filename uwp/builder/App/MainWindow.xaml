@@ -21,6 +21,7 @@
     </ComboBox>
     <TextBlock Text="Renderer: Native D3D11 (feature level 9_1). This recipe has no other verified renderer choices." TextWrapping="Wrap" />
     <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" />
+    <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration as a separate native mod" />
     <TextBlock Text="Package version (choose a version newer than the one installed on the target)" TextWrapping="Wrap" />
     <TextBox x:Name="PackageVersion" Text="1.0.10.0" />
     <TextBlock Text="The selected source mod is compiled into the client using the pinned local recipe." TextWrapping="Wrap" />
