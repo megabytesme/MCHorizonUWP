@@ -184,7 +184,8 @@ extern "C" int32_t __cdecl horizon_uwp_run(const uint16_t*, size_t, const uint16
 extern "C" int32_t __cdecl horizon_uwp_run_prepared(const uint16_t*, size_t, const uint16_t*, size_t);
 extern "C" int __cdecl horizon_uwp_xaml_start();
 extern "C" void __cdecl horizon_uwp_page_refresh_tile();
-extern "C" int __cdecl horizon_uwp_page_show_game(int);
+extern "C" int32_t __cdecl horizon_uwp_page_show_game(int);
+extern "C" size_t __cdecl horizon_uwp_page_switch_error(uint8_t*, size_t);
 #endif
 extern "C" int __cdecl horizon_uwp_is_local_test() {
     try {
@@ -491,8 +492,9 @@ static void run_game_in_primary_view() {
         events = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
 
         stage = "replacing the pre-game page with the game surface";
-        if (!horizon_uwp_page_show_game(1))
-            throw ref new Platform::FailureException();
+        const int32_t page_result = horizon_uwp_page_show_game(1);
+        if (page_result < 0)
+            throw Platform::Exception::CreateException(page_result);
         page_hidden = true;
         events->EmitInitialSize();
 #ifdef HORIZON_UWP_TOUCH_MOD
@@ -510,9 +512,18 @@ static void run_game_in_primary_view() {
         stage = "refreshing the live tile";
         horizon_uwp_page_refresh_tile();
     } catch (Platform::Exception^ error) {
-        char message[320];
-        sprintf_s(message, "Horizon encountered a Windows error while %s (0x%08X). A diagnostic was saved in app storage.",
-            stage, static_cast<unsigned>(error->HResult));
+        char message[512];
+        unsigned int page_detail_length = 0;
+        char page_detail[192] = {};
+        if (strcmp(stage, "replacing the pre-game page with the game surface") == 0)
+            page_detail_length = static_cast<unsigned int>(horizon_uwp_page_switch_error(
+                reinterpret_cast<uint8_t*>(page_detail), sizeof(page_detail)));
+        if (page_detail_length > 0)
+            sprintf_s(message, "Horizon encountered a Windows error while %s (0x%08X: %s). A diagnostic was saved in app storage.",
+                stage, static_cast<unsigned>(error->HResult), page_detail);
+        else
+            sprintf_s(message, "Horizon encountered a Windows error while %s (0x%08X). A diagnostic was saved in app storage.",
+                stage, static_cast<unsigned>(error->HResult));
         report_native_failure(message);
     } catch (...) {
         char message[256];

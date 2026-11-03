@@ -122,6 +122,7 @@ TextBox^ offline_name_box;
 Platform::String^ prompt_text = L"";
 unsigned prompt_kind = 0;
 unsigned displayed_generation = 0;
+char page_switch_error[256] = {};
 bool renderer_known = false;
 bool renderer_available = false;
 Platform::String^ renderer_failure;
@@ -1586,21 +1587,59 @@ extern "C" void __cdecl horizon_uwp_page_refresh_tile() {
             ref new DispatchedHandler([]() { update_live_tile(); }));
     } catch (...) {}
 }
-extern "C" int __cdecl horizon_uwp_page_show_game(int show) {
+extern "C" size_t __cdecl horizon_uwp_page_switch_error(unsigned char* buffer, size_t capacity) {
+    const size_t length = strlen(page_switch_error);
+    if (buffer && capacity) {
+        const size_t copied = (std::min)(length, capacity - 1);
+        memcpy(buffer, page_switch_error, copied);
+        buffer[copied] = 0;
+    }
+    return length;
+}
+extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
+    page_switch_error[0] = 0;
+    if (!dispatcher) {
+        strcpy_s(page_switch_error, "The XAML dispatcher is unavailable.");
+        return E_POINTER;
+    }
+    if (!dispatcher->HasThreadAccess) {
+        strcpy_s(page_switch_error, "The page switch was called outside the XAML dispatcher thread.");
+        return RPC_E_WRONG_THREAD;
+    }
+    if (!page) {
+        strcpy_s(page_switch_error, "The pre-game page was not initialized.");
+        return E_POINTER;
+    }
+    auto window = Window::Current;
+    if (!window) {
+        strcpy_s(page_switch_error, "The current XAML window is unavailable.");
+        return E_HANDLE;
+    }
     try {
-        if (!dispatcher || !dispatcher->HasThreadAccess || !page) return 0;
-        auto window = Window::Current;
-        if (!window) return 0;
         if (show) {
+            auto current_content = window->Content;
+            if (current_content == nullptr) return S_OK;
+            if (current_content != page) {
+                strcpy_s(page_switch_error, "The current window content is not the pre-game page.");
+                return E_UNEXPECTED;
+            }
             window->Content = nullptr;
         } else {
             window->Content = page;
             apply_theme();
             if (prompt_kind == 0) refresh();
         }
-        return 1;
+        return S_OK;
+    } catch (Platform::Exception^ error) {
+        const auto detail = error->Message;
+        if (detail && detail->Length() > 0)
+            WideCharToMultiByte(CP_UTF8, 0, detail->Data(), -1, page_switch_error,
+                                static_cast<int>(sizeof(page_switch_error)), nullptr, nullptr);
+        if (!page_switch_error[0]) strcpy_s(page_switch_error, "XAML threw an exception while switching page content.");
+        return error->HResult;
     } catch (...) {
-        return 0;
+        strcpy_s(page_switch_error, "An unknown exception occurred while switching page content.");
+        return E_FAIL;
     }
 }
 extern "C" size_t __cdecl horizon_uwp_dialog_text(unsigned char* buffer, size_t capacity) {
