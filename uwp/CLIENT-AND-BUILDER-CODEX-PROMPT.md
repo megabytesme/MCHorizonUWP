@@ -1,5 +1,40 @@
 # Codex prompt: Horizon UWP client and AppX builder
 
+## Current integration status — 3 November 2026
+
+The latest work is on the isolated branch
+`codex/uwp-nightly-f42ef42` in
+`C:/Users/ben/.huwp/b/upstream-fc021-20261103`. Its feature commits are
+`8cb8bfeba Add configurable touch controls and device gyro` and
+`5d8d03d61 Pin builder to configurable touch client`; the independent builder
+MSBuild-path fix is `01dfbcf22`. No changes were pushed. These current notes
+supersede older status statements below when they conflict.
+
+The native touch mod now provides pre-game sliders for touch-look sensitivity
+and control size, plus opt-in gyro aiming and its sensitivity. Control size
+scales both rendered controls and touch hit areas. Windows sensor access stays
+in a UWP adapter; the shared Rust mod contains settings and axis conversion.
+Controller vibration remains independent. The WinUI 3 builder publishes
+self-contained successfully and pins client source `8cb8bfeba46c53d8675e8fef860fecbb688b1221`
+at package version `2026.1103.930.54`.
+
+The ARM32 release Cargo build succeeded using all 32 configured cores, and the
+native host compiled through its controller, gyrometer, networking, picker,
+device-haptics, and credential-store objects. The final shell/package build is
+blocked because WinUI 2.7.3 is absent from
+`C:/Users/ben/.nuget/packages/microsoft.ui.xaml/2.7.3`; the checked-in ARM32
+shell build requires its license to be reviewed before restoring that NuGet
+dependency. No new client APPX has been produced or signed. The user has
+authorized signing a completed build through local SSH; private keys must stay
+in the certificate store and must not be exported.
+
+The reusable signed Minecraft 26.3 asset framework already available for the
+next client build is
+`C:/Users/ben/.huwp/b/upstream-fc021-20261103/.local/buildcheck/renderer-dx12-20261103/arm-final/deliverables/Horizon-26.3-Assets-signed.appx`.
+The extracted private resource tree is under
+`C:/Users/ben/.huwp/b/upstream-fc021-20261103/.local/buildcheck/live-tile/asset-framework-unpacked-gyro/resources`.
+Do not commit, delete, overwrite, or otherwise expose either asset copy.
+
 ## Published nightly update — 3 November 2026
 
 At the user's request, follow the published Horizon nightly instead of the
@@ -15,7 +50,8 @@ nightly version fields. It checks GitHub's public nightly release metadata
 but does not automatically integrate an unverified upstream revision. Its
 default APPX version, `2026.1103.930.50`, encodes the nightly's UTC release
 timestamp; use a higher version for subsequent port builds of the same
-nightly. The prototype signing integration approval block still applies.
+nightly. Signing remains outside the builder; the local SSH signing flow is
+authorized after a client package is produced.
 
 The signed ARM32 nightly client is
 `C:/Users/ben/.huwp/b/nightly-f42-arm-20261103/HorizonUWP-nightly-ARM32-signed.appx`
@@ -27,11 +63,10 @@ signature verification, signer thumbprint, every block-map entry, ARM machine
 type, executable match and stack reserve were checked. It has not yet been
 run on the phone and still uses the interim CoreWindow page.
 
-The real XAML/WinUI pre-game shell remains work in progress in the separate
-`codex/uwp-xaml-shell` worktree. Its isolated prototype renders WinUI 2
-navigation and system accent, Acrylic and Mica after providing the WinUI
-XAML metadata provider. It is not included in this nightly commit. Preserve
-that worktree and its private test packages when continuing the integration.
+At the time of this historical note, the real XAML/WinUI pre-game shell was
+still in a separate worktree. It has since been integrated into the isolated
+branch recorded in the current status above. Preserve the old worktree and its
+private test packages unless a later reconciliation explicitly needs them.
 
 ## Multiplayer stack fix — 3 November 2026
 
