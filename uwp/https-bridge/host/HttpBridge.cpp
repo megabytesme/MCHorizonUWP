@@ -1,3 +1,11 @@
+// Newer MSVC STL headers import these C names even for AppContainer builds,
+// while the UWP SDK hides their declarations. They are declared only to let
+// <cstdlib> compile; this bridge must never call either desktop-only API.
+#if defined(_MSC_VER) && _MSC_VER >= 1940 && defined(WINAPI_FAMILY)
+extern "C" __declspec(dllimport) char* __cdecl getenv(const char*);
+extern "C" __declspec(dllimport) int __cdecl system(const char*);
+#endif
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
