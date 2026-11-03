@@ -12,11 +12,11 @@ public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 /// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "f01546a5b9278831f1e515f8818b91e6b5601944";
+    public const string SourceCommit = "e9bfe852fbc1ad1d31e6eb22f44972a740774162";
     public const string UpstreamNightlyDate = "2026-11-03";
     public const string UpstreamNightlyCommit = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81";
     public const string UpstreamNightlyShortCommit = "f42ef42";
-    public const string DefaultPackageVersion = "2026.1103.930.57";
+    public const string DefaultPackageVersion = "2026.1103.930.58";
     public const string UpstreamReleaseVersion = "nightly-" + UpstreamNightlyDate;
     public const string UpstreamNightly = UpstreamNightlyDate + " " + UpstreamNightlyShortCommit;
     public const string RustVersion = "1.99.1";

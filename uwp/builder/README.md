@@ -45,7 +45,7 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`f01546a5b9278831f1e515f8818b91e6b5601944`, Rust 1.99.1 and Minecraft
+`e9bfe852fbc1ad1d31e6eb22f44972a740774162`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
@@ -54,7 +54,7 @@ port is based on Horizon nightly `2026-11-03` at upstream source commit
 date and short commit in Horizon's version fields. They are UWP port builds,
 not the official Horizon binaries. The upstream nightly's publication version
 is `2026.1103.930.50`; the current default UWP APPX version is
-`2026.1103.930.57`. Keep the same package identity for upgrades and choose a
+`2026.1103.930.58`. Keep the same package identity for upgrades and choose a
 higher version when rebuilding the port for the same nightly. This
 recipe is pinned; a newer upstream nightly must be integrated and verified
 before the builder's pin is updated. On startup the builder checks GitHub's

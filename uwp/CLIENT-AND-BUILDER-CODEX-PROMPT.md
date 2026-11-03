@@ -5,6 +5,7 @@
 The latest work is on the isolated branch
 `codex/uwp-nightly-f42ef42` in
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103`. Recent feature commits are
+`e9bfe852f Preserve XAML page switch failure details`,
 `f01546a5b Attach game input before replacing the UWP page`,
 `4d13f5e9c Fix native renderer probe and game startup diagnostics` and
 `1af61d2f6 Pin builder to the mobile renderer fix`; earlier commits add the
@@ -42,11 +43,15 @@ the process without a catchable dialog.
 
 On the next Lumia attempt, the resource log reached `rest-ready` after 15.4 s,
 then the app reported `0x8000FFFF` while attaching game input to the existing
-CoreWindow. This failure occurred while constructing the CoreWindow event
-adapter after the XAML content had been detached. The host now subscribes to
-CoreWindow events while XAML still owns the view, then detaches the page and
-sends the game's initial resize event. The change compiled and strict-linked
-for ARM32; the handset retry remains outstanding.
+CoreWindow. The host now subscribes to CoreWindow events while XAML still owns
+the view, then detaches the page and sends the game's initial resize event.
+Input registration has since passed; the latest attempt failed at page
+replacement with `0x8000FFFF`. The old page-switch helper hid both HRESULTs and
+XAML exceptions behind the same boolean result. The current source preserves
+the HRESULT, reports page/dispatcher precondition failures, and includes the
+XAML exception message in the app-local diagnostic and dialog. This diagnostic
+update compiled and strict-linked for ARM32; the actual page-switch issue is
+not yet confirmed fixed and the handset retry remains outstanding.
 
 After the user's license review, Microsoft.UI.Xaml 2.7.3 was restored to the
 per-user NuGet cache and the ARM32 WinUI shell build completed. The recovered
@@ -57,14 +62,14 @@ The shell emits existing WinUI metadata warnings from the legacy ARM SDK, but
 compiles and links successfully. The self-contained WinUI 3 builder was
 republished at
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103/uwp/builder/App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/publish/Horizon.Builder.App.exe`
-(SHA-256 `FFAA0B1611FAAB348653296A577D1FB309CC56674FD9B4A3A0B6F1164E99D843`).
+(SHA-256 `B832D636CEAE5F09585EAC9EE8F159FE630640A4EA5C51B1B86898BCB96A023B`).
 
-The signed ARM32 client bundle is at
-`C:/Users/ben/.huwp/b/input-handoff-fix-20261103/deliverables`. The client package is
+The signed ARM32 diagnostic client bundle is at
+`C:/Users/ben/.huwp/b/page-switch-details-20261103/deliverables`. The client package is
 `HorizonUWP-ARM32-signed.appx` (SHA-256
-`335615ED514CE289D07A497DC45401AF055F35EC3E719CA78C6960D0E3CB24B6`), identity
-`HorizonUWPLatestPreview`, version `2026.1103.930.57`; it was built from source
-`f01546a5b9278831f1e515f8818b91e6b5601944` and includes the pinned Horizon
+`C58B16C597B1AFFDA5A4A51987BE05561809B9397558D4C4C7F6107161040361`), identity
+`HorizonUWPLatestPreview`, version `2026.1103.930.58`; it was built from source
+`e9bfe852fbc1ad1d31e6eb22f44972a740774162` and includes the pinned Horizon
 nightly `2026-11-03` notes. It uses the already-built, unchanged 26.3 asset
 framework `Horizon-26.3-Assets-signed.appx` (SHA-256
 `CA814E4C946A93AE18DC9941A9AB7C197B55FD0350E4B453ECE2E4AFB1921BAD`) and
