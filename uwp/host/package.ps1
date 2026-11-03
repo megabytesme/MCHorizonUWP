@@ -6,9 +6,12 @@ param(
     [string]$Executable,
     [string]$OutputDirectory,
     [string]$Resources,
+    [ValidatePattern('^Horizon\.Asset\.[0-9-]+\.[0-9a-f]{20,30}$')][string]$ResourceFrameworkName,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$')][string]$IdentityName
 )
 $ErrorActionPreference = 'Stop'
+if ($Resources -and $ResourceFrameworkName) { throw 'Choose embedded resources or a resource framework, not both.' }
+if ($ResourceFrameworkName -and $ResourceFrameworkName.Length -gt 50) { throw 'Resource framework identity is too long.' }
 function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
     $machine = @{ x64 = 0x8664; arm64 = 0xaa64; arm = 0x1c4 }[$TargetArchitecture]
     $stream = [IO.File]::OpenRead($Path)
@@ -86,6 +89,16 @@ if ($Resources) {
 $manifest = (Get-Content (Join-Path $hostDir 'AppxManifest.xml') -Raw).Replace('ProcessorArchitecture="x64"', "ProcessorArchitecture=`"$Architecture`"")
 if ($IdentityName) {
     $manifest = $manifest.Replace('Name="HorizonUWPPrototype"', "Name=`"$IdentityName`"")
+}
+if ($ResourceFrameworkName) {
+    $manifestXml = [xml]$manifest
+    $namespace = $manifestXml.DocumentElement.NamespaceURI
+    $dependency = $manifestXml.CreateElement('PackageDependency', $namespace)
+    $dependency.SetAttribute('Name', $ResourceFrameworkName)
+    $dependency.SetAttribute('Publisher', 'CN=HorizonUWPPrototype')
+    $dependency.SetAttribute('MinVersion', '1.0.0.0')
+    $manifestXml.Package.Dependencies.AppendChild($dependency) | Out-Null
+    $manifest = $manifestXml.OuterXml
 }
 Set-Content -Path (Join-Path $stage 'AppxManifest.xml') -Value $manifest -Encoding UTF8
 Add-Type -AssemblyName System.Drawing

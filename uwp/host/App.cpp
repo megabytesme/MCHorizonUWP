@@ -168,6 +168,21 @@ public:
         if (local_manifest == INVALID_HANDLE_VALUE) {
             auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
             resources = Platform::String::Concat(installed, ref new Platform::String(L"\\resources"));
+            // A client may instead depend on a versioned resource framework.
+            // Only use an unambiguous framework from this package's graph.
+            Platform::String^ framework_resources = nullptr;
+            auto dependencies = Windows::ApplicationModel::Package::Current->Dependencies;
+            for (unsigned int index = 0; index < dependencies->Size; ++index) {
+                auto dependency = dependencies->GetAt(index);
+                auto name = dependency->Id->Name;
+                constexpr wchar_t prefix[] = L"Horizon.Asset.";
+                if (wcsncmp(name->Data(), prefix, _countof(prefix) - 1) != 0) continue;
+                if (wcscmp(dependency->Id->Publisher->Data(), L"CN=HorizonUWPPrototype") != 0) continue;
+                if (framework_resources != nullptr) throw ref new Platform::FailureException();
+                framework_resources = Platform::String::Concat(
+                    dependency->InstalledLocation->Path, ref new Platform::String(L"\\resources"));
+            }
+            if (framework_resources != nullptr) resources = framework_resources;
         } else {
             CloseHandle(local_manifest);
         }
