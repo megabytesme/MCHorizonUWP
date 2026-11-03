@@ -13,15 +13,28 @@ where they conflict with this update; their safeguards and remaining scope still
   dependency override still leaves non-adapted HTTPS paths unavailable.
 - Unsigned, private test packages include 4,961 verified sound files and
   `sounds.json`. They use distinct identities so they do not replace the
-  phone's existing game. They are **not installable until signed**:
+  phone's existing game. The original unsigned packages are:
   - x64: `.local/client-builder-integration/.local/combined-x64-unsigned/HorizonUWP-x64-with-sound.appx`,
     identity `HorizonUWPIntegrationX64`, SHA-256
     `e40f2f69787122994ae506e54892e22e2e99ef7eb2d6442623dca9d0420a5b4f`.
   - ARM32: `C:/Users/ben/.huwp/b/0e7ac4615b164865/combined-arm-unsigned/HorizonUWP-arm-with-sound.appx`,
     identity `HorizonUWPIntegrationArm`, SHA-256
-    `9026deeea1ef5a6958708cec2d26f30c67519861951a1b8a788ba449c55f722d`.
+    `9026deeea1ef5a6958708cec2d26f30c67519861951a1b8a788ba449c55f722c`.
   Both use publisher `CN=HorizonUWPPrototype`. The previous no-sound packages
   were retained. Do not upload, commit or redistribute any of these packages.
+- Signed copies were created through the user's local SSH account without
+  exporting the private key or changing certificate trust:
+  - x64: `.local/client-builder-integration/.local/combined-x64-unsigned/HorizonUWP-x64-with-sound-signed.appx`,
+    SHA-256 `125b7b5be518818dab44b1ed3bdb6a6f349041ef7ce65fdbb6d73ebbc8e8b66a`.
+  - ARM32: `C:/Users/ben/.huwp/b/0e7ac4615b164865/combined-arm-unsigned/HorizonUWP-arm-with-sound-signed.appx`,
+    SHA-256 `8beb685bde49e8eec8810e43b4a0c5504f8545a82ea99b3d9010f77d48233a81`.
+  ZIP integrity and signature entries were checked. Windows SignTool reports
+  the self-signed root is untrusted on this PC; installation and target-device
+  trust remain to be checked by the user. The signed copies contain private assets.
+- The stale `localhost` SSH host-key record was replaced with the already
+  trusted Ben-Desktop key from `192.168.1.121`. Normal verified localhost SSH
+  works; the original known-hosts file is backed up as
+  `C:/Users/ben/.ssh/known_hosts.before-codex-7339caa402cc402fac1874681114e178`.
 - The builder's pinned client source is `2ce3d73dbc9e82634b73d65606b3cb14a4e63347`.
   It fetches target and x64-host Cargo dependencies before an offline build,
   and can prepare missing sounds in a private snapshot from a selected Minecraft
@@ -42,8 +55,10 @@ where they conflict with this update; their safeguards and remaining scope still
   signing, Sandbox validation and device checks also remain open.
 - An automatic approval review blocked the command to create the
   certificate-store signing implementation, with the stated reason "blocked by
-  policy". Do not bypass that review. No certificate, private key, trust store
-  or signed package was changed. Resolve the review before continuing signing.
+  policy". Do not bypass that review. The user separately authorized signing
+  the existing test packages over SSH; those signed copies are listed above.
+  No certificate, private key or trust store was changed. Resolve the review
+  before implementing the rejected builder signing workflow.
 - The client build exhausted memory with all 32 jobs, even after running alone;
   both successful combined builds used 8 Cargo jobs. Increase concurrency only
   if available memory permits. No commits contain co-author trailers; do not push.
