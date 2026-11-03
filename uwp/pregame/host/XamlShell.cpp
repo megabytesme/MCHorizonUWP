@@ -124,6 +124,7 @@ unsigned prompt_kind = 0;
 unsigned displayed_generation = 0;
 bool renderer_known = false;
 bool renderer_available = false;
+Platform::String^ renderer_failure;
 TextBlock^ renderer_status;
 #ifdef HORIZON_UWP_TOUCH_MOD
 std::mutex gyro_settings_mutex;
@@ -134,39 +135,24 @@ double touch_sensitivity = 1.0;
 double touch_control_scale = 1.0;
 #endif
 
-int probe_native_renderer(CoreWindow^ window) {
-    if (!window) return 0;
+struct NativeRendererProbe {
+    HRESULT result;
+    D3D_FEATURE_LEVEL selected;
+};
+
+NativeRendererProbe probe_native_renderer() {
     const D3D_FEATURE_LEVEL requested[] = { D3D_FEATURE_LEVEL_9_1 };
-    D3D_FEATURE_LEVEL selected = D3D_FEATURE_LEVEL_9_1;
+    D3D_FEATURE_LEVEL selected = static_cast<D3D_FEATURE_LEVEL>(0);
     Microsoft::WRL::ComPtr<ID3D11Device> device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
     HRESULT result = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
         D3D11_CREATE_DEVICE_BGRA_SUPPORT, requested, ARRAYSIZE(requested), D3D11_SDK_VERSION,
         &device, &selected, &context);
-    if (FAILED(result) || selected != D3D_FEATURE_LEVEL_9_1) return 0;
-    Microsoft::WRL::ComPtr<IDXGIDevice> dxgi_device;
-    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
-    Microsoft::WRL::ComPtr<IDXGIFactory2> factory;
-    if (FAILED(device.As(&dxgi_device)) || FAILED(dxgi_device->GetAdapter(&adapter)) ||
-        FAILED(adapter->GetParent(IID_PPV_ARGS(&factory)))) return 0;
-    DXGI_SWAP_CHAIN_DESC1 description = {};
-    description.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    description.SampleDesc.Count = 1;
-    description.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    description.BufferCount = 2;
-    description.Scaling = DXGI_SCALING_NONE;
-    description.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-    description.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-    Microsoft::WRL::ComPtr<IUnknown> core_window;
-    core_window = reinterpret_cast<IUnknown*>(window);
-    Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain;
-    if (FAILED(factory->CreateSwapChainForCoreWindow(device.Get(), core_window.Get(),
-        &description, nullptr, &swap_chain))) return 0;
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> back_buffer;
-    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> target;
-    if (FAILED(swap_chain->GetBuffer(0, IID_PPV_ARGS(&back_buffer))) ||
-        FAILED(device->CreateRenderTargetView(back_buffer.Get(), nullptr, &target))) return 0;
-    return 1;
+    if (SUCCEEDED(result) && selected != D3D_FEATURE_LEVEL_9_1) result = DXGI_ERROR_UNSUPPORTED;
+    // Do not create a CoreWindow swap chain while XAML owns this window's
+    // compositor. The native game creates and validates its swap chain after
+    // the shell releases Window::Content in horizon_uwp_page_show_game().
+    return { result, selected };
 }
 enum class AppAppearance { Automatic, Windows10, Windows10Fluent, Windows11SunValley };
 AppAppearance selected_appearance = AppAppearance::Automatic;
@@ -1128,7 +1114,12 @@ void refresh() {
         renderers->SelectedIndex = 0;
         launch_card->Children->Append(renderers);
         renderer_status = text(renderer_known
+#ifdef HORIZON_UWP_NATIVE_D3D11
+            ? (renderer_available ? L"This device supports Direct3D 11 feature level 9_1. The game checks its presentation surface when it starts." :
+                (renderer_failure ? renderer_failure : L"The native Direct3D 11 device could not be created."))
+#else
             ? (renderer_available ? L"The client configured and presented through this renderer on this device." : L"The client could not open a compatible graphics device and presentation surface on this device.")
+#endif
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
@@ -1284,7 +1275,12 @@ void refresh() {
         panel->Children->Append(text(L"Horizon", 32));
         panel->Children->Append(text(prompt_text, 16));
         panel->Children->Append(text(renderer_known
+#ifdef HORIZON_UWP_NATIVE_D3D11
+            ? (renderer_available ? Platform::String::Concat(renderer_label(), L" is ready. The game checks presentation when it starts.") :
+                (renderer_failure ? renderer_failure : L"No compatible renderer was detected."))
+#else
             ? (renderer_available ? Platform::String::Concat(renderer_label(), L" is ready.") : L"No compatible renderer was detected.")
+#endif
             : L"Checking graphics support…", 14));
         panel->Children->Append(profile_card());
         panel->Children->Append(button(L"Start game", 1));
@@ -1470,9 +1466,14 @@ protected:
         PROBE_STAGE(L"Window activated");
 #ifdef HORIZON_UWP_NATIVE_D3D11
         renderer_known = true;
-        renderer_available = probe_native_renderer(CoreWindow::GetForCurrentThread()) != 0;
-        if (!renderer_available)
-            show_message(L"Graphics compatibility", L"This device could not open Horizon's native Direct3D 11 feature level 9_1 renderer.");
+        const auto probe = probe_native_renderer();
+        renderer_available = SUCCEEDED(probe.result);
+        if (!renderer_available) {
+            wchar_t message[192];
+            swprintf_s(message, L"Horizon could not create a Direct3D 11 feature level 9_1 device (HRESULT 0x%08X).",
+                static_cast<unsigned>(probe.result));
+            renderer_failure = ref new Platform::String(message);
+        }
 #else
         renderer_known = true;
 #ifdef HORIZON_UWP_DX12

@@ -461,57 +461,72 @@ static void run_game_in_primary_view() {
     }
 
     auto window = primary_window;
-    auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
-    auto resources = resolve_resources(local_path);
-    auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
-    auto application_view = Windows::UI::ViewManagement::ApplicationView::GetForCurrentView();
-    const bool was_full_screen = application_view->IsFullScreenMode;
-    const bool phone = Windows::Foundation::Metadata::ApiInformation::IsApiContractPresent(
-        L"Windows.Phone.PhoneContract", 1);
-    if (phone && !was_full_screen) {
-        try { application_view->TryEnterFullScreenMode(); }
-        catch (Platform::Exception^) {}
-    }
-
-    if (!horizon_uwp_page_show_game(1)) {
-        if (phone && !was_full_screen) application_view->ExitFullScreenMode();
-        report_native_failure("Horizon could not replace the pre-game page with the game surface.");
-        return;
-    }
-
+    const char* stage = "loading the game resources";
+    Windows::UI::ViewManagement::ApplicationView^ application_view = nullptr;
+    bool phone = false;
+    bool was_full_screen = false;
+    bool page_hidden = false;
     horizon_uwp::CoreWindowEvents^ events = nullptr;
 #ifdef HORIZON_UWP_TOUCH_MOD
-    horizon_uwp_gyro_set_visible(1);
+    bool gyro_visible = false;
 #endif
     try {
+        auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+        auto resources = resolve_resources(local_path);
+        auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
+        stage = "checking the active UWP view";
+        application_view = Windows::UI::ViewManagement::ApplicationView::GetForCurrentView();
+        was_full_screen = application_view->IsFullScreenMode;
+        phone = Windows::Foundation::Metadata::ApiInformation::IsApiContractPresent(
+            L"Windows.Phone.PhoneContract", 1);
+        if (phone && !was_full_screen) {
+            try { application_view->TryEnterFullScreenMode(); }
+            catch (Platform::Exception^) {}
+        }
+
+        stage = "replacing the pre-game page with the game surface";
+        if (!horizon_uwp_page_show_game(1))
+            throw ref new Platform::FailureException();
+        page_hidden = true;
+#ifdef HORIZON_UWP_TOUCH_MOD
+        stage = "starting device gyroscope input";
+        horizon_uwp_gyro_set_visible(1);
+        gyro_visible = true;
+#endif
+        stage = "attaching game input to the existing CoreWindow";
         events = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
         events->EmitInitialSize();
-        window->Activate();
+        // ShellApp already activated this CoreWindow. Avoid an extra
+        // activation transition after detaching the XAML page.
+        stage = "starting Horizon in the existing app window";
         const int32_t result = horizon_uwp_run_prepared(
             reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
             reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
         (void)result;
+        stage = "refreshing the live tile";
         horizon_uwp_page_refresh_tile();
     } catch (Platform::Exception^ error) {
-        char message[160];
-        sprintf_s(message, "Horizon encountered a Windows error (0x%08X). A diagnostic was saved in app storage.",
-            static_cast<unsigned>(error->HResult));
+        char message[320];
+        sprintf_s(message, "Horizon encountered a Windows error while %s (0x%08X). A diagnostic was saved in app storage.",
+            stage, static_cast<unsigned>(error->HResult));
         report_native_failure(message);
     } catch (...) {
-        report_native_failure("Horizon encountered a native error. A diagnostic was saved in app storage.");
+        char message[256];
+        sprintf_s(message, "Horizon encountered a native error while %s. A diagnostic was saved in app storage.", stage);
+        report_native_failure(message);
     }
 
 #ifdef HORIZON_UWP_TOUCH_MOD
-    horizon_uwp_gyro_set_visible(0);
+    if (gyro_visible) horizon_uwp_gyro_set_visible(0);
     horizon_uwp_gyro_enable(0);
 #endif
     if (events) delete events;
     horizon_uwp_resume_pregame_input();
-    if (phone && !was_full_screen) {
+    if (phone && !was_full_screen && application_view) {
         try { application_view->ExitFullScreenMode(); }
         catch (Platform::Exception^) {}
     }
-    if (!account_window_closed.load()) horizon_uwp_page_show_game(0);
+    if (page_hidden && !account_window_closed.load()) horizon_uwp_page_show_game(0);
 }
 
 extern "C" void __cdecl horizon_uwp_open_game_view() {
