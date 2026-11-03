@@ -4,7 +4,7 @@ using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
 
-public sealed record LocalBuildResult(string Workspace, string UnsignedPackage);
+public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, string? SoundWarning);
 
 /// <summary>Runs only the pinned local recipe in a fresh, builder-owned workspace.</summary>
 public static class LocalBuildRunner
@@ -12,11 +12,12 @@ public static class LocalBuildRunner
     public const long MinimumFreeBytes = 10L * 1024 * 1024 * 1024;
 
     public static async Task<LocalBuildResult> RunAsync(string source, string resources, BuildSelection selection,
-        IProbe probe, IProgress<string>? progress = null)
+        IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
     {
         var plan = LocalRecipe.Plan(selection);
         await LocalRecipe.ValidateSourceAsync(source, probe);
         LocalRecipe.ValidateResources(resources);
+        if (selection.PrepareSounds) LocalRecipe.ValidateSoundPreparation(resources, minecraftDirectory);
         var workspaceBase = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
         if (ResourcesContainWorkspace(resources, workspaceBase))
             throw new InvalidOperationException("Choose a resource directory that does not contain the builder workspace.");
@@ -68,6 +69,10 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("Cargo could not fetch dependencies. Check the internet connection and configured Cargo registries. " + error.Message, error);
         }
 
+        var packageResources = selection.PrepareSounds
+            ? await PrepareSoundResourcesAsync(snapshot, resources, minecraftDirectory!, probe, progress)
+            : Path.GetFullPath(resources);
+
         progress?.Report("Building the game bridge. This may take several minutes.");
         try
         {
@@ -95,10 +100,10 @@ public static class LocalBuildRunner
         manifest.Save(manifestPath);
         progress?.Report("Packaging the unsigned client with the selected resources.");
         await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
-            "-Executable", executable, "-OutputDirectory", packageDir, "-Resources", Path.GetFullPath(resources)]);
+            "-Executable", executable, "-OutputDirectory", packageDir, "-Resources", packageResources]);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
-        return new(root, package);
+        return new(root, package, LocalRecipe.SoundWarning(Path.Combine(packageDir, "package", "resources")));
     }
 
     public static async Task<string> CreateSnapshotAsync(string source, IProbe probe)
@@ -174,6 +179,66 @@ public static class LocalBuildRunner
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             using var file = new FileStream(target, FileMode.CreateNew);
             entry.DataStream?.CopyTo(file);
+        }
+    }
+
+    /// Prepares sounds only in a new resource tree under the selected build snapshot.
+    internal static async Task<string> PrepareSoundResourcesAsync(string snapshot, string resources, string minecraftDirectory,
+        IProbe probe, IProgress<string>? progress = null)
+    {
+        LocalRecipe.ValidateResources(resources);
+        LocalRecipe.ValidateSoundPreparation(resources, minecraftDirectory);
+        var root = Path.GetFullPath(snapshot);
+        var destination = Path.Combine(root, ".local", "horizon-client", LocalRecipe.MinecraftVersion);
+        progress?.Report("Copying the selected resources into the build workspace.");
+        await Task.Run(() => StageResources(resources, destination));
+        var cargo = probe.FindOnPath("cargo.exe") ?? throw new InvalidOperationException("Cargo is required to prepare sounds.");
+        var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+        var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe);
+        hostEnvironment["CARGO_BUILD_JOBS"] = Environment.ProcessorCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var plan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
+        progress?.Report("Building Horizon's resource preparation tool.");
+        await RunProcess(cargo, root, plan.Steps.Single(step => step.Name == "Build resource preparer").Arguments, hostEnvironment);
+        var preparer = Path.Combine(root, ".local", "builder-prepare-target", "x86_64-pc-windows-msvc", "debug", "horizon-prepare.exe");
+        progress?.Report("Preparing verified sound assets from the selected Minecraft installation.");
+        try
+        {
+            await RunProcess(preparer, root, ["sounds", "--root", root, "--minecraft-dir", Path.GetFullPath(minecraftDirectory)]);
+        }
+        catch (InvalidOperationException error)
+        {
+            throw new InvalidOperationException("Sound preparation failed. Select a Minecraft installation where version 26.3 has been played and its assets are complete. " + error.Message, error);
+        }
+        if (LocalRecipe.SoundWarning(destination) is not null)
+            throw new InvalidDataException("Sound preparation did not produce the expected files.");
+        return destination;
+    }
+
+    /// Copies a selected tree to a new workspace directory without following links or overwriting files.
+    internal static void StageResources(string source, string destination)
+    {
+        var input = Path.GetFullPath(source);
+        var output = Path.GetFullPath(destination);
+        if (!Directory.Exists(input)) throw new DirectoryNotFoundException("Resource directory is missing.");
+        if (Directory.Exists(output) || File.Exists(output)) throw new IOException("Resource staging already exists.");
+        if (ResourcesContainWorkspace(input, output)) throw new InvalidDataException("Resource staging cannot be inside the selected resources.");
+        ValidateResourceTree(input);
+        var pending = new Stack<(string Input, string Output)>();
+        pending.Push((input, output));
+        while (pending.TryPop(out var current))
+        {
+            if ((File.GetAttributes(current.Input) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("Prepared resources contain a link.");
+            Directory.CreateDirectory(current.Output);
+            foreach (var entry in Directory.EnumerateFileSystemEntries(current.Input))
+            {
+                var attributes = File.GetAttributes(entry);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("Prepared resources contain a link.");
+                var target = Path.Combine(current.Output, Path.GetFileName(entry));
+                if ((attributes & FileAttributes.Directory) != 0) pending.Push((entry, target));
+                else File.Copy(entry, target, overwrite: false);
+            }
         }
     }
 

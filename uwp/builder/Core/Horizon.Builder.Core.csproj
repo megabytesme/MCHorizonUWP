@@ -4,5 +4,5 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-  <ItemGroup><EmbeddedResource Include="Assets/FrameworkLogo.png" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Assets/FrameworkLogo.png" /><InternalsVisibleTo Include="Horizon.Builder.Tests" /></ItemGroup>
 </Project>

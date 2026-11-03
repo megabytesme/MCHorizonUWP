@@ -9,6 +9,9 @@
     <TextBlock x:Name="SourcePath" Text="No source selected" TextWrapping="Wrap" />
     <Button Content="Choose prepared resources" Click="ChooseResources_Click" />
     <TextBlock x:Name="ResourcesPath" Text="No resources selected" TextWrapping="Wrap" />
+    <Button Content="Choose Minecraft installation (for missing sounds)" Click="ChooseMinecraft_Click" />
+    <TextBlock x:Name="MinecraftPath" Text="No Minecraft installation selected" TextWrapping="Wrap" />
+    <CheckBox x:Name="PrepareSounds" Content="Prepare missing sounds from this installation in the build workspace" />
     <TextBlock Text="Target device" Style="{StaticResource BodyStrongTextBlockStyle}" />
     <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch">
       <ComboBoxItem Content="Windows desktop (x64)" />

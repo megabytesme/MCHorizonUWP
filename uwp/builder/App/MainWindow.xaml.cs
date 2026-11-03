@@ -11,6 +11,7 @@ public sealed partial class MainWindow : Window
     public MainWindow() { InitializeComponent(); }
     private string? sourceDirectory;
     private string? resourceDirectory;
+    private string? minecraftDirectory;
 
     private async Task<string?> PickFolderAsync()
     {
@@ -32,25 +33,35 @@ public sealed partial class MainWindow : Window
         if (chosen is not null) { resourceDirectory = chosen; ResourcesPath.Text = chosen; }
     }
 
+    private async void ChooseMinecraft_Click(object sender, RoutedEventArgs e)
+    {
+        var chosen = await PickFolderAsync();
+        if (chosen is not null) { minecraftDirectory = chosen; MinecraftPath.Text = chosen; }
+    }
+
     private async void CheckRecipe_Click(object sender, RoutedEventArgs e)
     {
         CheckRecipe.IsEnabled = false;
         RecipeSteps.Children.Clear();
         try
         {
-            if (sourceDirectory is null || resourceDirectory is null)
+            var source = sourceDirectory;
+            var resources = resourceDirectory;
+            var minecraft = minecraftDirectory;
+            if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true);
             var plan = LocalRecipe.Plan(selection);
-            LocalRecipe.ValidateResources(resourceDirectory);
+            LocalRecipe.ValidateResources(resources);
+            if (selection.PrepareSounds) LocalRecipe.ValidateSoundPreparation(resources, minecraft);
             var probe = new SystemProbe();
-            await LocalRecipe.ValidateSourceAsync(sourceDirectory, probe);
+            await LocalRecipe.ValidateSourceAsync(source, probe);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
             RecipeStatus.Text = blockers.Count == 0
                 ? "Pinned source revision and required tool locations were found. Cargo will fetch missing dependencies when the build starts; signing is not yet available."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
-            if (LocalRecipe.SoundWarning(resourceDirectory) is { } warning)
+            if (!selection.PrepareSounds && LocalRecipe.SoundWarning(resources) is { } warning)
                 RecipeSteps.Children.Add(new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap });
             foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name, TextWrapping = TextWrapping.Wrap });
             foreach (var note in plan.Notes) RecipeSteps.Children.Add(new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap });
@@ -64,13 +75,16 @@ public sealed partial class MainWindow : Window
         RunRecipe.IsEnabled = false;
         try
         {
-            if (sourceDirectory is null || resourceDirectory is null)
+            var source = sourceDirectory;
+            var resources = resourceDirectory;
+            var minecraft = minecraftDirectory;
+            if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
-            var result = await LocalBuildRunner.RunAsync(sourceDirectory, resourceDirectory, selection, new SystemProbe(), progress);
+            var result = await LocalBuildRunner.RunAsync(source, resources, selection, new SystemProbe(), progress, minecraft);
             RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
-            if (LocalRecipe.SoundWarning(resourceDirectory) is { } warning)
+            if (result.SoundWarning is { } warning)
                 RecipeStatus.Text += " " + warning;
         }
         catch (Exception error) { RecipeStatus.Text = $"{RecipeStatus.Text} Build failed: {error.Message}"; }
@@ -101,7 +115,7 @@ public sealed partial class MainWindow : Window
     {
         Results.Children.Clear();
         var profile = (TargetProfile)Profile.SelectedIndex;
-        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true);
+        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true);
         Results.Children.Add(new TextBlock
         {
             Text = $"Requested target: {selection.RustTarget} | Features: {string.Join(", ", selection.Features)}",

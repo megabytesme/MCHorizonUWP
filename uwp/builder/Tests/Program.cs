@@ -1,5 +1,19 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 4 && args[0] == "--prepare-sounds")
+{
+    try
+    {
+        Require(LocalRecipe.SoundWarning(args[2]) is not null, "fixture starts without sounds");
+        var prepared = await LocalBuildRunner.PrepareSoundResourcesAsync(args[1], args[2], args[3], new SystemProbe(), new ConsoleProgress());
+        Require(LocalRecipe.SoundWarning(prepared) is null, "prepared sounds present");
+        Require(LocalRecipe.SoundWarning(args[2]) is not null, "selected resources remain unchanged");
+        Console.WriteLine($"Prepared private sound resources: {prepared}");
+    }
+    catch (Exception error) { Console.Error.WriteLine(error.Message); Environment.ExitCode = 1; }
+    return;
+}
+
 if (args.Length == 4 && args[0] == "--build-local")
 {
     try
@@ -7,6 +21,7 @@ if (args.Length == 4 && args[0] == "--build-local")
         var profile = args[3] switch { "x64" => TargetProfile.DesktopX64, "arm" => TargetProfile.WindowsMobile, _ => throw new ArgumentException("Expected x64 or arm.") };
         var result = await LocalBuildRunner.RunAsync(args[1], args[2], new BuildSelection(profile, true), new SystemProbe(), new ConsoleProgress());
         Console.WriteLine($"Unsigned package: {result.UnsignedPackage}");
+        if (result.SoundWarning is not null) Console.WriteLine(result.SoundWarning);
     }
     catch (Exception error) { Console.Error.WriteLine(error.Message); Environment.ExitCode = 1; }
     return;
@@ -98,10 +113,23 @@ if (args.Contains("--scan"))
 var soundFixture = Path.Combine(Path.GetTempPath(), "HorizonBuilderSoundFixture-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(soundFixture);
 Require(LocalRecipe.SoundWarning(soundFixture) is not null, "missing sounds reported");
+try { LocalRecipe.ValidateSoundPreparation(soundFixture, null); throw new Exception("missing Minecraft installation accepted"); }
+catch (DirectoryNotFoundException) { }
 var minecraftSounds = Path.Combine(soundFixture, "assets", "minecraft");
 Directory.CreateDirectory(Path.Combine(minecraftSounds, "sounds"));
 File.WriteAllText(Path.Combine(minecraftSounds, "sounds.json"), "{}");
 Require(LocalRecipe.SoundWarning(soundFixture) is null, "sound presence recognized");
+var stagedFixture = Path.Combine(Path.GetTempPath(), "HorizonBuilderStageFixture-" + Guid.NewGuid().ToString("N"));
+LocalBuildRunner.StageResources(soundFixture, stagedFixture);
+File.WriteAllText(Path.Combine(stagedFixture, "assets", "minecraft", "sounds.json"), "changed");
+Require(File.ReadAllText(Path.Combine(minecraftSounds, "sounds.json")) == "{}", "staging preserves source bytes");
+try { LocalBuildRunner.StageResources(soundFixture, stagedFixture); throw new Exception("existing staging accepted"); }
+catch (IOException) { }
+try { LocalBuildRunner.StageResources(soundFixture, Path.Combine(soundFixture, "nested-output")); throw new Exception("nested staging accepted"); }
+catch (InvalidDataException) { }
+try { LocalRecipe.ValidateSoundPreparation(soundFixture, soundFixture); throw new Exception("existing sounds accepted for preparation"); }
+catch (InvalidDataException) { }
+
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
 Require(selection.ValidatedPackageVersion == "1.0.10.0", "default package version");
@@ -130,6 +158,9 @@ Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("t
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https"), "touch build features");
+var prepareRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
+Require(prepareRecipe.Steps.Single(step => step.Name == "Build resource preparer").Arguments.Contains("x86_64-pc-windows-msvc")
+    && prepareRecipe.Steps.Any(step => step.Name == "Prepare sound assets"), "optional sound preparation uses the desktop host target");
 var desktopRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false));
 Require(desktopRecipe.Steps.All(step => !step.Arguments.Contains("--offline-arm32")), "desktop excludes ARM override");
 try { _ = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false)); throw new Exception("unverified ARM64 recipe accepted"); }
@@ -137,6 +168,8 @@ catch (NotSupportedException) { }
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
 Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");
 Require(missingToolchain.Any(blocker => blocker.Contains("rust-src")), "rust-src checked");
+var soundBlockers = LocalRecipe.ToolchainBlockers(new BuildSelection(TargetProfile.WindowsMobile, true, PrepareSounds: true), new FakeProbe(), new RustToolchainFacts("rustc 1.99.1 (test)", true));
+Require(soundBlockers.Any(blocker => blocker.Contains("Sound preparation requires the x64")), "ARM sound preparation checks host compiler");
 Require(WindowsPackageManager.Arguments(InstallableTool.Rustup).SequenceEqual(["install", "--id", "Rustlang.Rustup", "--exact", "--source", "winget", "--interactive", "--no-upgrade"]), "fixed interactive Rustup install");
 Require(WindowsPackageManager.Arguments(InstallableTool.Git)[2] == "Git.Git", "fixed Git package");
 Require(WindowsPackageManager.Arguments(InstallableTool.Python)[2] == "Python.Python.3.13", "fixed Python package");
@@ -162,6 +195,8 @@ var withoutTouch = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMo
 Require(inputs.Sha256() != withoutTouch.Sha256(), "touch selection changes input hash");
 var nextVersion = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.11.0"), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() != nextVersion.Sha256(), "package version changes input hash");
+var withSounds = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, PrepareSounds: true), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(inputs.Sha256() != withSounds.Sha256(), "sound preparation changes input hash");
 try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, null, "stable", "14.44", "10.0.15063.0"); throw new Exception("missing touch digest accepted"); }
 catch (ArgumentException) { }
 try { _ = BuildInputs.Create(selection, commit, "not-a-hash", hash, hash, hash, hash, "stable", "14.44", "10.0.15063.0"); throw new Exception("invalid digest accepted"); }

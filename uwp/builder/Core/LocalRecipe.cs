@@ -47,6 +47,12 @@ public static class LocalRecipe
         fetch.AddRange(["fetch", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--target", selection.RustTarget,
             "--target", "x86_64-pc-windows-msvc", "-Z", "build-std=std,panic_abort"]);
         steps.Add(new("Fetch Cargo dependencies", "cargo", fetch.AsReadOnly()));
+        if (selection.PrepareSounds)
+        {
+            steps.Add(new("Build resource preparer", "cargo", ["+stable", "build", "--manifest-path", "Cargo.toml",
+                "-p", "horizon-prepare", "--bin", "horizon-prepare", "--target", "x86_64-pc-windows-msvc", "--target-dir", ".local/builder-prepare-target"]));
+            steps.Add(new("Prepare sound assets", "horizon-prepare", ["sounds", "--root", "<snapshot>", "--minecraft-dir", "<selected-installation>"]));
+        }
         var cargo = new List<string>(prefix);
         cargo.AddRange(["build", "--offline", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--features", string.Join(',', selection.Features),
             "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", ".local/builder-target"]);
@@ -59,6 +65,7 @@ public static class LocalRecipe
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
             "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
+        if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
         if (arm) notes.Add("ARM32 uses the offline TLS dependency override; skin and Minecraft session requests use the WinRT HTTPS adapter. Microsoft sign-in is not yet implemented.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
     }
@@ -101,6 +108,15 @@ public static class LocalRecipe
             : "Sound metadata or files are missing. The client will be silent until sounds are prepared from your Minecraft installation.";
     }
 
+    public static void ValidateSoundPreparation(string resourcesDirectory, string? minecraftDirectory)
+    {
+        if (minecraftDirectory is null || !Directory.Exists(minecraftDirectory))
+            throw new DirectoryNotFoundException("Choose a Minecraft installation to prepare sounds.");
+        var minecraft = Path.Combine(Path.GetFullPath(resourcesDirectory), "assets", "minecraft");
+        if (File.Exists(Path.Combine(minecraft, "sounds.json")) || Directory.Exists(Path.Combine(minecraft, "sounds")))
+            throw new InvalidDataException("Selected resources already contain some sound data. Use complete resources without sound preparation, or choose a sound-free copy.");
+    }
+
     public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust)
     {
         var blockers = new List<string>();
@@ -116,6 +132,8 @@ public static class LocalRecipe
             ? Path.Combine(pfx86, "Microsoft Visual Studio", "2017", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
             : Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");
         if (!probe.FileExists(vc)) blockers.Add($"The checked-in {arch} host script's Visual Studio installation was not found.");
+        if (arch == "arm" && selection.PrepareSounds && !probe.FileExists(Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")))
+            blockers.Add("Sound preparation requires the x64 Visual Studio installation used by the checked-in desktop host script.");
         if (arch == "arm" && !probe.FileExists(Path.Combine(pf, "LLVM", "bin", "clang.exe")))
             blockers.Add("The ARM32 recipe requires clang.exe in the standard LLVM installation.");
         var sdk = Path.Combine(pfx86, "Windows Kits", "10", "bin");

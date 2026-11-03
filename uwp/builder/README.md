@@ -56,9 +56,13 @@ dependency override; skins and Minecraft session requests use WinRT HTTPS. Micro
 The output uses the prototype publisher identity.
 The combined recipe has not yet been validated on a phone. The builder warns
 when `assets/minecraft/sounds.json` or the sounds directory is missing; this
-is only a presence check, not a complete sound-integrity check. To obtain
-sound data, use `horizon-prepare sounds` with your own Minecraft installation
-in a separate Horizon working copy, then select its prepared resource folder.
+is only a presence check, not a complete sound-integrity check. To prepare
+missing sounds, select your Minecraft installation and enable sound preparation.
+The builder copies the chosen resources into its private workspace, builds
+`horizon-prepare` from the pinned source and uses it to verify and copy sound
+objects. It does not modify the selected resource tree or Minecraft install.
+If the selected resources already contain any sound data, disable sound
+preparation or choose a sound-free copy; existing data is not overwritten.
 The package-version field changes only the isolated manifest and cannot be
 lower than the pinned source version. Choose a version newer than the package
 with the same identity already installed on the target; the builder cannot
