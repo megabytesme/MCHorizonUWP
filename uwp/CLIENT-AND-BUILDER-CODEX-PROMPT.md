@@ -5,6 +5,7 @@
 The latest work is on the isolated branch
 `codex/uwp-nightly-f42ef42` in
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103`. Recent feature commits are
+`f01546a5b Attach game input before replacing the UWP page`,
 `4d13f5e9c Fix native renderer probe and game startup diagnostics` and
 `1af61d2f6 Pin builder to the mobile renderer fix`; earlier commits add the
 single-window host, touch sensitivity and device gyro. The builder uses
@@ -39,6 +40,14 @@ launch stage plus HRESULT for caught Windows exceptions. The fix is built but
 still needs the user's phone test; unhandled access violations can still close
 the process without a catchable dialog.
 
+On the next Lumia attempt, the resource log reached `rest-ready` after 15.4 s,
+then the app reported `0x8000FFFF` while attaching game input to the existing
+CoreWindow. This failure occurred while constructing the CoreWindow event
+adapter after the XAML content had been detached. The host now subscribes to
+CoreWindow events while XAML still owns the view, then detaches the page and
+sends the game's initial resize event. The change compiled and strict-linked
+for ARM32; the handset retry remains outstanding.
+
 After the user's license review, Microsoft.UI.Xaml 2.7.3 was restored to the
 per-user NuGet cache and the ARM32 WinUI shell build completed. The recovered
 clean ARM32 build compiled the native touch, device-vibration, account, audio,
@@ -48,23 +57,26 @@ The shell emits existing WinUI metadata warnings from the legacy ARM SDK, but
 compiles and links successfully. The self-contained WinUI 3 builder was
 republished at
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103/uwp/builder/App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/publish/Horizon.Builder.App.exe`
-(SHA-256 `664B3A84A149BB1DBED638ACC529288E20752F02F023D37A4D2A3E4EEF70A05E`).
+(SHA-256 `FFAA0B1611FAAB348653296A577D1FB309CC56674FD9B4A3A0B6F1164E99D843`).
 
 The signed ARM32 client bundle is at
-`C:/Users/ben/.huwp/b/effe761770ca4441/deliverables`. The client package is
+`C:/Users/ben/.huwp/b/input-handoff-fix-20261103/deliverables`. The client package is
 `HorizonUWP-ARM32-signed.appx` (SHA-256
-`2FB97158F1284243F4EB37E80637FA117E94E1EFA22892099EDD01EE910DF401`), identity
-`HorizonUWPLatestPreview`, version `2026.1103.930.56`; it was built from source
-`4d13f5e9c16bd700d0a332117cc57974c306200e` and includes the pinned Horizon
+`335615ED514CE289D07A497DC45401AF055F35EC3E719CA78C6960D0E3CB24B6`), identity
+`HorizonUWPLatestPreview`, version `2026.1103.930.57`; it was built from source
+`f01546a5b9278831f1e515f8818b91e6b5601944` and includes the pinned Horizon
 nightly `2026-11-03` notes. It uses the already-built, unchanged 26.3 asset
 framework `Horizon-26.3-Assets-signed.appx` (SHA-256
 `CA814E4C946A93AE18DC9941A9AB7C197B55FD0350E4B453ECE2E4AFB1921BAD`) and
 Microsoft's ARM32 `Microsoft.UI.Xaml.2.7-arm.appx` dependency. The framework
 identity and resource digest match the previous package, so the installed
 assets runtime can be reused. Install dependencies before the client on a
-clean device. The client CMS signature, all eight block-map entries, package
-identity/dependencies, ARM executable and stack reserve were checked. The
-client and framework use thumbprint
+clean device. The CMS signature and MakeAppx extraction both verify; package
+identity/dependencies, ARM executable and stack reserve were checked. SignTool
+reports that the local prototype certificate chain ends at an untrusted root;
+install the included public certificate only if the target has not already
+trusted this signer. The bundle README lists install order and package hashes.
+The client and framework use thumbprint
 `22A7D038213EF31853EEE277B7C1FAFD576A70AB`; only the public certificate is
 included. Install as an update over the existing same-identity client; do not
 uninstall it first, because that removes app-local worlds, settings and

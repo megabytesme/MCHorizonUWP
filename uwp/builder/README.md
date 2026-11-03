@@ -45,7 +45,7 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`4d13f5e9c16bd700d0a332117cc57974c306200e`, Rust 1.99.1 and Minecraft
+`f01546a5b9278831f1e515f8818b91e6b5601944`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
@@ -54,7 +54,7 @@ port is based on Horizon nightly `2026-11-03` at upstream source commit
 date and short commit in Horizon's version fields. They are UWP port builds,
 not the official Horizon binaries. The upstream nightly's publication version
 is `2026.1103.930.50`; the current default UWP APPX version is
-`2026.1103.930.56`. Keep the same package identity for upgrades and choose a
+`2026.1103.930.57`. Keep the same package identity for upgrades and choose a
 higher version when rebuilding the port for the same nightly. This
 recipe is pinned; a newer upstream nightly must be integrated and verified
 before the builder's pin is updated. On startup the builder checks GitHub's
@@ -70,9 +70,11 @@ set in this recipe. These are build-input constraints, not assumptions about
 the device GPU. The native D3D11 pre-game check creates a feature-level 9_1
 device while XAML owns the view; the game checks its CoreWindow presentation
 surface after the shell detaches its page. This avoids treating XAML's active
-compositor as a failed game swap chain. The pre-game page and gameplay share
-one CoreWindow on every target, including desktop and Windows 10 Mobile. The preview runs x64 and ARM32
-plans in fresh builder-owned folders under
+compositor as a failed game swap chain. On Windows 10 Mobile, input handlers
+are registered before the XAML page is detached; the game receives its initial
+size after the handoff. The pre-game page and gameplay share one CoreWindow on
+every target, including desktop and Windows 10 Mobile. The preview runs x64
+and ARM32 plans in fresh builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
 Cargo fetches missing dependencies for the selected target and x64 build host
 from configured registries before the offline build. It can also create a reusable
