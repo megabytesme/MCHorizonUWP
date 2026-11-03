@@ -54,7 +54,11 @@ and installation are not yet integrated. A build requires
 at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
 dependency override; skins and Minecraft session requests use WinRT HTTPS. Microsoft sign-in is not yet implemented.
 The output uses the prototype publisher identity.
-The combined recipe has not yet been validated on a phone.
+The combined recipe has not yet been validated on a phone. The builder warns
+when `assets/minecraft/sounds.json` or the sounds directory is missing; this
+is only a presence check, not a complete sound-integrity check. To obtain
+sound data, use `horizon-prepare sounds` with your own Minecraft installation
+in a separate Horizon working copy, then select its prepared resource folder.
 The package-version field changes only the isolated manifest and cannot be
 lower than the pinned source version. Choose a version newer than the package
 with the same identity already installed on the target; the builder cannot

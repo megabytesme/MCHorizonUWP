@@ -95,6 +95,14 @@ if (args.Contains("--scan"))
     return;
 }
 
+var soundFixture = Path.Combine(Path.GetTempPath(), "HorizonBuilderSoundFixture-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(soundFixture);
+Require(LocalRecipe.SoundWarning(soundFixture) is not null, "missing sounds reported");
+var minecraftSounds = Path.Combine(soundFixture, "assets", "minecraft");
+Directory.CreateDirectory(Path.Combine(minecraftSounds, "sounds"));
+File.WriteAllText(Path.Combine(minecraftSounds, "sounds.json"), "{}");
+Require(LocalRecipe.SoundWarning(soundFixture) is null, "sound presence recognized");
+
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
 Require(selection.ValidatedPackageVersion == "1.0.10.0", "default package version");
 Require(new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.9.0").ValidatedPackageVersion == "1.0.9.0", "version above phone test");

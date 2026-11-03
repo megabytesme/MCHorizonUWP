@@ -50,6 +50,8 @@ public sealed partial class MainWindow : Window
                 ? "Pinned source revision and required tool locations were found. Cargo will fetch missing dependencies when the build starts; signing is not yet available."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
+            if (LocalRecipe.SoundWarning(resourceDirectory) is { } warning)
+                RecipeSteps.Children.Add(new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap });
             foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name, TextWrapping = TextWrapping.Wrap });
             foreach (var note in plan.Notes) RecipeSteps.Children.Add(new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap });
         }
@@ -68,6 +70,8 @@ public sealed partial class MainWindow : Window
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var result = await LocalBuildRunner.RunAsync(sourceDirectory, resourceDirectory, selection, new SystemProbe(), progress);
             RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
+            if (LocalRecipe.SoundWarning(resourceDirectory) is { } warning)
+                RecipeStatus.Text += " " + warning;
         }
         catch (Exception error) { RecipeStatus.Text = $"{RecipeStatus.Text} Build failed: {error.Message}"; }
         finally { RunRecipe.IsEnabled = true; }

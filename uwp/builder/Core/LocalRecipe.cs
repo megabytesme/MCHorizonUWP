@@ -92,6 +92,15 @@ public static class LocalRecipe
             throw new InvalidDataException("The selected resources are not for Minecraft 26.3.");
     }
 
+    /// Presence only: preparation verifies individual sound objects separately.
+    public static string? SoundWarning(string resourcesDirectory)
+    {
+        var minecraft = Path.Combine(Path.GetFullPath(resourcesDirectory), "assets", "minecraft");
+        return File.Exists(Path.Combine(minecraft, "sounds.json")) && Directory.Exists(Path.Combine(minecraft, "sounds"))
+            ? null
+            : "Sound metadata or files are missing. The client will be silent until sounds are prepared from your Minecraft installation.";
+    }
+
     public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust)
     {
         var blockers = new List<string>();
