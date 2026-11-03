@@ -41,7 +41,7 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`03c0832c5354b3522b24f564bf843ffc37368953`, Rust 1.99.1 and Minecraft
+`4bcdb5f4e2a05524b5b631738897c0527eecb546`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
@@ -53,7 +53,18 @@ from configured registries before the offline build. It can also create a reusab
 resource framework package for the selected prepared resources. Signing and
 installation are not yet integrated. A build requires
 at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
-dependency override; skins and Minecraft session requests use WinRT HTTPS. Microsoft sign-in is not yet implemented.
+dependency override; account, skin and Minecraft session requests use WinRT HTTPS.
+The Microsoft application (client) ID is public and is compiled into the client.
+At the user’s request the UI defaults to the [Fluent Launcher public client ID](https://github.com/Xcube-Studio/Natsurainko.FluentLauncher/blob/main/Natsurainko.FluentLauncher/Services/Accounts/AuthenticationService.cs);
+Microsoft accepted a device-code request for it. Minecraft/Xbox authorization with
+that ID has not yet been verified. The ID can be cleared for offline play or changed
+to a separately approved ID.
+Register a public client supporting personal Microsoft accounts and device-code flow;
+New IDs require [Minecraft Java App ID review](https://aka.ms/mce-reviewappid)
+for Minecraft services, as described in [Horizon’s account documentation](../../docs/microsoft-account.md). Without one, offline
+play remains available. The pre-game screen uses Credential Locker, shows a device
+code to enter in a browser on another device, and asks before replacing or removing
+a saved account. Real-account and physical-device validation remain outstanding.
 The output uses the prototype publisher identity.
 The combined recipe has not yet been validated on a phone. The builder warns
 when `assets/minecraft/sounds.json` or the sounds directory is missing; this

@@ -21,6 +21,7 @@ public sealed class BuildInputs
     public string ResourceInventorySha256 { get; private init; } = "";
     public string? TouchModSha256 { get; private init; }
     public string? DeviceVibrationModSha256 { get; private init; }
+    public string? MicrosoftClientId { get; private init; }
     public string RustToolchain { get; private init; } = "";
     public string MsvcVersion { get; private init; } = "";
     public string WindowsSdkVersion { get; private init; } = "";
@@ -42,7 +43,7 @@ public sealed class BuildInputs
             throw new ArgumentException("MSVC and Windows SDK versions must be numeric versions.");
         return new BuildInputs
         {
-            Schema = "horizon-uwp-inputs-v5", Target = selection.RustTarget, PackageVersion = selection.ValidatedPackageVersion,
+            Schema = "horizon-uwp-inputs-v6", Target = selection.RustTarget, PackageVersion = selection.ValidatedPackageVersion,
             PrepareSounds = selection.PrepareSounds,
             UseResourceFramework = selection.UseResourceFramework,
             Features = Array.AsReadOnly(selection.Features.ToArray()),
@@ -52,6 +53,7 @@ public sealed class BuildInputs
             ResourceInventorySha256 = Hex(resourceInventorySha256, 64),
             TouchModSha256 = touchModSha256 is null ? null : Hex(touchModSha256, 64),
             DeviceVibrationModSha256 = deviceVibrationModSha256 is null ? null : Hex(deviceVibrationModSha256, 64),
+            MicrosoftClientId = selection.ValidatedMicrosoftClientId,
             RustToolchain = rustToolchain, MsvcVersion = msvcVersion, WindowsSdkVersion = windowsSdkVersion,
         };
     }

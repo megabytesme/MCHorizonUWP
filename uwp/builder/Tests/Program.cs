@@ -239,7 +239,7 @@ Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("t
     && fetchStep.Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml"), "fetch uses target, host and overrides");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
-Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https,uwp-controller"), "touch and controller build features");
+Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https,uwp-controller,uwp-account"), "touch and controller build features");
 var withDevice = new BuildSelection(TargetProfile.WindowsMobile, true, NativeDeviceVibration: true);
 Require(withDevice.ModIds.Contains(BuildSelection.DeviceVibrationModId)
     && withDevice.Features.Contains("native-device-vibration-mod"), "device vibration is an optional native mod");
@@ -268,11 +268,14 @@ try { _ = WindowsPackageManager.Arguments((InstallableTool)99); throw new Except
 catch (ArgumentOutOfRangeException) { }
 try { await WindowsPackageManager.InstallAsync(new FakeProbe(), InstallableTool.Rustup); throw new Exception("missing WinGet accepted"); }
 catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
+Require(new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: " 01234567-89AB-CDEF-0123-456789ABCDEF ").ValidatedMicrosoftClientId == "01234567-89ab-cdef-0123-456789abcdef", "public client ID canonicalized");
+try { _ = new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "not-an-id").ValidatedMicrosoftClientId; throw new Exception("invalid client ID accepted"); }
+catch (ArgumentException) { }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
-Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller"]), "native touch feature selection");
+Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "uwp-account"]), "native touch feature selection");
 Require(selection.ModIds.SequenceEqual(["horizon_touch"]), "stable native touch mod ID");
 Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");
-Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-audio", "uwp-https", "uwp-controller"]), "touch can be omitted");
+Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-audio", "uwp-https", "uwp-controller", "uwp-account"]), "touch can be omitted");
 Require(new BuildSelection(TargetProfile.DesktopX64, false).ModIds.Count == 0, "omitted mod ID");
 try { _ = new BuildSelection((TargetProfile)99, false).RustTarget; throw new Exception("invalid target accepted"); }
 catch (ArgumentOutOfRangeException) { }
@@ -282,6 +285,8 @@ var inputs = BuildInputs.Create(selection, commit, hash, hash, hash, hash, hash,
 Require(inputs.ModIds.SequenceEqual(["horizon_touch"]), "input record includes stable mod ID");
 var repeated = BuildInputs.Create(selection, commit.ToUpperInvariant(), hash.ToUpperInvariant(), hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() == repeated.Sha256(), "canonical input hash");
+var withClient = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, MicrosoftClientId: "01234567-89ab-cdef-0123-456789abcdef"), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(inputs.Sha256() != withClient.Sha256(), "public application ID changes input hash");
 var withoutTouch = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, false), commit, hash, hash, hash, hash, null, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() != withoutTouch.Sha256(), "touch selection changes input hash");
 var nextVersion = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.11.0"), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");

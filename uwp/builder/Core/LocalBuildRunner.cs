@@ -54,6 +54,8 @@ public static class LocalBuildRunner
 
         progress?.Report("Preparing the Visual C++ environment.");
         var vcEnvironment = await VisualCppEnvironment(cmd, selection.Target, probe);
+        // Never inherit an unrelated client ID from the parent environment.
+        vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
@@ -93,7 +95,8 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_XAUDIO"] = "1";
         vcEnvironment["HORIZON_UWP_HTTP"] = "1";
         vcEnvironment["HORIZON_UWP_GAMEPAD"] = "1";
-        if (selection.NativeDeviceVibration) vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = "1";
+        vcEnvironment["HORIZON_UWP_ACCOUNT"] = "1";
+        vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
         progress?.Report("Strict-linking the UWP host.");
         // cmd.exe is required for the checked-in .cmd file. Its command is fixed;

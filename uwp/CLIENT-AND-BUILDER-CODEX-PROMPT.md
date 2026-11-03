@@ -1,5 +1,32 @@
 # Codex prompt: Horizon UWP client and AppX builder
 
+## Latest account and ARM32 update
+
+The user explicitly authorized the public Fluent Launcher application ID
+`0844e754-1d2e-4861-8e2b-18059609badb` as a temporary default while their own
+ID is reviewed. Microsoft accepted a device-code request; Xbox/Minecraft sign-in
+still needs a real-account/device test. Never read or copy another launcher's
+saved credentials. The native UWP pre-game dialogs and in-memory session handoff
+are in client source commit `4bcdb5f4e2a05524b5b631738897c0527eecb546`.
+The builder pins that source and allows the public ID to be changed or cleared.
+
+The signed ARM32 client and matching neutral resource framework, the Microsoft
+ARM VC runtime and public certificate are together under
+`C:/Users/ben/.huwp/b/pregame-account/.local/ready-arm/`. The client uses
+identity `HorizonUWPAccountPreview`, distinct from the earlier installed test.
+Both signed packages' CMS signatures were checked; the self-signed certificate
+is not trusted on the build PC and device trust may need setup. No trust store was
+changed. They contain the user's private resources; never commit or upload them.
+The user has not yet tested the new account, controller, vibration, or framework
+integration on a device.
+
+The upstream refresh in `C:/Users/ben/.huwp/b/upstream-2e0a6957` has had its
+textual merge conflicts resolved but still has UWP compilation work to complete.
+It must not replace the working integration branch until it passes tests and
+includes the new account and input features. Later historical notes below may
+say the pre-game UI is absent or list older source pins; this section supersedes
+those statements.
+
 ## Integration update — 3 November 2026
 
 The active continuation is the isolated worktree `.local/client-builder-integration`,
@@ -103,11 +130,20 @@ Paste the prompt below into the new Codex instance.
 
 ## Integration update (2026-11-03)
 
+The user explicitly authorized using Fluent Launcher’s published Microsoft client ID
+as a temporary default while their own application is reviewed, superseding the
+older instruction below not to use another application's ID for this case. The
+public ID is `0844e754-1d2e-4861-8e2b-18059609badb`; Microsoft accepted a
+device-code request without any saved-token access. Minecraft/Xbox login using
+that ID still requires real-account validation. Do not expose, copy, or overwrite
+existing launcher credentials.
+
 This update supersedes older branch-status statements below. The active integration
 worktree is `.local/client-builder-integration` on `uwp-client-builder-integration`.
 It combines the phone-tested touch, XAudio and WinRT HTTPS adapters, shared account
 protocol and Credential Locker core, and asset-framework builder work. Microsoft
-sign-in and the native UWP pre-game UI are not yet connected. The combined signed
+sign-in and the native UWP pre-game dialogs are connected in the latest source;
+real-account and device testing remain outstanding. The combined signed
 ARM32 and x64 sound packages are being tested by the user; do not overwrite them.
 
 The integration branch removes Wasm parsing from the UWP dependency graph. The
@@ -120,8 +156,7 @@ mod and generic tablet haptics still need physical-device testing.
 A separate uncommitted merge of upstream `origin/main` at
 `ccf8f453fb55e146f48964d4cd11d350cb586d53` is in
 `C:\Users\ben\.huwp\b\upstream-2e0a6957` on branch
-`codex/uwp-upstream-refresh-2e0a6957`. It is incomplete and has unresolved
-conflicts; preserve that worktree and do not replace the stable integration branch
+`codex/uwp-upstream-refresh-2e0a6957`. Its textual conflicts are resolved, but the port is incomplete and unverified; preserve that worktree and do not replace the stable integration branch
 with it until the update is reconciled and tested. Upstream split the client
 library and made major renderer, account and game changes. Keep UWP functionality
 in native mods or small platform adapters where possible, without losing upstream

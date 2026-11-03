@@ -12,7 +12,7 @@ public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 /// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "03c0832c5354b3522b24f564bf843ffc37368953";
+    public const string SourceCommit = "4bcdb5f4e2a05524b5b631738897c0527eecb546";
     public const string RustVersion = "1.99.1";
     public const string MinecraftVersion = "26.3";
     public const string SourceManifestVersion = "1.0.1.0";
@@ -33,6 +33,7 @@ public static class LocalRecipe
         if (selection.Target == TargetProfile.SurfaceProX)
             throw new NotSupportedException("The pinned local recipe currently covers x64 and ARM32 only.");
         var packageVersion = selection.ValidatedPackageVersion;
+        var clientId = selection.ValidatedMicrosoftClientId;
         var arm = selection.Target == TargetProfile.WindowsMobile;
         var arch = arm ? "arm" : "x64";
         var steps = new List<RecipeStep>
@@ -72,7 +73,9 @@ public static class LocalRecipe
         if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
         if (selection.UseResourceFramework) notes.Add("The separate unsigned resource framework contains your private prepared resources; retain it for clients using the same content and install it as a dependency.");
         if (selection.NativeDeviceVibration) notes.Add("Device vibration is an optional native mod with its own setting, separate from controller vibration; unsupported devices are ignored.");
-        if (arm) notes.Add("ARM32 uses the offline TLS dependency override; skin and Minecraft session requests use the WinRT HTTPS adapter. Microsoft sign-in is not yet implemented.");
+        if (clientId is null) notes.Add("No Microsoft application ID was supplied; sign-in needs a build configured with an approved public client ID.");
+        else notes.Add("Microsoft sign-in uses the configured public application ID and device-code flow; Xbox/Minecraft access depends on that registration.");
+        if (arm) notes.Add("ARM32 uses the offline TLS dependency override; account, skin and Minecraft session requests use the WinRT HTTPS adapter.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
     }
 
