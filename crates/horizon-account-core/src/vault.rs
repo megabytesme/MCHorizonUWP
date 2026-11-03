@@ -18,7 +18,7 @@ impl fmt::Display for StoreError {
 impl std::error::Error for StoreError {}
 
 /// Secure storage supplied by the platform. Implementations must not log values.
-pub trait SecretStore {
+pub trait SecretStore: Send + Sync {
     fn get(&self, key: &str) -> Result<Option<String>, StoreError>;
     fn set(&self, key: &str, value: &str) -> Result<(), StoreError>;
     fn remove(&self, key: &str) -> Result<bool, StoreError>;
@@ -50,7 +50,7 @@ impl fmt::Debug for StoredAccount {
 }
 
 /// Reads the active account; a missing entry is distinct from an invalid entry.
-pub fn load(store: &impl SecretStore) -> Result<Option<StoredAccount>, StoreError> {
+pub fn load(store: &(impl SecretStore + ?Sized)) -> Result<Option<StoredAccount>, StoreError> {
     let Some(value) = store.get(ACTIVE_ACCOUNT)? else {
         return Ok(None);
     };
@@ -65,7 +65,10 @@ pub fn load(store: &impl SecretStore) -> Result<Option<StoredAccount>, StoreErro
 }
 
 /// Saves a complete account as one vault entry. Errors never fall back to disk.
-pub fn save(store: &impl SecretStore, account: &StoredAccount) -> Result<(), StoreError> {
+pub fn save(
+    store: &(impl SecretStore + ?Sized),
+    account: &StoredAccount,
+) -> Result<(), StoreError> {
     if account.schema != SCHEMA {
         return Err(StoreError);
     }
@@ -76,7 +79,7 @@ pub fn save(store: &impl SecretStore, account: &StoredAccount) -> Result<(), Sto
     store.set(ACTIVE_ACCOUNT, &value)
 }
 
-pub fn remove(store: &impl SecretStore) -> Result<bool, StoreError> {
+pub fn remove(store: &(impl SecretStore + ?Sized)) -> Result<bool, StoreError> {
     store.remove(ACTIVE_ACCOUNT)
 }
 
@@ -101,11 +104,11 @@ impl SecretStore for CredentialLocker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
+    use std::sync::Mutex;
 
     #[derive(Default)]
     struct MemoryStore {
-        value: RefCell<Option<String>>,
+        value: Mutex<Option<String>>,
         fail: bool,
     }
     impl SecretStore for MemoryStore {
@@ -113,20 +116,20 @@ mod tests {
             if self.fail {
                 return Err(StoreError);
             }
-            Ok(self.value.borrow().clone())
+            Ok(self.value.lock().unwrap().clone())
         }
         fn set(&self, _key: &str, value: &str) -> Result<(), StoreError> {
             if self.fail {
                 return Err(StoreError);
             }
-            *self.value.borrow_mut() = Some(value.to_owned());
+            *self.value.lock().unwrap() = Some(value.to_owned());
             Ok(())
         }
         fn remove(&self, _key: &str) -> Result<bool, StoreError> {
             if self.fail {
                 return Err(StoreError);
             }
-            Ok(self.value.borrow_mut().take().is_some())
+            Ok(self.value.lock().unwrap().take().is_some())
         }
     }
     fn example() -> StoredAccount {
@@ -153,14 +156,14 @@ mod tests {
     #[test]
     fn invalid_and_unavailable_store_fail_without_echoing_contents() {
         let store = MemoryStore::default();
-        *store.value.borrow_mut() = Some("synthetic-secret-invalid-json".into());
+        *store.value.lock().unwrap() = Some("synthetic-secret-invalid-json".into());
         let error = load(&store).unwrap_err();
         assert!(!error.to_string().contains("synthetic"));
         let mut future = serde_json::to_value(example()).unwrap();
         future["schema"] = serde_json::json!(2);
-        *store.value.borrow_mut() = Some(future.to_string());
+        *store.value.lock().unwrap() = Some(future.to_string());
         assert!(load(&store).is_err());
-        *store.value.borrow_mut() = Some("x".repeat(MAX_SECRET_BYTES + 1));
+        *store.value.lock().unwrap() = Some("x".repeat(MAX_SECRET_BYTES + 1));
         assert!(load(&store).is_err());
         let failed = MemoryStore {
             fail: true,
@@ -169,6 +172,6 @@ mod tests {
         assert!(load(&failed).is_err());
         assert!(save(&failed, &example()).is_err());
         assert!(remove(&failed).is_err());
-        assert!(failed.value.borrow().is_none());
+        assert!(failed.value.lock().unwrap().is_none());
     }
 }
