@@ -1,5 +1,12 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 1 && args[0] == "--nightly-probe")
+{
+    var latest = await NightlyRelease.FetchAsync();
+    Console.WriteLine($"Published nightly source {latest.SourceCommit}, package version {LocalRecipe.PackageVersionFor(latest.PublishedAt)}");
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--pack-resources")
 {
     var framework = await ResourceFrameworkPacker.PackAsync(args[1], args[2]);
@@ -214,7 +221,18 @@ catch (InvalidDataException) { }
 
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
-Require(selection.ValidatedPackageVersion == "1.0.10.0", "default package version");
+Require(selection.ValidatedPackageVersion == LocalRecipe.DefaultPackageVersion, "default package version");
+Require(LocalRecipe.UpstreamNightlyCommit.StartsWith(LocalRecipe.UpstreamNightlyShortCommit, StringComparison.Ordinal), "nightly label matches source commit");
+Require(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T09:30:50Z")) == LocalRecipe.DefaultPackageVersion, "nightly publication time maps to package version");
+Require(new Version(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T09:30:51Z"))) > new Version(LocalRecipe.DefaultPackageVersion), "later nightly package versions sort later");
+Require(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T10:30:50+01:00")) == LocalRecipe.DefaultPackageVersion, "package version uses UTC");
+Require(new Version(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-01T00:00:00Z"))) > new Version(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-10-31T23:59:59Z"))), "package versions sort across month boundaries");
+var nightly = NightlyRelease.Parse("{\"tag_name\":\"nightly\",\"prerelease\":true,\"target_commitish\":\"f42ef42ef6ceccb3c6a20bea2481d87949a51c81\",\"published_at\":\"2026-11-03T09:30:50Z\"}");
+Require(nightly.SourceCommit == LocalRecipe.UpstreamNightlyCommit && LocalRecipe.PackageVersionFor(nightly.PublishedAt) == LocalRecipe.DefaultPackageVersion, "nightly metadata preserves source and publication time");
+try { _ = NightlyRelease.Parse("{\"tag_name\":\"release\",\"prerelease\":false}"); throw new Exception("non-nightly release accepted"); }
+catch (InvalidDataException) { }
+try { _ = NightlyRelease.Parse("{\"tag_name\":\"nightly\",\"prerelease\":true,\"target_commitish\":\"main\",\"published_at\":\"2026-11-03T09:30:50Z\"}"); throw new Exception("moving nightly source accepted"); }
+catch (InvalidDataException) { }
 Require(new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.9.0").ValidatedPackageVersion == "1.0.9.0", "version above phone test");
 var manifestTest = System.Xml.Linq.XDocument.Parse("<Package xmlns='http://schemas.microsoft.com/appx/manifest/foundation/windows10'><Identity Name='HorizonUWPPrototype' Publisher='CN=HorizonUWPPrototype' Version='1.0.1.0'/></Package>");
 LocalRecipe.ConfigureManifest(manifestTest, new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.9.0"));

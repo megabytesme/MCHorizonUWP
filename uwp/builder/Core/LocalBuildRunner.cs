@@ -56,6 +56,8 @@ public static class LocalBuildRunner
         var vcEnvironment = await VisualCppEnvironment(cmd, selection.Target, probe);
         // Never inherit an unrelated client ID from the parent environment.
         vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
+        vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
+        vcEnvironment["HORIZON_NIGHTLY"] = LocalRecipe.UpstreamNightly;
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");

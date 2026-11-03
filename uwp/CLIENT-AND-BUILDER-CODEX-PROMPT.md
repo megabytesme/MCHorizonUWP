@@ -1,5 +1,38 @@
 # Codex prompt: Horizon UWP client and AppX builder
 
+## Published nightly update — 3 November 2026
+
+At the user's request, follow the published Horizon nightly instead of the
+moving main branch. The current published source is
+`nightly-source/2026-11-03-f42ef42`, commit
+`f42ef42ef6ceccb3c6a20bea2481d87949a51c81`. UWP port commit
+`1c1a8de62627f05a27a995d7a9319ec9d4673e3c` merges that checkpoint and
+passed x64 and ARM32 release builds and strict UWP host links, including the
+8 MiB stack check. Device runtime testing is still outstanding. The Minecraft
+version and resource preparation code remain 26.3, so the existing asset
+framework is reusable. The builder pins the port commit and embeds Horizon's
+nightly version fields. It checks GitHub's public nightly release metadata
+but does not automatically integrate an unverified upstream revision. Its
+default APPX version, `2026.1103.930.50`, encodes the nightly's UTC release
+timestamp; use a higher version for subsequent port builds of the same
+nightly. The prototype signing integration approval block still applies.
+
+The signed ARM32 nightly client is
+`C:/Users/ben/.huwp/b/nightly-f42-arm-20261103/HorizonUWP-nightly-ARM32-signed.appx`
+(SHA-256 `4A8431FF31C139630D300744AB174AC7246EA2E1DB599798A18394E4D2EB58DA`).
+Its `HorizonUWPLatestPreview` identity is the same as the earlier tested
+preview; version `2026.1103.930.50` is newer. It depends on the existing
+signed 26.3 framework and Microsoft ARM VC runtime described below. CMS/PKCS7
+signature verification, signer thumbprint, every block-map entry, ARM machine
+type, executable match and stack reserve were checked. It has not yet been
+run on the phone and still uses the interim CoreWindow page.
+
+The real XAML/WinUI pre-game shell remains work in progress in the separate
+`codex/uwp-xaml-shell` worktree. Its isolated prototype renders WinUI 2
+navigation and system accent, Acrylic and Mica after providing the WinUI
+XAML metadata provider. It is not included in this nightly commit. Preserve
+that worktree and its private test packages when continuing the integration.
+
 ## Multiplayer stack fix — 3 November 2026
 
 The user successfully signed in on the separate desktop UWP test, but the app
@@ -19,8 +52,8 @@ The package signature, block map, identity and PE stack reserve were verified.
 The phone build has not yet been tested. Do not remove or reinstall over user
 data; ordinary same-identity upgrading is intended to preserve it.
 
-The builder now pins client commit `4145cbcb3d4c338a01401a03c4bf9c5d2cfabf0a`
-so its builds include the multiplayer stack fix. The user next requested a
+The builder previously pinned client commit `4145cbcb3d4c338a01401a03c4bf9c5d2cfabf0a`;
+the newer pin above includes the same multiplayer stack fix. The user next requested a
 pregame design like their WikiViewer app: themed navigation, a home page with
 Start game, a profile/account button and a settings page. The three requested
 styles follow system accent colors: plain UWP, Fluent Acrylic on supported

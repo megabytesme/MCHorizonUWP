@@ -4,6 +4,8 @@
     Title="Horizon UWP Builder">
   <ScrollViewer><StackPanel Padding="28" Spacing="16" MaxWidth="820" HorizontalAlignment="Stretch">
     <TextBlock Text="Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" />
+    <TextBlock x:Name="UpstreamNightly" TextWrapping="Wrap" />
+    <TextBlock x:Name="NightlyStatus" Text="Checking for a newer Horizon nightly…" TextWrapping="Wrap" />
     <TextBlock Text="Choose a local Horizon checkout and prepared resources, then inspect and run the pinned build recipe. Missing Cargo dependencies are downloaded from configured registries. Packages are unsigned." TextWrapping="Wrap" />
     <Button Content="Choose Horizon source" Click="ChooseSource_Click" />
     <TextBlock x:Name="SourcePath" Text="No source selected" TextWrapping="Wrap" />
@@ -25,7 +27,7 @@
     <TextBlock Text="Microsoft application (client) ID — defaults to Fluent Launcher’s public ID; replace it with yours when approved" TextWrapping="Wrap" />
     <TextBox x:Name="MicrosoftClientId" PlaceholderText="00000000-0000-0000-0000-000000000000" />
     <TextBlock Text="Package version (choose a version newer than the one installed on the target)" TextWrapping="Wrap" />
-    <TextBox x:Name="PackageVersion" Text="1.0.10.0" />
+    <TextBox x:Name="PackageVersion" />
     <TextBlock Text="The selected source mod is compiled into the client using the pinned local recipe." TextWrapping="Wrap" />
     <Button Content="Check setup" Click="CheckSetup_Click" />
     <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />

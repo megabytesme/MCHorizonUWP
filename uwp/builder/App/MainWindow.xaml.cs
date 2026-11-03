@@ -8,7 +8,29 @@ namespace Horizon.Builder.App;
 
 public sealed partial class MainWindow : Window
 {
-    public MainWindow() { InitializeComponent(); MicrosoftClientId.Text = BuildSelection.FluentLauncherClientId; }
+    public MainWindow()
+    {
+        InitializeComponent();
+        MicrosoftClientId.Text = BuildSelection.FluentLauncherClientId;
+        PackageVersion.Text = LocalRecipe.DefaultPackageVersion;
+        UpstreamNightly.Text = $"Horizon nightly {LocalRecipe.UpstreamNightlyDate} · {LocalRecipe.UpstreamNightlyShortCommit} (UWP port)";
+        _ = CheckNightlyAsync();
+    }
+
+    private async Task CheckNightlyAsync()
+    {
+        try
+        {
+            var release = await NightlyRelease.FetchAsync();
+            NightlyStatus.Text = release.SourceCommit == LocalRecipe.UpstreamNightlyCommit
+                ? "This recipe follows the current published Horizon nightly."
+                : $"Horizon has published nightly source {release.SourceCommit[..7]} ({release.PublishedAt:yyyy-MM-dd} UTC). The UWP port must be integrated and tested before this recipe can build it.";
+        }
+        catch (Exception)
+        {
+            NightlyStatus.Text = "Could not check for a newer nightly. The pinned recipe is still available.";
+        }
+    }
     private string? sourceDirectory;
     private string? resourceDirectory;
     private string? minecraftDirectory;

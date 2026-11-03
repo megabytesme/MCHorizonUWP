@@ -41,10 +41,24 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`4145cbcb3d4c338a01401a03c4bf9c5d2cfabf0a`, Rust 1.99.1 and Minecraft
+`1c1a8de62627f05a27a995d7a9319ec9d4673e3c`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
+port is based on Horizon nightly `2026-11-03` at upstream source commit
+`f42ef42ef6ceccb3c6a20bea2481d87949a51c81`; builds embed the upstream nightly
+date and short commit in Horizon's version fields. They are UWP port builds,
+not the official Horizon binaries. The default APPX version encodes the
+nightly's UTC publication time as `year.monthday.hourminute.second` (for this
+nightly, `2026.1103.930.50`). Keep the same package identity for upgrades and
+choose a higher version when rebuilding the port for the same nightly. This
+recipe is pinned; a newer upstream nightly must be integrated and verified
+before the builder's pin is updated. On startup the builder checks GitHub's
+public nightly release metadata and reports when its source differs; a failed
+check does not prevent an offline build from the pinned source. The check
+does not download or execute the new release. Minecraft resource framework versions
+remain tied to the Minecraft resources, not to the Horizon nightly date.
+The
 preview uses the native D3D11 renderer and runs x64 and ARM32 plans in fresh
 builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
