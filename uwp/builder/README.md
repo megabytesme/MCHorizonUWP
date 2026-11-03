@@ -41,7 +41,7 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`4bcdb5f4e2a05524b5b631738897c0527eecb546`, Rust 1.99.1 and Minecraft
+`9819667e6114aa796ffe51ef522058a804eb8fd4`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
@@ -62,9 +62,11 @@ to a separately approved ID.
 Register a public client supporting personal Microsoft accounts and device-code flow;
 New IDs require [Minecraft Java App ID review](https://aka.ms/mce-reviewappid)
 for Minecraft services, as described in [Horizon’s account documentation](../../docs/microsoft-account.md). Without one, offline
-play remains available. The pre-game screen uses Credential Locker, shows a device
+play remains available. The native pre-game page uses Credential Locker, shows a device
 code to enter in a browser on another device, and asks before replacing or removing
-a saved account. Real-account and physical-device validation remain outstanding.
+a saved account. The UWP client uses Windows service discovery for Minecraft SRV
+records, and its built-in native picker imports content mods and resource-pack ZIPs.
+Real-account and physical-device validation remain outstanding.
 The output uses the prototype publisher identity.
 The combined recipe has not yet been validated on a phone. The builder warns
 when `assets/minecraft/sounds.json` or the sounds directory is missing; this

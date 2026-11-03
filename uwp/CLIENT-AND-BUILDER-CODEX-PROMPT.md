@@ -35,10 +35,10 @@ package isolates its game paths and disables audio. Do not delete its app data
 or inspect the user's credentials. No certificate trust was changed.
 
 The updated source includes upstream Horizon through
-`eb545bab38934988f5ed6ff79064663c240e743d`. It is in the isolated
-`codex/uwp-upstream-refresh-2e0a6957` worktree. The builder still pins the
-earlier source and must be updated after the new source is committed and
-validated; the previously reported builder-signing approval block still applies.
+`eb545bab38934988f5ed6ff79064663c240e743d`, in client commit
+`9819667e6114aa796ffe51ef522058a804eb8fd4` on the isolated
+`codex/uwp-upstream-refresh-2e0a6957` worktree. The builder pins that client
+commit; the previously reported builder-signing approval block still applies.
 The native renderer's custom glint and live pack reload and the split-screen
 multi-controller route remain incomplete. Historical notes below are
 superseded where they conflict with this section.
