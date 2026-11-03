@@ -484,18 +484,22 @@ static void run_game_in_primary_view() {
             catch (Platform::Exception^) {}
         }
 
+        // Subscribe while XAML still owns the CoreWindow. Older Windows 10
+        // Mobile builds can reject CoreWindow input event registration after
+        // Window::Content is cleared, even though the CoreWindow is unchanged.
+        stage = "attaching game input to the existing CoreWindow";
+        events = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
+
         stage = "replacing the pre-game page with the game surface";
         if (!horizon_uwp_page_show_game(1))
             throw ref new Platform::FailureException();
         page_hidden = true;
+        events->EmitInitialSize();
 #ifdef HORIZON_UWP_TOUCH_MOD
         stage = "starting device gyroscope input";
         horizon_uwp_gyro_set_visible(1);
         gyro_visible = true;
 #endif
-        stage = "attaching game input to the existing CoreWindow";
-        events = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
-        events->EmitInitialSize();
         // ShellApp already activated this CoreWindow. Avoid an extra
         // activation transition after detaching the XAML page.
         stage = "starting Horizon in the existing app window";
