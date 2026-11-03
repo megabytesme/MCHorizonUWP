@@ -48,8 +48,9 @@ exact tool locations required by that revision's host/package scripts. The
 preview uses the native D3D11 renderer and runs x64 and ARM32 plans in fresh
 builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
-Cargo build uses the existing offline cache; dependency acquisition, signing,
-framework packaging and installation are not yet integrated. A build requires
+Cargo fetches missing dependencies for the selected target and x64 build host
+from configured registries before the offline build. Signing, framework packaging
+and installation are not yet integrated. A build requires
 at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
 dependency override; skins and Minecraft session requests use WinRT HTTPS. Microsoft sign-in is not yet implemented.
 The output uses the prototype publisher identity.

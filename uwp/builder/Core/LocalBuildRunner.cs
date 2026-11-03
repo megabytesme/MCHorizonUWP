@@ -58,8 +58,25 @@ public static class LocalBuildRunner
             vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
             vcEnvironment["CFLAGS_thumbv7a_uwp_windows_msvc"] = "-DWINAPI_FAMILY=WINAPI_FAMILY_APP";
         }
+        progress?.Report("Fetching missing Cargo dependencies from configured registries.");
+        try
+        {
+            await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Fetch Cargo dependencies").Arguments, vcEnvironment);
+        }
+        catch (InvalidOperationException error)
+        {
+            throw new InvalidOperationException("Cargo could not fetch dependencies. Check the internet connection and configured Cargo registries. " + error.Message, error);
+        }
+
         progress?.Report("Building the game bridge. This may take several minutes.");
-        await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Build game bridge").Arguments, vcEnvironment);
+        try
+        {
+            await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Build game bridge").Arguments, vcEnvironment);
+        }
+        catch (InvalidOperationException error)
+        {
+            throw new InvalidOperationException("The offline Cargo build failed. Check that the required toolchain and dependencies are available. " + error.Message, error);
+        }
 
         var arch = arm ? "arm" : "x64";
         vcEnvironment["HORIZON_UWP_XAUDIO"] = "1";

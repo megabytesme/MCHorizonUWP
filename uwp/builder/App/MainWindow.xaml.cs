@@ -47,7 +47,7 @@ public sealed partial class MainWindow : Window
             await LocalRecipe.ValidateSourceAsync(sourceDirectory, probe);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
             RecipeStatus.Text = blockers.Count == 0
-                ? "Pinned source revision and required tool locations were found. The offline Cargo cache is not verified; signing is not yet available."
+                ? "Pinned source revision and required tool locations were found. Cargo will fetch missing dependencies when the build starts; signing is not yet available."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
             foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name, TextWrapping = TextWrapping.Wrap });

@@ -115,6 +115,11 @@ Require(!LocalBuildRunner.ResourcesContainWorkspace(Path.Combine(testHome, "reso
 var recipe = LocalRecipe.Plan(selection);
 Require(recipe.SourceCommit == LocalRecipe.SourceCommit && recipe.Target == "thumbv7a-uwp-windows-msvc", "pinned ARM recipe");
 Require(recipe.Steps.Any(step => step.Name == "Prepare ARM32 overrides" && step.Arguments.Contains("--offline-arm32")), "ARM offline override selected");
+var fetchStep = recipe.Steps.Single(step => step.Name == "Fetch Cargo dependencies");
+Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("thumbv7a-uwp-windows-msvc")
+    && fetchStep.Arguments.Contains("x86_64-pc-windows-msvc")
+    && fetchStep.Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml"), "fetch uses target, host and overrides");
+Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https"), "touch build features");
 var desktopRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false));

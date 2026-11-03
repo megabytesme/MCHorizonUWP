@@ -4,7 +4,7 @@
     Title="Horizon UWP Builder">
   <ScrollViewer><StackPanel Padding="28" Spacing="16" MaxWidth="820" HorizontalAlignment="Stretch">
     <TextBlock Text="Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" />
-    <TextBlock Text="Choose a local Horizon checkout and prepared resources, then inspect and run the pinned build recipe. Packages are unsigned." TextWrapping="Wrap" />
+    <TextBlock Text="Choose a local Horizon checkout and prepared resources, then inspect and run the pinned build recipe. Missing Cargo dependencies are downloaded from configured registries. Packages are unsigned." TextWrapping="Wrap" />
     <Button Content="Choose Horizon source" Click="ChooseSource_Click" />
     <TextBlock x:Name="SourcePath" Text="No source selected" TextWrapping="Wrap" />
     <Button Content="Choose prepared resources" Click="ChooseResources_Click" />

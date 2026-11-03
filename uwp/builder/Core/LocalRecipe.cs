@@ -41,8 +41,13 @@ public static class LocalRecipe
             new("Prepare Rust source copy", "powershell", ["-NoProfile", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", "stable"]),
         };
         if (arm) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
-        var cargo = new List<string> { "+stable" };
-        if (arm) cargo.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
+        var prefix = new List<string> { "+stable" };
+        if (arm) prefix.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
+        var fetch = new List<string>(prefix);
+        fetch.AddRange(["fetch", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--target", selection.RustTarget,
+            "--target", "x86_64-pc-windows-msvc", "-Z", "build-std=std,panic_abort"]);
+        steps.Add(new("Fetch Cargo dependencies", "cargo", fetch.AsReadOnly()));
+        var cargo = new List<string>(prefix);
         cargo.AddRange(["build", "--offline", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--features", string.Join(',', selection.Features),
             "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", ".local/builder-target"]);
         steps.Add(new("Build game bridge", "cargo", cargo.AsReadOnly()));
@@ -52,7 +57,7 @@ public static class LocalRecipe
         var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
             "The resulting APPX is unsigned and requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
-            "At least 10 GiB free space and a populated Cargo dependency cache are required; the game-bridge build runs offline.",
+            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
         if (arm) notes.Add("ARM32 uses the offline TLS dependency override; skin and Minecraft session requests use the WinRT HTTPS adapter. Microsoft sign-in is not yet implemented.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
