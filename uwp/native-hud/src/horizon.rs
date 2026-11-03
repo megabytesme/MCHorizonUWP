@@ -58,6 +58,7 @@ impl Atlas {
                     HorizonBlend::Depth(rect) => Blend::Depth(rect),
                     HorizonBlend::Vignette => Blend::Vignette,
                     HorizonBlend::EndPortal => Blend::EndPortal,
+                    HorizonBlend::CitGlint(index) => Blend::CitGlint(index),
                 },
             })
             .collect();

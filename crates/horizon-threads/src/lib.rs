@@ -1,7 +1,40 @@
 //! Scheduling hints for the game's threads and its allocator: the few OS calls
 //! that the other crates, which forbid unsafe code, can't make themselves.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+/// The game window's boot screen, before wgpu's first frame paints over it.
+#[cfg(target_os = "windows")]
+pub mod boot_paint;
+pub mod capped;
+pub mod heap_census;
+pub mod jobs;
+pub mod memory_limit;
+
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
+
+/// The worker threads the machine offers this process: `available_parallelism`'s
+/// answer (its share of the cores — CPU affinity, a container's quota), resolved
+/// once, since it doesn't change under a run and asking again on a later path
+/// can only disagree with the pools already started. `HORIZON_WORKER_THREADS`
+/// sets it instead, to cap every pool on a machine whose OS reports more cores
+/// than a run should take; a value that isn't a positive number is ignored.
+/// Each pool keeps its own share of the count (the streaming pool all but one,
+/// far decoration a third of it).
+pub fn worker_count() -> usize {
+    static COUNT: OnceLock<usize> = OnceLock::new();
+    *COUNT.get_or_init(|| {
+        parse_worker_count(std::env::var("HORIZON_WORKER_THREADS").ok())
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
+    })
+}
+
+/// `Some(n)` when `value` names a positive count (`" 4 "` counts; `"0"`,
+/// `"lots"`, a missing variable don't).
+fn parse_worker_count(value: Option<String>) -> Option<usize> {
+    value?.trim().parse().ok().filter(|&n| n > 0)
+}
 
 /// Ask the OS to run the calling thread ahead of the process's other
 /// threads, as vanilla's `MinecraftServer.spin` does for its server thread
@@ -199,10 +232,28 @@ pub fn catch_stop_signals() {}
 /// World generation, meshing and the tick allocate and free small blocks on
 /// every worker at once; the system heaps serialise them (Windows' heap was
 /// 16% of a chunk's generation time), mimalloc keeps a heap per thread.
+
+///
+/// It sits behind [`capped`]'s hard ceiling: with none set, every request is
+/// passed on unchanged and only the byte counter moves.
+pub use capped::{ALLOCATOR, Allocator};
+
+/// The global allocator of a build with the `alloc-census` feature: live
+/// heap bytes by startup step and thread, for `horizon-ctl memory`.
+pub use heap_census::CensusAllocator;
+/// Whether this build counts the heap by tag (feature `alloc-census`).
+pub const HEAP_CENSUS: bool = cfg!(feature = "alloc-census");
+/// Tag the calling thread's allocations `name` while the guard lives, in a
+/// build that counts the heap ([`HEAP_CENSUS`]); nothing otherwise.
+#[inline]
+pub fn heap_tag(name: &'static str) -> Option<heap_census::Tag> {
+    HEAP_CENSUS.then(|| heap_census::tag(name))
+}
+
 #[cfg(not(target_vendor = "uwp"))]
-pub use mimalloc::MiMalloc as Allocator;
+pub(crate) const PLATFORM_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(target_vendor = "uwp")]
-pub use std::alloc::System as Allocator;
+pub(crate) const PLATFORM_ALLOCATOR: std::alloc::System = std::alloc::System;
 
 /// `mi_option_purge_delay` in mimalloc.h (index 15 in v2 and v3); the bindings
 /// don't name it.
@@ -218,6 +269,58 @@ pub fn configure_allocator() {
     #[cfg(not(target_vendor = "uwp"))]
     unsafe {
         libmimalloc_sys::mi_option_set(PURGE_DELAY, 0);
+    }
+}
+
+/// The bytes the allocator has committed now and at its peak (mimalloc's
+/// process info), for `horizon-ctl memory`.
+#[cfg(not(target_vendor = "uwp"))]
+pub fn allocator_commit() -> (usize, usize) {
+    let mut info = [0usize; 8];
+    let [
+        elapsed,
+        user,
+        system,
+        rss,
+        peak_rss,
+        commit,
+        peak_commit,
+        faults,
+    ] = &mut info;
+    // SAFETY: writes eight integers through pointers to them.
+    unsafe {
+        libmimalloc_sys::mi_process_info(
+            elapsed,
+            user,
+            system,
+            rss,
+            peak_rss,
+            commit,
+            peak_commit,
+            faults,
+        );
+    }
+    (info[5], info[6])
+}
+
+/// UWP uses the system allocator; query process commit instead of mimalloc.
+#[cfg(target_vendor = "uwp")]
+pub fn allocator_commit() -> (usize, usize) {
+    use windows_sys::Win32::System::ProcessStatus::{
+        K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+    };
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+    let size = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
+    // SAFETY: the current process pseudo-handle needs no closing; the API
+    // initializes at most `size` bytes of the zero-initialized counters.
+    unsafe {
+        let mut counters: PROCESS_MEMORY_COUNTERS = std::mem::zeroed();
+        counters.cb = size;
+        if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, size) == 0 {
+            (0, 0)
+        } else {
+            (counters.PagefileUsage, counters.PeakPagefileUsage)
+        }
     }
 }
 
@@ -333,11 +436,90 @@ pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Resu
 /// UWP cannot create desktop junctions; callers can copy the directory.
 #[cfg(all(windows, target_vendor = "uwp"))]
 pub fn junction(_target: &std::path::Path, _at: &std::path::Path) -> std::io::Result<()> {
-    Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "junctions are unavailable in UWP"))
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "junctions are unavailable in UWP",
+    ))
+}
+
+/// Keep this process's standard handles out of the processes it starts. Windows hands a child
+/// every inheritable handle of its parent, not only the three standard handles it is given
+/// (CreateProcessW with bInheritHandles, as `std::process::Command` starts it). horizon-ctl's own
+/// standard handles are inheritable when its caller gave it pipes (a script that reads its output,
+/// an MCP client), so the game it launches would hold the caller's pipe open for its whole life and
+/// the caller, waiting for the end of horizon-ctl's output, would wait until the game quits. A
+/// child given `Stdio::inherit()` still gets them: `Command` duplicates the handles it passes.
+/// Unix needs none of this: a child's 0-2 are replaced and the rest are close-on-exec.
+#[cfg(all(windows, not(target_vendor = "uwp")))]
+pub fn keep_stdio_from_children() {
+    use windows_sys::Win32::Foundation::{
+        HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE, SetHandleInformation,
+    };
+    use windows_sys::Win32::System::Console::{
+        GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+    };
+    for which in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+        // SAFETY: GetStdHandle has no preconditions; SetHandleInformation only gets a handle this
+        // process holds, and when it fails (no console, a pseudo-handle) the handle stays as it was.
+        unsafe {
+            let handle = GetStdHandle(which);
+            if !handle.is_null() && handle != INVALID_HANDLE_VALUE {
+                SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    /// Without `HORIZON_WORKER_THREADS`, the count is the machine's.
+    #[test]
+    fn worker_count_defaults_to_the_machine() {
+        if std::env::var_os("HORIZON_WORKER_THREADS").is_some() {
+            return;
+        }
+        let machine = std::thread::available_parallelism().map_or(1, |n| n.get());
+        assert_eq!(super::worker_count(), machine);
+    }
+
+    /// Only a positive number overrides the machine's count.
+    #[test]
+    fn worker_count_override_parses() {
+        for (value, parsed) in [
+            (None, None),
+            (Some("4"), Some(4)),
+            (Some(" 4 "), Some(4)),
+            (Some("0"), None),
+            (Some("-2"), None),
+            (Some("lots"), None),
+            (Some(""), None),
+        ] {
+            assert_eq!(super::parse_worker_count(value.map(String::from)), parsed);
+        }
+    }
+
+    /// After it, this process's standard output is no longer handed to the processes it starts.
+    #[cfg(windows)]
+    #[test]
+    fn standard_handles_stay_out_of_children() {
+        use windows_sys::Win32::Foundation::{
+            GetHandleInformation, HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE,
+        };
+        use windows_sys::Win32::System::Console::{GetStdHandle, STD_OUTPUT_HANDLE};
+        super::keep_stdio_from_children();
+        // SAFETY: reads the flags of this process's own standard output handle.
+        unsafe {
+            let handle = GetStdHandle(STD_OUTPUT_HANDLE);
+            let mut flags = 0;
+            if !handle.is_null()
+                && handle != INVALID_HANDLE_VALUE
+                && GetHandleInformation(handle, &mut flags) != 0
+            {
+                assert_eq!(flags & HANDLE_FLAG_INHERIT, 0);
+            }
+        }
+    }
+
     /// The hint holds on the platforms that take it.
     #[test]
     fn favouring_a_thread_takes_where_the_os_allows_it() {

@@ -1,10 +1,15 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = "1.0.10.0", bool PrepareSounds = false, bool UseResourceFramework = false)
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = "1.0.10.0", bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "")
 {
+    // Public Fluent Launcher application ID, selected at the user's request while their own is reviewed.
+    public const string FluentLauncherClientId = "0844e754-1d2e-4861-8e2b-18059609badb";
     public const string TouchModId = "horizon_touch";
-    public IReadOnlyList<string> ModIds => NativeTouchMod ? [TouchModId] : [];
+    public const string DeviceVibrationModId = "horizon_device_vibration";
+    public IReadOnlyList<string> ModIds => new[]
+        { NativeTouchMod ? TouchModId : null, NativeDeviceVibration ? DeviceVibrationModId : null }
+        .Where(id => id is not null).Select(id => id!).ToArray();
     public string ValidatedPackageVersion
     {
         get
@@ -18,6 +23,18 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
             return PackageVersion;
         }
     }
+    // Application (client) IDs are public GUIDs, not credentials.
+    public string? ValidatedMicrosoftClientId
+    {
+        get
+        {
+            var text = MicrosoftClientId.Trim();
+            if (text.Length == 0) return null;
+            if (!Guid.TryParseExact(text, "D", out var id) || id == Guid.Empty)
+                throw new ArgumentException("Microsoft application ID must be a nonempty GUID.");
+            return id.ToString("D");
+        }
+    }
     public string RustTarget => Target switch
     {
         TargetProfile.DesktopX64 => "x86_64-uwp-windows-msvc",
@@ -28,7 +45,8 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
 
     // These features are recorded as individual tokens; no user-supplied shell
     // fragments or paths are interpolated. Execution requires a verified recipe.
-    public IReadOnlyList<string> Features => NativeTouchMod
-        ? ["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https"]
-        : ["native-d3d11", "uwp-audio", "uwp-https"];
+    public IReadOnlyList<string> Features => new[]
+        { "native-d3d11", NativeTouchMod ? "native-touch-mod" : null,
+          NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "uwp-account" }
+        .Where(feature => feature is not null).Select(feature => feature!).ToArray();
 }

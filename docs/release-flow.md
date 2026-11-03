@@ -13,15 +13,15 @@ reopened; labels never start it):
 
 | Job | Runs on | What | Time |
 | --- | --- | --- | --- |
-| `verify` | GitHub `ubuntu-latest` | Gathers three jobs that run at once: `python` (public-tree check, Python tests), `clippy` (rustfmt, clippy with warnings denied) and `tests` (Rust tests). Dependencies come from caches saved by main's runs | ~4 min |
+| `verify` | GitHub `ubuntu-latest`; with `SELF_HOSTED_CI=all`, playhorizon's checks runners for main's pushes and this repository's own pull requests, never a fork's ([CI runners](ci-runners.md)) | Public-tree check, Python tests, rustfmt, clippy with warnings denied, Rust tests, one after another in one job (one runner from the organisation's shared pool per run). Dependencies and the workspace build come from a cache saved by main's runs (GitHub) or the runner's own build folder (playhorizon) | ~8 min |
 | `parity / parity` | A runner with the label `horizon-game`: the Mac mini's and playhorizon's (below) | Only for a change to a harness, an oracle, a probe or the runner (or the `run-parity` label): the vanilla harnesses the change can affect (`tools/parity.py --changed <base>`). Other pull requests skip it: [parity-main](#parity-on-main) checks them on main | seconds when nothing is affected; minutes per affected harness |
 
 Pushes to main run `verify` only; the nightly audit covers main's harnesses.
 
-`verify` is the check main requires, so it runs `always()` in every run of `checks` and fails unless `python`,
-`clippy` and `tests` all passed: GitHub counts a *skipped* required check as passed, and labels used to start runs
-whose `verify` was skipped, which let auto-merge merge before the real `verify` finished. A pull request that changes
-only documentation skips the Rust steps and finishes in about a minute. A pull request's public-tree check reads only
+`verify` is the check main requires, so it has no condition and runs in every run of `checks`: GitHub counts a
+*skipped* required check as passed, and labels used to start runs whose `verify` was skipped, which let
+auto-merge merge before the real `verify` finished. A pull request that changes no Rust (docs, tools) runs only its
+quick steps and finishes in about a minute. A pull request's public-tree check reads only
 its own commits (`--range base..head`); main's pushes read every ref's history.
 
 ### The parity job
@@ -169,9 +169,10 @@ fork's pull request: the Team member decides whether to run it, and a skipped ru
 Most pull requests merge on `verify` alone and leave the vanilla harnesses to `.github/workflows/parity-main.yml`,
 which runs them on main a batch of merges at a time, on the Mac mini's runner:
 
-- It starts on every push to main, one run at a time (`concurrency: parity-main`). Merges that land while a run
-  goes on wait in one pending run: GitHub keeps only the newest and cancels the others, so the next run takes them
-  all.
+- It starts on every push to main, one run at a time (`concurrency: parity-main`). A run that started always
+  finishes; merges that land while it goes on wait in one pending run: GitHub keeps only the newest and cancels the
+  others, so the next run takes them all. The many `cancelled` runs in the list are those pending ones, plus runs
+  whose bisect outgrew the job's 240 minutes.
 - `tools/parity_main.py base` gives the newest commit main contains whose parity-main passed (else the last
   merge's parent), and the run is `tools/parity.py --changed <that commit>`: the union of the harnesses every merge
   since then can affect, once, with every earlier pass reused.
@@ -180,8 +181,11 @@ which runs them on main a batch of merges at a time, on the Mac mini's runner:
   (`🤖 Agent: parity-main found that this merge breaks ...`). Fix it with a pull request as usual; the next
   run checks from the last green commit again.
 - Nightlies build only on a commit both `checks` and `parity-main` passed on (`tools/release_train.py`,
-  `tools/ci/nightly.py`, see below), so a broken merge holds them instead of reaching players. `release.yml` also
-  starts when a parity-main run finishes. A forced run (`force=true`) doesn't wait for parity-main.
+  `tools/ci/nightly.py`, see below), so a broken merge holds them instead of reaching players. They take the
+  newest such commit even when a later batch failed: that failure is in merges the green commit doesn't contain, so
+  a broken or flaky harness holds only what landed after the last green run, never the whole Nightly (before
+  2026-11-03, any later failure held every Nightly until a run passed again: 30 h without one). `release.yml`
+  also starts when a parity-main run finishes. A forced run (`force=true`) doesn't wait for parity-main.
 
 A pull request still runs its own parity job when it changes a harness script, an oracle
 (`mods/horizon/src/test/`), a probe (`crates/*/examples/`, `game/*_fixture.rs`, `game/*_harness.rs`), the runner
@@ -231,8 +235,8 @@ commits) since the commit the published Nightly was built on:
 - One Nightly build at a time: while one runs or waits, the train starts none. At most 12 builds a UTC day (the
   reviewers' `/nightly` builds count): past that the train waits for the next day, except for `release-now` and
   `force=true`.
-- A scheduled run takes main's newest commit where `checks` and `parity-main` passed; after a run of either, the
-  commit it passed on, once both passed there.
+- A scheduled run takes main's newest commit where `checks` and `parity-main` passed (a later failed
+  parity-main batch doesn't change it); after a run of either, the commit it passed on, once both passed there.
 
 ### Nightly only
 
@@ -393,13 +397,16 @@ and by hand; pushes to `launcher` and `launcher-*` branches only build.
   launcher's tests, checks its libraries, and installs the latest game release with the new launcher.
 - Published with `--latest=false`: the repository's latest release stays a game release. Notes list the pull
   requests under New and Fixed; Kira posts launcher releases without pinging.
+- Windows also publishes `horizon-launcher-setup.exe`, the launcher's binary under another name: with no
+  arguments it opens the per-user setup (`launcher/src/installer.rs`) instead of Home, and
+  `horizon-launcher.exe uninstall` removes it again. Both files are in the release's signed `SHA256SUMS`.
 
 Making a launcher release GitHub's latest instead would break servers: every `horizon-server` already installed,
 `install.sh` and `install.ps1` ask for `releases/latest` and expect the game's archives there, and a server that
 can't update can't fetch the fix either. So the game release stays the latest, and it sends people to the launcher
 (#1647): its notes open with a "Want to play? Download the Horizon launcher" block (`PLAYERS` in
 `tools/release_train.py`: raw HTML, which GitHub shows and launchers' notes skip; the site's Releases page leaves
-it out too), and its archives carry labels ("Game files the
+it out too), which `PLAYERS_FOOTER` repeats above the disclaimer at the end, and its archives carry labels ("Game files the
 launcher installs: Linux (…)") that GitHub shows in place of the file names. Everything that downloads matches
 the asset's name, which is unchanged.
 

@@ -54,7 +54,7 @@ fn now() -> u64 {
 // ----- The device-code flow ----------------------------------------------------------------------
 
 /// What the player types at the verification page.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct DeviceCode {
     pub user_code: String,
     pub verification_uri: String,
@@ -226,7 +226,12 @@ struct Minecraft {
     xuid: Option<String>,
 }
 
-fn minecraft_login(ep: &Endpoints, ms_access: &str) -> Result<Minecraft, String> {
+fn minecraft_login(
+    ep: &Endpoints,
+    ms_access: &str,
+    progress: &dyn Fn(session::Phase),
+) -> Result<Minecraft, String> {
+    progress(session::Phase::Xbox);
     let (status, xbl) = send(
         request_to("POST", &ep.xbox_user),
         Some(Body::Json(json!({
@@ -263,6 +268,7 @@ fn minecraft_login(ep: &Endpoints, ms_access: &str) -> Result<Minecraft, String>
         return Err("Xbox Live refused the sign-in.".into());
     };
     let xuid = claims.and_then(|c| str_field(c, "xid"));
+    progress(session::Phase::Minecraft);
     let (token, expires_in) = minecraft_token(ep, &format!("XBL3.0 x={uhs};{xsts_token}"))?;
     Ok(Minecraft {
         token,
@@ -396,6 +402,8 @@ fn profile(ep: &Endpoints, token: &str) -> Result<Option<Account>, String> {
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Secrets {
     refresh_token: String,
+    #[serde(default)]
+    sign_in_required: bool,
     minecraft_token: String,
     minecraft_expires_at: u64,
     #[serde(default)]
@@ -417,10 +425,20 @@ impl std::fmt::Debug for Secrets {
 
 /// From Microsoft tokens to a ready account: Xbox, XSTS, Minecraft, ownership, profile.
 pub fn finish_sign_in(ep: &Endpoints, ms: MsTokens) -> Result<(Account, Secrets), String> {
-    let mc = minecraft_login(ep, &ms.access)?;
+    finish_sign_in_with_progress(ep, ms, &|_| {})
+}
+
+pub fn finish_sign_in_with_progress(
+    ep: &Endpoints,
+    ms: MsTokens,
+    progress: &dyn Fn(session::Phase),
+) -> Result<(Account, Secrets), String> {
+    let mc = minecraft_login(ep, &ms.access, progress)?;
+    progress(session::Phase::Ownership);
     if !owns_game(ep, &mc.token)? {
         return Err(DOES_NOT_OWN.into());
     }
+    progress(session::Phase::Profile);
     let account = profile(ep, &mc.token)?.ok_or(NO_PROFILE)?;
     Ok((account, Secrets::new(ms.refresh, mc)))
 }
@@ -429,6 +447,7 @@ impl Secrets {
     fn new(refresh_token: String, mc: Minecraft) -> Self {
         Self {
             refresh_token,
+            sign_in_required: false,
             minecraft_token: mc.token,
             minecraft_expires_at: mc.expires_at,
             xuid: mc.xuid,
@@ -455,30 +474,65 @@ pub fn check(
     account: &Account,
     secrets: Secrets,
 ) -> Check {
-    let mut secrets = secrets;
-    if secrets.minecraft_expires_at <= now() + RENEW_BEFORE {
+    check_with(ep, client_id, account, secrets, false, &|_| {})
+}
+
+fn check_with(
+    ep: &Endpoints,
+    client_id: Option<&str>,
+    account: &Account,
+    mut secrets: Secrets,
+    force: bool,
+    progress: &dyn Fn(session::Phase),
+) -> Check {
+    if secrets.sign_in_required {
+        return Check::NoAnswer(SIGN_IN_AGAIN.into(), secrets);
+    }
+    if force || secrets.minecraft_expires_at <= now() + RENEW_BEFORE {
+        progress(session::Phase::Microsoft);
         let renewed = client_id
             .ok_or_else(|| NOT_CONFIGURED.to_string())
-            .and_then(|id| refresh_ms(ep, id, &secrets.refresh_token))
-            .and_then(|ms| Ok((minecraft_login(ep, &ms.access)?, ms.refresh)));
-        match renewed {
-            Ok((mc, refresh)) => {
+            .and_then(|id| refresh_ms(ep, id, &secrets.refresh_token));
+        let ms = match renewed {
+            Ok(ms) => ms,
+            Err(e) => {
+                secrets.sign_in_required = e == SIGN_IN_AGAIN;
+                return Check::NoAnswer(e, secrets);
+            }
+        };
+        // Microsoft can rotate its refresh credential even if a later service fails.
+        secrets.refresh_token = ms.refresh;
+        match minecraft_login(ep, &ms.access, progress) {
+            Ok(mc) => {
                 secrets = Secrets {
                     owns: secrets.owns,
-                    ..Secrets::new(refresh, mc)
+                    ..Secrets::new(secrets.refresh_token, mc)
                 }
             }
             Err(e) => return Check::NoAnswer(e, secrets),
         }
     }
     let token = &secrets.minecraft_token;
-    match owns_game(ep, token).and_then(|owns| Ok(if owns { profile(ep, token)? } else { None })) {
+    progress(session::Phase::Ownership);
+    match owns_game(ep, token).and_then(|owns| {
+        if !owns {
+            return Ok(None);
+        }
+        progress(session::Phase::Profile);
+        profile(ep, token)
+    }) {
         Err(e) => Check::NoAnswer(e, secrets),
         Ok(None) => Check::DoesNot(Secrets {
             owns: false,
             ..secrets
         }),
-        Ok(Some(p)) if p.uuid != account.uuid => Check::NoAnswer(OTHER_PROFILE.into(), secrets),
+        Ok(Some(p)) if p.uuid != account.uuid => Check::NoAnswer(
+            OTHER_PROFILE.into(),
+            Secrets {
+                sign_in_required: true,
+                ..secrets
+            },
+        ),
         Ok(Some(p)) => Check::Owns(
             p,
             Secrets {

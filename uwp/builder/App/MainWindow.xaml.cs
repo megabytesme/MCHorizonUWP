@@ -8,7 +8,7 @@ namespace Horizon.Builder.App;
 
 public sealed partial class MainWindow : Window
 {
-    public MainWindow() { InitializeComponent(); }
+    public MainWindow() { InitializeComponent(); MicrosoftClientId.Text = BuildSelection.FluentLauncherClientId; }
     private string? sourceDirectory;
     private string? resourceDirectory;
     private string? minecraftDirectory;
@@ -50,7 +50,7 @@ public sealed partial class MainWindow : Window
             var minecraft = minecraftDirectory;
             if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true, MicrosoftClientId.Text);
             var plan = LocalRecipe.Plan(selection);
             LocalRecipe.ValidateResources(resources);
             if (selection.PrepareSounds) LocalRecipe.ValidateSoundPreparation(resources, minecraft);
@@ -80,7 +80,7 @@ public sealed partial class MainWindow : Window
             var minecraft = minecraftDirectory;
             if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true);
+            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true, MicrosoftClientId.Text);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var result = await LocalBuildRunner.RunAsync(source, resources, selection, new SystemProbe(), progress, minecraft);
             RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
@@ -117,7 +117,7 @@ public sealed partial class MainWindow : Window
     {
         Results.Children.Clear();
         var profile = (TargetProfile)Profile.SelectedIndex;
-        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true);
+        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true, MicrosoftClientId.Text);
         Results.Children.Add(new TextBlock
         {
             Text = $"Requested target: {selection.RustTarget} | Features: {string.Join(", ", selection.Features)}",

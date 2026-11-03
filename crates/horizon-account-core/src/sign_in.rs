@@ -36,6 +36,7 @@ impl fmt::Debug for Session {
 pub enum SignInError {
     NotConfigured,
     RegistrationRejected,
+    MinecraftApprovalRequired,
     Declined,
     CodeExpired,
     DoesNotOwn,
@@ -51,6 +52,7 @@ impl fmt::Display for SignInError {
         f.write_str(match self {
             Self::NotConfigured => "Microsoft sign-in is not configured for this build.",
             Self::RegistrationRejected => "Microsoft refused this app registration.",
+            Self::MinecraftApprovalRequired => "Minecraft services refused this app. Its public application ID may need Mojang approval.",
             Self::Declined => "Sign-in was declined in the browser.",
             Self::CodeExpired => "The sign-in code expired. Start again.",
             Self::DoesNotOwn => "This account does not own Minecraft: Java Edition.",
@@ -68,6 +70,7 @@ impl fmt::Display for SignInError {
 fn classify(message: &str) -> SignInError {
     match message {
         "Microsoft refused this launcher's app registration (client ID)." => SignInError::RegistrationRejected,
+        "The Minecraft services refused this launcher: its app is not approved by Mojang yet." => SignInError::MinecraftApprovalRequired,
         "Sign-in was declined in the browser." => SignInError::Declined,
         "The sign-in code expired. Start again." => SignInError::CodeExpired,
         "This account doesn't own Minecraft: Java Edition." => SignInError::DoesNotOwn,
@@ -396,6 +399,7 @@ mod tests {
     }
     #[test]
     fn unknown_server_errors_are_not_echoed() {
+        assert_eq!(classify("The Minecraft services refused this launcher: its app is not approved by Mojang yet."), SignInError::MinecraftApprovalRequired);
         let error = classify("synthetic-secret-from-server");
         assert_eq!(error, SignInError::Protocol);
         assert!(!error.to_string().contains("synthetic"));

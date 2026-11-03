@@ -3,6 +3,7 @@
 //! the vanilla key mappings they are bound to, the left stick as an analog
 //! move vector and the right stick turning the view. `horizon-ctl pad`
 //! injects a virtual pad on top of the real one.
+use super::event_loop::EventLoopCtl;
 use super::{Game, Screen};
 use horizon_client::{
     Result,
@@ -12,7 +13,7 @@ use horizon_client::{
 };
 use serde_json::{Value, json};
 use std::time::Instant;
-use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode};
+use winit::keyboard::KeyCode;
 
 pub(super) const HELP: &[&str] = &[
     "pad BUTTON down|up|tap         a virtual controller button (south east west north lb rb lt rt select start ls rs up down left right)",
@@ -25,8 +26,13 @@ pub(super) const HELP: &[&str] = &[
 /// The controllers and the state the game last acted on.
 #[derive(Default)]
 pub(super) struct Pads {
+    /// Splitscreen: this player's pad, read by `PadRouter` for every game, instead of the pads.
+    pub(super) feed: Option<PadState>,
     /// The real controllers and the DualSense's output.
-    #[cfg(feature = "controllers")]
+    #[cfg(any(
+        feature = "controllers",
+        all(target_vendor = "uwp", feature = "uwp-controller")
+    ))]
     devices: hardware::Devices,
     /// The virtual pad of `horizon-ctl pad`.
     injected: PadState,
@@ -42,6 +48,9 @@ pub(super) struct Pads {
     late_releases: Vec<Button>,
     /// The merged state of the last poll.
     pub(super) state: PadState,
+    /// The hardware's buttons at the last poll, for `input-log`'s `pad`
+    /// events: the merged state hides which source moved.
+    last_hardware: PadState,
     /// The pad drove the game last (the mouse and keyboard hand control back).
     pub(super) in_use: bool,
     pub(super) style: GlyphStyle,
@@ -51,14 +60,38 @@ pub(super) struct Pads {
     last_rumble: Option<(&'static str, gamepad::Pulse)>,
     /// The player's health between polls (a drop is damage taken).
     health: HealthWatch,
+    #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+    device_vibration_enabled: bool,
 }
 
-#[cfg(feature = "controllers")]
+#[cfg(all(
+    feature = "controllers",
+    not(all(target_vendor = "uwp", feature = "uwp-controller"))
+))]
 mod hardware;
+#[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+#[path = "pad/uwp.rs"]
+mod hardware;
+pub(super) use hardware::{PadId, PadRouter};
+
+/// What a controller did since the last frame.
+#[cfg_attr(not(feature = "controllers"), allow(dead_code))]
+pub(in crate::game) enum PadEvent {
+    Press(PadId, Button),
+    /// Disconnected (out of battery, unplugged, out of range).
+    Gone(PadId),
+    /// Connected again under the same id (Windows keeps it; macOS gives a new one). On Linux
+    /// gilrs gives a new device the slot of a disconnected one of the same model, so there this
+    /// can be another controller of that model.
+    Back(PadId),
+}
 
 /// A build without the `controllers` feature (the server build, which must not need libudev): no
 /// hardware pads, only `horizon-ctl pad`'s virtual one.
-#[cfg(not(feature = "controllers"))]
+#[cfg(not(any(
+    feature = "controllers",
+    all(target_vendor = "uwp", feature = "uwp-controller")
+)))]
 mod hardware {
     use super::{super::Game, Pads};
     use horizon_client::gamepad::{PadState, Pulse, Rumble};
@@ -67,6 +100,33 @@ mod hardware {
     impl Pads {
         pub(super) fn read(&mut self) -> PadState {
             PadState::default()
+        }
+        pub(in crate::game) fn release_hardware(&mut self) {}
+    }
+
+    pub(in crate::game) type PadId = usize;
+    #[derive(Default)]
+    pub(in crate::game) struct PadRouter {}
+    impl PadRouter {
+        pub(in crate::game) fn events(&mut self) -> Vec<super::PadEvent> {
+            Vec::new()
+        }
+        pub(in crate::game) fn lend_output(&mut self, _: &mut Pads, _: PadId) {}
+        pub(in crate::game) fn reclaim_output(&mut self, _: &mut Pads) {}
+        pub(in crate::game) fn connected(&self, _: PadId) -> bool {
+            false
+        }
+        pub(in crate::game) fn uuid(&self, _: PadId) -> [u8; 16] {
+            [0; 16]
+        }
+        pub(in crate::game) fn state(&self, _: PadId) -> PadState {
+            PadState::default()
+        }
+        pub(in crate::game) fn name(&self, _: PadId) -> String {
+            String::new()
+        }
+        pub(in crate::game) fn style(&self, _: PadId) -> horizon_client::gamepad::GlyphStyle {
+            horizon_client::gamepad::GlyphStyle::Auto
         }
     }
 
@@ -82,6 +142,36 @@ mod hardware {
 }
 
 impl Pads {
+    /// The digital buttons the person's pad changed since the last poll.
+    pub(super) fn hardware_edges(&mut self, hardware: PadState) -> Vec<(Button, bool)> {
+        let edges = Button::ALL
+            .into_iter()
+            .filter_map(|button| {
+                let was = self.last_hardware.held(button);
+                let now = hardware.held(button);
+                (was != now).then_some((button, now))
+            })
+            .collect();
+        self.last_hardware = hardware;
+        edges
+    }
+
+    /// A replay's pad button, in place of `pad`'s line.
+    pub(super) fn inject_button(&mut self, button: Button, down: bool) {
+        self.injected.set(button, down);
+    }
+    /// A replay ended: let go of everything it held.
+    pub(super) fn clear_injected(&mut self) {
+        self.injected = PadState::default();
+    }
+
+    /// Include releases delayed until the next simulation tick.
+    pub(super) fn holds_action(&self, settings: &gamepad::PadSettings, action: &str) -> bool {
+        settings.binding(action).is_some_and(|button| {
+            self.edges.is_held(button) || self.late_releases.contains(&button)
+        })
+    }
+
     /// A new player entity took over (spawn, respawn, a server joined, a
     /// dimension change): its health is not compared with the old one's.
     pub(super) fn player_replaced(&mut self) {
@@ -91,9 +181,28 @@ impl Pads {
 
 impl Game<'_> {
     /// Once per loop iteration: read the pads and act on button changes.
-    pub(super) fn poll_pads(&mut self, event_loop: &ActiveEventLoop) {
+    pub(super) fn poll_pads(&mut self, event_loop: &dyn EventLoopCtl) {
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        {
+            let enabled = self.device_vibration_on();
+            if self.pad.device_vibration_enabled && !enabled {
+                horizon_device_vibration_native::cancel();
+            }
+            self.pad.device_vibration_enabled = enabled;
+        }
         let settings = &self.settings.controller;
         if !settings.enabled {
+            #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+            {
+                let health = self
+                    .player
+                    .as_ref()
+                    .filter(|_| self.title.is_none())
+                    .map(|p| p.health.health());
+                if let Some(damage) = self.pad.health.observe(health) {
+                    self.pad_rumble(Rumble::Hurt(damage));
+                }
+            }
             self.pad_output_off();
             if self.pad.state != PadState::default() {
                 self.pad.state = PadState::default();
@@ -101,9 +210,26 @@ impl Game<'_> {
                     self.pad_edge(event_loop, button, down);
                 }
             }
+            // The keyboard's menu focus follows its widget all the same.
+            self.pad_menu_frame(event_loop);
             return;
         }
-        let hardware = self.pad.read();
+        let hardware = match self.pad.feed {
+            Some(state) => state,
+            None => self.pad.read(),
+        };
+        // A person's pad, for `input-log` and the repro recording; the virtual
+        // pad is an agent's `pad` line and is recorded as that.
+        let hardware_edges = self.pad.hardware_edges(hardware);
+        for (button, down) in hardware_edges {
+            self.note_input(
+                super::input_trace::InputOrigin::User,
+                super::input_trace::TraceKind::Pad {
+                    button: button.name().to_owned(),
+                    action: if down { "down" } else { "up" }.to_owned(),
+                },
+            );
+        }
         self.ui.options.pad_style = self.settings.controller.glyphs.resolve(self.pad.style);
         let state = hardware.merge(&self.pad.injected);
         self.pad.virtual_input = self.pad.injected != PadState::default();
@@ -142,7 +268,7 @@ impl Game<'_> {
         self.pad_menu_frame(event_loop);
     }
 
-    fn pad_edge(&mut self, event_loop: &ActiveEventLoop, button: Button, down: bool) {
+    fn pad_edge(&mut self, event_loop: &dyn EventLoopCtl, button: Button, down: bool) {
         let ticking = self.title.is_none() && self.screen == Screen::Playing && !self.pause;
         if down {
             // Pressed again before its held-back release went out.
@@ -158,7 +284,7 @@ impl Game<'_> {
         self.pad_button_logged(event_loop, button, down);
     }
 
-    fn pad_button_logged(&mut self, event_loop: &ActiveEventLoop, button: Button, down: bool) {
+    fn pad_button_logged(&mut self, event_loop: &dyn EventLoopCtl, button: Button, down: bool) {
         if let Err(e) = self.pad_button(event_loop, button, down) {
             log::warn!("Horizon: controller {}: {e}", button.name());
         }
@@ -172,7 +298,7 @@ impl Game<'_> {
 
     fn pad_button(
         &mut self,
-        event_loop: &ActiveEventLoop,
+        event_loop: &dyn EventLoopCtl,
         button: Button,
         down: bool,
     ) -> Result<()> {
@@ -296,16 +422,30 @@ impl Game<'_> {
         self.turn_player(f64::from(yaw / 0.15), f64::from(pitch / 0.15));
     }
 
+    #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+    fn device_vibration_on(&self) -> bool {
+        let id = horizon_device_vibration_native::MOD_ID;
+        self.native_on(id)
+            && horizon_device_vibration_native::enabled(
+                self.native_setting(id, horizon_device_vibration_native::ENABLED_KEY)
+                    .as_deref(),
+            )
+    }
+
     /// Vibrate the active pad, when vibration is on and the pad is the one
     /// playing (a pad lying idle while the mouse plays stays still).
     pub(super) fn pad_rumble(&mut self, rumble: Rumble) {
+        let Some(pulse) = rumble.pulse() else {
+            return;
+        };
+        #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
+        if self.focused && self.device_vibration_on() {
+            horizon_device_vibration_native::vibrate(pulse.strong.max(pulse.weak), pulse.millis);
+        }
         let settings = &self.settings.controller;
         if !settings.enabled || !settings.vibration || !self.pad.in_use {
             return;
         }
-        let Some(pulse) = rumble.pulse() else {
-            return;
-        };
         self.pad.last_rumble = Some((rumble.name(), pulse));
         self.pad_vibrate(rumble, pulse);
     }

@@ -1,16 +1,16 @@
 # Horizon UWP Builder preview
 
 This desktop WinUI 3 preview checks a small set of build prerequisites and
-records a target and optional native touch source-mod selection. The touch
-selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
+records a target and optional native touch and device-vibration source-mod selections.
+The latter has its own in-game setting, separate from controller vibration.
+The touch selection maps to the `native-touch-mod` Cargo feature. The mod has been tested
 on a Lumia in its separate branch. The local recipe builds from a pinned source
 snapshot and links to official setup instructions for
 missing tools. On request it can invoke the system Windows Package Manager for
 fixed Rustup, Git and Python packages, with interactive license/elevation prompts and normal
 package verification. The local recipe copies user-selected prepared resources
 into private package output, but does not sign or install packages. Tool presence does not establish version or recipe
-compatibility; the required UWP Rust patches and build recipes still need a
-verified implementation. Visual Studio detection checks common installation
+compatibility with every machine; the x64 and ARM32 recipes have been built locally. Visual Studio detection checks common installation
 locations and may miss custom locations.
 
 Build on Windows with the .NET 8 SDK, Windows App SDK NuGet packages and Visual
@@ -36,12 +36,12 @@ plan and unresolved device and licensing requirements are in
 
 The core includes a canonical input record with hashes for the recipe, source
 revision, lockfile, patched Rust standard library, resource inventory and
-selected touch mod, plus toolchain versions. It contains no file paths or keys.
+selected native mods, plus toolchain versions. It contains no file paths or keys.
 This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`2ce3d73dbc9e82634b73d65606b3cb14a4e63347`, Rust 1.99.1 and Minecraft
+`4bcdb5f4e2a05524b5b631738897c0527eecb546`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
@@ -49,10 +49,22 @@ preview uses the native D3D11 renderer and runs x64 and ARM32 plans in fresh
 builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
 Cargo fetches missing dependencies for the selected target and x64 build host
-from configured registries before the offline build. Signing, framework packaging
-and installation are not yet integrated. A build requires
+from configured registries before the offline build. It can also create a reusable
+resource framework package for the selected prepared resources. Signing and
+installation are not yet integrated. A build requires
 at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
-dependency override; skins and Minecraft session requests use WinRT HTTPS. Microsoft sign-in is not yet implemented.
+dependency override; account, skin and Minecraft session requests use WinRT HTTPS.
+The Microsoft application (client) ID is public and is compiled into the client.
+At the user’s request the UI defaults to the [Fluent Launcher public client ID](https://github.com/Xcube-Studio/Natsurainko.FluentLauncher/blob/main/Natsurainko.FluentLauncher/Services/Accounts/AuthenticationService.cs);
+Microsoft accepted a device-code request for it. Minecraft/Xbox authorization with
+that ID has not yet been verified. The ID can be cleared for offline play or changed
+to a separately approved ID.
+Register a public client supporting personal Microsoft accounts and device-code flow;
+New IDs require [Minecraft Java App ID review](https://aka.ms/mce-reviewappid)
+for Minecraft services, as described in [Horizon’s account documentation](../../docs/microsoft-account.md). Without one, offline
+play remains available. The pre-game screen uses Credential Locker, shows a device
+code to enter in a browser on another device, and asks before replacing or removing
+a saved account. Real-account and physical-device validation remain outstanding.
 The output uses the prototype publisher identity.
 The combined recipe has not yet been validated on a phone. The builder warns
 when `assets/minecraft/sounds.json` or the sounds directory is missing; this

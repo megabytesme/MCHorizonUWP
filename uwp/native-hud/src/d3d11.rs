@@ -280,7 +280,7 @@ fn draw_pass(draw: &Draw) -> Option<DrawPass> {
         Blend::Invert => Some(DrawPass::OverlayInvert),
         Blend::Additive => Some(DrawPass::OverlayAdditive),
         Blend::Vignette => Some(DrawPass::OverlayVignette),
-        Blend::Depth(_) | Blend::EndPortal => None,
+        Blend::Depth(_) | Blend::EndPortal | Blend::CitGlint(_) => None,
     }
 }
 

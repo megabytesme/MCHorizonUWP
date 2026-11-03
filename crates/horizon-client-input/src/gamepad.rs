@@ -131,6 +131,41 @@ pub struct PadState {
     pub right: [f32; 2],
     pub triggers: [f32; 2],
 }
+
+/// Translate Windows.Gaming.Input's GamepadReading into Horizon's layout.
+#[cfg(any(target_vendor = "uwp", test))]
+pub fn from_windows_gaming_input(buttons: u32, axes: [f32; 6]) -> PadState {
+    let mut state = PadState::default();
+    for (mask, button) in [
+        (0x0004, Button::South),
+        (0x0008, Button::East),
+        (0x0010, Button::West),
+        (0x0020, Button::North),
+        (0x0400, Button::LeftBumper),
+        (0x0800, Button::RightBumper),
+        (0x0002, Button::Select),
+        (0x0001, Button::Start),
+        (0x1000, Button::LeftStick),
+        (0x2000, Button::RightStick),
+        (0x0040, Button::DPadUp),
+        (0x0080, Button::DPadDown),
+        (0x0100, Button::DPadLeft),
+        (0x0200, Button::DPadRight),
+    ] {
+        state.set(button, buttons & mask != 0);
+    }
+    let axis = |value: f32, min: f32| {
+        if value.is_finite() {
+            value.clamp(min, 1.0)
+        } else {
+            0.0
+        }
+    };
+    state.left = [axis(axes[0], -1.0), axis(axes[1], -1.0)];
+    state.right = [axis(axes[2], -1.0), axis(axes[3], -1.0)];
+    state.triggers = [axis(axes[4], 0.0), axis(axes[5], 0.0)];
+    state
+}
 impl PadState {
     pub fn set(&mut self, button: Button, down: bool) {
         if down {
@@ -1162,6 +1197,22 @@ pub fn bow_power(ticks: u32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_gamepad_maps_buttons_axes_and_clamps_bad_values() {
+        let pad = from_windows_gaming_input(
+            0x0004 | 0x0002 | 0x0200 | 0x0800,
+            [0.5, -0.75, f32::NAN, 2.0, -1.0, 0.8],
+        );
+        assert!(pad.held(Button::South));
+        assert!(pad.held(Button::Select));
+        assert!(pad.held(Button::DPadRight));
+        assert!(pad.held(Button::RightBumper));
+        assert!(!pad.held(Button::East));
+        assert_eq!(pad.left, [0.5, -0.75]);
+        assert_eq!(pad.right, [0.0, 1.0]);
+        assert_eq!(pad.triggers, [0.0, 0.8]);
+    }
 
     #[test]
     fn defaults_follow_bedrock() {

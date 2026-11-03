@@ -14,10 +14,17 @@ native-d3d11 = ["horizon-client/native-d3d11"]
 uwp-https = ["horizon-client/uwp-https"]
 native-d3d11-readback = ["horizon-client/native-d3d11-readback"]
 native-touch-mod = ["horizon-client/native-touch-mod"]
+native-device-vibration-mod = ["horizon-client/native-device-vibration-mod"]
 uwp-audio = ["horizon-client/uwp-audio"]
+uwp-controller = ["horizon-client/uwp-controller"]
+uwp-account = ["dep:horizon-account-core", "uwp-https"]
 
 [dependencies]
 horizon-client = { path = "../../crates/horizon-client", default-features = false }
+
+[target.'cfg(target_vendor = "uwp")'.dependencies]
+horizon-threads = { path = "../../crates/horizon-threads" }
+horizon-account-core = { path = "../../crates/horizon-account-core", optional = true }
 
 [patch.crates-io]
 wgpu-hal = { path = "../../third_party/wgpu-hal" }

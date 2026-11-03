@@ -148,6 +148,11 @@ impl BlockEditScreen {
             dragging: None,
         }
     }
+    /// Whether one of the block's text boxes has the keyboard's focus: the
+    /// window asks the OS for an input method only then.
+    pub(super) fn text_focused(&self) -> bool {
+        self.focus.is_some()
+    }
 }
 
 impl Game<'_> {
@@ -336,7 +341,7 @@ impl Game<'_> {
         let size = self.renderer_viewport().unwrap_or([1, 1]);
         let b = HudBatch::new(size);
         let cursor = self.cursor;
-        let shift = self.keys.contains(&KeyCode::ShiftLeft);
+        let shift = self.has_shift_down();
         let alt = self.keys.contains(&KeyCode::AltLeft);
         let atlas_click = |game: &Game<'_>, edit: &mut EditBox| {
             edit.click(&game.gui.atlas, cursor.0, false, false);
@@ -429,8 +434,8 @@ impl Game<'_> {
         shortcut: Option<horizon_client::clipboard::EditShortcut>,
         text: Option<&str>,
     ) {
-        let ctrl = self.keys.contains(&KeyCode::ControlLeft);
-        let shift = self.keys.contains(&KeyCode::ShiftLeft);
+        let ctrl = self.has_control_down_with_quirk();
+        let shift = self.has_shift_down();
         let types_text = self.types_text();
         let size = self.renderer_viewport().unwrap_or([1, 1]);
         let b = HudBatch::new(size);

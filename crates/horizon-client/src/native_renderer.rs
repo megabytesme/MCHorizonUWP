@@ -115,7 +115,7 @@ impl NativeRenderer {
         let atlas = Atlas::from_horizon(atlas, 2048)?;
         let hud = HudRenderer::new(window.renderer(), &atlas)?;
         let panorama =
-            horizon_native_panorama::Panorama::new(window.renderer(), faces.size, &faces.pixels)?;
+            horizon_native_panorama::Panorama::new(window.renderer(), faces.size, &faces.texels())?;
         let entities = horizon_native_entities::d3d11::EntityRenderer::new(&atlas);
         Ok(Self {
             window,

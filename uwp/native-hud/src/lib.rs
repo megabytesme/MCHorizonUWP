@@ -30,6 +30,8 @@ pub enum Blend {
     Depth([u32; 4]),
     Vignette,
     EndPortal,
+    /// Upstream CIT glint needs its own textures and blend pipeline.
+    CitGlint(u8),
 }
 
 #[derive(Clone, Debug, PartialEq)]

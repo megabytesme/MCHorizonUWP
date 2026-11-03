@@ -1,3 +1,10 @@
+// New MSVC STL headers name these desktop functions even under AppContainer.
+// Declarations allow the headers to compile; this bridge never calls them.
+#if defined(_MSC_VER) && _MSC_VER >= 1940 && defined(WINAPI_FAMILY)
+extern "C" __declspec(dllimport) char* __cdecl getenv(const char*);
+extern "C" __declspec(dllimport) int __cdecl system(const char*);
+#endif
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>

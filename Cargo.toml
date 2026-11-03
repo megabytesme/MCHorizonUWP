@@ -1,19 +1,25 @@
 [workspace]
-exclude = ["launcher", "crates/horizon-telemetry-server", "crates/horizon-mod-registry", "third_party/wgpu-hal", "third_party/winit", "uwp/native-terrain", "uwp/native-hud", "uwp/d3d11-backend", "uwp/native-scene", "uwp/native-window", "uwp/native-panorama", "uwp/native-entities", "mods/horizon-touch-native", "uwp/xaudio-stream", "uwp/https-bridge", "uwp/credential-store"]
+exclude = ["launcher", "crates/horizon-telemetry-server", "crates/horizon-mod-registry", "third_party/wgpu-hal", "third_party/winit", "uwp/native-terrain", "uwp/native-hud", "uwp/d3d11-backend", "uwp/native-scene", "uwp/native-window", "uwp/native-panorama", "uwp/native-entities", "mods/horizon-touch-native", "uwp/xaudio-stream", "uwp/https-bridge", "uwp/credential-store", "third_party/naga", "third_party/libmimalloc-sys", "mods/horizon-device-vibration-native", "uwp/gamepad-bridge", "uwp/device-vibration-bridge"]
 members = [
     "crates/horizon-core",
     "crates/horizon-dualsense",
+    "crates/horizon-narrator",
     "crates/horizon-threads",
     "crates/horizon-hdr",
     "crates/horizon-world",
     "crates/horizon-client",
+    "crates/horizon-client-lib",
     "crates/horizon-client-core",
     "crates/horizon-client-input",
     "crates/horizon-client-render",
+    "crates/horizon-cosmetics",
     "crates/horizon-command",
     "crates/horizon-items",
     "crates/horizon-server-files",
     "crates/horizon-anticheat",
+    "crates/horizon-chat-filter",
+    # The Model Context Protocol, shared by horizon-ctl, horizon-server and the launcher.
+    "crates/horizon-mcp",
     "crates/horizon-server",
     "crates/horizon-bots",
     "crates/horizon-assets",
@@ -28,6 +34,7 @@ members = [
     "crates/cargo-horizon-mod",
     "crates/horizon-port-pack",
     "crates/horizon-shaders",
+    "crates/horizon-optifine",
     "crates/horizon-shader-api",
     "crates/horizon-release-sign",
     "xtask",
@@ -61,6 +68,12 @@ large_enum_variant = "allow"
 wgpu-hal = { path = "third_party/wgpu-hal" }
 parking_lot_core = { path = "third_party/parking_lot_core" }
 winit = { path = "third_party/winit" }
+# naga 30.0.1, with the fixes to its GLSL frontend that shader packs need (THIRD_PARTY_NOTICES.md).
+naga = { path = "third_party/naga" }
+# libmimalloc-sys 0.1.49 whose mimalloc v3 counts bits without POPCNT when MSVC builds it: the
+# game died before main on CPUs without it (Core 2, #7264; THIRD_PARTY_NOTICES.md). Drop this and
+# the folder once a libmimalloc-sys release has microsoft/mimalloc#1291's fix.
+libmimalloc-sys = { path = "third_party/libmimalloc-sys" }
 
 # Line tables keep file:line in backtraces; full debug info made every
 # example and test binary hundreds of megabytes and slow to link.
