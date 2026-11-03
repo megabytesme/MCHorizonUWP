@@ -6,40 +6,54 @@ The latest work is on the isolated branch
 `codex/uwp-nightly-f42ef42` in
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103`. Its feature commits are
 `8cb8bfeba Add configurable touch controls and device gyro` and
-`e3fa11d91 Pin builder to configurable touch client`; the independent builder
-MSBuild-path fix is `01dfbcf22`. No changes were pushed. These current notes
-supersede older status statements below when they conflict.
+`e3fa11d91 Pin builder to configurable touch client`; the new single-window
+commit is `474f38902`. The builder pin and memory-aware Cargo parallelism are
+now updated with it. The independent builder MSBuild-path fix is `01dfbcf22`.
+No changes were pushed. These current notes supersede older status statements
+below when they conflict.
 
 The native touch mod now provides pre-game sliders for touch-look sensitivity
 and control size, plus opt-in gyro aiming and its sensitivity. Control size
 scales both rendered controls and touch hit areas. Windows sensor access stays
 in a UWP adapter; the shared Rust mod contains settings and axis conversion.
-Controller vibration remains independent. The WinUI 3 builder publishes
-self-contained successfully and pins client source `8cb8bfeba46c53d8675e8fef860fecbb688b1221`
-at package version `2026.1103.930.54`.
+Controller vibration remains independent. The pre-game page and game now share
+one CoreWindow on both desktop and Windows 10 Mobile. The host replaces the
+XAML root with the game surface, restores the page when gameplay exits, and
+starts/stops device gyroscope input with the game view's visibility.
 
 After the user's license review, Microsoft.UI.Xaml 2.7.3 was restored to the
-per-user NuGet cache and the ARM32 WinUI shell build completed. Cargo built the
-ARM32 client with all 32 cores and the native touch, device-vibration, account,
-audio, HTTPS, controller, and XAML-shell features. The native host strict link
-passed and verified its 8 MiB stack reserve. The shell emits existing WinUI
-metadata warnings from the legacy ARM SDK, but compiles and links successfully.
+per-user NuGet cache and the ARM32 WinUI shell build completed. The clean ARM32
+recipe built the native touch, device-vibration, account, audio, HTTPS,
+controller and XAML-shell features using seven Cargo jobs on a 32-processor
+machine; the builder now caps parallelism to its memory budget. The strict host
+link passed and verified its 8 MiB stack reserve. The shell emits existing
+WinUI metadata warnings from the legacy ARM SDK, but compiles and links
+successfully. The self-contained WinUI 3 builder was republished.
+Its executable is
+`C:/Users/ben/.huwp/b/upstream-fc021-20261103/uwp/builder/App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/publish/Horizon.Builder.App.exe`
+(SHA-256 `BC27488B4A8234221F0E3786A1239FF3D85CE6562D4E2CDABD7E5251E7025647`).
 
 The signed ARM32 client package is at
-`C:/Users/ben/.huwp/b/arm32-touchsens-20261103/deliverables/HorizonUWP-ARM32-signed.appx`
-(SHA-256 `CD1C68AF58D274BB51FBCFA98004976F0585B9551B3E660C24464F99948268CC`).
-Its identity is `HorizonUWPLatestPreview`, version `2026.1103.930.54`; it uses
-Horizon nightly `2026-11-03` and the exact release notes for source
-`f42ef42ef6ceccb3c6a20bea2481d87949a51c81`. The AppX block map, ARM machine
-type, packaged-executable match and CMS signature were checked. The signature
-uses thumbprint `22A7D038213EF31853EEE277B7C1FAFD576A70AB`; Windows SignTool on this
-build account reports the same untrusted self-signed root as it does for earlier
-packages. The target must trust the existing prototype certificate. Only the
-public certificate is included; no private key was exported.
+`C:/Users/ben/.huwp/b/6dae778f98f74936/deliverables/HorizonUWP-ARM32-signed.appx`
+(SHA-256 `7B53C902874452E8EF6359AEA1A8E65F10BF703FB825FE2EA74E752D15F74DE9`).
+Its identity is `HorizonUWPLatestPreview`, version `2026.1103.930.55`; the
+builder pins client source `474f389024d37f1de80c7e38531b10f991200fde` and embeds
+the exact Horizon nightly `2026-11-03` notes. Its same-folder assets framework
+is `Horizon-26.3-Assets-signed.appx` (SHA-256
+`CA814E4C946A93AE18DC9941A9AB7C197B55FD0350E4B453ECE2E4AFB1921BAD`), and the
+Microsoft WinUI dependency is `Microsoft.UI.Xaml.2.7-arm.appx`. Install those
+two dependencies before the client on a clean device. The package CMS
+signatures, all block-map entries, dependency identity/publisher and ARM
+executable were checked. Both Horizon packages use thumbprint
+`22A7D038213EF31853EEE277B7C1FAFD576A70AB`; the build account's SignTool reports
+the same untrusted self-signed root as for earlier packages. Only the public
+certificate is included. Install as an update over the existing same-identity
+client; uninstalling first would delete app-local worlds, settings and accounts.
 
-The install bundle also includes the Microsoft-signed ARM32
-`Microsoft.UI.Xaml.2.7` framework package and a copy of the previously signed
-Minecraft 26.3 asset framework. The client manifest depends on both. The
+The install bundle, including the public prototype certificate and
+`README-ARM32.txt`, is at
+`C:/Users/ben/.huwp/b/6dae778f98f74936/deliverables`. The client manifest depends
+on both framework packages. The
 preserved original asset framework is
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103/.local/buildcheck/renderer-dx12-20261103/arm-final/deliverables/Horizon-26.3-Assets-signed.appx`;
 its extracted private resource tree is under
@@ -47,8 +61,8 @@ its extracted private resource tree is under
 Do not commit, delete, overwrite, or otherwise expose either asset copy. The
 install bundle is at
 `C:/Users/ben/.huwp/b/arm32-touchsens-20261103/deliverables`.
-Device installation, touch feel, audio, haptics and game start still need the
-user's phone test.
+The single-window behavior, touch feel, audio, haptics and game start still need
+the user's phone test.
 
 ## Published nightly update — 3 November 2026
 

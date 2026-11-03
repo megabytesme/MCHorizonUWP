@@ -10,8 +10,15 @@ public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, 
 public static class LocalBuildRunner
 {
     public const long MinimumFreeBytes = 10L * 1024 * 1024 * 1024;
-    // The project instructions ask builds to use every available processor.
-    public static int CargoJobCount(int processors, long memoryBytes) => Math.Max(1, processors);
+    // Rust's full game bridge can use several GiB in a single rustc process.
+    // Leave room for the OS and other apps so a large CPU count cannot exhaust RAM.
+    public static int CargoJobCount(int processors, long memoryBytes)
+    {
+        const long bytesPerCargoJob = 4L * 1024 * 1024 * 1024;
+        var cpuLimit = Math.Max(1, processors);
+        var memoryLimit = memoryBytes <= 0 ? 1 : (int)Math.Min(int.MaxValue, memoryBytes / bytesPerCargoJob);
+        return Math.Min(cpuLimit, Math.Max(1, memoryLimit));
+    }
 
     public static async Task<LocalBuildResult> RunAsync(string source, string resources, BuildSelection selection,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
@@ -72,7 +79,7 @@ public static class LocalBuildRunner
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
         var jobs = CargoJobCount(Environment.ProcessorCount, GC.GetGCMemoryInfo().TotalAvailableMemoryBytes);
         vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        progress?.Report($"Using all {jobs} available processor cores for Cargo.");
+        progress?.Report($"Using {jobs} Cargo jobs across {Environment.ProcessorCount} processors, limited by available memory.");
         if (arm)
         {
             vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");

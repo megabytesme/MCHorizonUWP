@@ -45,7 +45,7 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`8cb8bfeba46c53d8675e8fef860fecbb688b1221`, Rust 1.99.1 and Minecraft
+`474f389024d37f1de80c7e38531b10f991200fde`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
@@ -53,7 +53,7 @@ port is based on Horizon nightly `2026-11-03` at upstream source commit
 `f42ef42ef6ceccb3c6a20bea2481d87949a51c81`; builds embed the upstream nightly
 date and short commit in Horizon's version fields. They are UWP port builds,
 not the official Horizon binaries. The upstream nightly's publication version
-is `2026.1103.930.50`; the default UWP APPX version `2026.1103.930.54` advances
+is `2026.1103.930.50`; the default UWP APPX version `2026.1103.930.55` advances
 it for this port build. Keep the same package identity for upgrades and choose
 a higher version when rebuilding the port for the same nightly. This
 recipe is pinned; a newer upstream nightly must be integrated and verified
@@ -69,12 +69,15 @@ fails in the upstream Windows bindings before linking; ANGLE has no ARM32 DLL
 set in this recipe. These are build-input constraints, not assumptions about
 the device GPU. At launch the client checks the selected backend against its
 live CoreWindow surface and only enables Start game when it can configure and
-present a frame. The preview runs x64 and ARM32 plans in fresh builder-owned
-folders under
+present a frame. The pre-game page and gameplay share one CoreWindow on every
+target, including desktop and Windows 10 Mobile. The preview runs x64 and ARM32
+plans in fresh builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
 Cargo fetches missing dependencies for the selected target and x64 build host
 from configured registries before the offline build. It can also create a reusable
-resource framework package for the selected prepared resources. Signing and
+resource framework package for the selected prepared resources. Parallel Rust
+compilation is capped to roughly one job per 4 GiB of runtime memory budget and
+the available logical processors, to reduce compiler out-of-memory failures. Signing and
 installation are not yet integrated. A build requires
 at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
 dependency override; account, skin and Minecraft session requests use WinRT HTTPS.
