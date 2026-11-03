@@ -6,7 +6,7 @@ The latest work is on the isolated branch
 `codex/uwp-nightly-f42ef42` in
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103`. Its feature commits are
 `8cb8bfeba Add configurable touch controls and device gyro` and
-`5d8d03d61 Pin builder to configurable touch client`; the independent builder
+`e3fa11d91 Pin builder to configurable touch client`; the independent builder
 MSBuild-path fix is `01dfbcf22`. No changes were pushed. These current notes
 supersede older status statements below when they conflict.
 
