@@ -41,7 +41,7 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`9819667e6114aa796ffe51ef522058a804eb8fd4`, Rust 1.99.1 and Minecraft
+`4145cbcb3d4c338a01401a03c4bf9c5d2cfabf0a`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The

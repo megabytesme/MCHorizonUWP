@@ -19,9 +19,26 @@ The package signature, block map, identity and PE stack reserve were verified.
 The phone build has not yet been tested. Do not remove or reinstall over user
 data; ordinary same-identity upgrading is intended to preserve it.
 
-The user next requested a pregame design like their WikiViewer app: themed
-navigation, a home page with Start game, a profile/account button and a
-settings page. The current CoreWindow page remains a functional interim UI.
+The builder now pins client commit `4145cbcb3d4c338a01401a03c4bf9c5d2cfabf0a`
+so its builds include the multiplayer stack fix. The user next requested a
+pregame design like their WikiViewer app: themed navigation, a home page with
+Start game, a profile/account button and a settings page. The three requested
+styles follow system accent colors: plain UWP, Fluent Acrylic on supported
+Windows 10 versions, and Mica on supported Windows 11 versions. The current
+CoreWindow page remains a functional interim UI.
+
+An isolated native C++/CX probe in `.local/xaml-probe` confirmed that a UWP
+XAML primary view can create a separate DirectX CoreWindow and both remain
+responsive on this Windows 11 desktop. A separate probe loaded WinUI 2.8
+navigation controls successfully. The installed WinUI 2.7 framework was in
+the probe's package graph, but activation returned 0x80040154 on this PC;
+the cause has not been established. WinUI 2.7.3's ARM framework declares a
+15063 minimum, whereas the newer framework's requirements must be respected.
+Do not change or repair the user's shared WinUI installations to work around
+the probe. Phone view switching, native account/session handoff, actual theme
+selection and Mica/Acrylic behavior remain to be implemented and tested.
+The older Direct2D themed experiment is uncommitted in the separate
+`upstream-2e0a6957` worktree and must be preserved.
 
 ## Native page and networking update — 3 November 2026
 
@@ -60,8 +77,9 @@ or inspect the user's credentials. No certificate trust was changed.
 The updated source includes upstream Horizon through
 `eb545bab38934988f5ed6ff79064663c240e743d`, in client commit
 `9819667e6114aa796ffe51ef522058a804eb8fd4` on the isolated
-`codex/uwp-upstream-refresh-2e0a6957` worktree. The builder pins that client
-commit; the previously reported builder-signing approval block still applies.
+`codex/uwp-upstream-refresh-2e0a6957` worktree. The builder pins the later stack
+fix recorded above; the previously reported builder-signing approval block
+still applies.
 The native renderer's custom glint and live pack reload and the split-screen
 multi-controller route remain incomplete. Historical notes below are
 superseded where they conflict with this section.

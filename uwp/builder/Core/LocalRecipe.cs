@@ -12,7 +12,7 @@ public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 /// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "9819667e6114aa796ffe51ef522058a804eb8fd4";
+    public const string SourceCommit = "4145cbcb3d4c338a01401a03c4bf9c5d2cfabf0a";
     public const string RustVersion = "1.99.1";
     public const string MinecraftVersion = "26.3";
     public const string SourceManifestVersion = "1.0.1.0";
