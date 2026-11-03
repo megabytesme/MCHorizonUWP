@@ -1,5 +1,54 @@
 # Codex prompt: Horizon UWP client and AppX builder
 
+## Integration update — 3 November 2026
+
+The active continuation is the isolated worktree `.local/client-builder-integration`,
+branch `uwp-client-builder-integration`. The main `uwp-dx11-port` worktree's
+pre-existing changes were left in place. The instructions below are historical
+where they conflict with this update; their safeguards and remaining scope still apply.
+
+- Native touch, XAudio2 and WinRT HTTPS are combined. Both x64 and ARM32 game
+  bridges and hosts passed the SDK 15063 strict link; the combined builds have
+  not been installed or exercised on the target devices. The ARM32 offline
+  dependency override still leaves non-adapted HTTPS paths unavailable.
+- Unsigned, private test packages include 4,961 verified sound files and
+  `sounds.json`. They use distinct identities so they do not replace the
+  phone's existing game. They are **not installable until signed**:
+  - x64: `.local/client-builder-integration/.local/combined-x64-unsigned/HorizonUWP-x64-with-sound.appx`,
+    identity `HorizonUWPIntegrationX64`, SHA-256
+    `e40f2f69787122994ae506e54892e22e2e99ef7eb2d6442623dca9d0420a5b4f`.
+  - ARM32: `C:/Users/ben/.huwp/b/0e7ac4615b164865/combined-arm-unsigned/HorizonUWP-arm-with-sound.appx`,
+    identity `HorizonUWPIntegrationArm`, SHA-256
+    `9026deeea1ef5a6958708cec2d26f30c67519861951a1b8a788ba449c55f722d`.
+  Both use publisher `CN=HorizonUWPPrototype`. The previous no-sound packages
+  were retained. Do not upload, commit or redistribute any of these packages.
+- The builder's pinned client source is `2ce3d73dbc9e82634b73d65606b3cb14a4e63347`.
+  It fetches target and x64-host Cargo dependencies before an offline build,
+  and can prepare missing sounds in a private snapshot from a selected Minecraft
+  installation. Fresh-cache offline checks passed for x64 and ARM32; the sound
+  preparation step was exercised on the user's local installation without
+  changing the selected resources. The full updated builder recipe has not yet
+  been run end to end from a clean Windows installation.
+- A self-contained builder publish is at
+  `.local/client-builder-integration/uwp/builder/App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/publish/`.
+  Keep the publish folder together. It is a development build, not an installer.
+- The shared account protocol, Credential Locker storage and cancellable
+  sign-in/restore worker are committed. Synthetic tests pass and the account
+  crate type-checks for x64 UWP; the pre-game UI, native host wiring and session
+  handoff are **not implemented**, and no real sign-in has been tested.
+- Real versioned asset-framework packaging and package-graph lookup are not
+  implemented. The synthetic framework proof remains the only framework test.
+  Renderer selection beyond the native D3D11 recipe, ARM64, clean-machine setup,
+  signing, Sandbox validation and device checks also remain open.
+- An automatic approval review blocked the command to create the
+  certificate-store signing implementation, with the stated reason "blocked by
+  policy". Do not bypass that review. No certificate, private key, trust store
+  or signed package was changed. Resolve the review before continuing signing.
+- The client build exhausted memory with all 32 jobs, even after running alone;
+  both successful combined builds used 8 Cargo jobs. Increase concurrency only
+  if available memory permits. No commits contain co-author trailers; do not push.
+
+
 Paste the prompt below into the new Codex instance.
 
 ---
