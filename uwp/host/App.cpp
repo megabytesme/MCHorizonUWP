@@ -12,15 +12,43 @@
 
 static Windows::UI::Core::CoreWindow^ current_window;
 static std::atomic<DWORD> current_window_thread{0};
+#ifdef HORIZON_UWP_ACCOUNT
+static std::atomic<bool> account_window_closed{false};
+static std::atomic<bool> account_window_visible{false};
+static bool pregame_input = true;
+extern "C" int __cdecl horizon_uwp_window_closed() { return account_window_closed.load() ? 1 : 0; }
+extern "C" int __cdecl horizon_uwp_window_visible() { return account_window_visible.load() ? 1 : 0; }
+#endif
 static HorizonUwpEvent pending_events[4096];
 static uint32_t event_read, event_write;
 
 static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
+#ifdef HORIZON_UWP_ACCOUNT
+    // Modal account input belongs to the shell dialog, not to the game queue.
+    if (pregame_input && event->kind >= HORIZON_UWP_KEY_DOWN) return;
+#endif
     const uint32_t next = (event_write + 1) % 4096;
     if (next == event_read) event_read = (event_read + 1) % 4096;
     pending_events[event_write] = *event;
     event_write = next;
 }
+#ifdef HORIZON_UWP_ACCOUNT
+extern "C" void __cdecl horizon_uwp_discard_pregame_input() {
+    // Preserve resize, focus, visibility and close events. Dialog input must not
+    // be replayed into the game, where it could activate an unintended action.
+    uint32_t read = event_read, write = event_read;
+    while (read != event_write) {
+        const auto event = pending_events[read];
+        read = (read + 1) % 4096;
+        if (event.kind < HORIZON_UWP_KEY_DOWN) {
+            pending_events[write] = event;
+            write = (write + 1) % 4096;
+        }
+    }
+    event_write = write;
+    pregame_input = false;
+}
+#endif
 extern "C" void* __cdecl horizon_uwp_window_handle() {
     // CoreWindow must only be handed out on its owning UI thread.
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
@@ -187,6 +215,10 @@ public:
             CloseHandle(local_manifest);
         }
         auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
+#ifdef HORIZON_UWP_ACCOUNT
+        // The native account dialog needs an active CoreWindow before the game event loop starts.
+        window_->Activate();
+#endif
         const int32_t result = horizon_uwp_run(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                                                reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
         if (result != 0) throw ref new Platform::FailureException();
@@ -223,8 +255,16 @@ private:
         }
 #endif
     }
-    void Closed(CoreWindow^, CoreWindowEventArgs^) { closed_ = true; }
-    void VisibilityChanged(CoreWindow^, VisibilityChangedEventArgs^ args) { visible_ = args->Visible; }
+    void Closed(CoreWindow^, CoreWindowEventArgs^) { closed_ = true;
+#ifdef HORIZON_UWP_ACCOUNT
+        account_window_closed.store(true);
+#endif
+    }
+    void VisibilityChanged(CoreWindow^, VisibilityChangedEventArgs^ args) { visible_ = args->Visible;
+#ifdef HORIZON_UWP_ACCOUNT
+        account_window_visible.store(args->Visible);
+#endif
+    }
     void SizeChanged(CoreWindow^, WindowSizeChangedEventArgs^) {
 #ifndef HORIZON_UWP_GAME_BRIDGE
         Check(renderer_->Resize());

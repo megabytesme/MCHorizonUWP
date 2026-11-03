@@ -457,18 +457,25 @@ pub fn check(
 ) -> Check {
     let mut secrets = secrets;
     if secrets.minecraft_expires_at <= now() + RENEW_BEFORE {
-        let renewed = client_id
+        let ms = match client_id
             .ok_or_else(|| NOT_CONFIGURED.to_string())
             .and_then(|id| refresh_ms(ep, id, &secrets.refresh_token))
-            .and_then(|ms| Ok((minecraft_login(ep, &ms.access)?, ms.refresh)));
-        match renewed {
-            Ok((mc, refresh)) => {
+        {
+            Ok(ms) => ms,
+            Err(error) => return Check::NoAnswer(error, secrets),
+        };
+        // Microsoft may rotate this credential before Xbox or Minecraft answers.
+        // Return the new value even if either later step fails, so the caller can
+        // persist it instead of losing the account's working refresh token.
+        secrets.refresh_token = ms.refresh;
+        match minecraft_login(ep, &ms.access) {
+            Ok(mc) => {
                 secrets = Secrets {
                     owns: secrets.owns,
-                    ..Secrets::new(refresh, mc)
+                    ..Secrets::new(secrets.refresh_token, mc)
                 }
             }
-            Err(e) => return Check::NoAnswer(e, secrets),
+            Err(error) => return Check::NoAnswer(error, secrets),
         }
     }
     let token = &secrets.minecraft_token;

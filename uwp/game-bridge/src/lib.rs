@@ -1,8 +1,13 @@
 //! C ABI for embedding the actual Horizon game loop in a UWP host.
 
+#[cfg(all(target_vendor = "uwp", feature = "uwp-account"))]
+mod pregame;
+
 #[cfg(target_vendor = "uwp")]
 unsafe extern "C" {
     fn horizon_uwp_report_error(text: *const u8, len: usize);
+    #[cfg(feature = "uwp-account")]
+    fn horizon_uwp_discard_pregame_input();
 }
 
 #[cfg(target_vendor = "uwp")]
@@ -26,6 +31,16 @@ pub unsafe extern "C" fn horizon_uwp_run(
     let game_dir = PathBuf::from(std::ffi::OsString::from_wide(game_dir));
     horizon_client::logging::set_game_home(game_dir.clone());
     horizon_client::logging::init(&game_dir, "Render thread");
+    #[cfg(feature = "uwp-account")]
+    let result = match pregame::start() {
+        Some(session) => {
+            // Do not replay taps or keystrokes from the native dialogs into the game.
+            unsafe { horizon_uwp_discard_pregame_input() };
+            horizon_client::run_uwp_with_session(&resources, &game_dir, session)
+        }
+        None => return 0,
+    };
+    #[cfg(not(feature = "uwp-account"))]
     let result = horizon_client::run_uwp(&resources, &game_dir);
     horizon_client::logging::flush();
     match result {

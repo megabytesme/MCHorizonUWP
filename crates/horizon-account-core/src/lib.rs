@@ -173,6 +173,17 @@ fn send(
             200,
             json!({"id":"00000000000000000000000000000001","name":"Tester"}),
         ),
+        100 => {
+            assert!(request.url.ends_with("/token"));
+            (
+                200,
+                json!({"access_token":"renewed-access","refresh_token":"rotated-refresh"}),
+            )
+        }
+        101 => {
+            assert!(request.url.ends_with("/authenticate"));
+            (503, Value::Null)
+        }
         _ => panic!("unexpected request"),
     };
     Ok((status, value))
@@ -201,6 +212,24 @@ mod tests {
         assert_eq!(session["access_token"], "synthetic-minecraft");
         assert_eq!(session["user_type"], "msa");
         MOCK_STEP.with(|s| assert_eq!(s.get(), 8));
+    }
+    #[test]
+    fn rotated_refresh_survives_a_later_xbox_failure() {
+        MOCK_STEP.with(|s| s.set(100));
+        let account = Account {
+            name: "Tester".into(),
+            uuid: "00000000000000000000000000000001".into(),
+            skin: None,
+            cape: None,
+        };
+        let secrets: Secrets = serde_json::from_value(json!({"refresh_token":"previous-refresh","minecraft_token":"old-token","minecraft_expires_at":0,"owns":true})).unwrap();
+        let Check::NoAnswer(_, returned) =
+            check(&Endpoints::live(), Some("fake-client"), &account, secrets)
+        else {
+            panic!("expected service failure")
+        };
+        assert_eq!(returned.refresh_token, "rotated-refresh");
+        assert!(returned.owns);
     }
     #[test]
     fn form_encoding_handles_non_ascii_and_reserved_characters() {
