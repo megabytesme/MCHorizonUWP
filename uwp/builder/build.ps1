@@ -27,8 +27,8 @@ if (-not $tools) {
 }
 $project = Join-Path $PSScriptRoot "App\Horizon.Builder.App.csproj"
 if ($Publish) {
-    dotnet publish $project -c $Configuration -p:Platform=x64 -p:SelfContained=true "-p:AppxMSBuildToolsPath=$tools\" -m
+    dotnet publish $project -c $Configuration -p:Platform=x64 -p:SelfContained=true "-p:AppxMSBuildToolsPath=$tools/" -m
 } else {
-    dotnet build $project -c $Configuration -p:Platform=x64 "-p:AppxMSBuildToolsPath=$tools\" -m
+    dotnet build $project -c $Configuration -p:Platform=x64 "-p:AppxMSBuildToolsPath=$tools/" -m
 }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
