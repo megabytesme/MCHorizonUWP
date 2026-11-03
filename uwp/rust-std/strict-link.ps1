@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)][string]$RustLibrary,
     [Parameter(Mandatory)][string]$Output,
     [ValidateSet('X64', 'ARM64', 'ARM')][string]$Machine = 'X64',
-    [string[]]$ExtraLibraries = @()
+    [string[]]$ExtraLibraries = @(),
+    [ValidateRange(0, 1073741824)][long]$StackReserve = 0
 )
 
 # Run in a UWP MSVC developer environment. The sentinel object resolves
@@ -21,6 +22,7 @@ if ($LASTEXITCODE -ne 0) { throw "Compiling link sentinels failed: $LASTEXITCODE
 $linkArgs = @('/nologo', '/APPCONTAINER', '/SUBSYSTEM:WINDOWS', "/MACHINE:$Machine", '/OPT:REF',
     '/NODEFAULTLIB:kernel32.lib', "/MAP:$mapPath", "/OUT:$outputPath") +
     $Objects + @($stubObj, 'WindowsApp.lib', 'ntdll.lib') + $ExtraLibraries + @($RustLibrary)
+if ($StackReserve -gt 0) { $linkArgs += "/STACK:$StackReserve" }
 & link @linkArgs
 if ($LASTEXITCODE -ne 0) { throw "Strict UWP link failed: $LASTEXITCODE" }
 if (Select-String -Path $mapPath -Pattern 'dead-import-sentinels\.obj|forbidden_api' -Quiet) {

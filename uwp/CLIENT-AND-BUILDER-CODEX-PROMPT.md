@@ -1,5 +1,28 @@
 # Codex prompt: Horizon UWP client and AppX builder
 
+## Multiplayer stack fix — 3 November 2026
+
+The user successfully signed in on the separate desktop UWP test, but the app
+crashed entering multiplayer. Windows recorded stack overflow 0xc00000fd;
+the crash stack points to `Game::new` during the game's UI-thread handoff.
+The game host now reserves an 8 MiB stack and verifies the PE header after
+strict linking. Both x64 and ARM32 links pass. The user confirmed that the
+updated x64 test reaches multiplayer and connects to a server. The test was
+intentionally muted and did not test audio.
+
+An updated signed ARM32 package, version 1.0.2.0 of the same
+`HorizonUWPLatestPreview` identity, is at
+`C:/Users/ben/.huwp/b/stack-fix-arm-20261103a/HorizonUWP-ARM32-signed.appx`
+(SHA-256 `6683BDC76E31D8ACFFD78F971C92902D63D6C825E29BC1571A5CE3C550745FB8`).
+It retains the previous package's publisher and 26.3 framework dependency.
+The package signature, block map, identity and PE stack reserve were verified.
+The phone build has not yet been tested. Do not remove or reinstall over user
+data; ordinary same-identity upgrading is intended to preserve it.
+
+The user next requested a pregame design like their WikiViewer app: themed
+navigation, a home page with Start game, a profile/account button and a
+settings page. The current CoreWindow page remains a functional interim UI.
+
 ## Native page and networking update — 3 November 2026
 
 The user reported a crash at the account-service waiting dialog and asked for

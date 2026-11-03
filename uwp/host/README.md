@@ -11,7 +11,10 @@ then set `HORIZON_UWP_GAME_LIB` to its static library and run
 `HORIZON_UWP_XAUDIO=1` and `HORIZON_UWP_HTTP=1` when the matching Rust features
 are enabled. See `../xaudio-stream/README.md` and `../https-bridge/README.md`.
 The host uses a strict UWP link and the locally installed Visual Studio and SDK
-paths in the build script.
+paths in the build script. The game host reserves an 8 MiB thread stack, and
+the link checks the resulting PE header: Horizon's startup can overflow the
+default 1 MiB UI-thread stack before entering multiplayer. This is reserved
+address space; Windows commits stack pages as they are needed.
 
 Run `./uwp/host/package.ps1 -Architecture x64 -Game -Resources <prepared-dir>`
 with a fresh `-OutputDirectory` to package prepared resources. `-Executable`
