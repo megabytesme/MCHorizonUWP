@@ -25,10 +25,12 @@ Minecraft face, or a rotating mix. The tile is disabled until selected. Pin the
 app to Start for Windows to display its tile updates. Face images are reduced to
 an 8-by-8 local tile image; access and refresh tokens are never included.
 
-Windows 10 Mobile switches between the pre-game and game views instead of
-requesting a separate standalone window. On game exit it returns to the pre-game
-page. UWP narrator speech is unavailable in the app container; the game reports
-it as inactive without logging the expected missing SAPI class.
+The pre-game page and game use the same app view and CoreWindow on every device.
+The host clears the XAML root while the game renders into that window, then
+restores the pre-game page when the game exits. This also keeps Windows 10
+Mobile within its single-window model. UWP narrator speech is unavailable in the
+app container; the game reports it as inactive without logging the expected
+missing SAPI class.
 
 Host builds with this feature also require `HORIZON_UWP_ACCOUNT=1` and
 `HORIZON_UWP_HTTP=1`. The first links the account and Credential Locker adapters;

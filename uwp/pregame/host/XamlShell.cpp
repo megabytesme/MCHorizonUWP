@@ -1,4 +1,4 @@
-// Native UWP XAML shell. The game stays in its own DirectX CoreWindow.
+// Native UWP XAML shell. Windows Mobile reuses the primary CoreWindow for the game.
 #if defined(_MSC_VER) && _MSC_VER >= 1940 && defined(WINAPI_FAMILY)
 extern "C" __declspec(dllimport) char* __cdecl getenv(const char*);
 extern "C" __declspec(dllimport) int __cdecl system(const char*);
@@ -1584,6 +1584,23 @@ extern "C" void __cdecl horizon_uwp_page_refresh_tile() {
         if (dispatcher) dispatcher->RunAsync(CoreDispatcherPriority::Normal,
             ref new DispatchedHandler([]() { update_live_tile(); }));
     } catch (...) {}
+}
+extern "C" int __cdecl horizon_uwp_page_show_game(int show) {
+    try {
+        if (!dispatcher || !dispatcher->HasThreadAccess || !page) return 0;
+        auto window = Window::Current;
+        if (!window) return 0;
+        if (show) {
+            window->Content = nullptr;
+        } else {
+            window->Content = page;
+            apply_theme();
+            if (prompt_kind == 0) refresh();
+        }
+        return 1;
+    } catch (...) {
+        return 0;
+    }
 }
 extern "C" size_t __cdecl horizon_uwp_dialog_text(unsigned char* buffer, size_t capacity) {
     const size_t length = offline_input.size();

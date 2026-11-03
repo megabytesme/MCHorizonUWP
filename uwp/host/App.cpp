@@ -17,8 +17,11 @@ static std::atomic<DWORD> current_window_thread{0};
 #ifdef HORIZON_UWP_ACCOUNT
 static std::atomic<bool> account_window_closed{false};
 static std::atomic<bool> account_window_visible{false};
+#ifdef HORIZON_UWP_TOUCH_MOD
+extern "C" int __cdecl horizon_uwp_gyro_enable(int enabled);
+extern "C" void __cdecl horizon_uwp_gyro_set_visible(int visible);
+#endif
 #ifdef HORIZON_UWP_XAML_SHELL
-static std::atomic<int> primary_view_id{0};
 static Windows::UI::Core::CoreWindow^ primary_window;
 static DWORD primary_window_thread = 0;
 #endif
@@ -34,24 +37,29 @@ extern "C" void __cdecl horizon_uwp_attach_shell(Windows::UI::Core::CoreWindow^ 
 #ifdef HORIZON_UWP_XAML_SHELL
     primary_window = window;
     primary_window_thread = GetCurrentThreadId();
-    primary_view_id.store(Windows::UI::ViewManagement::ApplicationView::GetForCurrentView()->Id,
-        std::memory_order_release);
 #endif
     account_window_closed.store(false);
     account_window_visible.store(true);
     window->Closed += ref new Windows::Foundation::TypedEventHandler<Windows::UI::Core::CoreWindow^, Windows::UI::Core::CoreWindowEventArgs^>(
-        [](Windows::UI::Core::CoreWindow^, Windows::UI::Core::CoreWindowEventArgs^) { account_window_closed.store(true); });
+        [](Windows::UI::Core::CoreWindow^, Windows::UI::Core::CoreWindowEventArgs^) {
+            account_window_closed.store(true);
+#ifdef HORIZON_UWP_TOUCH_MOD
+            horizon_uwp_gyro_set_visible(0);
+            horizon_uwp_gyro_enable(0);
+#endif
+        });
     window->VisibilityChanged += ref new Windows::Foundation::TypedEventHandler<Windows::UI::Core::CoreWindow^, Windows::UI::Core::VisibilityChangedEventArgs^>(
-        [](Windows::UI::Core::CoreWindow^, Windows::UI::Core::VisibilityChangedEventArgs^ args) { account_window_visible.store(args->Visible); });
+        [](Windows::UI::Core::CoreWindow^, Windows::UI::Core::VisibilityChangedEventArgs^ args) {
+            account_window_visible.store(args->Visible);
+#ifdef HORIZON_UWP_TOUCH_MOD
+            horizon_uwp_gyro_set_visible(args->Visible ? 1 : 0);
+#endif
+        });
 }
 #endif
 #endif
 static HorizonUwpEvent pending_events[4096];
 static uint32_t event_read, event_write;
-#ifdef HORIZON_UWP_TOUCH_MOD
-extern "C" int __cdecl horizon_uwp_gyro_enable(int enabled);
-extern "C" void __cdecl horizon_uwp_gyro_set_visible(int visible);
-#endif
 
 static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
 #ifdef HORIZON_UWP_ACCOUNT
@@ -83,7 +91,44 @@ extern "C" void __cdecl horizon_uwp_discard_pregame_input() {
     event_write = write;
     pregame_input = false;
 }
+#ifdef HORIZON_UWP_XAML_SHELL
+extern "C" void __cdecl horizon_uwp_resume_pregame_input() {
+    event_read = event_write = 0;
+    pregame_input = true;
+}
 #endif
+#endif
+
+#ifdef HORIZON_UWP_GAME_BRIDGE
+static Platform::String^ resolve_resources(Platform::String^ local_path) {
+    auto resources = Platform::String::Concat(local_path, ref new Platform::String(L"\\resources"));
+    auto manifest = Platform::String::Concat(resources, ref new Platform::String(L"\\horizon-resources.json"));
+    HANDLE local_manifest = CreateFile2(manifest->Data(), GENERIC_READ,
+                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                        OPEN_EXISTING, nullptr);
+    if (local_manifest == INVALID_HANDLE_VALUE) {
+        auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
+        resources = Platform::String::Concat(installed, ref new Platform::String(L"\\resources"));
+        Platform::String^ framework_resources = nullptr;
+        auto dependencies = Windows::ApplicationModel::Package::Current->Dependencies;
+        for (unsigned int index = 0; index < dependencies->Size; ++index) {
+            auto dependency = dependencies->GetAt(index);
+            auto name = dependency->Id->Name;
+            constexpr wchar_t prefix[] = L"Horizon.Asset.";
+            if (wcsncmp(name->Data(), prefix, _countof(prefix) - 1) != 0) continue;
+            if (wcscmp(dependency->Id->Publisher->Data(), L"CN=HorizonUWPPrototype") != 0) continue;
+            if (framework_resources != nullptr) throw ref new Platform::FailureException();
+            framework_resources = Platform::String::Concat(
+                dependency->InstalledLocation->Path, ref new Platform::String(L"\\resources"));
+        }
+        if (framework_resources != nullptr) resources = framework_resources;
+    } else {
+        CloseHandle(local_manifest);
+    }
+    return resources;
+}
+#endif
+
 extern "C" void* __cdecl horizon_uwp_window_handle() {
     // CoreWindow must only be handed out on its owning UI thread.
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
@@ -139,6 +184,7 @@ extern "C" int32_t __cdecl horizon_uwp_run(const uint16_t*, size_t, const uint16
 extern "C" int32_t __cdecl horizon_uwp_run_prepared(const uint16_t*, size_t, const uint16_t*, size_t);
 extern "C" int __cdecl horizon_uwp_xaml_start();
 extern "C" void __cdecl horizon_uwp_page_refresh_tile();
+extern "C" int __cdecl horizon_uwp_page_show_game(int);
 #endif
 extern "C" int __cdecl horizon_uwp_is_local_test() {
     try {
@@ -308,54 +354,13 @@ public:
 #ifdef HORIZON_UWP_GAME_BRIDGE
         try {
         auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
-        auto resources = Platform::String::Concat(local_path, ref new Platform::String(L"\\resources"));
-        // Prefer prepared, writable local resources; a sideloaded phone package
-        // can include the same prepared tree under its installed location.
-        auto manifest = Platform::String::Concat(resources, ref new Platform::String(L"\\horizon-resources.json"));
-        HANDLE local_manifest = CreateFile2(manifest->Data(), GENERIC_READ,
-                                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                            OPEN_EXISTING, nullptr);
-        if (local_manifest == INVALID_HANDLE_VALUE) {
-            auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
-            resources = Platform::String::Concat(installed, ref new Platform::String(L"\\resources"));
-            // A client may instead depend on a versioned resource framework.
-            // Only use an unambiguous framework from this package's graph.
-            Platform::String^ framework_resources = nullptr;
-            auto dependencies = Windows::ApplicationModel::Package::Current->Dependencies;
-            for (unsigned int index = 0; index < dependencies->Size; ++index) {
-                auto dependency = dependencies->GetAt(index);
-                auto name = dependency->Id->Name;
-                constexpr wchar_t prefix[] = L"Horizon.Asset.";
-                if (wcsncmp(name->Data(), prefix, _countof(prefix) - 1) != 0) continue;
-                if (wcscmp(dependency->Id->Publisher->Data(), L"CN=HorizonUWPPrototype") != 0) continue;
-                if (framework_resources != nullptr) throw ref new Platform::FailureException();
-                framework_resources = Platform::String::Concat(
-                    dependency->InstalledLocation->Path, ref new Platform::String(L"\\resources"));
-            }
-            if (framework_resources != nullptr) resources = framework_resources;
-        } else {
-            CloseHandle(local_manifest);
-        }
+        auto resources = resolve_resources(local_path);
         auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
 #ifdef HORIZON_UWP_ACCOUNT
         // The native account dialog needs an active CoreWindow before the game event loop starts.
         window_->Activate();
 #endif
 #ifdef HORIZON_UWP_XAML_SHELL
-        // Mobile has one foreground surface. The primary XAML view switches to
-        // this view after CreateNewView; asking for a second standalone window
-        // makes the game view fail and used to close the whole app immediately.
-        const bool phone = Windows::Foundation::Metadata::ApiInformation::IsApiContractPresent(
-            L"Windows.Phone.PhoneContract", 1);
-        if (!phone) {
-            auto shown = Windows::UI::ViewManagement::ApplicationViewSwitcher::TryShowAsStandaloneAsync(
-                Windows::UI::ViewManagement::ApplicationView::GetForCurrentView()->Id);
-            shown->Completed = ref new Windows::Foundation::AsyncOperationCompletedHandler<bool>(
-                [](Windows::Foundation::IAsyncOperation<bool>^ operation, Windows::Foundation::AsyncStatus status) {
-                    if (status != Windows::Foundation::AsyncStatus::Completed || !operation->GetResults())
-                        report_native_failure("Horizon could not open a separate game window.");
-                });
-        }
         const int32_t result = horizon_uwp_run_prepared(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                                                reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
 #else
@@ -374,17 +379,7 @@ public:
             report_native_failure("Horizon encountered a native error. A diagnostic was saved in app storage.");
         }
 #ifdef HORIZON_UWP_XAML_SHELL
-        const int home_view = primary_view_id.load(std::memory_order_acquire);
-        if (home_view > 0 && home_view != Windows::UI::ViewManagement::ApplicationView::GetForCurrentView()->Id) {
-            auto returned = Windows::UI::ViewManagement::ApplicationViewSwitcher::SwitchAsync(home_view);
-            returned->Completed = ref new Windows::Foundation::AsyncActionCompletedHandler(
-                [](Windows::Foundation::IAsyncAction^, Windows::Foundation::AsyncStatus status) {
-                    if (status != Windows::Foundation::AsyncStatus::Completed)
-                        report_native_failure("Horizon could not return to its home page.");
-                });
-        } else {
-            Windows::ApplicationModel::Core::CoreApplication::Exit();
-        }
+        Windows::ApplicationModel::Core::CoreApplication::Exit();
 #endif
 #else
         while (!closed_) {
@@ -459,23 +454,71 @@ public:
 };
 
 #ifdef HORIZON_UWP_XAML_SHELL
+static void run_game_in_primary_view() {
+    if (!primary_window || GetCurrentThreadId() != primary_window_thread) {
+        report_native_failure("Horizon could not start the game on its UWP view thread.");
+        return;
+    }
+
+    auto window = primary_window;
+    auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+    auto resources = resolve_resources(local_path);
+    auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
+    auto application_view = Windows::UI::ViewManagement::ApplicationView::GetForCurrentView();
+    const bool was_full_screen = application_view->IsFullScreenMode;
+    const bool phone = Windows::Foundation::Metadata::ApiInformation::IsApiContractPresent(
+        L"Windows.Phone.PhoneContract", 1);
+    if (phone && !was_full_screen) {
+        try { application_view->TryEnterFullScreenMode(); }
+        catch (Platform::Exception^) {}
+    }
+
+    if (!horizon_uwp_page_show_game(1)) {
+        if (phone && !was_full_screen) application_view->ExitFullScreenMode();
+        report_native_failure("Horizon could not replace the pre-game page with the game surface.");
+        return;
+    }
+
+    horizon_uwp::CoreWindowEvents^ events = nullptr;
+#ifdef HORIZON_UWP_TOUCH_MOD
+    horizon_uwp_gyro_set_visible(1);
+#endif
+    try {
+        events = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
+        events->EmitInitialSize();
+        window->Activate();
+        const int32_t result = horizon_uwp_run_prepared(
+            reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
+            reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
+        (void)result;
+        horizon_uwp_page_refresh_tile();
+    } catch (Platform::Exception^ error) {
+        char message[160];
+        sprintf_s(message, "Horizon encountered a Windows error (0x%08X). A diagnostic was saved in app storage.",
+            static_cast<unsigned>(error->HResult));
+        report_native_failure(message);
+    } catch (...) {
+        report_native_failure("Horizon encountered a native error. A diagnostic was saved in app storage.");
+    }
+
+#ifdef HORIZON_UWP_TOUCH_MOD
+    horizon_uwp_gyro_set_visible(0);
+    horizon_uwp_gyro_enable(0);
+#endif
+    if (events) delete events;
+    horizon_uwp_resume_pregame_input();
+    if (phone && !was_full_screen) {
+        try { application_view->ExitFullScreenMode(); }
+        catch (Platform::Exception^) {}
+    }
+    if (!account_window_closed.load()) horizon_uwp_page_show_game(0);
+}
+
 extern "C" void __cdecl horizon_uwp_open_game_view() {
     try {
-        auto game_view = CoreApplication::CreateNewView(ref new AppViewSource());
-        if (Windows::Foundation::Metadata::ApiInformation::IsApiContractPresent(
-                L"Windows.Phone.PhoneContract", 1)) {
-            game_view->Dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([]() {
-                auto switched = Windows::UI::ViewManagement::ApplicationViewSwitcher::SwitchAsync(
-                    Windows::UI::ViewManagement::ApplicationView::GetForCurrentView()->Id);
-                switched->Completed = ref new Windows::Foundation::AsyncActionCompletedHandler(
-                    [](Windows::Foundation::IAsyncAction^, Windows::Foundation::AsyncStatus status) {
-                    if (status != Windows::Foundation::AsyncStatus::Completed)
-                        report_native_failure("Horizon could not switch to the game view.");
-                    });
-            }));
-        }
+        run_game_in_primary_view();
     } catch (...) {
-        report_native_failure("Horizon could not create the game window.");
+        report_native_failure("Horizon could not start Horizon in the app window.");
     }
 }
 #endif
