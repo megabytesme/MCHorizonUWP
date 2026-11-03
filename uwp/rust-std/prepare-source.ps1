@@ -25,11 +25,18 @@ $env:GIT_CEILING_DIRECTORIES = Split-Path -Parent $root
 Push-Location $root
 try {
     foreach ($patch in $patches) {
-        & git apply --check $patch
+        # Git for Windows may check out patch files with CRLF while rustup's
+        # source uses LF. Normalize a private copy, never the tracked patch.
+        $normalized = Join-Path $root ("horizon-" + [IO.Path]::GetFileName($patch))
+        $patchText = [IO.File]::ReadAllText($patch).Replace("`r`n", "`n")
+        $stream = [IO.File]::Open($normalized, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+        $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false))
+        try { $writer.Write($patchText) } finally { $writer.Dispose() }
+        & git apply --check $normalized
         if ($LASTEXITCODE -ne 0) { throw "The UWP patch does not match this rust-src: $patch" }
-        & git apply $patch
+        & git apply $normalized
         if ($LASTEXITCODE -ne 0) { throw "Could not apply the UWP patch: $patch" }
-        & git apply --reverse --check $patch
+        & git apply --reverse --check $normalized
         if ($LASTEXITCODE -ne 0) { throw "The UWP patch was not applied: $patch" }
     }
 } finally {
