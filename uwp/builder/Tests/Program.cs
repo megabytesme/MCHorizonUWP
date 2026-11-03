@@ -223,12 +223,14 @@ catch (InvalidDataException) { }
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
 Require(selection.ValidatedPackageVersion == LocalRecipe.DefaultPackageVersion, "default package version");
 Require(LocalRecipe.UpstreamNightlyCommit.StartsWith(LocalRecipe.UpstreamNightlyShortCommit, StringComparison.Ordinal), "nightly label matches source commit");
-Require(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T09:30:50Z")) == LocalRecipe.DefaultPackageVersion, "nightly publication time maps to package version");
-Require(new Version(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T09:30:51Z"))) > new Version(LocalRecipe.DefaultPackageVersion), "later nightly package versions sort later");
-Require(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T10:30:50+01:00")) == LocalRecipe.DefaultPackageVersion, "package version uses UTC");
+var publicationVersion = LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T09:30:50Z"));
+Require(publicationVersion == "2026.1103.930.50", "nightly publication time maps to package version");
+Require(new Version(LocalRecipe.DefaultPackageVersion) > new Version(publicationVersion), "port rebuild advances past upstream publication version");
+Require(new Version(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T09:30:51Z"))) > new Version(publicationVersion), "later nightly package versions sort later");
+Require(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-03T10:30:50+01:00")) == publicationVersion, "package version uses UTC");
 Require(new Version(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-11-01T00:00:00Z"))) > new Version(LocalRecipe.PackageVersionFor(DateTimeOffset.Parse("2026-10-31T23:59:59Z"))), "package versions sort across month boundaries");
 var nightly = NightlyRelease.Parse("{\"tag_name\":\"nightly\",\"prerelease\":true,\"target_commitish\":\"f42ef42ef6ceccb3c6a20bea2481d87949a51c81\",\"published_at\":\"2026-11-03T09:30:50Z\"}");
-Require(nightly.SourceCommit == LocalRecipe.UpstreamNightlyCommit && LocalRecipe.PackageVersionFor(nightly.PublishedAt) == LocalRecipe.DefaultPackageVersion, "nightly metadata preserves source and publication time");
+Require(nightly.SourceCommit == LocalRecipe.UpstreamNightlyCommit && LocalRecipe.PackageVersionFor(nightly.PublishedAt) == publicationVersion, "nightly metadata preserves source and publication time");
 try { _ = NightlyRelease.Parse("{\"tag_name\":\"release\",\"prerelease\":false}"); throw new Exception("non-nightly release accepted"); }
 catch (InvalidDataException) { }
 try { _ = NightlyRelease.Parse("{\"tag_name\":\"nightly\",\"prerelease\":true,\"target_commitish\":\"main\",\"published_at\":\"2026-11-03T09:30:50Z\"}"); throw new Exception("moving nightly source accepted"); }
