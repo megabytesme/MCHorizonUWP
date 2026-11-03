@@ -18,13 +18,17 @@ native-device-vibration-mod = ["horizon-client/native-device-vibration-mod"]
 uwp-audio = ["horizon-client/uwp-audio"]
 uwp-controller = ["horizon-client/uwp-controller"]
 uwp-account = ["dep:horizon-account-core", "uwp-https"]
+xaml-shell = ["uwp-account"]
 
 [dependencies]
 horizon-client = { path = "../../crates/horizon-client", default-features = false }
+pollster = "0.4"
 
 [target.'cfg(target_vendor = "uwp")'.dependencies]
 horizon-threads = { path = "../../crates/horizon-threads" }
 horizon-account-core = { path = "../../crates/horizon-account-core", optional = true }
+horizon-core = { path = "../../crates/horizon-core" }
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "parking_lot", "gles"] }
 
 [patch.crates-io]
 wgpu-hal = { path = "../../third_party/wgpu-hal" }

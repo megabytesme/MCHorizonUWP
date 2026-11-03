@@ -1,22 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-         IgnorableNamespaces="uap">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap">
   <Identity Name="HorizonUWPPrototype" Publisher="CN=HorizonUWPPrototype" Version="1.0.1.0" ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>Horizon UWP Prototype</DisplayName>
-    <PublisherDisplayName>Horizon UWP Prototype</PublisherDisplayName>
+    <DisplayName>Horizon</DisplayName>
+    <PublisherDisplayName>Horizon</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.15063.0" MaxVersionTested="10.0.26100.0" />
     <PackageDependency Name="Microsoft.VCLibs.140.00" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" MinVersion="14.0.0.0" />
   </Dependencies>
-  <Resources><Resource Language="en-us" /></Resources>
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
   <Applications>
     <Application Id="App" Executable="HorizonUWP.exe" EntryPoint="HorizonUWP.App">
-      <uap:VisualElements DisplayName="Horizon UWP Prototype" Description="D3D11 UWP host prototype" BackgroundColor="#14243A"
-                          Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" />
+      <uap:VisualElements DisplayName="Horizon" Description="Unofficial Horizon client for Minecraft: Java Edition" BackgroundColor="#14243A" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" />
     </Application>
   </Applications>
   <Capabilities>

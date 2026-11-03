@@ -6,6 +6,47 @@ static ALLOCATOR: horizon_threads::Allocator = horizon_threads::ALLOCATOR;
 
 #[cfg(all(target_vendor = "uwp", feature = "uwp-account"))]
 mod pregame;
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+mod xaml_pregame;
+
+// The XAML shell and DirectX game view have different UI threads. A successful
+// account session crosses that boundary only through this in-process slot;
+// it is consumed once and is never serialized to the command line or disk.
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+static PREPARED_SESSION: std::sync::Mutex<Option<xaml_pregame::Selection>> =
+    std::sync::Mutex::new(None);
+
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    not(feature = "native-d3d11")
+))]
+fn uwp_renderer_available() -> bool {
+    let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+    descriptor.backends = wgpu::Backends::GL;
+    let instance = wgpu::Instance::new(descriptor);
+    pollster::block_on(instance.enumerate_adapters(wgpu::Backends::GL))
+        .into_iter()
+        .any(|adapter| {
+            adapter.get_info().backend == wgpu::Backend::Gl
+                && pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
+                    .is_ok()
+        })
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_release_label(buffer: *mut u8, capacity: usize) -> usize {
+    let label = horizon_core::release::nightly_label()
+        .unwrap_or_else(|| format!("Horizon {}", horizon_core::release::VERSION));
+    let bytes = label.as_bytes();
+    if buffer.is_null() || bytes.len() > capacity {
+        return 0;
+    }
+    // SAFETY: the C++ caller provides a writable buffer of `capacity` bytes.
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer, bytes.len()) };
+    bytes.len()
+}
 
 #[cfg(target_vendor = "uwp")]
 unsafe extern "C" {
@@ -15,6 +56,8 @@ unsafe extern "C" {
     fn horizon_uwp_is_ui_thread() -> i32;
     fn horizon_uwp_pump_events();
     fn horizon_uwp_is_local_test() -> i32;
+    #[cfg(all(feature = "xaml-shell", not(feature = "native-d3d11")))]
+    fn horizon_uwp_page_renderer(supported: i32);
     #[cfg(feature = "uwp-account")]
     fn horizon_uwp_discard_pregame_input();
 }
@@ -51,29 +94,8 @@ fn install_panic_reporter() {
 }
 
 #[cfg(target_vendor = "uwp")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn horizon_uwp_run(
-    resources: *const u16,
-    resources_len: usize,
-    game_dir: *const u16,
-    game_dir_len: usize,
-) -> i32 {
-    use std::os::windows::ffi::OsStringExt;
-    use std::path::PathBuf;
-
-    install_panic_reporter();
-    if resources.is_null() || game_dir.is_null() {
-        report_failure("Horizon could not find its resource or data path.");
-        return -1;
-    }
-    // The host owns both buffers for the duration of this call.
-    let resources = unsafe { std::slice::from_raw_parts(resources, resources_len) };
-    let game_dir = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
-    let resources = PathBuf::from(std::ffi::OsString::from_wide(resources));
-    let game_dir = PathBuf::from(std::ffi::OsString::from_wide(game_dir));
+fn configure_isolated_test(game_dir: &std::path::Path) {
     if unsafe { horizon_uwp_is_local_test() != 0 } {
-        // Only the separately registered local test has this package marker.
-        // Set these before any game or account worker threads are created.
         let home = game_dir.join("isolated-test-home");
         for name in [
             "HORIZON_HOME",
@@ -88,12 +110,115 @@ pub unsafe extern "C" fn horizon_uwp_run(
             std::env::set_var("HORIZON_NO_AUDIO", "1");
         }
     }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_prepare(game_dir: *const u16, game_dir_len: usize) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+    if game_dir.is_null() {
+        return -1;
+    }
+    install_panic_reporter();
+    #[cfg(not(feature = "native-d3d11"))]
+    unsafe { horizon_uwp_page_renderer(i32::from(uwp_renderer_available())) };
+    let game_dir = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
+    let game_dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(game_dir));
+    configure_isolated_test(&game_dir);
+    match xaml_pregame::start() {
+        Some(session) => {
+            let mut slot = PREPARED_SESSION
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            if slot.is_some() {
+                return -1;
+            }
+            *slot = Some(session);
+            1
+        }
+        None => 0,
+    }
+}
+
+#[cfg(target_vendor = "uwp")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_run(
+    resources: *const u16,
+    resources_len: usize,
+    game_dir: *const u16,
+    game_dir_len: usize,
+) -> i32 {
+    unsafe { run(resources, resources_len, game_dir, game_dir_len, false) }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_run_prepared(
+    resources: *const u16,
+    resources_len: usize,
+    game_dir: *const u16,
+    game_dir_len: usize,
+) -> i32 {
+    unsafe { run(resources, resources_len, game_dir, game_dir_len, true) }
+}
+
+#[cfg(target_vendor = "uwp")]
+unsafe fn run(
+    resources: *const u16,
+    resources_len: usize,
+    game_dir: *const u16,
+    game_dir_len: usize,
+    prepared: bool,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+    use std::path::PathBuf;
+
+    install_panic_reporter();
+    if resources.is_null() || game_dir.is_null() {
+        report_failure("Horizon could not find its resource or data path.");
+        return -1;
+    }
+    // The host owns both buffers for the duration of this call.
+    let resources = unsafe { std::slice::from_raw_parts(resources, resources_len) };
+    let game_dir = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
+    let resources = PathBuf::from(std::ffi::OsString::from_wide(resources));
+    let game_dir = PathBuf::from(std::ffi::OsString::from_wide(game_dir));
+    // The shell does this before starting its account worker. The legacy host
+    // reaches it here before starting any game or account worker threads.
+    if !prepared {
+        configure_isolated_test(&game_dir);
+    }
     horizon_client::logging::set_game_home(game_dir.clone());
     horizon_client::logging::init(&game_dir, "Render thread");
-    #[cfg(feature = "uwp-account")]
+    #[cfg(feature = "xaml-shell")]
+    let selection = if prepared {
+        PREPARED_SESSION
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+    } else {
+        pregame::start().map(|session| xaml_pregame::Selection {
+            session,
+            offline_name: None,
+        })
+    };
+    #[cfg(feature = "xaml-shell")]
+    let result = match selection {
+        Some(selection) => {
+            // Do not replay taps or keystrokes from the native dialogs into the game.
+            unsafe { horizon_uwp_discard_pregame_input() };
+            // Horizon already supports an offline player name through this
+            // public (non-secret) setting. Account tokens never enter it.
+            if let Some(name) = &selection.offline_name {
+                unsafe { std::env::set_var("HORIZON_PLAYER_NAME", name) };
+            }
+            horizon_client::run_uwp_with_session(&resources, &game_dir, selection.session)
+        }
+        None => return 0,
+    };
+    #[cfg(all(feature = "uwp-account", not(feature = "xaml-shell")))]
     let result = match pregame::start() {
         Some(session) => {
-            // Do not replay taps or keystrokes from the native dialogs into the game.
             unsafe { horizon_uwp_discard_pregame_input() };
             horizon_client::run_uwp_with_session(&resources, &game_dir, session)
         }

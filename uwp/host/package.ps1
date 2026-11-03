@@ -7,9 +7,13 @@ param(
     [string]$OutputDirectory,
     [string]$Resources,
     [ValidatePattern('^Horizon\.Asset\.[0-9-]+\.[0-9a-f]{20,30}$')][string]$ResourceFrameworkName,
-    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$')][string]$IdentityName
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$')][string]$IdentityName,
+    [ValidateSet('2.7', '2.8')][string]$WinUIFramework,
+    [string]$PackageVersion,
+    [string]$ReleaseNotes
 )
 $ErrorActionPreference = 'Stop'
+if (-not $WinUIFramework) { $WinUIFramework = if ($Architecture -eq 'arm') { '2.7' } else { '2.8' } }
 if ($Resources -and $ResourceFrameworkName) { throw 'Choose embedded resources or a resource framework, not both.' }
 if ($ResourceFrameworkName -and $ResourceFrameworkName.Length -gt 50) { throw 'Resource framework identity is too long.' }
 function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
@@ -64,6 +68,13 @@ if ($AngleBin) {
 }
 New-Item -ItemType Directory -Force -Path $stage,(Join-Path $stage 'Assets') | Out-Null
 Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage 'HorizonUWP.exe') -Force
+$notesStage = Join-Path $stage 'horizon-release-notes.txt'
+if (Test-Path -LiteralPath $notesStage) { throw 'Release-note staging already exists; use a fresh OutputDirectory.' }
+if ($ReleaseNotes) {
+    $notes = Get-Item -LiteralPath $ReleaseNotes -ErrorAction Stop
+    if ($notes.PSIsContainer -or $notes.Length -gt 1MB) { throw 'Release notes must be a text file no larger than 1 MiB.' }
+    Copy-Item -LiteralPath $notes.FullName -Destination $notesStage
+}
 # Staging persists between builds; remove stale DLLs before copying validated inputs.
 foreach ($name in @('libEGL.dll', 'libGLESv2.dll', 'z.dll')) {
     $old = Join-Path $stage $name
@@ -90,6 +101,29 @@ $manifest = (Get-Content (Join-Path $hostDir 'AppxManifest.xml') -Raw).Replace('
 if ($IdentityName) {
     $manifest = $manifest.Replace('Name="HorizonUWPPrototype"', "Name=`"$IdentityName`"")
 }
+if ($PackageVersion) {
+    $parts = $PackageVersion.Split('.')
+    if ($parts.Count -ne 4) { throw 'Package version must contain four numeric fields.' }
+    foreach ($part in $parts) {
+        [uint16]$value = 0
+        if ($part -notmatch '^(0|[1-9][0-9]*)$' -or -not [uint16]::TryParse($part, [ref]$value)) {
+            throw 'Package version fields must be numbers from 0 to 65535.'
+        }
+    }
+    $manifestXml = [xml]$manifest
+    $manifestXml.Package.Identity.Version = $PackageVersion
+    $manifest = $manifestXml.OuterXml
+}
+if ($WinUIFramework) {
+    $manifestXml = [xml]$manifest
+    $namespace = $manifestXml.DocumentElement.NamespaceURI
+    $dependency = $manifestXml.CreateElement('PackageDependency', $namespace)
+    $dependency.SetAttribute('Name', "Microsoft.UI.Xaml.$WinUIFramework")
+    $dependency.SetAttribute('Publisher', 'CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US')
+    $dependency.SetAttribute('MinVersion', $(if ($WinUIFramework -eq '2.7') { '7.2208.15002.0' } else { '8.2501.31001.0' }))
+    $manifestXml.Package.Dependencies.AppendChild($dependency) | Out-Null
+    $manifest = $manifestXml.OuterXml
+}
 if ($ResourceFrameworkName) {
     $manifestXml = [xml]$manifest
     $namespace = $manifestXml.DocumentElement.NamespaceURI
@@ -101,15 +135,12 @@ if ($ResourceFrameworkName) {
     $manifest = $manifestXml.OuterXml
 }
 Set-Content -Path (Join-Path $stage 'AppxManifest.xml') -Value $manifest -Encoding UTF8
-Add-Type -AssemblyName System.Drawing
-foreach ($logo in @(@('StoreLogo.png',50), @('Square150x150Logo.png',150), @('Square44x44Logo.png',44))) {
-    $bitmap = [System.Drawing.Bitmap]::new($logo[1], $logo[1])
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    $graphics.Clear([System.Drawing.Color]::FromArgb(20, 36, 58))
-    $bitmap.Save((Join-Path $stage (Join-Path 'Assets' $logo[0])), [System.Drawing.Imaging.ImageFormat]::Png)
-    $graphics.Dispose(); $bitmap.Dispose()
-}
-$makeAppx = '${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe'
+$brandAssets = Join-Path $hostDir 'Assets'
+foreach ($name in @('StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.png')) {
+    $sourceLogo = Join-Path $brandAssets $name
+    if (-not (Test-Path -LiteralPath $sourceLogo -PathType Leaf)) { throw "Missing Horizon logo asset: $sourceLogo" }
+    Copy-Item -LiteralPath $sourceLogo -Destination (Join-Path $stage (Join-Path 'Assets' $name)) -Force
+}$makeAppx = '${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe'
 $makeAppx = [Environment]::ExpandEnvironmentVariables($makeAppx.Replace('${env:ProgramFiles(x86)}', '%ProgramFiles(x86)%'))
 $package = Join-Path $build "HorizonUWP-$Architecture.appx"
 $makeLog = Join-Path $build "makeappx-$Architecture.log"

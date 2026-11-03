@@ -1,5 +1,6 @@
 //! Shared Horizon account protocol. Transport is supplied by each platform.
 //! Tokens are kept out of Debug output and transport errors.
+pub mod profiles;
 pub mod sign_in;
 pub mod vault;
 

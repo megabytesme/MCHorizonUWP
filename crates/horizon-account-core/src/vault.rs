@@ -54,14 +54,18 @@ pub fn load(store: &(impl SecretStore + ?Sized)) -> Result<Option<StoredAccount>
     let Some(value) = store.get(ACTIVE_ACCOUNT)? else {
         return Ok(None);
     };
+    decode(&value).map(Some)
+}
+
+pub(crate) fn decode(value: &str) -> Result<StoredAccount, StoreError> {
     if value.len() > MAX_SECRET_BYTES {
         return Err(StoreError);
     }
-    let account: StoredAccount = serde_json::from_str(&value).map_err(|_| StoreError)?;
+    let account: StoredAccount = serde_json::from_str(value).map_err(|_| StoreError)?;
     if account.schema != SCHEMA {
         return Err(StoreError);
     }
-    Ok(Some(account))
+    Ok(account)
 }
 
 /// Saves a complete account as one vault entry. Errors never fall back to disk.

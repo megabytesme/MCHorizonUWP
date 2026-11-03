@@ -145,7 +145,7 @@ extern "C" int __cdecl horizon_uwp_dialog_show(const unsigned char* text, size_t
             reinterpret_cast<const char*>(text), static_cast<int>(length), &message[0], count) != count) return -1;
         button_count = 0;
         switch (kind) {
-        case 0: add(L"Play offline", 1); add(L"Microsoft account", 2); break;
+        case 0: add(L"Start game", 1); add(L"Microsoft account", 2); break;
         case 1: add(L"Sign in", 1); add(L"Saved account", 2); break;
         case 2: add(L"Cancel", 1); break;
         case 3: add(L"OK", 1); break;
@@ -164,6 +164,7 @@ extern "C" int __cdecl horizon_uwp_dialog_show(const unsigned char* text, size_t
 }
 extern "C" int __cdecl horizon_uwp_dialog_poll() { return choice; }
 extern "C" void __cdecl horizon_uwp_dialog_cancel() { choice = -1; }
+extern "C" void __cdecl horizon_uwp_page_profile(const unsigned char*, size_t) {}
 
 extern "C" void __cdecl horizon_uwp_page_event(const HorizonUwpEvent* event) {
     if (!event || !visible || choice != 0) return;

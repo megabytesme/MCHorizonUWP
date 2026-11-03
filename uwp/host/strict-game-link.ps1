@@ -6,7 +6,11 @@ $output = Join-Path (Get-Location).Path 'HorizonUWP.exe'
 $stackReserve = 8MB
 if ($env:HORIZON_UWP_XAUDIO) { $objects += 'XAudioStream.obj'; $libraries += 'xaudio2.lib' }
 if ($env:HORIZON_UWP_HTTP) { $objects += 'HttpBridge.obj' }
-if ($env:HORIZON_UWP_ACCOUNT) { $objects += @('NativeDialog.obj', 'CredentialStore.obj'); $libraries += @('d2d1.lib', 'dwrite.lib') }
+if ($env:HORIZON_UWP_ACCOUNT) {
+    $objects += 'CredentialStore.obj'
+    if ($env:HORIZON_UWP_XAML_SHELL) { $objects += 'XamlShell.obj' }
+    else { $objects += 'NativeDialog.obj'; $libraries += @('d2d1.lib', 'dwrite.lib') }
+}
 if ($env:HORIZON_UWP_GAMEPAD) { $objects += 'Gamepad.obj' }
 if ($env:HORIZON_UWP_DEVICE_VIBRATION) { $objects += 'DeviceVibration.obj' }
 & $linker -Objects $objects `

@@ -20,12 +20,17 @@ if not defined HORIZON_UWP_GAME_LIB (
     echo Set HORIZON_UWP_GAME_LIB to the Rust game bridge static library.
     exit /b 1
 )
+if defined HORIZON_UWP_XAML_SHELL if not defined HORIZON_UWP_ACCOUNT (
+    echo The XAML shell requires HORIZON_UWP_ACCOUNT.
+    exit /b 1
+)
 if not exist "%HORIZON_UWP_GAME_LIB%" exit /b 1
 set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
 if /i "%ARCH%"=="arm" set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community"
 call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
 if errorlevel 1 exit /b %errorlevel%
 set "OUTDIR=%~dp0build\game-%ARCH%"
+if defined HORIZON_UWP_BUILD_DIR set "OUTDIR=%HORIZON_UWP_BUILD_DIR%"
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 set "FXC=%ProgramFiles(x86)%\Windows Kits\10\bin\%SDK%\x64\fxc.exe"
 if not exist "%FXC%" exit /b 1
@@ -36,6 +41,8 @@ if errorlevel 1 exit /b 1
 set "FRAME_DEFINE="
 if defined HORIZON_UWP_FRAME_PROBE set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_FRAME_PROBE"
 if defined HORIZON_UWP_ACCOUNT set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_ACCOUNT"
+if defined HORIZON_UWP_XAML_SHELL set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_XAML_SHELL"
+if defined HORIZON_UWP_NATIVE_D3D11 set "FRAME_DEFINE=%FRAME_DEFINE% /DHORIZON_UWP_NATIVE_D3D11"
 pushd "%OUTDIR%"
 cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /DHORIZON_UWP_GAME_BRIDGE %FRAME_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /I"%~dp0..\dx11" /I"%OUTDIR%" "%~dp0App.cpp" "%~dp0..\dx11\Dx11Renderer.cpp" "%~dp0..\window-bridge\CoreWindowEvents.cpp"
 if errorlevel 1 (popd & exit /b 1)
@@ -60,7 +67,13 @@ if defined HORIZON_UWP_DEVICE_VIBRATION (
     if errorlevel 1 (popd & exit /b 1)
 )
 if defined HORIZON_UWP_ACCOUNT (
-    cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\pregame\host\NativeDialog.cpp" "%~dp0..\credential-store\host\CredentialStore.cpp"
+    cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\credential-store\host\CredentialStore.cpp"
+    if errorlevel 1 (popd & exit /b 1)
+    if defined HORIZON_UWP_XAML_SHELL (
+        cmd /d /c ""%~dp0..\pregame\host\build-shell.cmd" "%ARCH%" "%OUTDIR%""
+    ) else (
+        cl /nologo /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\pregame\host\NativeDialog.cpp"
+    )
     if errorlevel 1 (popd & exit /b 1)
 )
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0strict-game-link.ps1"

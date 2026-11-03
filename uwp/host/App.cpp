@@ -22,6 +22,18 @@ extern "C" void __cdecl horizon_uwp_page_event(const HorizonUwpEvent* event);
 extern "C" void __cdecl horizon_uwp_page_shutdown();
 extern "C" int __cdecl horizon_uwp_window_closed() { return account_window_closed.load() ? 1 : 0; }
 extern "C" int __cdecl horizon_uwp_window_visible() { return account_window_visible.load() ? 1 : 0; }
+#ifdef HORIZON_UWP_XAML_SHELL
+extern "C" void __cdecl horizon_uwp_attach_shell(Windows::UI::Core::CoreWindow^ window) {
+    current_window = window;
+    current_window_thread.store(GetCurrentThreadId(), std::memory_order_release);
+    account_window_closed.store(false);
+    account_window_visible.store(true);
+    window->Closed += ref new Windows::Foundation::TypedEventHandler<Windows::UI::Core::CoreWindow^, Windows::UI::Core::CoreWindowEventArgs^>(
+        [](Windows::UI::Core::CoreWindow^, Windows::UI::Core::CoreWindowEventArgs^) { account_window_closed.store(true); });
+    window->VisibilityChanged += ref new Windows::Foundation::TypedEventHandler<Windows::UI::Core::CoreWindow^, Windows::UI::Core::VisibilityChangedEventArgs^>(
+        [](Windows::UI::Core::CoreWindow^, Windows::UI::Core::VisibilityChangedEventArgs^ args) { account_window_visible.store(args->Visible); });
+}
+#endif
 #endif
 static HorizonUwpEvent pending_events[4096];
 static uint32_t event_read, event_write;
@@ -64,6 +76,9 @@ extern "C" void* __cdecl horizon_uwp_window_handle() {
     return reinterpret_cast<void*>(current_window);
 }
 extern "C" void __cdecl horizon_uwp_pump_events() {
+    // The XAML account state machine runs on a worker. Only the owning UI
+    // thread may pump a CoreWindow dispatcher.
+    if (!current_window || current_window_thread.load(std::memory_order_acquire) != GetCurrentThreadId()) return;
     current_window->Dispatcher->ProcessEvents(Windows::UI::Core::CoreProcessEventsOption::ProcessAllIfPresent);
 }
 extern "C" int __cdecl horizon_uwp_pop_event(HorizonUwpEvent* event) {
@@ -105,6 +120,10 @@ extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
     } catch (Platform::Exception^) { return 0; }
 }
 extern "C" int32_t __cdecl horizon_uwp_run(const uint16_t*, size_t, const uint16_t*, size_t);
+#ifdef HORIZON_UWP_XAML_SHELL
+extern "C" int32_t __cdecl horizon_uwp_run_prepared(const uint16_t*, size_t, const uint16_t*, size_t);
+extern "C" int __cdecl horizon_uwp_xaml_start();
+#endif
 extern "C" int __cdecl horizon_uwp_is_local_test() {
     try {
         auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
@@ -294,8 +313,22 @@ public:
         // The native account dialog needs an active CoreWindow before the game event loop starts.
         window_->Activate();
 #endif
+#ifdef HORIZON_UWP_XAML_SHELL
+        auto shown = Windows::UI::ViewManagement::ApplicationViewSwitcher::TryShowAsStandaloneAsync(
+            Windows::UI::ViewManagement::ApplicationView::GetForCurrentView()->Id);
+        shown->Completed = ref new Windows::Foundation::AsyncOperationCompletedHandler<bool>(
+            [](Windows::Foundation::IAsyncOperation<bool>^ operation, Windows::Foundation::AsyncStatus status) {
+                if (status != Windows::Foundation::AsyncStatus::Completed || !operation->GetResults()) {
+                    report_native_failure("Horizon could not open the game window.");
+                    Windows::ApplicationModel::Core::CoreApplication::Exit();
+                }
+            });
+        const int32_t result = horizon_uwp_run_prepared(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
+                                               reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
+#else
         const int32_t result = horizon_uwp_run(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                                                reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
+#endif
         // The Rust bridge reports an error before returning a failure.
         (void)result;
         } catch (Platform::Exception^ error) {
@@ -306,6 +339,9 @@ public:
         } catch (...) {
             report_native_failure("Horizon encountered a native error. A diagnostic was saved in app storage.");
         }
+#ifdef HORIZON_UWP_XAML_SHELL
+        Windows::ApplicationModel::Core::CoreApplication::Exit();
+#endif
 #else
         while (!closed_) {
             if (visible_) {
@@ -371,12 +407,26 @@ public:
     virtual IFrameworkView^ CreateView() { return ref new AppView(); }
 };
 
+#ifdef HORIZON_UWP_XAML_SHELL
+extern "C" void __cdecl horizon_uwp_open_game_view() {
+    try {
+        CoreApplication::CreateNewView(ref new AppViewSource());
+    } catch (...) {
+        report_native_failure("Horizon could not create the game window.");
+    }
+}
+#endif
+
 [Platform::MTAThread]
 int main(Platform::Array<Platform::String^>^) {
 #ifdef HORIZON_UWP_GAME_BRIDGE
     try {
 #endif
+#ifdef HORIZON_UWP_XAML_SHELL
+    horizon_uwp_xaml_start();
+#else
     CoreApplication::Run(ref new AppViewSource());
+#endif
 #ifdef HORIZON_UWP_GAME_BRIDGE
     } catch (Platform::Exception^ error) {
         char message[160];

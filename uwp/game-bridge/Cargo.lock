@@ -1478,7 +1478,10 @@ version = "0.1.0"
 dependencies = [
  "horizon-account-core",
  "horizon-client",
+ "horizon-core",
  "horizon-threads",
+ "pollster",
+ "wgpu",
 ]
 
 [[package]]
