@@ -18,22 +18,37 @@ Controller vibration remains independent. The WinUI 3 builder publishes
 self-contained successfully and pins client source `8cb8bfeba46c53d8675e8fef860fecbb688b1221`
 at package version `2026.1103.930.54`.
 
-The ARM32 release Cargo build succeeded using all 32 configured cores, and the
-native host compiled through its controller, gyrometer, networking, picker,
-device-haptics, and credential-store objects. The final shell/package build is
-blocked because WinUI 2.7.3 is absent from
-`C:/Users/ben/.nuget/packages/microsoft.ui.xaml/2.7.3`; the checked-in ARM32
-shell build requires its license to be reviewed before restoring that NuGet
-dependency. No new client APPX has been produced or signed. The user has
-authorized signing a completed build through local SSH; private keys must stay
-in the certificate store and must not be exported.
+After the user's license review, Microsoft.UI.Xaml 2.7.3 was restored to the
+per-user NuGet cache and the ARM32 WinUI shell build completed. Cargo built the
+ARM32 client with all 32 cores and the native touch, device-vibration, account,
+audio, HTTPS, controller, and XAML-shell features. The native host strict link
+passed and verified its 8 MiB stack reserve. The shell emits existing WinUI
+metadata warnings from the legacy ARM SDK, but compiles and links successfully.
 
-The reusable signed Minecraft 26.3 asset framework already available for the
-next client build is
-`C:/Users/ben/.huwp/b/upstream-fc021-20261103/.local/buildcheck/renderer-dx12-20261103/arm-final/deliverables/Horizon-26.3-Assets-signed.appx`.
-The extracted private resource tree is under
+The signed ARM32 client package is at
+`C:/Users/ben/.huwp/b/arm32-touchsens-20261103/deliverables/HorizonUWP-ARM32-signed.appx`
+(SHA-256 `CD1C68AF58D274BB51FBCFA98004976F0585B9551B3E660C24464F99948268CC`).
+Its identity is `HorizonUWPLatestPreview`, version `2026.1103.930.54`; it uses
+Horizon nightly `2026-11-03` and the exact release notes for source
+`f42ef42ef6ceccb3c6a20bea2481d87949a51c81`. The AppX block map, ARM machine
+type, packaged-executable match and CMS signature were checked. The signature
+uses thumbprint `22A7D038213EF31853EEE277B7C1FAFD576A70AB`; Windows SignTool on this
+build account reports the same untrusted self-signed root as it does for earlier
+packages. The target must trust the existing prototype certificate. Only the
+public certificate is included; no private key was exported.
+
+The install bundle also includes the Microsoft-signed ARM32
+`Microsoft.UI.Xaml.2.7` framework package and a copy of the previously signed
+Minecraft 26.3 asset framework. The client manifest depends on both. The
+preserved original asset framework is
+`C:/Users/ben/.huwp/b/upstream-fc021-20261103/.local/buildcheck/renderer-dx12-20261103/arm-final/deliverables/Horizon-26.3-Assets-signed.appx`;
+its extracted private resource tree is under
 `C:/Users/ben/.huwp/b/upstream-fc021-20261103/.local/buildcheck/live-tile/asset-framework-unpacked-gyro/resources`.
-Do not commit, delete, overwrite, or otherwise expose either asset copy.
+Do not commit, delete, overwrite, or otherwise expose either asset copy. The
+install bundle is at
+`C:/Users/ben/.huwp/b/arm32-touchsens-20261103/deliverables`.
+Device installation, touch feel, audio, haptics and game start still need the
+user's phone test.
 
 ## Published nightly update — 3 November 2026
 
