@@ -15,5 +15,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250909003" />
     <ProjectReference Include="..\Core\Horizon.Builder.Core.csproj" />
+    <Content Include="..\..\host\Assets\Square150x150Logo.png" Link="Assets\Square150x150Logo.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

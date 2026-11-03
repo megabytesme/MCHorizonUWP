@@ -12,11 +12,11 @@ public sealed record RustToolchainFacts(string Version, bool SourceAvailable);
 /// <summary>Recipe for one locally available source revision.</summary>
 public static class LocalRecipe
 {
-    public const string SourceCommit = "1c1a8de62627f05a27a995d7a9319ec9d4673e3c";
+    public const string SourceCommit = "d9b9143382417ca630fd432625784110044b943f";
     public const string UpstreamNightlyDate = "2026-11-03";
     public const string UpstreamNightlyCommit = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81";
     public const string UpstreamNightlyShortCommit = "f42ef42";
-    public const string DefaultPackageVersion = "2026.1103.930.50";
+    public const string DefaultPackageVersion = "2026.1103.930.51";
     public const string UpstreamReleaseVersion = "nightly-" + UpstreamNightlyDate;
     public const string UpstreamNightly = UpstreamNightlyDate + " " + UpstreamNightlyShortCommit;
     public const string RustVersion = "1.99.1";
@@ -80,7 +80,8 @@ public static class LocalRecipe
             selection.UseResourceFramework ? "<framework-name>" : "<selected-resources>"]));
         var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
             $"Based on Horizon nightly {UpstreamNightlyDate}, source {UpstreamNightlyShortCommit}; this is a UWP port, not an official Horizon binary.",
-            "The resulting APPX is unsigned and requires matching dependencies and a user-controlled signing identity.",
+            "The renderer is checked on the device before launch; unavailable graphics devices are not offered.",
+            "The resulting APPX requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
             "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and limits parallel jobs to fit memory.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };

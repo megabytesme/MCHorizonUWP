@@ -3,7 +3,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Horizon UWP Builder">
   <ScrollViewer><StackPanel Padding="28" Spacing="16" MaxWidth="820" HorizontalAlignment="Stretch">
-    <TextBlock Text="Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" />
+    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+      <Image Source="Assets/Square150x150Logo.png" Width="44" Height="44" />
+      <TextBlock Text="Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
+    </StackPanel>
     <TextBlock x:Name="UpstreamNightly" TextWrapping="Wrap" />
     <TextBlock x:Name="NightlyStatus" Text="Checking for a newer Horizon nightly…" TextWrapping="Wrap" />
     <TextBlock Text="Choose a local Horizon checkout and prepared resources, then inspect and run the pinned build recipe. Missing Cargo dependencies are downloaded from configured registries. Packages are unsigned." TextWrapping="Wrap" />
@@ -14,16 +17,21 @@
     <Button Content="Choose Minecraft installation (for missing sounds)" Click="ChooseMinecraft_Click" />
     <TextBlock x:Name="MinecraftPath" Text="No Minecraft installation selected" TextWrapping="Wrap" />
     <CheckBox x:Name="PrepareSounds" Content="Prepare missing sounds from this installation in the build workspace" />
-    <CheckBox x:Name="PackageFramework" Content="Build a separate reusable framework for these prepared resources" />
+    <CheckBox x:Name="PackageFramework" Content="Build a separate reusable framework for these prepared resources" IsChecked="True" />
     <TextBlock Text="Target device" Style="{StaticResource BodyStrongTextBlockStyle}" />
-    <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch">
+    <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="Profile_SelectionChanged">
       <ComboBoxItem Content="Windows desktop (x64)" />
       <ComboBoxItem Content="Surface Pro X (ARM64)" />
       <ComboBoxItem Content="Windows 10 Mobile (ARM32, 15063)" />
     </ComboBox>
-    <TextBlock Text="Renderer: Native D3D11 (feature level 9_1). This recipe has no other verified renderer choices." TextWrapping="Wrap" />
-    <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" />
-    <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration as a separate native mod" />
+    <TextBlock Text="Renderer build" Style="{StaticResource BodyStrongTextBlockStyle}" />
+    <ComboBox x:Name="Renderer" SelectedIndex="0" HorizontalAlignment="Stretch">
+      <ComboBoxItem Content="Native Direct3D 11 (feature level 9_1)" />
+      <ComboBoxItem Content="ANGLE (OpenGL ES 3.0)" />
+    </ComboBox>
+    <TextBlock Text="The client probes the selected renderer and presentation surface at runtime. It only enables Start game when the built renderer can open on that device." TextWrapping="Wrap" />
+    <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls as a build-time source mod" IsChecked="True" />
+    <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration as a separate native mod" IsChecked="True" />
     <TextBlock Text="Microsoft application (client) ID — defaults to Fluent Launcher’s public ID; replace it with yours when approved" TextWrapping="Wrap" />
     <TextBox x:Name="MicrosoftClientId" PlaceholderText="00000000-0000-0000-0000-000000000000" />
     <TextBlock Text="Package version (choose a version newer than the one installed on the target)" TextWrapping="Wrap" />
@@ -31,7 +39,7 @@
     <TextBlock Text="The selected source mod is compiled into the client using the pinned local recipe." TextWrapping="Wrap" />
     <Button Content="Check setup" Click="CheckSetup_Click" />
     <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />
-    <TextBlock Text="The client includes native audio and HTTPS for skins and Minecraft session requests. Microsoft sign-in uses an approved public application ID and a browser on another device. Output uses the prototype publisher and must be signed before installation." TextWrapping="Wrap" />
+    <TextBlock Text="The client includes audio, HTTPS, controllers and a native pre-game shell. Microsoft sign-in uses the configured public application ID and device-code flow. Client and resource framework packages use the HorizonUWPPrototype publisher and require a matching signing certificate before installation." TextWrapping="Wrap" />
     <Button x:Name="RunRecipe" Content="Build unsigned client" Click="RunRecipe_Click" />
     <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
     <StackPanel x:Name="RecipeSteps" Spacing="6" />

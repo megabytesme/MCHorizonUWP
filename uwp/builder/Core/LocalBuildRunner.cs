@@ -10,10 +10,8 @@ public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, 
 public static class LocalBuildRunner
 {
     public const long MinimumFreeBytes = 10L * 1024 * 1024 * 1024;
-    // Large Rust crates have exhausted memory when every logical CPU was used.
-    // Keep as much parallelism as the machine's memory budget can sustain.
-    public static int CargoJobCount(int processors, long memoryBytes) =>
-        (int)Math.Clamp(memoryBytes / (4L * 1024 * 1024 * 1024), 1, Math.Max(1, processors));
+    // The project instructions ask builds to use every available processor.
+    public static int CargoJobCount(int processors, long memoryBytes) => Math.Max(1, processors);
 
     public static async Task<LocalBuildResult> RunAsync(string source, string resources, BuildSelection selection,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
@@ -26,6 +24,14 @@ public static class LocalBuildRunner
         if (ResourcesContainWorkspace(resources, workspaceBase))
             throw new InvalidOperationException("Choose a resource directory that does not contain the builder workspace.");
         ValidateResourceTree(resources);
+        string? angleBin = null;
+        if (selection.ValidatedRenderer == "angle")
+        {
+            angleBin = Path.Combine(Path.GetFullPath(source), ".local", "vcpkg-x64", "installed", "x64-uwp-local", "bin");
+            foreach (var name in new[] { "libEGL.dll", "libGLESv2.dll" })
+                if (!File.Exists(Path.Combine(angleBin, name)))
+                    throw new FileNotFoundException($"The selected ANGLE build needs {name} in the source checkout's x64 UWP vcpkg output.", Path.Combine(angleBin, name));
+        }
         var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
         var profileRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
@@ -58,12 +64,13 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
         vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
         vcEnvironment["HORIZON_NIGHTLY"] = LocalRecipe.UpstreamNightly;
+        vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
         var jobs = CargoJobCount(Environment.ProcessorCount, GC.GetGCMemoryInfo().TotalAvailableMemoryBytes);
         vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        progress?.Report($"Using {jobs} parallel Cargo jobs within the available memory budget.");
+        progress?.Report($"Using all {jobs} available processor cores for Cargo.");
         if (arm)
         {
             vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
@@ -98,14 +105,18 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_HTTP"] = "1";
         vcEnvironment["HORIZON_UWP_GAMEPAD"] = "1";
         vcEnvironment["HORIZON_UWP_ACCOUNT"] = "1";
+        vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
+        vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = selection.ValidatedRenderer == "native-d3d11" ? "1" : "";
         vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
+        var hostOutput = Path.Combine(root, "native-host", "game-" + arch);
+        vcEnvironment["HORIZON_UWP_BUILD_DIR"] = hostOutput;
         progress?.Report("Strict-linking the UWP host.");
         // cmd.exe is required for the checked-in .cmd file. Its command is fixed;
         // selected paths are passed in the working directory or environment only.
         await RunProcess(cmd, snapshot, ["/d", "/c", "uwp\\host\\build-game.cmd", arch], vcEnvironment);
 
-        var executable = Path.Combine(snapshot, "uwp", "host", "build", "game-" + arch, "HorizonUWP.exe");
+        var executable = Path.Combine(hostOutput, "HorizonUWP.exe");
         var packageDir = Path.Combine(root, "package");
         var manifestPath = Path.Combine(snapshot, "uwp", "host", "AppxManifest.xml");
         var manifest = XDocument.Load(manifestPath);
@@ -117,10 +128,23 @@ public static class LocalBuildRunner
             progress?.Report("Packaging a reusable resource framework from a private snapshot.");
             framework = await ResourceFrameworkPacker.PackAsync(packageResources, Path.Combine(root, "resource-framework"), progress);
         }
+        string? releaseNotes = null;
+        try { releaseNotes = await NightlyRelease.FetchPinnedNotesAsync(LocalRecipe.UpstreamNightlyDate, LocalRecipe.UpstreamNightlyCommit); }
+        catch (Exception) { /* The package remains buildable when GitHub is unavailable. */ }
+        string? releaseNotesPath = null;
+        if (!string.IsNullOrWhiteSpace(releaseNotes))
+        {
+            releaseNotesPath = Path.Combine(root, "horizon-release-notes.txt");
+            await File.WriteAllTextAsync(releaseNotesPath, releaseNotes, new System.Text.UTF8Encoding(false));
+        }
         progress?.Report("Packaging the unsigned client.");
-        await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
+        var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
-            framework is null ? "-Resources" : "-ResourceFrameworkName", framework?.Name ?? packageResources]);
+            "-IdentityName", "HorizonUWPLatestPreview", "-WinUIFramework", arm ? "2.7" : "2.8",
+            framework is null ? "-Resources" : "-ResourceFrameworkName", framework?.Name ?? packageResources };
+        if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
+        if (releaseNotesPath is not null) { packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath); }
+        await RunProcess(powershell, snapshot, packageArguments);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
         return new(root, package, LocalRecipe.SoundWarning(packageResources), framework?.Package);

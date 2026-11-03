@@ -13,6 +13,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         MicrosoftClientId.Text = BuildSelection.FluentLauncherClientId;
         PackageVersion.Text = LocalRecipe.DefaultPackageVersion;
+        UpdateRendererChoices();
         UpstreamNightly.Text = $"Horizon nightly {LocalRecipe.UpstreamNightlyDate} · {LocalRecipe.UpstreamNightlyShortCommit} (UWP port)";
         _ = CheckNightlyAsync();
     }
@@ -34,6 +35,24 @@ public sealed partial class MainWindow : Window
     private string? sourceDirectory;
     private string? resourceDirectory;
     private string? minecraftDirectory;
+
+    private string SelectedRenderer => (TargetProfile)Profile.SelectedIndex == TargetProfile.WindowsMobile
+        ? "native-d3d11" : Renderer.SelectedIndex == 1 ? "angle" : "native-d3d11";
+
+    private void UpdateRendererChoices()
+    {
+        if (Profile is null || Renderer is null) return;
+        var phone = (TargetProfile)Profile.SelectedIndex == TargetProfile.WindowsMobile;
+        Renderer.IsEnabled = !phone;
+        if (phone && Renderer.SelectedIndex != 0) Renderer.SelectedIndex = 0;
+    }
+
+    private void Profile_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateRendererChoices();
+
+    private BuildSelection CurrentSelection() => new((TargetProfile)Profile.SelectedIndex,
+        NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true,
+        PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true,
+        MicrosoftClientId.Text, SelectedRenderer);
 
     private async Task<string?> PickFolderAsync()
     {
@@ -72,7 +91,7 @@ public sealed partial class MainWindow : Window
             var minecraft = minecraftDirectory;
             if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true, MicrosoftClientId.Text);
+            var selection = CurrentSelection();
             var plan = LocalRecipe.Plan(selection);
             LocalRecipe.ValidateResources(resources);
             if (selection.PrepareSounds) LocalRecipe.ValidateSoundPreparation(resources, minecraft);
@@ -102,7 +121,7 @@ public sealed partial class MainWindow : Window
             var minecraft = minecraftDirectory;
             if (source is null || resources is null)
                 throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
-            var selection = new BuildSelection((TargetProfile)Profile.SelectedIndex, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true, MicrosoftClientId.Text);
+            var selection = CurrentSelection();
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var result = await LocalBuildRunner.RunAsync(source, resources, selection, new SystemProbe(), progress, minecraft);
             RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
@@ -138,14 +157,13 @@ public sealed partial class MainWindow : Window
     private void CheckSetup_Click(object sender, RoutedEventArgs e)
     {
         Results.Children.Clear();
-        var profile = (TargetProfile)Profile.SelectedIndex;
-        var selection = new BuildSelection(profile, NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true, PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true, MicrosoftClientId.Text);
+        var selection = CurrentSelection();
         Results.Children.Add(new TextBlock
         {
             Text = $"Requested target: {selection.RustTarget} | Features: {string.Join(", ", selection.Features)}",
             TextWrapping = TextWrapping.Wrap
         });
-        foreach (var check in new SetupChecker(new SystemProbe()).Scan(profile))
+        foreach (var check in new SetupChecker(new SystemProbe()).Scan(selection.Target))
         {
             var panel = new StackPanel { Spacing = 4 };
             panel.Children.Add(new TextBlock { Text = $"{check.Name} — {check.Status}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });

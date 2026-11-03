@@ -1,7 +1,7 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "")
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", string Renderer = "native-d3d11")
 {
     // Public Fluent Launcher application ID, selected at the user's request while their own is reviewed.
     public const string FluentLauncherClientId = "0844e754-1d2e-4861-8e2b-18059609badb";
@@ -43,10 +43,18 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
         _ => throw new ArgumentOutOfRangeException(nameof(Target)),
     };
 
+    public string ValidatedRenderer => Renderer switch
+    {
+        "native-d3d11" => Renderer,
+        "angle" when Target == TargetProfile.DesktopX64 => Renderer,
+        "angle" => throw new NotSupportedException("ANGLE builds are currently available for x64; ARM32 uses the native Direct3D 11 renderer."),
+        _ => throw new ArgumentException("Choose a supported renderer."),
+    };
+
     // These features are recorded as individual tokens; no user-supplied shell
     // fragments or paths are interpolated. Execution requires a verified recipe.
     public IReadOnlyList<string> Features => new[]
-        { "native-d3d11", NativeTouchMod ? "native-touch-mod" : null,
-          NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "uwp-account" }
+        { ValidatedRenderer == "native-d3d11" ? "native-d3d11" : null, NativeTouchMod ? "native-touch-mod" : null,
+          NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell" }
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();
 }
