@@ -22,7 +22,8 @@ horizon-shader-api = { path = "../horizon-shader-api", optional = true }
 
 [features]
 # The mod registry's index (docs/api/mod-index.md): the launcher, the registry server and its CI.
-index = ["dep:sha2", "dep:minisign-verify", "dep:horizon-shader-api", "dep:wasmparser"]
+native-index = ["dep:sha2", "dep:minisign-verify", "dep:horizon-shader-api"]
+index = ["native-index", "dep:wasmparser"]
 
 [lints]
 workspace = true

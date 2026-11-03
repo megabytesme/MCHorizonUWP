@@ -563,8 +563,16 @@ pub fn inspect(kind: &Kind, path: &Path) -> Result<Facts, String> {
             crate::Content::read(path, &m)?;
             let api_level = match wasm {
                 Some(wasm) => {
-                    let functions = crate::api_level::imports(&wasm)?;
-                    Some(crate::api_level::needed(functions.iter().map(String::as_str)).0)
+                    #[cfg(feature = "index")]
+                    {
+                        let functions = crate::api_level::imports(&wasm)?;
+                        Some(crate::api_level::needed(functions.iter().map(String::as_str)).0)
+                    }
+                    #[cfg(not(feature = "index"))]
+                    {
+                        let _ = wasm;
+                        return Err("WebAssembly code mods are not supported by this build".into());
+                    }
                 }
                 None => None,
             };
@@ -673,6 +681,7 @@ fn names(caps: &[Capability]) -> String {
 }
 
 pub mod native;
+#[cfg(feature = "index")]
 pub mod registry;
 #[cfg(test)]
 mod tests;

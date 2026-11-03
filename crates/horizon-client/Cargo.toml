@@ -29,9 +29,7 @@ horizon-shaders = { path = "../horizon-shaders" }
 # Horizon's own shader packs: the format, the stages and the check (docs/shaders.md).
 horizon-shader-api = { path = "../horizon-shader-api" }
 horizon-friends = { path = "../horizon-friends" }
-# Horizon mods: sandboxed WebAssembly components, off unless installed and turned on (docs/mods.md).
-# Their runtime is the `mods` feature.
-horizon-mods = { path = "../horizon-mods", default-features = false, features = ["index"] }
+# Content and native-mod metadata. UWP excludes legacy WebAssembly inspection.
 wgpu = { version = "30.0.1", default-features = false, features = ["std", "parking_lot", "wgsl", "naga-ir"] }
 winit = "0.30.13"
 pollster = "0.4"
@@ -68,6 +66,7 @@ unicode-bidi = "0.3.18"
 fs4 = { version = "1.1.0", default-features = false, features = ["sync"] }
 
 [target.'cfg(target_vendor = "uwp")'.dependencies]
+horizon-mods = { path = "../horizon-mods", default-features = false, features = ["native-index"] }
 horizon-native-hud = { path = "../../uwp/native-hud", features = ["horizon", "d3d11"], optional = true }
 horizon-native-panorama = { path = "../../uwp/native-panorama", optional = true }
 horizon-native-entities = { path = "../../uwp/native-entities", optional = true }
@@ -82,6 +81,7 @@ horizon-uwp-d3d11 = { path = "../../uwp/d3d11-backend", optional = true }
 rustix = { version = "1", default-features = false, features = ["std", "time", "process", "fs"] }
 
 [target.'cfg(not(target_vendor = "uwp"))'.dependencies]
+horizon-mods = { path = "../horizon-mods", default-features = false, features = ["index"] }
 wgpu = { version = "30.0.1", default-features = false, features = ["vulkan", "metal"] }
 
 [target.'cfg(all(windows, not(target_vendor = "uwp")))'.dependencies]

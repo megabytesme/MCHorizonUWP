@@ -6,6 +6,7 @@
 use super::*;
 use std::path::PathBuf;
 
+#[cfg(feature = "index")]
 const OTHER_KEY: &str = "RWSe8ZD+cTOAqNd/jnXTmDtoKp0c0HxkGMrBBWcWQeEkPmcHB+XkaE9S";
 
 fn fixtures() -> PathBuf {
@@ -45,6 +46,7 @@ fn reads_the_sample_and_keeps_unknown_kinds() {
 }
 
 #[test]
+#[cfg(feature = "index")]
 fn files_pass_against_their_entries() {
     let index = sample();
     let hmod = fixtures().join("coords_hud-0.1.0.hmod");
@@ -59,6 +61,7 @@ fn files_pass_against_their_entries() {
 }
 
 #[test]
+#[cfg(feature = "index")]
 fn a_changed_file_key_or_manifest_is_refused() {
     let index = sample();
     let dir = std::env::temp_dir().join(format!("horizon-index-{}", std::process::id()));
@@ -101,6 +104,30 @@ fn a_changed_file_key_or_manifest_is_refused() {
     let e = check(&revoked, "coords_hud", &hmod).unwrap_err();
     assert!(e.contains("taken down: Test."), "{e}");
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+#[cfg(not(feature = "index"))]
+fn native_index_rejects_wasm_without_disabling_content_packs() {
+    let index = sample();
+    let error = check(
+        &index,
+        "coords_hud",
+        &fixtures().join("coords_hud-0.1.0.hmod"),
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("WebAssembly code mods are not supported"),
+        "{error}"
+    );
+    assert_eq!(
+        check(&index, "cozy", &fixtures().join("cozy-1.0.0.hpack")),
+        Ok(Trust::Unsigned)
+    );
+    assert_eq!(
+        check(&index, "glow", &fixtures().join("glow-1.0.0.hshader")),
+        Ok(Trust::Unsigned)
+    );
 }
 
 #[test]

@@ -54,7 +54,7 @@ fn on() -> bool {
     true
 }
 
-#[cfg(feature = "index")]
+#[cfg(feature = "native-index")]
 impl PackMod {
     pub fn requirement(&self) -> crate::index::Requirement {
         crate::index::Requirement {
