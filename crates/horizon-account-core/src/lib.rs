@@ -1,5 +1,7 @@
 //! Shared Horizon account protocol. Transport is supplied by each platform.
 //! Tokens are kept out of Debug output and transport errors.
+pub mod vault;
+
 use serde_json::{json, Value};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const SCOPE: &str = "XboxLive.signin offline_access";
@@ -32,6 +34,7 @@ fn request_to(method: &str, url: &str) -> AccountRequest {
         authorization: None,
     }
 }
+#[cfg(any(target_vendor = "uwp", test))]
 fn form_encode(fields: &[(&str, &str)]) -> String {
     fn encode(value: &str) -> String {
         let mut out = String::new();
@@ -87,10 +90,18 @@ fn send(
 }
 #[cfg(not(any(target_vendor = "uwp", test)))]
 fn send(
-    _request: AccountRequest,
-    _body: Option<Body<'_>>,
+    request: AccountRequest,
+    body: Option<Body<'_>>,
     service: &str,
 ) -> Result<(u16, Value), String> {
+    // This crate's desktop transport is deliberately unavailable; consuming the
+    // request here keeps the same protocol types without logging their contents.
+    let _ = (request.method, request.url);
+    match body {
+        Some(Body::Form(fields)) => drop(fields),
+        Some(Body::Json(value)) => drop(value),
+        None => {}
+    }
     Err(format!(
         "Could not reach {service}. Check your internet connection."
     ))

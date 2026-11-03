@@ -6,10 +6,15 @@ version = 4
 name = "horizon-account-core"
 version = "0.1.0"
 dependencies = [
+ "horizon-uwp-credential-store",
  "horizon-uwp-https-bridge",
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "horizon-uwp-credential-store"
+version = "0.1.0"
 
 [[package]]
 name = "horizon-uwp-https-bridge"
