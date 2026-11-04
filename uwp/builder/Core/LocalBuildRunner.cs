@@ -10,14 +10,9 @@ public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, 
 public static class LocalBuildRunner
 {
     public const long MinimumFreeBytes = 10L * 1024 * 1024 * 1024;
-    // Rust's full game bridge can use several GiB in a single rustc process.
-    // Leave room for the OS and other apps so a large CPU count cannot exhaust RAM.
     public static int CargoJobCount(int processors, long memoryBytes)
     {
-        const long bytesPerCargoJob = 4L * 1024 * 1024 * 1024;
-        var cpuLimit = Math.Max(1, processors);
-        var memoryLimit = memoryBytes <= 0 ? 1 : (int)Math.Min(int.MaxValue, memoryBytes / bytesPerCargoJob);
-        return Math.Min(cpuLimit, Math.Max(1, memoryLimit));
+        return Math.Max(1, processors);
     }
 
     public static async Task<LocalBuildResult> RunAsync(string source, string resources, BuildSelection selection,
@@ -32,9 +27,11 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("Choose a resource directory that does not contain the builder workspace.");
         ValidateResourceTree(resources);
         string? angleBin = null;
-        if (selection.Target == TargetProfile.DesktopX64)
+        if (selection.Target != TargetProfile.WindowsMobile)
         {
-            var candidate = Path.Combine(Path.GetFullPath(source), ".local", "vcpkg-x64", "installed", "x64-uwp-local", "bin");
+            var triplet = selection.Target == TargetProfile.SurfaceProX ? "arm64-uwp-local" : "x64-uwp-local";
+            var vcpkgRoot = selection.Target == TargetProfile.SurfaceProX ? "vcpkg" : "vcpkg-x64";
+            var candidate = Path.Combine(Path.GetFullPath(source), ".local", vcpkgRoot, "installed", triplet, "bin");
             if (new[] { "libEGL.dll", "libGLESv2.dll" }.All(name => File.Exists(Path.Combine(candidate, name))))
                 angleBin = candidate;
             else if (selection.ValidatedRenderer == "angle")
@@ -78,9 +75,9 @@ public static class LocalBuildRunner
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
-        var jobs = CargoJobCount(Environment.ProcessorCount, GC.GetGCMemoryInfo().TotalAvailableMemoryBytes);
+        var jobs = Math.Max(1, Environment.ProcessorCount);
         vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        progress?.Report($"Using {jobs} Cargo jobs across {Environment.ProcessorCount} processors, limited by available memory.");
+        progress?.Report($"Using all {jobs} available processor cores for Cargo.");
         if (arm)
         {
             vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
@@ -110,7 +107,13 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("The offline Cargo build failed. Check that the required toolchain and dependencies are available. " + error.Message, error);
         }
 
-        var arch = arm ? "arm" : "x64";
+        var arch = selection.Target switch
+        {
+            TargetProfile.DesktopX64 => "x64",
+            TargetProfile.SurfaceProX => "arm64",
+            TargetProfile.WindowsMobile => "arm",
+            _ => throw new ArgumentOutOfRangeException(nameof(selection)),
+        };
         vcEnvironment["HORIZON_UWP_XAUDIO"] = "1";
         vcEnvironment["HORIZON_UWP_HTTP"] = "1";
         vcEnvironment["HORIZON_UWP_GAMEPAD"] = "1";
@@ -144,20 +147,27 @@ public static class LocalBuildRunner
         }
         string? releaseNotes = null;
         try { releaseNotes = await NightlyRelease.FetchPinnedNotesAsync(LocalRecipe.UpstreamNightlyDate, LocalRecipe.UpstreamNightlyCommit); }
-        catch (Exception) { /* The package remains buildable when GitHub is unavailable. */ }
-        string? releaseNotesPath = null;
-        if (!string.IsNullOrWhiteSpace(releaseNotes))
+        catch (HttpRequestException) { /* Use the checked-in notes for this exact source pin below. */ }
+        if (string.IsNullOrWhiteSpace(releaseNotes))
         {
-            releaseNotesPath = Path.Combine(root, "horizon-release-notes.txt");
-            await File.WriteAllTextAsync(releaseNotesPath, releaseNotes, new System.Text.UTF8Encoding(false));
+            var pinnedNotes = Path.Combine(snapshot, "uwp", "host", "Assets",
+                $"horizon-release-notes-{LocalRecipe.UpstreamNightlyDate}-{LocalRecipe.UpstreamNightlyShortCommit}.txt");
+            if (!File.Exists(pinnedNotes))
+                throw new FileNotFoundException("The release notes for the pinned Horizon nightly are unavailable.", pinnedNotes);
+            var fallbackNotes = await File.ReadAllTextAsync(pinnedNotes);
+            if (fallbackNotes.Length > 1024 * 1024 || !fallbackNotes.Contains(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The checked-in Horizon release notes do not match the pinned nightly.");
+            releaseNotes = fallbackNotes;
         }
+        var releaseNotesPath = Path.Combine(root, "horizon-release-notes.txt");
+        await File.WriteAllTextAsync(releaseNotesPath, releaseNotes, new System.Text.UTF8Encoding(false));
         progress?.Report("Packaging the unsigned client.");
         var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
-            "-IdentityName", "HorizonUWPLatestPreview", "-WinUIFramework", "2.7",
+            "-IdentityName", "HorizonUWPPrototype", "-WinUIFramework", "2.7",
             framework is null ? "-Resources" : "-ResourceFrameworkName", framework?.Name ?? packageResources };
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
-        if (releaseNotesPath is not null) { packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath); }
+        packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath);
         await RunProcess(powershell, snapshot, packageArguments);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
@@ -185,13 +195,16 @@ public static class LocalBuildRunner
     private static async Task<Dictionary<string, string>> VisualCppEnvironment(string cmd, TargetProfile profile, IProbe probe)
     {
         var arm = profile == TargetProfile.WindowsMobile;
+        var arm64 = profile == TargetProfile.SurfaceProX;
         var root = arm ? probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)" : probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files";
         var vcvars = arm
             ? Path.Combine(root, "Microsoft Visual Studio", "2017", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
             : Path.Combine(root, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");
         IReadOnlyList<string> args = arm
             ? ["/d", "/c", "call", vcvars, "x64_arm", "store", "10.0.15063.0", "&&", "set"]
-            : ["/d", "/c", "call", vcvars, "x64", "&&", "set"];
+            : arm64
+                ? ["/d", "/c", "call", vcvars, "x64_arm64", "store", "10.0.26100.0", "&&", "set"]
+                : ["/d", "/c", "call", vcvars, "x64", "&&", "set"];
         var output = await RunProcess(cmd, Path.GetDirectoryName(vcvars)!, args, captureOutput: true);
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var line in output.Split('\n'))

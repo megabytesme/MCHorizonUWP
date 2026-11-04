@@ -2182,7 +2182,23 @@ impl Renderer {
                     config.width, config.height, config.format, config.present_mode
                 ));
             }
-            surface.configure(&device, &config);
+            if let Err(error) = Self::configure(
+                &device,
+                surface,
+                &config,
+                None,
+                &device_lost,
+            ) {
+                log::error!(
+                    "Horizon renderer: {} surface configuration failed: {error}",
+                    api.label()
+                );
+                return Err(std::io::Error::other(format!(
+                    "{} surface configuration failed: {error}",
+                    api.label()
+                ))
+                .into());
+            }
             let hdr_output = hdr::output(&caps);
             crate::graphics::offer_hdr(hdr_output.is_some());
             if previous.is_none() {

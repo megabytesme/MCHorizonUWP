@@ -12,6 +12,16 @@ use crate::{
     },
 };
 
+// The UWP host owns a XAML SwapChainPanel alongside its existing CoreWindow.
+// DXGI refuses a second CoreWindow swap chain after the launcher has taken
+// ownership of that view, so the DX12 backend asks the host for the panel that
+// will display the game. The host returns one owned COM reference per call.
+#[cfg(target_vendor = "uwp")]
+unsafe extern "C" {
+    fn horizon_uwp_acquire_game_swapchain_panel() -> *mut core::ffi::c_void;
+    fn horizon_uwp_release_game_swapchain_panel(panel: *mut core::ffi::c_void);
+}
+
 impl crate::Instance for super::Instance {
     type A = super::Api;
 
@@ -138,6 +148,35 @@ impl crate::Instance for super::Instance {
         ));
         match window_handle {
             raw_window_handle::RawWindowHandle::WinRt(handle) => {
+                #[cfg(target_vendor = "uwp")]
+                {
+                    let _ = handle;
+                    let panel = unsafe { horizon_uwp_acquire_game_swapchain_panel() };
+                    if panel.is_null() {
+                        return Err(crate::InstanceError::new(
+                            "UWP game SwapChainPanel is unavailable".into(),
+                        ));
+                    }
+                    let owned_panel = unsafe {
+                        super::types::ISwapChainPanelNative::from_raw_borrowed(&panel)
+                    }
+                    .map(|panel| panel.to_owned());
+                    unsafe { horizon_uwp_release_game_swapchain_panel(panel) };
+                    let owned_panel = owned_panel.ok_or_else(|| {
+                        crate::InstanceError::new("UWP game SwapChainPanel is invalid".into())
+                    })?;
+                    return Ok(super::Surface {
+                        factory: self.factory.clone(),
+                        factory_media: self.factory_media.clone(),
+                        target: SurfaceTarget::SwapChainPanel(owned_panel),
+                        supports_allow_tearing: self.supports_allow_tearing,
+                        swap_chain: RwLock::new(None),
+                        options: self.options.clone(),
+                        hdr_source: None,
+                    });
+                }
+                #[cfg(not(target_vendor = "uwp"))]
+                {
                 let raw_core_window = handle.core_window.as_ptr();
                 let core_window = unsafe { IUnknown::from_raw_borrowed(&raw_core_window) }
                     .ok_or_else(|| {
@@ -154,6 +193,7 @@ impl crate::Instance for super::Instance {
                     options: self.options.clone(),
                     hdr_source: None,
                 })
+                }
             }
             raw_window_handle::RawWindowHandle::Win32(handle) => {
                 // https://github.com/rust-windowing/raw-window-handle/issues/171

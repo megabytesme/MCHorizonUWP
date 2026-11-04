@@ -47,10 +47,10 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     public string ValidatedRenderer => Renderer switch
     {
         "native-d3d11" => Renderer,
-        "angle" when Target == TargetProfile.DesktopX64 => Renderer,
-        "angle" => throw new NotSupportedException("The current package recipe contains ANGLE runtime DLLs for x64 only; this is a package build constraint, not a device capability check."),
-        "dx12" when Target == TargetProfile.DesktopX64 => Renderer,
-        "dx12" => throw new NotSupportedException("The Direct3D 12 CoreWindow backend currently builds only for x64; the Windows bindings fail to compile for ARM32."),
+        "angle" when Target != TargetProfile.WindowsMobile => Renderer,
+        "angle" => throw new NotSupportedException("The current package recipe contains ANGLE runtime DLLs for x64 and ARM64 only."),
+        "dx12" when Target != TargetProfile.WindowsMobile => Renderer,
+        "dx12" => throw new NotSupportedException("The Direct3D 12 renderer is not included in ARM32 packages."),
         _ => throw new ArgumentException("Choose a supported renderer."),
     };
 
@@ -58,7 +58,7 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     // fragments or paths are interpolated. Execution requires a verified recipe.
     public IReadOnlyList<string> Features => new[]
         { "native-d3d11",
-          Target == TargetProfile.DesktopX64 ? "uwp-dx12-renderer" : null,
+          Target != TargetProfile.WindowsMobile ? "uwp-dx12-renderer" : null,
           IncludesNativeTouchMod ? "native-touch-mod" : null,
           NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell" }
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();

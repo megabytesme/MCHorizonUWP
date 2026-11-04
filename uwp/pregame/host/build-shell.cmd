@@ -7,6 +7,11 @@ set "VCARCH=x64"
 set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
 set "SDK=10.0.26100.0"
 set "WINUI_VERSION=2.7.3"
+if /i "%ARCH%"=="arm64" (
+    set "VCARCH=x64_arm64"
+    set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
+    set "SDK=10.0.26100.0"
+)
 if /i "%ARCH%"=="arm" (
     set "VCARCH=x64_arm"
     set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community"
@@ -14,7 +19,7 @@ if /i "%ARCH%"=="arm" (
     set "WINUI_VERSION=2.7.3"
 )
 if defined HORIZON_UWP_WINUI_VERSION set "WINUI_VERSION=%HORIZON_UWP_WINUI_VERSION%"
-if /i not "%ARCH%"=="arm" if /i not "%ARCH%"=="x64" exit /b 1
+if /i not "%ARCH%"=="arm" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="x64" exit /b 1
 set "WINUI=%USERPROFILE%\.nuget\packages\microsoft.ui.xaml\%WINUI_VERSION%\lib\uap10.0"
 if not exist "%WINUI%\Microsoft.UI.Xaml.winmd" (
     echo WinUI %WINUI_VERSION% is missing. Restore Microsoft.UI.Xaml %WINUI_VERSION% and review its license before building the XAML shell.

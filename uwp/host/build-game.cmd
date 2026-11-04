@@ -16,7 +16,7 @@ if /i "%ARCH%"=="arm" (
     set "SDK=10.0.15063.0"
 )
 if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="arm" exit /b 1
-if defined HORIZON_UWP_DX12 if /i not "%ARCH%"=="x64" exit /b 1
+if defined HORIZON_UWP_DX12 if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" exit /b 1
 
 if not defined HORIZON_UWP_GAME_LIB (
     echo Set HORIZON_UWP_GAME_LIB to the Rust game bridge static library.

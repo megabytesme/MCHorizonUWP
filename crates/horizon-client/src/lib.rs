@@ -22,12 +22,18 @@ pub fn run_uwp_with_session(
     session: Option<auth::AuthSession>,
 ) -> Result<()> {
     uwp_mods::install()?;
-    let args = vec![
+    let mut args = vec![
         "--resources".to_owned(),
         resources.to_string_lossy().into_owned(),
         "--game-dir".to_owned(),
         game_dir.to_string_lossy().into_owned(),
     ];
+    if let Ok(server) = std::env::var("HORIZON_UWP_SERVER_ADDRESS")
+        && !server.is_empty()
+        && server.len() <= 255
+    {
+        args.extend(["--server".to_owned(), server]);
+    }
     // The diagnostic marker is honored only by the opt-in readback build.
     // Its game directory is separate, so ordinary worlds remain untouched.
     #[cfg(feature = "native-d3d11-readback")]

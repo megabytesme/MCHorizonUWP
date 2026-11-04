@@ -942,9 +942,14 @@ impl Audio {
         if let Some(reason) = output_disabled(|name| std::env::var_os(name)) {
             return Err(reason.into());
         }
+        let mut reported_samples = false;
         let stream = horizon_uwp_xaudio_stream::Stream::open(move |output| {
             if let Ok(mut m) = mixer.lock() { mix(&mut m, output, 2, 48_000); }
             else { output.fill(0.0); }
+            if !reported_samples && output.iter().any(|sample| sample.abs() > 0.0001) {
+                log::info!("Horizon: XAudio2 is playing non-silent game audio");
+                reported_samples = true;
+            }
         })?;
         log::info!("Horizon: XAudio2 default output (48000 Hz, stereo)");
         Ok(stream)

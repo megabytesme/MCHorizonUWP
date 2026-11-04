@@ -16,7 +16,7 @@ public static class LocalRecipe
     public const string UpstreamNightlyDate = "2026-11-03";
     public const string UpstreamNightlyCommit = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81";
     public const string UpstreamNightlyShortCommit = "f42ef42";
-    public const string DefaultPackageVersion = "2026.1103.930.58";
+    public const string DefaultPackageVersion = "2026.1104.930.1";
     public const string UpstreamReleaseVersion = "nightly-" + UpstreamNightlyDate;
     public const string UpstreamNightly = UpstreamNightlyDate + " " + UpstreamNightlyShortCommit;
     public const string RustVersion = "1.99.1";
@@ -43,20 +43,24 @@ public static class LocalRecipe
 
     public static LocalBuildPlan Plan(BuildSelection selection)
     {
-        if (selection.Target == TargetProfile.SurfaceProX)
-            throw new NotSupportedException("The pinned local recipe currently covers x64 and ARM32 only.");
         var packageVersion = selection.ValidatedPackageVersion;
         var clientId = selection.ValidatedMicrosoftClientId;
-        var arm = selection.Target == TargetProfile.WindowsMobile;
-        var arch = arm ? "arm" : "x64";
+        var arm32 = selection.Target == TargetProfile.WindowsMobile;
+        var arch = selection.Target switch
+        {
+            TargetProfile.DesktopX64 => "x64",
+            TargetProfile.SurfaceProX => "arm64",
+            TargetProfile.WindowsMobile => "arm",
+            _ => throw new ArgumentOutOfRangeException(nameof(selection)),
+        };
         var steps = new List<RecipeStep>
         {
             new("Snapshot pinned source", "git", ["archive", "--format=tar", SourceCommit]),
             new("Prepare Rust source copy", "powershell", ["-NoProfile", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", "stable"]),
         };
-        if (arm) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
+        if (arm32) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
         var prefix = new List<string> { "+stable" };
-        if (arm) prefix.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
+        if (arm32) prefix.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
         var fetch = new List<string>(prefix);
         fetch.AddRange(["fetch", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--target", selection.RustTarget,
             "--target", "x86_64-pc-windows-msvc", "-Z", "build-std=std,panic_abort"]);
@@ -83,14 +87,14 @@ public static class LocalRecipe
             "The renderer is checked on the device before launch; unavailable graphics devices are not offered.",
             "The resulting APPX requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
-            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and limits parallel jobs to fit memory.",
+            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and uses all available processor cores.",
             "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
         if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
         if (selection.UseResourceFramework) notes.Add("The separate unsigned resource framework contains your private prepared resources; retain it for clients using the same content and install it as a dependency.");
         if (selection.NativeDeviceVibration) notes.Add("Device vibration is an optional native mod with its own setting, separate from controller vibration; unsupported devices are ignored.");
         if (clientId is null) notes.Add("No Microsoft application ID was supplied; sign-in needs a build configured with an approved public client ID.");
         else notes.Add("Microsoft sign-in uses the configured public application ID and device-code flow; Xbox/Minecraft access depends on that registration.");
-        if (arm) notes.Add("ARM32 uses the offline TLS dependency override; account, skin and Minecraft session requests use the WinRT HTTPS adapter.");
+        if (arm32) notes.Add("ARM32 uses the offline TLS dependency override; account, skin and Minecraft session requests use the WinRT HTTPS adapter.");
         return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
     }
 
@@ -151,7 +155,13 @@ public static class LocalRecipe
         if (!rust.SourceAvailable) blockers.Add("The stable toolchain does not contain rust-src.");
         var pf = probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files";
         var pfx86 = probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)";
-        var arch = selection.Target == TargetProfile.WindowsMobile ? "arm" : "x64";
+        var arch = selection.Target switch
+        {
+            TargetProfile.DesktopX64 => "x64",
+            TargetProfile.SurfaceProX => "arm64",
+            TargetProfile.WindowsMobile => "arm",
+            _ => throw new ArgumentOutOfRangeException(nameof(selection)),
+        };
         var vc = arch == "arm"
             ? Path.Combine(pfx86, "Microsoft Visual Studio", "2017", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
             : Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");

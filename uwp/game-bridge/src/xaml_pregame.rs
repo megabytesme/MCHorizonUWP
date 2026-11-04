@@ -31,6 +31,7 @@ const NOTICE: u32 = 3;
 const CONFIRM: u32 = 4;
 const SELECT_ACCOUNT: u32 = 5;
 const OFFLINE_NAME: u32 = 7;
+const ADD_ACCOUNT: u32 = 8;
 
 pub struct Selection {
     pub session: Option<AuthSession>,
@@ -318,7 +319,17 @@ pub fn start() -> Option<Selection> {
                 return Some(active);
             }
             2 => {
-                let outcome = match prompt("Manage the accounts on this device.", ACCOUNT) {
+                let account_action = match prompt("Manage the accounts on this device.", ACCOUNT) {
+                    1 => match prompt("Choose how to add an account.", ADD_ACCOUNT) {
+                        1 => 1,
+                        2 => 3,
+                        _ => 0,
+                    },
+                    2 => 2,
+                    3 => 4,
+                    _ => 0,
+                };
+                let outcome = match account_action {
                     1 => match client_id {
                         Some(id) => {
                             let account_store: Arc<dyn SecretStore> =

@@ -82,14 +82,20 @@ impl Hooks for DeviceVibration {
 }
 
 pub(crate) fn install() -> crate::Result<()> {
+    // The UWP shell keeps one process alive while it returns from Minecraft
+    // to the launcher. Native hooks are process-wide, so later game sessions
+    // reuse the first registration instead of trying to replace its OnceLock.
+    if mod_api::MODS.get().is_some() {
+        return Ok(());
+    }
     let mut mods: Vec<Box<dyn Hooks>> = vec![Box::new(Picker)];
     #[cfg(feature = "native-touch-mod")]
     mods.push(Box::new(Touch));
     #[cfg(feature = "native-device-vibration-mod")]
     mods.push(Box::new(DeviceVibration));
-    mod_api::MODS
-        .set(mods.into())
-        .map_err(|_| "native UWP mods are already installed")?;
+    if mod_api::MODS.set(mods.into()).is_err() && mod_api::MODS.get().is_none() {
+        return Err("native UWP mods could not be installed".into());
+    }
     mod_api::name_mods(&[
         PICKER_ID,
         #[cfg(feature = "native-touch-mod")]

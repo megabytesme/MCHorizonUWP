@@ -75,6 +75,8 @@ unsafe extern "C" {
     fn horizon_uwp_is_local_test() -> i32;
     #[cfg(feature = "uwp-account")]
     fn horizon_uwp_discard_pregame_input();
+    #[cfg(feature = "xaml-shell")]
+    fn horizon_uwp_page_selected_server(buffer: *mut u8, capacity: usize) -> usize;
 }
 
 #[cfg(all(
@@ -143,13 +145,13 @@ fn take_touch_gyro() -> Option<(f32, f32, i32)> {
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_probe_renderer(
-    core_window: *mut std::ffi::c_void,
+    surface_handle: *mut std::ffi::c_void,
     renderer: u32,
     width: u32,
     height: u32,
 ) -> i32 {
     install_panic_reporter();
-    let Some(core_window) = std::ptr::NonNull::new(core_window) else {
+    let Some(surface_handle) = std::ptr::NonNull::new(surface_handle) else {
         return 0;
     };
     let (backend, expected_backend) = match renderer {
@@ -160,13 +162,26 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
     descriptor.backends = backend;
     let instance = wgpu::Instance::new(descriptor);
-    let target = wgpu::SurfaceTargetUnsafe::RawHandle {
-        raw_display_handle: Some(raw_window_handle::RawDisplayHandle::Windows(
-            raw_window_handle::WindowsDisplayHandle::new(),
-        )),
-        raw_window_handle: raw_window_handle::RawWindowHandle::WinRt(
-            raw_window_handle::WinRtWindowHandle::new(core_window),
-        ),
+    let target = match renderer {
+        1 => wgpu::SurfaceTargetUnsafe::RawHandle {
+            raw_display_handle: Some(raw_window_handle::RawDisplayHandle::Windows(
+                raw_window_handle::WindowsDisplayHandle::new(),
+            )),
+            raw_window_handle: raw_window_handle::RawWindowHandle::WinRt(
+                raw_window_handle::WinRtWindowHandle::new(surface_handle),
+            ),
+        },
+        2 => {
+            #[cfg(feature = "uwp-dx12-renderer")]
+            {
+                wgpu::SurfaceTargetUnsafe::SwapChainPanel(surface_handle.as_ptr())
+            }
+            #[cfg(not(feature = "uwp-dx12-renderer"))]
+            {
+                return 0;
+            }
+        }
+        _ => return 0,
     };
     let Ok(surface) = (unsafe { instance.create_surface_unsafe(target) }) else {
         return 0;
@@ -310,6 +325,14 @@ pub unsafe extern "C" fn horizon_uwp_run_prepared(
     unsafe {
         std::env::set_var("HORIZON_UWP_RENDERER", renderer_name);
         std::env::set_var("WGPU_BACKEND", backend);
+        let mut server = [0u8; 256];
+        let length = horizon_uwp_page_selected_server(server.as_mut_ptr(), server.len());
+        let address = server
+            .get(..length)
+            .filter(|_| length <= 255)
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
+            .filter(|address| !address.is_empty());
+        std::env::set_var("HORIZON_UWP_SERVER_ADDRESS", address.unwrap_or(""));
     }
     unsafe { run(resources, resources_len, game_dir, game_dir_len, true) }
 }
