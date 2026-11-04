@@ -6,13 +6,14 @@ if "%OUTPUT%"=="" exit /b 1
 set "VCARCH=x64"
 set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
 set "SDK=10.0.26100.0"
-set "WINUI_VERSION=2.8.7"
+set "WINUI_VERSION=2.7.3"
 if /i "%ARCH%"=="arm" (
     set "VCARCH=x64_arm"
     set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community"
     set "SDK=10.0.16299.0"
     set "WINUI_VERSION=2.7.3"
 )
+if defined HORIZON_UWP_WINUI_VERSION set "WINUI_VERSION=%HORIZON_UWP_WINUI_VERSION%"
 if /i not "%ARCH%"=="arm" if /i not "%ARCH%"=="x64" exit /b 1
 set "WINUI=%USERPROFILE%\.nuget\packages\microsoft.ui.xaml\%WINUI_VERSION%\lib\uap10.0"
 if not exist "%WINUI%\Microsoft.UI.Xaml.winmd" (
@@ -21,8 +22,12 @@ if not exist "%WINUI%\Microsoft.UI.Xaml.winmd" (
 )
 set "PROBE_DEFINE="
 if defined HORIZON_UWP_SHELL_PROBE set "PROBE_DEFINE=/DHORIZON_UWP_SHELL_PROBE"
+if defined HORIZON_UWP_DISPLAY_DIAGNOSTICS set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_DISPLAY_DIAGNOSTICS"
 if defined HORIZON_UWP_NATIVE_D3D11 set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_NATIVE_D3D11"
+if defined HORIZON_UWP_ANGLE set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_ANGLE"
 if defined HORIZON_UWP_DX12 set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_DX12"
+if /i "%HORIZON_UWP_DEFAULT_RENDERER%"=="angle" set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_DEFAULT_RENDERER_ANGLE"
+if /i "%HORIZON_UWP_DEFAULT_RENDERER%"=="dx12" set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_DEFAULT_RENDERER_DX12"
 if defined HORIZON_UWP_TOUCH_MOD set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_TOUCH_MOD"
 rem The caller may already be in a different Visual Studio environment. Reset
 rem only this child process so the ARM32 compiler and 16299 SDK can be selected.

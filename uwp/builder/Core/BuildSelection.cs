@@ -7,7 +7,7 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     public const string FluentLauncherClientId = "0844e754-1d2e-4861-8e2b-18059609badb";
     public const string TouchModId = "horizon_touch";
     public const string DeviceVibrationModId = "horizon_device_vibration";
-    public bool IncludesNativeTouchMod => NativeTouchMod && ValidatedRenderer == "native-d3d11";
+    public bool IncludesNativeTouchMod => NativeTouchMod;
     public IReadOnlyList<string> ModIds => new[]
         { IncludesNativeTouchMod ? TouchModId : null, NativeDeviceVibration ? DeviceVibrationModId : null }
         .Where(id => id is not null).Select(id => id!).ToArray();
@@ -57,8 +57,9 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     // These features are recorded as individual tokens; no user-supplied shell
     // fragments or paths are interpolated. Execution requires a verified recipe.
     public IReadOnlyList<string> Features => new[]
-        { ValidatedRenderer == "native-d3d11" ? "native-d3d11" : null,
-          ValidatedRenderer == "dx12" ? "uwp-dx12-renderer" : null, IncludesNativeTouchMod ? "native-touch-mod" : null,
+        { "native-d3d11",
+          Target == TargetProfile.DesktopX64 ? "uwp-dx12-renderer" : null,
+          IncludesNativeTouchMod ? "native-touch-mod" : null,
           NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell" }
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();
 }

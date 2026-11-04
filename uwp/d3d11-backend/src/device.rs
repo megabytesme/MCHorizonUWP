@@ -1,4 +1,4 @@
-use std::{ffi::c_void, marker::PhantomData, rc::Rc};
+use std::ffi::c_void;
 use windows::{
     Win32::{
         Foundation::{E_INVALIDARG, HMODULE},
@@ -9,10 +9,10 @@ use windows::{
             },
             Direct3D11::*,
             Dxgi::{
-                Common::*, DXGI_PRESENT, DXGI_SCALING_NONE, DXGI_SWAP_CHAIN_DESC1,
-                DXGI_SWAP_CHAIN_FLAG, DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
-                DXGI_USAGE_RENDER_TARGET_OUTPUT, IDXGIAdapter, IDXGIDevice, IDXGIFactory2,
-                IDXGISwapChain1,
+                Common::*, DXGI_MATRIX_3X2_F, DXGI_PRESENT, DXGI_SCALING_NONE,
+                DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG,
+                DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL, DXGI_USAGE_RENDER_TARGET_OUTPUT, IDXGIAdapter,
+                IDXGIDevice, IDXGIFactory2, IDXGISwapChain1, IDXGISwapChain2,
             },
         },
     },
@@ -106,7 +106,6 @@ pub struct Renderer {
     depth: Option<ID3D11DepthStencilView>,
     pipeline: Pipeline,
     depth_convention: DepthConvention,
-    _ui_thread: PhantomData<Rc<()>>,
 }
 
 impl Renderer {
@@ -129,11 +128,90 @@ impl Renderer {
     ///
     /// # Safety
     /// `window` must be a live, non-null CoreWindow COM interface pointer on
-    /// the calling UI thread. The host must keep the CoreWindow alive until
-    /// this renderer is dropped.
+    /// its owning UI thread. The host must keep the CoreWindow alive during
+    /// swap-chain creation. After construction, the renderer owns its D3D11
+    /// resources and may be transferred to one render thread; the immediate
+    /// context and swap chain must only be used by one thread at a time.
     pub unsafe fn new(window: *mut c_void) -> Result<Self> {
         let window = unsafe { IUnknown::from_raw_borrowed(&window) }
             .ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
+        let (device, context, factory) = Self::create_device()?;
+        let desc = DXGI_SWAP_CHAIN_DESC1 {
+            Format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            SampleDesc: DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
+            BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
+            BufferCount: 2,
+            Scaling: DXGI_SCALING_NONE,
+            SwapEffect: DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
+            AlphaMode: DXGI_ALPHA_MODE_IGNORE,
+            ..Default::default()
+        };
+        let swap_chain =
+            unsafe { factory.CreateSwapChainForCoreWindow(&device, window, &desc, None)? };
+        Self::from_swap_chain(device, context, swap_chain)
+    }
+
+    /// Creates a XAML composition swap chain for a `SwapChainPanel`.
+    pub fn new_for_composition(
+        width: u32,
+        height: u32,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> Result<Self> {
+        if width == 0
+            || height == 0
+            || !scale_x.is_finite()
+            || !scale_y.is_finite()
+            || scale_x <= 0.0
+            || scale_y <= 0.0
+        {
+            return Err(Error::from_hresult(E_INVALIDARG));
+        }
+        let (device, context, factory) = Self::create_device()?;
+        let desc = DXGI_SWAP_CHAIN_DESC1 {
+            Width: width,
+            Height: height,
+            Format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            SampleDesc: DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
+            BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
+            BufferCount: 2,
+            Scaling: DXGI_SCALING_STRETCH,
+            SwapEffect: DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
+            AlphaMode: DXGI_ALPHA_MODE_IGNORE,
+            ..Default::default()
+        };
+        let swap_chain = unsafe { factory.CreateSwapChainForComposition(&device, &desc, None)? };
+        let renderer = Self::from_swap_chain(device, context, swap_chain)?;
+        renderer.set_composition_scale(scale_x, scale_y)?;
+        Ok(renderer)
+    }
+
+    /// Cancels the scale that XAML applies to a composition swap chain.
+    ///
+    /// SwapChainPanel buffers are sized in physical pixels, while XAML applies
+    /// its composition scale when presenting them. Without this inverse
+    /// transform, a high-DPI panel magnifies the already pixel-sized image.
+    pub fn set_composition_scale(&self, scale_x: f32, scale_y: f32) -> Result<()> {
+        if !scale_x.is_finite() || !scale_y.is_finite() || scale_x <= 0.0 || scale_y <= 0.0 {
+            return Err(Error::from_hresult(E_INVALIDARG));
+        }
+        let swap_chain: IDXGISwapChain2 = self.swap_chain.cast()?;
+        let inverse_scale = DXGI_MATRIX_3X2_F {
+            _11: 1.0 / scale_x,
+            _22: 1.0 / scale_y,
+            ..Default::default()
+        };
+        unsafe { swap_chain.SetMatrixTransform(&inverse_scale)? };
+        Ok(())
+    }
+
+    fn create_device() -> Result<(ID3D11Device, ID3D11DeviceContext, IDXGIFactory2)> {
         let mut device = None;
         let mut context = None;
         unsafe {
@@ -153,21 +231,14 @@ impl Renderer {
         let context = context.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
         let dxgi: IDXGIDevice = device.cast()?;
         let factory: IDXGIFactory2 = unsafe { dxgi.GetAdapter()?.GetParent()? };
-        let desc = DXGI_SWAP_CHAIN_DESC1 {
-            Format: DXGI_FORMAT_B8G8R8A8_UNORM,
-            SampleDesc: DXGI_SAMPLE_DESC {
-                Count: 1,
-                Quality: 0,
-            },
-            BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
-            BufferCount: 2,
-            Scaling: DXGI_SCALING_NONE,
-            SwapEffect: DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
-            AlphaMode: DXGI_ALPHA_MODE_IGNORE,
-            ..Default::default()
-        };
-        let swap_chain =
-            unsafe { factory.CreateSwapChainForCoreWindow(&device, window, &desc, None)? };
+        Ok((device, context, factory))
+    }
+
+    fn from_swap_chain(
+        device: ID3D11Device,
+        context: ID3D11DeviceContext,
+        swap_chain: IDXGISwapChain1,
+    ) -> Result<Self> {
         let (target, depth) = Self::create_targets(&device, &swap_chain)?;
         let pipeline = Pipeline::new(&device)?;
         Ok(Self {
@@ -178,8 +249,18 @@ impl Renderer {
             depth: Some(depth),
             pipeline,
             depth_convention: DepthConvention::Forward,
-            _ui_thread: PhantomData,
         })
+    }
+
+    /// Returns the borrowed swap-chain interface for binding to a XAML panel.
+    pub fn swap_chain_ptr(&self) -> *mut c_void {
+        self.swap_chain.as_raw()
+    }
+
+    /// Returns the composition surface's current physical pixel dimensions.
+    pub fn swap_chain_size(&self) -> Result<[u32; 2]> {
+        let desc = unsafe { self.swap_chain.GetDesc1()? };
+        Ok([desc.Width, desc.Height])
     }
 
     /// Selects the depth convention of subsequently submitted frames.
@@ -225,6 +306,11 @@ impl Renderer {
 
     /// Recreates the swap-chain target using the CoreWindow's current size.
     pub fn resize(&mut self) -> Result<()> {
+        self.resize_to(0, 0)
+    }
+
+    /// Recreates the swap-chain target at the requested pixel dimensions.
+    pub fn resize_to(&mut self, width: u32, height: u32) -> Result<()> {
         unsafe {
             self.context
                 .OMSetRenderTargets(None, None::<&ID3D11DepthStencilView>);
@@ -232,8 +318,8 @@ impl Renderer {
             self.depth = None;
             self.swap_chain.ResizeBuffers(
                 2,
-                0,
-                0,
+                width,
+                height,
                 DXGI_FORMAT_B8G8R8A8_UNORM,
                 DXGI_SWAP_CHAIN_FLAG(0),
             )?;

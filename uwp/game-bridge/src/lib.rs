@@ -300,16 +300,28 @@ pub unsafe extern "C" fn horizon_uwp_run_prepared(
     resources_len: usize,
     game_dir: *const u16,
     game_dir_len: usize,
+    renderer: u32,
 ) -> i32 {
-    #[cfg(feature = "uwp-dx12-renderer")]
-    unsafe {
-        std::env::set_var("WGPU_BACKEND", "dx12")
+    let (renderer_name, backend) = match renderer {
+        1 => ("angle", "gl"),
+        2 => ("dx12", "dx12"),
+        _ => ("d3d11", "gl"),
     };
-    #[cfg(all(not(feature = "uwp-dx12-renderer"), not(feature = "native-d3d11")))]
     unsafe {
-        std::env::set_var("WGPU_BACKEND", "gl")
-    };
+        std::env::set_var("HORIZON_UWP_RENDERER", renderer_name);
+        std::env::set_var("WGPU_BACKEND", backend);
+    }
     unsafe { run(resources, resources_len, game_dir, game_dir_len, true) }
+}
+
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    feature = "native-d3d11"
+))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_prepare_native_renderer() -> i32 {
+    horizon_client::native_renderer::prepare_window_renderer_on_ui_thread()
 }
 
 #[cfg(target_vendor = "uwp")]

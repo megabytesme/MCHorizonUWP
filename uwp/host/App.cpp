@@ -1,14 +1,24 @@
+#if defined(_MSC_VER) && _MSC_VER >= 1940 && defined(WINAPI_FAMILY)
+extern "C" __declspec(dllimport) char* __cdecl getenv(const char*);
+extern "C" __declspec(dllimport) int __cdecl system(const char*);
+#endif
 #include <windows.h>
 #include <windows.storage.h>
 #include <cstdio>
+#include <cstdarg>
 #include <cstring>
+#include <algorithm>
 #include <atomic>
+#include <mutex>
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
+#include <roapi.h>
+#include <wrl/client.h>
 #include <windows.applicationmodel.h>
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
+#include <windows.system.threading.h>
 #include <windows.ui.viewmanagement.h>
 #include <windows.ui.popups.h>
 
@@ -23,11 +33,27 @@ extern "C" void __cdecl horizon_uwp_gyro_set_visible(int visible);
 #endif
 #ifdef HORIZON_UWP_XAML_SHELL
 static Windows::UI::Core::CoreWindow^ primary_window;
+static Windows::UI::Core::CoreDispatcher^ primary_dispatcher;
 static DWORD primary_window_thread = 0;
+static Microsoft::WRL::ComPtr<IAgileReference> primary_window_agile;
+static HRESULT primary_window_agile_result = E_PENDING;
+static Microsoft::WRL::ComPtr<IUnknown> worker_window_proxy;
+static std::mutex worker_window_mutex;
+static horizon_uwp::CoreWindowEvents^ active_game_events;
+static Windows::UI::ViewManagement::ApplicationView^ game_application_view;
+static bool game_phone = false;
+static bool game_was_full_screen = false;
+static bool game_page_hidden = false;
+static bool game_gyro_visible = false;
+static std::atomic<bool> game_running{false};
+static std::atomic<bool> session_preparation_running{false};
 #endif
-static bool pregame_input = true;
+static std::atomic<bool> pregame_input{true};
 extern "C" void __cdecl horizon_uwp_page_event(const HorizonUwpEvent* event);
 extern "C" void __cdecl horizon_uwp_page_shutdown();
+#ifdef HORIZON_UWP_XAML_SHELL
+extern "C" void __cdecl horizon_uwp_resume_pregame_input();
+#endif
 extern "C" int __cdecl horizon_uwp_window_closed() { return account_window_closed.load() ? 1 : 0; }
 extern "C" int __cdecl horizon_uwp_window_visible() { return account_window_visible.load() ? 1 : 0; }
 #ifdef HORIZON_UWP_XAML_SHELL
@@ -36,7 +62,13 @@ extern "C" void __cdecl horizon_uwp_attach_shell(Windows::UI::Core::CoreWindow^ 
     current_window_thread.store(GetCurrentThreadId(), std::memory_order_release);
 #ifdef HORIZON_UWP_XAML_SHELL
     primary_window = window;
+    primary_dispatcher = window->Dispatcher;
     primary_window_thread = GetCurrentThreadId();
+    Microsoft::WRL::ComPtr<IUnknown> unknown;
+    unknown = reinterpret_cast<IUnknown*>(window);
+    const HRESULT agile_result = RoGetAgileReference(
+        AGILEREFERENCE_DEFAULT, IID_IUnknown, unknown.Get(), &primary_window_agile);
+    primary_window_agile_result = agile_result;
 #endif
     account_window_closed.store(false);
     account_window_visible.store(true);
@@ -60,25 +92,151 @@ extern "C" void __cdecl horizon_uwp_attach_shell(Windows::UI::Core::CoreWindow^ 
 #endif
 static HorizonUwpEvent pending_events[4096];
 static uint32_t event_read, event_write;
+static std::mutex event_queue_mutex;
+static uint32_t cached_width, cached_height;
+static double cached_scale = 1.0;
+static uint32_t game_surface_width, game_surface_height;
+static double game_surface_scale_x = 1.0, game_surface_scale_y = 1.0;
+static std::atomic<bool> game_surface_active{false};
+
+#ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
+static std::atomic<uint32_t> display_pointer_samples{0};
+static void display_trace(const char* format, ...) {
+    try {
+        char line[512];
+        va_list args;
+        va_start(args, format);
+        const int length = vsnprintf_s(line, sizeof(line), _TRUNCATE, format, args);
+        va_end(args);
+        if (length <= 0) return;
+        auto folder = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+        auto path = Platform::String::Concat(folder, L"\\horizon-display-trace.log");
+        HANDLE file = CreateFile2(path->Data(), FILE_APPEND_DATA,
+            FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_ALWAYS, nullptr);
+        if (file == INVALID_HANDLE_VALUE) return;
+        DWORD written = 0;
+        WriteFile(file, line, static_cast<DWORD>(length), &written, nullptr);
+        CloseHandle(file);
+    } catch (...) {}
+}
+#endif
 
 static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
-#ifdef HORIZON_UWP_ACCOUNT
-    // The native startup page owns its input until the game is started.
-    if (pregame_input) {
-        horizon_uwp_page_event(event);
-        if (event->kind >= HORIZON_UWP_KEY_DOWN) return;
+    if (!event) return;
+    const HorizonUwpEvent raw = *event;
+    HorizonUwpEvent adjusted = *event;
+    {
+        std::lock_guard<std::mutex> lock(event_queue_mutex);
+        if (game_surface_active.load(std::memory_order_acquire) && game_surface_width && game_surface_height) {
+            if (adjusted.kind == HORIZON_UWP_RESIZE) {
+                adjusted.width = static_cast<float>(game_surface_width);
+                adjusted.height = static_cast<float>(game_surface_height);
+            } else if ((adjusted.kind >= HORIZON_UWP_POINTER_MOVE &&
+                        adjusted.kind <= HORIZON_UWP_POINTER_WHEEL) ||
+                       adjusted.kind == HORIZON_UWP_POINTER_CANCEL) {
+                const double event_scale = adjusted.scale_factor > 0.0f ? adjusted.scale_factor : 1.0;
+                adjusted.x = static_cast<float>(adjusted.x * game_surface_scale_x / event_scale);
+                adjusted.y = static_cast<float>(adjusted.y * game_surface_scale_y / event_scale);
+            }
+            adjusted.scale_factor = static_cast<float>(game_surface_scale_x);
+        }
+    }
+#ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
+    if (raw.kind == HORIZON_UWP_RESIZE) {
+        uint32_t width = 0, height = 0;
+        double scale_x = 1.0, scale_y = 1.0;
+        { std::lock_guard<std::mutex> lock(event_queue_mutex);
+          width = game_surface_width; height = game_surface_height;
+          scale_x = game_surface_scale_x; scale_y = game_surface_scale_y; }
+        display_trace("resize raw=%.0fx%.0f event_scale=%.4f normalized=%.0fx%.0f panel=%ux%u panel_scale=%.4fx%.4f active=%d\r\n",
+            raw.width, raw.height, raw.scale_factor, adjusted.width, adjusted.height,
+            width, height, scale_x, scale_y, game_surface_active.load() ? 1 : 0);
+    } else if ((raw.kind >= HORIZON_UWP_POINTER_MOVE && raw.kind <= HORIZON_UWP_POINTER_WHEEL) ||
+               raw.kind == HORIZON_UWP_POINTER_CANCEL) {
+        const uint32_t sample = display_pointer_samples.fetch_add(1) + 1;
+        if (sample <= 24 || sample % 100 == 0) {
+            uint32_t width = 0, height = 0;
+            double scale_x = 1.0, scale_y = 1.0;
+            { std::lock_guard<std::mutex> lock(event_queue_mutex);
+              width = game_surface_width; height = game_surface_height;
+              scale_x = game_surface_scale_x; scale_y = game_surface_scale_y; }
+            display_trace("pointer sample=%u kind=%u raw=%.2f,%.2f event_scale=%.4f normalized=%.2f,%.2f panel_scale=%.4f,%.4f panel=%ux%u\r\n",
+                sample, raw.kind, raw.x, raw.y, raw.scale_factor, adjusted.x, adjusted.y,
+                scale_x, scale_y, width, height);
+        }
     }
 #endif
+#ifdef HORIZON_UWP_ACCOUNT
+    // The native startup page owns its input until the game is started.
+    if (pregame_input.load(std::memory_order_acquire)) {
+        horizon_uwp_page_event(&adjusted);
+        if (adjusted.kind >= HORIZON_UWP_KEY_DOWN) return;
+    }
+#endif
+    std::lock_guard<std::mutex> lock(event_queue_mutex);
+    if (adjusted.kind == HORIZON_UWP_RESIZE) {
+        cached_width = static_cast<uint32_t>((std::max)(0.0f, adjusted.width));
+        cached_height = static_cast<uint32_t>((std::max)(0.0f, adjusted.height));
+        cached_scale = adjusted.scale_factor > 0.0f ? adjusted.scale_factor : 1.0;
+    }
     const uint32_t next = (event_write + 1) % 4096;
     if (next == event_read) event_read = (event_read + 1) % 4096;
-    pending_events[event_write] = *event;
+    pending_events[event_write] = adjusted;
     event_write = next;
+}
+
+extern "C" void __cdecl horizon_uwp_set_game_surface_metrics(
+    uint32_t width, uint32_t height, double scale_x, double scale_y) {
+    if (!width || !height || scale_x <= 0.0 || scale_y <= 0.0) return;
+    {
+        std::lock_guard<std::mutex> lock(event_queue_mutex);
+        game_surface_width = width;
+        game_surface_height = height;
+        game_surface_scale_x = scale_x;
+        game_surface_scale_y = scale_y;
+    }
+    HorizonUwpEvent resize{};
+    resize.kind = HORIZON_UWP_RESIZE;
+    resize.width = static_cast<float>(width);
+    resize.height = static_cast<float>(height);
+    resize.scale_factor = static_cast<float>(scale_x);
+    queue_event(nullptr, &resize);
+}
+
+#ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
+extern "C" void __cdecl horizon_uwp_trace_game_surface(
+    double actual_width, double actual_height, double scale_x, double scale_y,
+    uint32_t pixel_width, uint32_t pixel_height) {
+    double bounds_width = 0.0, bounds_height = 0.0, logical_dpi = 0.0;
+    try {
+        if (current_window) {
+            bounds_width = current_window->Bounds.Width;
+            bounds_height = current_window->Bounds.Height;
+            logical_dpi = Windows::Graphics::Display::DisplayInformation::GetForCurrentView()->LogicalDpi;
+        }
+    } catch (...) {}
+    display_trace("panel actual=%.2fx%.2f composition=%.4fx%.4f pixels=%ux%u corewindow=%.2fx%.2f logical_dpi=%.2f\r\n",
+        actual_width, actual_height, scale_x, scale_y, pixel_width, pixel_height,
+        bounds_width, bounds_height, logical_dpi);
+}
+
+extern "C" void __cdecl horizon_uwp_trace_game_swapchain(uint32_t width, uint32_t height) {
+    display_trace("swapchain buffers=%ux%u\r\n", width, height);
+}
+#endif
+
+extern "C" void __cdecl horizon_uwp_set_game_surface_active(int active) {
+    game_surface_active.store(active != 0, std::memory_order_release);
+#ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
+    display_trace("surface active=%d\r\n", active != 0 ? 1 : 0);
+#endif
 }
 #ifdef HORIZON_UWP_ACCOUNT
 extern "C" void __cdecl horizon_uwp_discard_pregame_input() {
     horizon_uwp_page_shutdown();
     // Preserve resize, focus, visibility and close events. Dialog input must not
     // be replayed into the game, where it could activate an unintended action.
+    std::lock_guard<std::mutex> lock(event_queue_mutex);
     uint32_t read = event_read, write = event_read;
     while (read != event_write) {
         const auto event = pending_events[read];
@@ -89,12 +247,13 @@ extern "C" void __cdecl horizon_uwp_discard_pregame_input() {
         }
     }
     event_write = write;
-    pregame_input = false;
+    pregame_input.store(false, std::memory_order_release);
 }
 #ifdef HORIZON_UWP_XAML_SHELL
 extern "C" void __cdecl horizon_uwp_resume_pregame_input() {
+    std::lock_guard<std::mutex> lock(event_queue_mutex);
     event_read = event_write = 0;
-    pregame_input = true;
+    pregame_input.store(true, std::memory_order_release);
 }
 #endif
 #endif
@@ -130,61 +289,138 @@ static Platform::String^ resolve_resources(Platform::String^ local_path) {
 #endif
 
 extern "C" void* __cdecl horizon_uwp_window_handle() {
+#ifdef HORIZON_UWP_XAML_SHELL
+    const DWORD owner = current_window_thread.load(std::memory_order_acquire);
+    if (!owner || !current_window) return nullptr;
+    if (GetCurrentThreadId() == owner) return reinterpret_cast<void*>(current_window);
+    if (FAILED(primary_window_agile_result)) return nullptr;
+    std::lock_guard<std::mutex> lock(worker_window_mutex);
+    if (!worker_window_proxy && primary_window_agile) {
+        Microsoft::WRL::ComPtr<IUnknown> proxy;
+        if (SUCCEEDED(primary_window_agile->Resolve(IID_IUnknown, &proxy)))
+            worker_window_proxy = std::move(proxy);
+    }
+    return worker_window_proxy.Get();
+#else
     // CoreWindow must only be handed out on its owning UI thread.
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
     if (!owner || GetCurrentThreadId() != owner) return nullptr;
     return reinterpret_cast<void*>(current_window);
+#endif
 }
 extern "C" void __cdecl horizon_uwp_pump_events() {
     // The XAML account state machine runs on a worker. Only the owning UI
     // thread may pump a CoreWindow dispatcher.
+#ifdef HORIZON_UWP_XAML_SHELL
+    return; // XAML owns this dispatcher's outer event loop.
+#else
     if (!current_window || current_window_thread.load(std::memory_order_acquire) != GetCurrentThreadId()) return;
     current_window->Dispatcher->ProcessEvents(Windows::UI::Core::CoreProcessEventsOption::ProcessAllIfPresent);
+#endif
 }
 extern "C" int __cdecl horizon_uwp_pop_event(HorizonUwpEvent* event) {
-    if (!event || event_read == event_write) return 0;
+    if (!event) return 0;
+    std::lock_guard<std::mutex> lock(event_queue_mutex);
+    if (event_read == event_write) return 0;
     *event = pending_events[event_read];
     event_read = (event_read + 1) % 4096;
     return 1;
 }
 extern "C" void __cdecl horizon_uwp_get_metrics(uint32_t* width, uint32_t* height, double* scale) {
-    const double s = Windows::Graphics::Display::DisplayInformation::GetForCurrentView()->LogicalDpi / 96.0;
-    *width = static_cast<uint32_t>(current_window->Bounds.Width * s);
-    *height = static_cast<uint32_t>(current_window->Bounds.Height * s);
-    *scale = s;
+    if (!width || !height || !scale) return;
+    std::lock_guard<std::mutex> lock(event_queue_mutex);
+    if (game_surface_active.load(std::memory_order_acquire) && game_surface_width && game_surface_height) {
+        *width = game_surface_width;
+        *height = game_surface_height;
+        *scale = game_surface_scale_x;
+    } else {
+        *width = cached_width;
+        *height = cached_height;
+        *scale = cached_scale;
+    }
+}
+extern "C" void __cdecl horizon_uwp_get_surface_metrics(
+    uint32_t* width, uint32_t* height, double* scale_x, double* scale_y) {
+    if (!width || !height || !scale_x || !scale_y) return;
+    std::lock_guard<std::mutex> lock(event_queue_mutex);
+    if (game_surface_active.load(std::memory_order_acquire) && game_surface_width && game_surface_height) {
+        *width = game_surface_width;
+        *height = game_surface_height;
+        *scale_x = game_surface_scale_x;
+        *scale_y = game_surface_scale_y;
+    } else {
+        *width = cached_width;
+        *height = cached_height;
+        *scale_x = cached_scale;
+        *scale_y = cached_scale;
+    }
 }
 extern "C" void __cdecl horizon_uwp_set_cursor_visible(int visible) {
-    if (!current_window || !current_window->Dispatcher->HasThreadAccess) return;
-    current_window->PointerCursor = visible
-        ? ref new Windows::UI::Core::CoreCursor(Windows::UI::Core::CoreCursorType::Arrow, 0)
-        : nullptr;
+    if (!current_window) return;
+    auto set_cursor = [visible]() {
+        if (current_window) current_window->PointerCursor = visible
+            ? ref new Windows::UI::Core::CoreCursor(Windows::UI::Core::CoreCursorType::Arrow, 0)
+            : nullptr;
+    };
+    if (current_window_thread.load(std::memory_order_acquire) == GetCurrentThreadId()) set_cursor();
+#ifdef HORIZON_UWP_XAML_SHELL
+    else if (primary_dispatcher) primary_dispatcher->RunAsync(
+        Windows::UI::Core::CoreDispatcherPriority::Normal,
+        ref new Windows::UI::Core::DispatchedHandler(set_cursor));
+#endif
 }
 extern "C" void __cdecl horizon_uwp_set_ime_allowed(int allowed) {
-    if (!current_window || !current_window->Dispatcher->HasThreadAccess) return;
-    try {
-        auto pane = Windows::UI::ViewManagement::InputPane::GetForCurrentView();
-        if (pane) {
-            if (allowed) pane->TryShow(); else pane->TryHide();
-        }
-    } catch (Platform::Exception^) {
-        // InputPane is optional on devices without a touch keyboard.
-    }
+    auto set_ime = [allowed]() {
+        try {
+            auto pane = Windows::UI::ViewManagement::InputPane::GetForCurrentView();
+            if (pane) { if (allowed) pane->TryShow(); else pane->TryHide(); }
+        } catch (Platform::Exception^) { /* InputPane is optional. */ }
+    };
+    if (current_window_thread.load(std::memory_order_acquire) == GetCurrentThreadId()) set_ime();
+#ifdef HORIZON_UWP_XAML_SHELL
+    else if (primary_dispatcher) primary_dispatcher->RunAsync(
+        Windows::UI::Core::CoreDispatcherPriority::Normal,
+        ref new Windows::UI::Core::DispatchedHandler(set_ime));
+#endif
 }
 
 extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
-    if (!current_window || !current_window->Dispatcher->HasThreadAccess) return 0;
-    const double scale = Windows::Graphics::Display::DisplayInformation::GetForCurrentView()->LogicalDpi / 96.0;
-    try {
-        current_window->PointerPosition = Windows::Foundation::Point(static_cast<float>(x / scale), static_cast<float>(y / scale));
+    if (!current_window) return 0;
+    double scale = 1.0;
+    { std::lock_guard<std::mutex> lock(event_queue_mutex); scale = cached_scale; }
+    auto set_position = [x, y, scale]() {
+        try { if (current_window) current_window->PointerPosition = Windows::Foundation::Point(
+            static_cast<float>(x / scale), static_cast<float>(y / scale)); }
+        catch (Platform::Exception^) {}
+    };
+    if (current_window_thread.load(std::memory_order_acquire) == GetCurrentThreadId()) {
+        set_position();
         return 1;
-    } catch (Platform::Exception^) { return 0; }
+    }
+#ifdef HORIZON_UWP_XAML_SHELL
+    if (primary_dispatcher) {
+        primary_dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::Normal,
+            ref new Windows::UI::Core::DispatchedHandler(set_position));
+        return 1;
+    }
+#endif
+    return 0;
 }
 extern "C" int32_t __cdecl horizon_uwp_run(const uint16_t*, size_t, const uint16_t*, size_t);
 #ifdef HORIZON_UWP_XAML_SHELL
-extern "C" int32_t __cdecl horizon_uwp_run_prepared(const uint16_t*, size_t, const uint16_t*, size_t);
+extern "C" int32_t __cdecl horizon_uwp_run_prepared(
+    const uint16_t*, size_t, const uint16_t*, size_t, uint32_t);
+extern "C" int __cdecl horizon_uwp_page_selected_renderer();
+#ifdef HORIZON_UWP_NATIVE_D3D11
+extern "C" int32_t __cdecl horizon_uwp_prepare_native_renderer();
+#endif
 extern "C" int __cdecl horizon_uwp_xaml_start();
 extern "C" void __cdecl horizon_uwp_page_refresh_tile();
 extern "C" int32_t __cdecl horizon_uwp_page_show_game(int);
+extern "C" int __cdecl horizon_uwp_page_exit_after_game();
+extern "C" int __cdecl horizon_uwp_prepare(const uint16_t*, size_t);
+extern "C" void __cdecl horizon_uwp_open_game_view();
+extern "C" void __cdecl horizon_uwp_trace_shell_event(const char* event);
 extern "C" size_t __cdecl horizon_uwp_page_switch_error(uint8_t*, size_t);
 #endif
 extern "C" int __cdecl horizon_uwp_is_local_test() {
@@ -253,20 +489,23 @@ extern "C" void __cdecl horizon_uwp_fatal_begin(const uint8_t* text, size_t len)
         bool expected = true;
         if (!fatal_done.compare_exchange_strong(expected, false)) return;
         if (horizon_uwp_is_ui_thread()) show_fatal(body);
+#ifdef HORIZON_UWP_XAML_SHELL
+        else if (primary_dispatcher) primary_dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::High,
+            ref new Windows::UI::Core::DispatchedHandler([body]() { show_fatal(body); }));
+#else
         else current_window->Dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::High,
             ref new Windows::UI::Core::DispatchedHandler([body]() { show_fatal(body); }));
+#endif
     } catch (...) { fatal_done.store(true); }
 }
 static void report_native_failure(const char* message) {
     const auto text = reinterpret_cast<const uint8_t*>(message);
     const size_t length = strlen(message);
     horizon_uwp_report_error(text, length);
+    // ShowAsync completes when the owning XAML dispatcher resumes naturally.
+    // Pumping ProcessEvents here can occur from inside a RunAsync callback and
+    // throws RPC_E_CANTCALLOUT_ININPUTSYNCCALL, masking the original failure.
     horizon_uwp_fatal_begin(text, length);
-    try {
-        while (!horizon_uwp_fatal_done() && horizon_uwp_is_ui_thread() && current_window)
-            current_window->Dispatcher->ProcessEvents(
-                Windows::UI::Core::CoreProcessEventsOption::ProcessOneAndAllPending);
-    } catch (...) {}
 }
 #ifdef HORIZON_UWP_FRAME_PROBE
 extern "C" void __cdecl horizon_uwp_frame_presented() {
@@ -363,7 +602,8 @@ public:
 #endif
 #ifdef HORIZON_UWP_XAML_SHELL
         const int32_t result = horizon_uwp_run_prepared(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
-                                               reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
+                                               reinterpret_cast<const uint16_t*>(game->Data()), game->Length(),
+                                               static_cast<uint32_t>(horizon_uwp_page_selected_renderer()));
 #else
         const int32_t result = horizon_uwp_run(reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                                                reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
@@ -455,11 +695,100 @@ public:
 };
 
 #ifdef HORIZON_UWP_XAML_SHELL
+static void prepare_next_game_session() {
+    if (horizon_uwp_page_exit_after_game() != 0) return;
+    bool expected = false;
+    if (!session_preparation_running.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) return;
+    horizon_uwp_trace_shell_event("next game-session preparation queued");
+    try {
+        Windows::System::Threading::ThreadPool::RunAsync(
+            ref new Windows::System::Threading::WorkItemHandler([](Windows::Foundation::IAsyncAction^) {
+                int result = -1;
+                horizon_uwp_trace_shell_event("next game-session preparation started");
+                try {
+                    auto local = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+                    auto game = Platform::String::Concat(local, L"\\game");
+                    result = horizon_uwp_prepare(
+                        reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
+                } catch (Platform::Exception^ error) {
+                    char message[192];
+                    sprintf_s(message, "Horizon could not prepare the next game session (0x%08X). A diagnostic was saved in app storage.",
+                        static_cast<unsigned>(error->HResult));
+                    report_native_failure(message);
+                } catch (...) {
+                    report_native_failure("Horizon could not prepare the next game session. A diagnostic was saved in app storage.");
+                }
+                char event[96];
+                sprintf_s(event, "next game-session preparation returned %d", result);
+                horizon_uwp_trace_shell_event(event);
+                if (result == 1 && primary_dispatcher) {
+                    primary_dispatcher->RunAsync(
+                        Windows::UI::Core::CoreDispatcherPriority::Normal,
+                        ref new Windows::UI::Core::DispatchedHandler([]() {
+                            session_preparation_running.store(false, std::memory_order_release);
+                            if (horizon_uwp_page_exit_after_game() == 0) {
+                                horizon_uwp_trace_shell_event("prepared session accepted; opening game view");
+                                horizon_uwp_open_game_view();
+                            }
+                        }));
+                } else {
+                    session_preparation_running.store(false, std::memory_order_release);
+                }
+            }),
+            Windows::System::Threading::WorkItemPriority::Normal,
+            Windows::System::Threading::WorkItemOptions::TimeSliced);
+    } catch (...) {
+        session_preparation_running.store(false, std::memory_order_release);
+        report_native_failure("Horizon could not start the next game-session worker.");
+    }
+}
+
+static void finish_game_in_primary_view() {
+    if (GetCurrentThreadId() != primary_window_thread) {
+        if (primary_dispatcher) primary_dispatcher->RunAsync(
+            Windows::UI::Core::CoreDispatcherPriority::Normal,
+            ref new Windows::UI::Core::DispatchedHandler([]() { finish_game_in_primary_view(); }));
+        return;
+    }
+#ifdef HORIZON_UWP_TOUCH_MOD
+    if (game_gyro_visible) horizon_uwp_gyro_set_visible(0);
+    horizon_uwp_gyro_enable(0);
+    game_gyro_visible = false;
+#endif
+    const bool exit_after_game = horizon_uwp_page_exit_after_game() != 0;
+    horizon_uwp_trace_shell_event(exit_after_game
+        ? "game ended; quit behavior is close app"
+        : "game ended; returning to Horizon home");
+    if (active_game_events) {
+        delete active_game_events;
+        active_game_events = nullptr;
+    }
+    horizon_uwp_resume_pregame_input();
+    if (game_phone && !game_was_full_screen && game_application_view) {
+        try { game_application_view->ExitFullScreenMode(); }
+        catch (Platform::Exception^) {}
+    }
+    if (game_page_hidden && !account_window_closed.load()) {
+        const int32_t page_result = horizon_uwp_page_show_game(exit_after_game ? -1 : 0);
+        if (page_result < 0)
+            report_native_failure("Horizon could not restore the pre-game page after the game stopped.");
+    }
+    game_page_hidden = false;
+    game_phone = false;
+    game_was_full_screen = false;
+    game_application_view = nullptr;
+    game_running.store(false, std::memory_order_release);
+    if (exit_after_game) Windows::ApplicationModel::Core::CoreApplication::Exit();
+    else prepare_next_game_session();
+}
+
 static void run_game_in_primary_view() {
     if (!primary_window || GetCurrentThreadId() != primary_window_thread) {
         report_native_failure("Horizon could not start the game on its UWP view thread.");
         return;
     }
+    bool expected = false;
+    if (!game_running.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) return;
 
     auto window = primary_window;
     const char* stage = "loading the game resources";
@@ -467,6 +796,7 @@ static void run_game_in_primary_view() {
     bool phone = false;
     bool was_full_screen = false;
     bool page_hidden = false;
+    bool worker_started = false;
     horizon_uwp::CoreWindowEvents^ events = nullptr;
 #ifdef HORIZON_UWP_TOUCH_MOD
     bool gyro_visible = false;
@@ -475,6 +805,10 @@ static void run_game_in_primary_view() {
         auto local_path = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
         auto resources = resolve_resources(local_path);
         auto game = Platform::String::Concat(local_path, ref new Platform::String(L"\\game"));
+        const unsigned renderer = static_cast<unsigned>(horizon_uwp_page_selected_renderer());
+        char start_event[96];
+        sprintf_s(start_event, "starting game view with renderer %u", renderer);
+        horizon_uwp_trace_shell_event(start_event);
         stage = "checking the active UWP view";
         application_view = Windows::UI::ViewManagement::ApplicationView::GetForCurrentView();
         was_full_screen = application_view->IsFullScreenMode;
@@ -491,36 +825,114 @@ static void run_game_in_primary_view() {
         stage = "attaching game input to the existing CoreWindow";
         events = ref new horizon_uwp::CoreWindowEvents(window, queue_event, nullptr);
 
-        stage = "replacing the pre-game page with the game surface";
+        stage = "sending the initial game size";
+        events->EmitInitialSize();
+
+        stage = "showing the game surface over the launcher page";
         const int32_t page_result = horizon_uwp_page_show_game(1);
         if (page_result < 0)
             throw Platform::Exception::CreateException(page_result);
         page_hidden = true;
-        events->EmitInitialSize();
+
+        if (renderer == 0) {
+#ifdef HORIZON_UWP_NATIVE_D3D11
+            // Bind the native composition swap chain to the existing XAML panel.
+            stage = "creating the Direct3D 11 composition surface on the UWP UI thread";
+            const int32_t renderer_result = horizon_uwp_prepare_native_renderer();
+            if (renderer_result < 0)
+                throw Platform::Exception::CreateException(renderer_result);
+#else
+            throw Platform::Exception::CreateException(E_NOTIMPL);
+#endif
+        }
+
 #ifdef HORIZON_UWP_TOUCH_MOD
         stage = "starting device gyroscope input";
         horizon_uwp_gyro_set_visible(1);
         gyro_visible = true;
 #endif
-        // ShellApp already activated this CoreWindow. Avoid an extra
-        // activation transition after detaching the XAML page.
-        stage = "starting Horizon in the existing app window";
-        const int32_t result = horizon_uwp_run_prepared(
-            reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
-            reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
-        (void)result;
-        stage = "refreshing the live tile";
-        horizon_uwp_page_refresh_tile();
+        // XAML owns the CoreWindow dispatcher. Run Horizon on a render worker
+        // so its winit loop can poll queued input while XAML continues to
+        // dispatch CoreWindow events without a nested ProcessEvents call.
+        active_game_events = events;
+        events = nullptr;
+        game_application_view = application_view;
+        game_phone = phone;
+        game_was_full_screen = was_full_screen;
+        game_page_hidden = page_hidden;
+        game_gyro_visible = gyro_visible;
+        stage = "starting Horizon on the game worker";
+        Windows::System::Threading::ThreadPool::RunAsync(
+            ref new Windows::System::Threading::WorkItemHandler([resources, game, renderer](Windows::Foundation::IAsyncAction^) {
+                try {
+                    const int32_t result = horizon_uwp_run_prepared(
+                        reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
+                        reinterpret_cast<const uint16_t*>(game->Data()), game->Length(), renderer);
+                      char finish_event[96];
+                      sprintf_s(finish_event, "game bridge returned %d", result);
+                      horizon_uwp_trace_shell_event(finish_event);
+                    (void)result;
+                    horizon_uwp_page_refresh_tile();
+                } catch (Platform::Exception^ error) {
+                    char message[320];
+                    char detail[160] = {};
+                    if (error->Message && error->Message->Length() > 0)
+                        WideCharToMultiByte(CP_UTF8, 0, error->Message->Data(), -1, detail,
+                            static_cast<int>(sizeof(detail)), nullptr, nullptr);
+                    if (detail[0]) sprintf_s(message,
+                        "Horizon encountered a Windows error on the game worker (0x%08X: %s). A diagnostic was saved in app storage.",
+                        static_cast<unsigned>(error->HResult), detail);
+                    else sprintf_s(message,
+                        "Horizon encountered a Windows error on the game worker (0x%08X). A diagnostic was saved in app storage.",
+                        static_cast<unsigned>(error->HResult));
+                    report_native_failure(message);
+                } catch (...) {
+                    report_native_failure("Horizon encountered a native error on the game worker. A diagnostic was saved in app storage.");
+                }
+                if (primary_dispatcher) primary_dispatcher->RunAsync(
+                    Windows::UI::Core::CoreDispatcherPriority::Normal,
+                    ref new Windows::UI::Core::DispatchedHandler([]() { finish_game_in_primary_view(); }));
+            }), Windows::System::Threading::WorkItemPriority::High,
+            Windows::System::Threading::WorkItemOptions::TimeSliced);
+        worker_started = true;
     } catch (Platform::Exception^ error) {
         char message[512];
+        char exception_detail[160] = {};
+        if (error->Message && error->Message->Length() > 0)
+            WideCharToMultiByte(CP_UTF8, 0, error->Message->Data(), -1, exception_detail,
+                                static_cast<int>(sizeof(exception_detail)), nullptr, nullptr);
         unsigned int page_detail_length = 0;
         char page_detail[192] = {};
-        if (strcmp(stage, "replacing the pre-game page with the game surface") == 0)
+        if (strcmp(stage, "showing the game surface over the launcher page") == 0)
             page_detail_length = static_cast<unsigned int>(horizon_uwp_page_switch_error(
                 reinterpret_cast<uint8_t*>(page_detail), sizeof(page_detail)));
+        const bool sending_initial_size = strcmp(stage, "sending the initial game size") == 0;
+        const unsigned int size_stage = sending_initial_size ? horizon_uwp_window_size_stage() : 0;
+        const char* size_operation = nullptr;
+        char unknown_size_operation[64] = {};
+        switch (size_stage) {
+            case 1: size_operation = "reading DisplayInformation.LogicalDpi"; break;
+            case 2: size_operation = "reading CoreWindow.Bounds"; break;
+            case 3: size_operation = "sending the resize event"; break;
+            case 4: size_operation = "finishing the initial size handoff"; break;
+            default: break;
+        }
+        if (!size_operation && sending_initial_size) {
+            sprintf_s(unknown_size_operation, "checking initial size (stage %u)", size_stage);
+            size_operation = unknown_size_operation;
+        }
         if (page_detail_length > 0)
             sprintf_s(message, "Horizon encountered a Windows error while %s (0x%08X: %s). A diagnostic was saved in app storage.",
                 stage, static_cast<unsigned>(error->HResult), page_detail);
+        else if (size_operation && exception_detail[0])
+            sprintf_s(message, "Horizon encountered a Windows error while %s, %s (0x%08X: %s). A diagnostic was saved in app storage.",
+                stage, size_operation, static_cast<unsigned>(error->HResult), exception_detail);
+        else if (size_operation)
+            sprintf_s(message, "Horizon encountered a Windows error while %s, %s (0x%08X). A diagnostic was saved in app storage.",
+                stage, size_operation, static_cast<unsigned>(error->HResult));
+        else if (exception_detail[0])
+            sprintf_s(message, "Horizon encountered a Windows error while %s (0x%08X: %s). A diagnostic was saved in app storage.",
+                stage, static_cast<unsigned>(error->HResult), exception_detail);
         else
             sprintf_s(message, "Horizon encountered a Windows error while %s (0x%08X). A diagnostic was saved in app storage.",
                 stage, static_cast<unsigned>(error->HResult));
@@ -531,25 +943,61 @@ static void run_game_in_primary_view() {
         report_native_failure(message);
     }
 
+    if (worker_started) return;
+
 #ifdef HORIZON_UWP_TOUCH_MOD
     if (gyro_visible) horizon_uwp_gyro_set_visible(0);
     horizon_uwp_gyro_enable(0);
+    game_gyro_visible = false;
 #endif
-    if (events) delete events;
+    if (active_game_events) {
+        delete active_game_events;
+        active_game_events = nullptr;
+    } else if (events) {
+        delete events;
+    }
     horizon_uwp_resume_pregame_input();
     if (phone && !was_full_screen && application_view) {
         try { application_view->ExitFullScreenMode(); }
         catch (Platform::Exception^) {}
     }
     if (page_hidden && !account_window_closed.load()) horizon_uwp_page_show_game(0);
+    game_page_hidden = false;
+    game_phone = false;
+    game_was_full_screen = false;
+    game_application_view = nullptr;
+    game_running.store(false, std::memory_order_release);
 }
 
 extern "C" void __cdecl horizon_uwp_open_game_view() {
+    horizon_uwp_trace_shell_event("open game view callback entered");
     try {
         run_game_in_primary_view();
     } catch (...) {
         report_native_failure("Horizon could not start Horizon in the app window.");
     }
+}
+
+extern "C" void __cdecl horizon_uwp_trace_shell_event(const char* event) {
+    if (!event) return;
+    try {
+        auto local = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+        auto path = Platform::String::Concat(local, L"\\horizon-uwp-lifecycle.log");
+        HANDLE file = CreateFile2(path->Data(), FILE_APPEND_DATA,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_ALWAYS, nullptr);
+        if (file == INVALID_HANDLE_VALUE) return;
+        SYSTEMTIME now = {};
+        GetSystemTime(&now);
+        char line[512];
+        const int length = sprintf_s(line, "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ tid=%lu %s\r\n",
+            now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond,
+            now.wMilliseconds, GetCurrentThreadId(), event);
+        if (length > 0) {
+            DWORD written = 0;
+            WriteFile(file, line, static_cast<DWORD>(length), &written, nullptr);
+        }
+        CloseHandle(file);
+    } catch (...) {}
 }
 #endif
 

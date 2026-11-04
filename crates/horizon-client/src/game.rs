@@ -435,6 +435,18 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+
+#[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+fn uwp_uses_native_d3d11() -> bool {
+    std::env::var("HORIZON_UWP_RENDERER")
+        .map(|renderer| renderer.eq_ignore_ascii_case("d3d11"))
+        .unwrap_or(true)
+}
+
+#[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
+fn uwp_uses_native_d3d11() -> bool {
+    false
+}
 use winit::{
     application::ApplicationHandler,
     error::EventLoopError,
@@ -15710,7 +15722,8 @@ impl Game<'_> {
         self.touch_gyro_frame();
         let mut hud = horizon_client::spans::time("hud", || self.hud(size));
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-        if self.title.is_none()
+        if self.native_renderer.is_some()
+            && self.title.is_none()
             && matches!(
                 self.screen,
                 Screen::Playing | Screen::Inventory | Screen::Creative
@@ -15723,6 +15736,11 @@ impl Game<'_> {
             self.touch.draw(&mut hud, &self.gui.atlas);
             #[cfg(feature = "native-touch-mod")]
             self.release_failed_touch_module();
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if self.native_renderer.is_none() && self.title.is_none() && self.screen == Screen::Playing
+        {
+            self.touch.draw(&mut hud, &self.gui.atlas);
         }
         #[cfg(all(target_vendor = "uwp", not(feature = "native-d3d11")))]
         if self.title.is_none() && self.screen == Screen::Playing {
@@ -16048,9 +16066,23 @@ impl Game<'_> {
             chunk_fade: self.settings.chunk_fade,
         };
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-        let result = match &mut self.native_renderer {
+        let native_result = match &mut self.native_renderer {
             Some(renderer) => horizon_client::spans::time("renderer", || renderer.present(&frame)),
-            None => Err("native renderer".into()),
+            None => Ok(false),
+        };
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let result = if self.native_renderer.is_some() {
+            native_result
+        } else {
+            match self.renderer.as_mut() {
+                Some(renderer) => {
+                    renderer.set_pass_timing(self.debug || self.gpu_passes);
+                    horizon_client::spans::time("renderer", || {
+                        horizon_client::presentation::present(renderer, &frame)
+                    })
+                }
+                None => Err("renderer".into()),
+            }
         };
         #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         let result = match self.renderer.as_mut() {
@@ -16804,10 +16836,14 @@ impl Game<'_> {
         let arriving = self.view_arrival.arriving(view, now, has) || self.remote_backlog() > 0;
 
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-        let terrain: Option<&mut dyn horizon_client::presentation::TerrainBackend> = self
-            .native_renderer
-            .as_mut()
-            .map(|r| r as &mut dyn horizon_client::presentation::TerrainBackend);
+        let terrain: Option<&mut dyn horizon_client::presentation::TerrainBackend> =
+            if let Some(renderer) = self.native_renderer.as_mut() {
+                Some(renderer as &mut dyn horizon_client::presentation::TerrainBackend)
+            } else {
+                self.renderer.as_mut().map(|renderer| {
+                    renderer as &mut dyn horizon_client::presentation::TerrainBackend
+                })
+            };
         #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         let terrain: Option<&mut dyn horizon_client::presentation::TerrainBackend> = self
             .renderer
@@ -17001,6 +17037,16 @@ impl ApplicationHandler for Game<'_> {
                 return;
             }
         };
+        #[cfg(target_vendor = "uwp")]
+        {
+            let physical = window.inner_size();
+            log::info!(
+                "Horizon UWP window metrics: inner={}x{} physical pixels, scale_factor={:.3}",
+                physical.width,
+                physical.height,
+                window.scale_factor()
+            );
+        }
         drop(window_step);
         horizon_client::telemetry::note_display(&window);
         match self.new_renderer(window.clone()) {
@@ -20954,11 +21000,20 @@ impl Loading {
                 return;
             }
         };
+        #[cfg(target_vendor = "uwp")]
+        {
+            let physical = window.inner_size();
+            log::info!(
+                "Horizon UWP loading window: inner={}x{} physical pixels, scale_factor={:.3}",
+                physical.width,
+                physical.height,
+                window.scale_factor()
+            );
+        }
         drop(window_step);
         horizon_client::telemetry::note_display(&window);
 
-        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
-        {
+        if !uwp_uses_native_d3d11() {
             // The renderer takes seconds to build and winit's window sits white
             // until the first frame presents, so paint the boot screen on it and
             // keep repainting it as the console's lines arrive; the wgpu frames
@@ -21042,8 +21097,14 @@ impl Loading {
             return;
         };
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-        {
+        if uwp_uses_native_d3d11() {
             let size = window.inner_size();
+            log::info!(
+                "Horizon UWP title renderer: viewport={}x{} physical pixels, scale_factor={:.3}",
+                size.width,
+                size.height,
+                window.scale_factor()
+            );
             drop(self.native_renderer.take());
             let gui = self.gui.as_ref().expect("GUI was just assigned");
             match horizon_client::native_renderer::NativeRenderer::new(
@@ -21056,8 +21117,7 @@ impl Loading {
             }
         }
 
-        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
-        {
+        if !uwp_uses_native_d3d11() {
             let offscreen = self.options.as_ref().is_some_and(|o| o.offscreen);
             if let Some(renderer) = &mut self.renderer {
                 horizon_client::presentation::PresentationBackend::release_surface(renderer);
@@ -21112,14 +21172,30 @@ impl Loading {
         event_loop.set_control_flow(ControlFlow::Poll);
     }
     fn draw(&mut self) {
-        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
-        let size = self.renderer.as_ref().map(Renderer::viewport_size);
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-        let size = self.native_renderer.as_ref().map(|r| r.viewport_size());
+        let native_size = self.native_renderer.as_ref().map(|r| r.viewport_size());
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
+        let native_size: Option<[u32; 2]> = None;
+        let size = native_size.or_else(|| self.renderer.as_ref().map(Renderer::viewport_size));
         let Some(size) = size else {
             return;
         };
         let mut batch = HudBatch::new(size);
+        #[cfg(target_vendor = "uwp")]
+        {
+            static LOGGED_METRICS: std::sync::atomic::AtomicBool =
+                std::sync::atomic::AtomicBool::new(false);
+            if !LOGGED_METRICS.swap(true, Ordering::Relaxed) {
+                log::info!(
+                    "Horizon UWP title layout: framebuffer={}x{}, GUI={}x{} at GUI scale {:.1}",
+                    size[0],
+                    size[1],
+                    batch.width,
+                    batch.height,
+                    batch.scale
+                );
+            }
+        }
         self.draw_menu(&mut batch);
         self.menu.frame_drawn((batch.width, batch.height));
         let mut frame = loading_frame(&batch);
@@ -21138,7 +21214,6 @@ impl Loading {
                 Err(e) => log::warn!("Horizon: native loading screen frame failed: {e}"),
             }
         }
-        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         if let Some(renderer) = &mut self.renderer {
             match horizon_client::presentation::present(renderer, &frame) {
                 Ok(true) if self.gui.is_some() && self.menu.pending.is_none() => {
@@ -21173,29 +21248,33 @@ impl Loading {
         }
         let renderer_at = Instant::now();
 
-        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
-        let renderer = startup::time("renderer.world", || {
-            build_renderer(
-                window.clone(),
-                options.offscreen,
-                &loaded.pack,
-                &gui,
-                self.renderer.as_ref(),
-                loaded.renderer_cpu,
-                self.settings.horizon.api,
-                self.settings.horizon.translucent_batching,
-                shader_packs::picked_pack_draws_flat(&self.settings),
-            )
-        })?;
+        let renderer = if uwp_uses_native_d3d11() {
+            None
+        } else {
+            Some(startup::time("renderer.world", || {
+                build_renderer(
+                    window.clone(),
+                    options.offscreen,
+                    &loaded.pack,
+                    &gui,
+                    self.renderer.as_ref(),
+                    loaded.renderer_cpu,
+                    self.settings.horizon.api,
+                    self.settings.horizon.translucent_batching,
+                    shader_packs::picked_pack_draws_flat(&self.settings),
+                )
+            })?)
+        };
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
-        let native_renderer = {
+        let native_renderer = if uwp_uses_native_d3d11() {
             let mut renderer = self
                 .native_renderer
                 .take()
                 .ok_or("native renderer is unavailable")?;
-            let assets = &loaded.pack.render;
-            renderer.set_terrain(assets)?;
-            renderer
+            renderer.set_terrain(&loaded.pack.render)?;
+            Some(renderer)
+        } else {
+            None
         };
 
         log::info!(
@@ -21234,13 +21313,10 @@ impl Loading {
         drop(game_step);
         let game_ms = game_at.elapsed().as_millis();
         game.window = Some(window);
-        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
-        {
-            game.renderer = Some(renderer);
-        }
+        game.renderer = renderer;
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         {
-            game.native_renderer = Some(native_renderer);
+            game.native_renderer = native_renderer;
         }
         game.world_renderer_ready = true;
         game.fullscreen = self.fullscreen;

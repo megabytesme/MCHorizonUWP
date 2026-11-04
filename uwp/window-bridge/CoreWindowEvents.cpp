@@ -1,11 +1,22 @@
 #include "CoreWindowEvents.h"
 #include <windows.ui.input.h>
+#include <atomic>
 
 using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
 using namespace Windows::UI::Core;
 using namespace Windows::UI::Input;
 using namespace Windows::Devices::Input;
+
+namespace horizon_uwp {
+
+static std::atomic<uint32_t> current_size_stage{0};
+
+} // namespace horizon_uwp
+
+extern "C" uint32_t __cdecl horizon_uwp_window_size_stage() {
+    return horizon_uwp::current_size_stage.load(std::memory_order_acquire);
+}
 
 namespace horizon_uwp {
 
@@ -50,17 +61,40 @@ CoreWindowEvents::~CoreWindowEvents() {
 }
 
 void CoreWindowEvents::Emit(HorizonUwpEvent& event) {
-    event.scale_factor = display_->LogicalDpi / 96.0f;
+    event.scale_factor = scale_factor_;
     callback_(context_, &event);
 }
 
 void CoreWindowEvents::EmitInitialSize() {
+    current_size_stage.store(1, std::memory_order_release);
+    try {
+        const auto scale = display_->LogicalDpi / 96.0f;
+        scale_factor_ = scale;
+    } catch (Platform::Exception^ error) {
+        if (width_ <= 0.0f || height_ <= 0.0f)
+            throw ref new Platform::Exception(error->HResult, L"Reading DisplayInformation.LogicalDpi failed.");
+    }
+    current_size_stage.store(2, std::memory_order_release);
+    try {
+        const auto bounds = window_->Bounds;
+        width_ = bounds.Width * scale_factor_;
+        height_ = bounds.Height * scale_factor_;
+    } catch (Platform::Exception^ error) {
+        // XAML can temporarily make view metrics unavailable while its root is
+        // detached. Continue with the last size observed before the handoff.
+        if (width_ <= 0.0f || height_ <= 0.0f)
+            throw ref new Platform::Exception(error->HResult, L"Reading CoreWindow.Bounds failed.");
+    }
     HorizonUwpEvent event{};
     event.kind = HORIZON_UWP_RESIZE;
-    const auto scale = display_->LogicalDpi / 96.0f;
-    event.width = window_->Bounds.Width * scale;
-    event.height = window_->Bounds.Height * scale;
+    event.width = width_;
+    event.height = height_;
+    current_size_stage.store(3, std::memory_order_release);
     Emit(event);
+    // Keep the last completed step until the next resize begins. If WinRT
+    // raises a delayed exception while unwinding the caller, clearing this to
+    // zero would erase the only useful handoff diagnostic.
+    current_size_stage.store(4, std::memory_order_release);
 }
 
 void CoreWindowEvents::OnSize(CoreWindow^, WindowSizeChangedEventArgs^) { EmitInitialSize(); }
@@ -90,8 +124,7 @@ void CoreWindowEvents::OnCharacter(CoreWindow^, CharacterReceivedEventArgs^ args
 void CoreWindowEvents::EmitPointer(uint32_t kind, PointerEventArgs^ args) {
     HorizonUwpEvent e{}; e.kind = kind;
     auto point = args->CurrentPoint; auto properties = point->Properties;
-    const auto scale = display_->LogicalDpi / 96.0f;
-    e.x = point->Position.X * scale; e.y = point->Position.Y * scale;
+    e.x = point->Position.X * scale_factor_; e.y = point->Position.Y * scale_factor_;
     e.pointer_id = point->PointerId;
     e.pointer_type = static_cast<uint32_t>(point->PointerDevice->PointerDeviceType);
     e.buttons = (properties->IsLeftButtonPressed ? 1u : 0u) |

@@ -1,8 +1,4 @@
 // Native UWP XAML shell. Windows Mobile reuses the primary CoreWindow for the game.
-#if defined(_MSC_VER) && _MSC_VER >= 1940 && defined(WINAPI_FAMILY)
-extern "C" __declspec(dllimport) char* __cdecl getenv(const char*);
-extern "C" __declspec(dllimport) int __cdecl system(const char*);
-#endif
 #using <Microsoft.UI.Xaml.winmd>
 #include <windows.h>
 #include <d3d11_1.h>
@@ -32,6 +28,8 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.ui.xaml.input.h>
 #include <windows.ui.xaml.controls.h>
 #include <windows.ui.xaml.controls.primitives.h>
+#include <windows.ui.xaml.documents.h>
+#include <windows.ui.xaml.media.dxinterop.h>
 #include <windows.ui.xaml.markup.h>
 #include <windows.ui.xaml.media.h>
 #include <windows.ui.xaml.media.imaging.h>
@@ -44,6 +42,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -70,6 +69,7 @@ using namespace Windows::UI::Xaml::Controls::Primitives;
 using namespace Windows::UI::Xaml::Input;
 using namespace Windows::UI::Xaml::Media;
 using namespace Windows::UI::Xaml::Media::Imaging;
+using namespace Windows::UI::Xaml::Documents;
 using namespace Windows::Web::Http;
 using namespace Windows::Web::Http::Filters;
 using namespace Concurrency;
@@ -77,6 +77,7 @@ namespace muxc = Microsoft::UI::Xaml::Controls;
 
 extern "C" void __cdecl horizon_uwp_attach_shell(CoreWindow^ window);
 extern "C" void __cdecl horizon_uwp_open_game_view();
+extern "C" void __cdecl horizon_uwp_trace_shell_event(const char* event);
 extern "C" int __cdecl horizon_uwp_prepare(const uint16_t*, size_t);
 extern "C" int __cdecl horizon_uwp_pick_files(const wchar_t*, size_t, unsigned);
 extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsigned);
@@ -90,23 +91,84 @@ extern "C" int __cdecl horizon_uwp_gyro_available();
 #endif
 
 namespace {
-#ifdef HORIZON_UWP_SHELL_PROBE
+char last_shell_stage[128] = "process startup";
+
+void trace_platform_error(const char* stage, Platform::Exception^ error) {
+    try {
+        char detail[512] = {};
+        if (error && error->Message) {
+            WideCharToMultiByte(CP_UTF8, 0, error->Message->Data(), -1,
+                detail, static_cast<int>(sizeof(detail)), nullptr, nullptr);
+        }
+        char event[768];
+        sprintf_s(event, sizeof(event), "%s at %s: HRESULT 0x%08X; %s",
+            stage, last_shell_stage, error ? static_cast<unsigned>(error->HResult) : 0u,
+            detail[0] ? detail : "no error message");
+        horizon_uwp_trace_shell_event(event);
+    } catch (...) {}
+}
+
 void probe_stage(const wchar_t* value) {
-    auto base = ApplicationData::Current->LocalFolder->Path;
-    auto path = Platform::String::Concat(base, L"\\shell-stage.txt");
-    HANDLE h = CreateFile2(path->Data(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
-    if (h != INVALID_HANDLE_VALUE) { DWORD written = 0; WriteFile(h, value, static_cast<DWORD>(wcslen(value) * sizeof(wchar_t)), &written, nullptr); CloseHandle(h); }
+    try {
+        WideCharToMultiByte(CP_UTF8, 0, value, -1, last_shell_stage,
+            static_cast<int>(sizeof(last_shell_stage)), nullptr, nullptr);
+        horizon_uwp_trace_shell_event(last_shell_stage);
+#ifdef HORIZON_UWP_SHELL_PROBE
+        auto base = ApplicationData::Current->LocalFolder->Path;
+        auto path = Platform::String::Concat(base, L"\\shell-stage.txt");
+        HANDLE h = CreateFile2(path->Data(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+        if (h != INVALID_HANDLE_VALUE) {
+            DWORD written = 0;
+            WriteFile(h, value, static_cast<DWORD>(wcslen(value) * sizeof(wchar_t)), &written, nullptr);
+            CloseHandle(h);
+        }
+#endif
+    } catch (...) {}
 }
 #define PROBE_STAGE(value) probe_stage(value)
-#else
-#define PROBE_STAGE(value) ((void)0)
-#endif
 std::atomic<int> choice{-1};
 std::atomic<unsigned> prompt_generation{0};
 std::atomic<unsigned> skin_generation{0};
 CoreDispatcher^ dispatcher;
 Page^ page;
+Grid^ shell_root;
+Grid^ app_title_bar;
+ColumnDefinition^ title_bar_left_padding;
+ColumnDefinition^ title_bar_right_padding;
 ContentControl^ content;
+#ifdef HORIZON_UWP_NATIVE_D3D11
+SwapChainPanel^ game_surface;
+extern "C" void __cdecl horizon_uwp_set_game_surface_metrics(
+    uint32_t width, uint32_t height, double scale_x, double scale_y);
+extern "C" void __cdecl horizon_uwp_set_game_surface_active(int active);
+#ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
+extern "C" void __cdecl horizon_uwp_trace_game_surface(
+    double actual_width, double actual_height, double scale_x, double scale_y,
+    uint32_t pixel_width, uint32_t pixel_height);
+extern "C" void __cdecl horizon_uwp_trace_game_swapchain(uint32_t width, uint32_t height);
+#endif
+
+void update_game_surface_metrics() {
+    if (!game_surface) return;
+    const double scale_x = game_surface->CompositionScaleX;
+    const double scale_y = game_surface->CompositionScaleY;
+    const double pixel_width = game_surface->ActualWidth * scale_x;
+    const double pixel_height = game_surface->ActualHeight * scale_y;
+    if (!std::isfinite(pixel_width) || !std::isfinite(pixel_height) ||
+        !std::isfinite(scale_x) || !std::isfinite(scale_y) ||
+        pixel_width < 1.0 || pixel_height < 1.0 || scale_x <= 0.0 || scale_y <= 0.0)
+        return;
+#ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
+    horizon_uwp_trace_game_surface(
+        game_surface->ActualWidth, game_surface->ActualHeight, scale_x, scale_y,
+        static_cast<uint32_t>(std::ceil(pixel_width)),
+        static_cast<uint32_t>(std::ceil(pixel_height)));
+#endif
+    horizon_uwp_set_game_surface_metrics(
+        static_cast<uint32_t>(std::ceil(pixel_width)),
+        static_cast<uint32_t>(std::ceil(pixel_height)), scale_x, scale_y);
+}
+#endif
 muxc::NavigationView^ navigation;
 muxc::NavigationViewItem^ profile_navigation;
 Button^ fallback_profile;
@@ -125,6 +187,8 @@ unsigned displayed_generation = 0;
 char page_switch_error[256] = {};
 bool renderer_known = false;
 bool renderer_available = false;
+bool renderer_availability[3] = {};
+std::atomic<unsigned> selected_renderer{0};
 Platform::String^ renderer_failure;
 TextBlock^ renderer_status;
 #ifdef HORIZON_UWP_TOUCH_MOD
@@ -150,9 +214,7 @@ NativeRendererProbe probe_native_renderer() {
         D3D11_CREATE_DEVICE_BGRA_SUPPORT, requested, ARRAYSIZE(requested), D3D11_SDK_VERSION,
         &device, &selected, &context);
     if (SUCCEEDED(result) && selected != D3D_FEATURE_LEVEL_9_1) result = DXGI_ERROR_UNSUPPORTED;
-    // Do not create a CoreWindow swap chain while XAML owns this window's
-    // compositor. The native game creates and validates its swap chain after
-    // the shell releases Window::Content in horizon_uwp_page_show_game().
+    // This probes device support only. The game uses a XAML composition panel.
     return { result, selected };
 }
 enum class AppAppearance { Automatic, Windows10, Windows10Fluent, Windows11SunValley };
@@ -162,6 +224,7 @@ bool show_settings = false;
 bool show_logs = false;
 bool show_news = false;
 bool has_winui = false;
+std::atomic<int> game_exit_behavior{0};
 unsigned profile_kind = 0;
 unsigned live_tile_mode = 0;
 bool tile_skin_available = false;
@@ -183,13 +246,44 @@ Platform::String^ installed_release() {
     return length && length <= sizeof(buffer) ? decode(buffer, length) : ref new Platform::String(L"Horizon");
 }
 
-Platform::String^ renderer_label() {
+bool renderer_packaged(unsigned renderer) {
+    switch (renderer) {
+        case 0:
 #ifdef HORIZON_UWP_NATIVE_D3D11
-    return L"Direct3D 11 (native, feature level 9_1)";
-#elif defined(HORIZON_UWP_DX12)
-    return L"Direct3D 12 (WGPU)";
+            return true;
 #else
-    return L"OpenGL ES 3.0 (ANGLE)";
+            return false;
+#endif
+        case 1:
+#ifdef HORIZON_UWP_ANGLE
+            return true;
+#else
+            return false;
+#endif
+        case 2:
+#ifdef HORIZON_UWP_DX12
+            return true;
+#else
+            return false;
+#endif
+        default: return false;
+    }
+}
+Platform::String^ renderer_label(unsigned renderer) {
+    switch (renderer) {
+        case 0: return L"Direct3D 11 (native, feature level 9_1)";
+        case 1: return L"ANGLE (OpenGL ES 3.0)";
+        case 2: return L"Direct3D 12";
+        default: return L"Unknown renderer";
+    }
+}
+unsigned default_renderer() {
+#ifdef HORIZON_UWP_DEFAULT_RENDERER_DX12
+    return 2;
+#elif defined(HORIZON_UWP_DEFAULT_RENDERER_ANGLE)
+    return 1;
+#else
+    return 0;
 #endif
 }
 
@@ -221,6 +315,42 @@ void load_latest_log(TextBox^ output) {
         }
         try { dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([output, result]() { output->Text = result; })); }
         catch (...) {}
+    }));
+}
+
+void load_shell_log(TextBox^ output) {
+    output->Text = L"Loading launcher lifecycle log…";
+    auto path = Platform::String::Concat(
+        ApplicationData::Current->LocalFolder->Path, L"\\horizon-uwp-lifecycle.log");
+    ThreadPool::RunAsync(ref new WorkItemHandler([path, output](IAsyncAction^) {
+        Platform::String^ result = L"No launcher lifecycle events have been recorded yet.";
+        HANDLE file = CreateFile2(path->Data(), GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, nullptr);
+        if (file != INVALID_HANDLE_VALUE) {
+            LARGE_INTEGER size = {};
+            if (GetFileSizeEx(file, &size)) {
+                constexpr DWORD limit = 65536;
+                LARGE_INTEGER offset = {};
+                offset.QuadPart = size.QuadPart > limit ? size.QuadPart - limit : 0;
+                if (SetFilePointerEx(file, offset, nullptr, FILE_BEGIN)) {
+                    std::string bytes(limit, '\0');
+                    DWORD count = 0;
+                    if (ReadFile(file, &bytes[0], limit, &count, nullptr)) {
+                        const int needed = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), count, nullptr, 0);
+                        if (needed > 0) {
+                            std::wstring wide(needed, L'\0');
+                            MultiByteToWideChar(CP_UTF8, 0, bytes.data(), count, &wide[0], needed);
+                            result = ref new Platform::String(wide.data(), needed);
+                        }
+                    }
+                }
+            }
+            CloseHandle(file);
+        }
+        try {
+            dispatcher->RunAsync(CoreDispatcherPriority::Normal,
+                ref new DispatchedHandler([output, result]() { output->Text = result; }));
+        } catch (...) {}
     }));
 }
 
@@ -303,7 +433,10 @@ bool supports_mica() {
 AppAppearance resolved_appearance(AppAppearance requested) {
     if (requested == AppAppearance::Windows10) return requested;
     if (requested == AppAppearance::Windows10Fluent && supports_acrylic()) return requested;
-    if (requested == AppAppearance::Windows11SunValley && supports_mica()) return requested;
+    if (requested == AppAppearance::Windows11SunValley) {
+        if (supports_mica()) return requested;
+        return supports_acrylic() ? AppAppearance::Windows10Fluent : AppAppearance::Windows10;
+    }
     if (supports_mica()) return AppAppearance::Windows11SunValley;
     if (supports_acrylic()) return AppAppearance::Windows10Fluent;
     return AppAppearance::Windows10;
@@ -350,9 +483,16 @@ Platform::String^ decode(const unsigned char* bytes, size_t length) {
 }
 
 void choose(int value, unsigned generation) {
-    if (generation != prompt_generation.load()) return;
+    if (generation != prompt_generation.load()) {
+        horizon_uwp_trace_shell_event("ignored stale start or account selection");
+        return;
+    }
     int expected = 0;
-    choice.compare_exchange_strong(expected, value);
+    if (choice.compare_exchange_strong(expected, value)) {
+        char event[96];
+        sprintf_s(event, "startup page accepted choice %d", value);
+        horizon_uwp_trace_shell_event(event);
+    }
 }
 
 Button^ button(Platform::String^ label, int value) {
@@ -753,33 +893,67 @@ void show_about() {
     wchar_t version[64];
     swprintf_s(version, L"%u.%u.%u.%u", package_version.Major, package_version.Minor,
         package_version.Build, package_version.Revision);
-    std::wstring details = L"Architecture: " + std::wstring(package_architecture()->Data()) +
-        L"\nMinecraft version: 26.3\nWindows: " + windows_version_label() +
-        L"\nHorizon release: " + std::wstring(installed_release()->Data()) +
-        L"\nHorizon upstream commit: " + std::wstring(build_label(horizon_uwp_upstream_ref)->Data()) +
-        L"\nUWP port commit: " + std::wstring(build_label(horizon_uwp_port_ref)->Data()) +
-        L"\nApp package version: " + version;
-    auto body = ref new StackPanel();
-    body->Children->Append(text(L"Unofficial UWP client for Horizon and Minecraft: Java Edition.", 15));
-    auto information = ref new TextBox();
-    information->Text = ref new Platform::String(details.c_str());
-    information->IsReadOnly = true;
-    information->AcceptsReturn = true;
-    information->TextWrapping = TextWrapping::Wrap;
-    information->MinHeight = 180;
-    body->Children->Append(information);
-    for (const auto& entry : std::vector<std::pair<const wchar_t*, std::wstring>>{
-        { L"Horizon source", L"https://github.com/horizon-rust/horizon" },
-        { L"Report an issue", L"https://github.com/horizon-rust/horizon/issues" },
-        { L"Horizon license", L"https://github.com/horizon-rust/horizon/blob/main/LICENSE" },
-        { L"Installed release notes", upstream_release_url() } }) {
-        body->Children->Append(action_button(ref new Platform::String(entry.first),
-            ref new RoutedEventHandler([url = entry.second](Platform::Object^, RoutedEventArgs^) { open_web_link(url); })));
-    }
+    auto details = ref new TextBlock();
+    details->TextWrapping = TextWrapping::Wrap;
+    auto add_text = [details](Platform::String^ value) {
+        auto run = ref new Run(); run->Text = value; details->Inlines->Append(run);
+    };
+    auto add_break = [details]() { details->Inlines->Append(ref new LineBreak()); };
+    auto add_link = [details](Platform::String^ label, const std::wstring& address) {
+        auto link = ref new Hyperlink();
+        link->NavigateUri = ref new Uri(ref new Platform::String(address.c_str()));
+        auto run = ref new Run(); run->Text = label; link->Inlines->Append(run);
+        details->Inlines->Append(link);
+    };
+    auto upstream_ref = build_label(horizon_uwp_upstream_ref);
+    auto port_ref = build_label(horizon_uwp_port_ref);
+    auto upstream_text = std::wstring(upstream_ref->Data(), upstream_ref->Length());
+    auto port_text = std::wstring(port_ref->Data(), port_ref->Length());
+    const auto upstream_commit_url = L"https://github.com/horizon-rust/horizon/commit/" + upstream_text;
+    auto title = ref new Run();
+    title->Text = L"Horizon UWP";
+    title->FontWeight = Windows::UI::Text::FontWeights::Bold;
+    title->FontSize = 18;
+    details->Inlines->Append(title);
+    add_break();
+    add_text(Platform::String::Concat(L"Version ", ref new Platform::String(version)));
+    add_text(Platform::String::Concat(Platform::String::Concat(L" (", package_architecture()), L")"));
+    add_break();
+    add_text(Platform::String::Concat(L"Horizon ", installed_release()));
+    add_break();
+    add_text(L"Minecraft Java Edition 26.3");
+    add_break();
+    add_text(ref new Platform::String(windows_version_label().c_str()));
+    add_break();
+    add_break();
+    add_text(L"Horizon commit: ");
+    add_link(upstream_ref, upstream_commit_url);
+    add_break();
+    add_text(L"UWP integration: ");
+    add_link(port_ref, L"https://github.com/horizon-rust/horizon/commits/" + port_text);
+    add_break();
+    add_break();
+    add_text(L"A community-built Windows client for Horizon, the open-source Minecraft: Java Edition implementation. Minecraft is a trademark of Microsoft Corporation and Mojang AB. This project is not affiliated with or endorsed by them.");
+    add_break();
+    add_break();
+    add_text(L"Source code: ");
+    add_link(L"GitHub", L"https://github.com/horizon-rust/horizon");
+    add_break();
+    add_text(L"Found a bug? Report it in the ");
+    add_link(L"issue tracker", L"https://github.com/horizon-rust/horizon/issues");
+    add_text(L".");
+    add_break();
+    add_break();
+    add_text(L"License: ");
+    add_link(L"Horizon license", L"https://github.com/horizon-rust/horizon/blob/main/LICENSE");
+    auto scroll = ref new ScrollViewer();
+    scroll->MaxHeight = 560;
+    scroll->VerticalScrollBarVisibility = ScrollBarVisibility::Auto;
+    scroll->Content = details;
     auto dialog = ref new ContentDialog();
-    dialog->Title = L"About Horizon UWP";
-    dialog->Content = body;
-    dialog->CloseButtonText = L"Close";
+    dialog->Title = L"About";
+    dialog->Content = scroll;
+    dialog->PrimaryButtonText = L"OK";
     dialog->ShowAsync();
 }
 
@@ -1089,7 +1263,9 @@ void refresh() {
             themes->Items->Append(item);
         }
         safe_cast<ComboBoxItem^>(themes->Items->GetAt(2))->IsEnabled = supports_acrylic();
-        safe_cast<ComboBoxItem^>(themes->Items->GetAt(3))->IsEnabled = supports_mica() && has_winui;
+        // Keep all three named styles selectable. On Windows 10, the Sun
+        // Valley choice uses the Acrylic treatment available on that OS.
+        safe_cast<ComboBoxItem^>(themes->Items->GetAt(3))->IsEnabled = true;
         themes->SelectedIndex = static_cast<int>(selected_appearance);
         themes->SelectionChanged += ref new SelectionChangedEventHandler([themes](Platform::Object^, SelectionChangedEventArgs^) {
             if (themes->SelectedIndex < 0 || themes->SelectedIndex > 3) return;
@@ -1102,28 +1278,68 @@ void refresh() {
         if ((resolved_appearance(selected_appearance) == AppAppearance::Windows11SunValley) !=
             (resolved_appearance(startup_appearance) == AppAppearance::Windows11SunValley))
             appearance_card->Children->Append(text(L"Colours and materials have updated. Restart the app to finish applying the control styles.", 14));
+        if (selected_appearance == AppAppearance::Windows11SunValley && !supports_mica())
+            appearance_card->Children->Append(text(L"Mica is available on Windows 11. On this Windows version, this choice uses the closest available system material.", 14));
         appearance_card->Children->Append(text(L"Automatic matches your Windows version. The app follows your light, dark and high contrast settings.", 14));
         panel->Children->Append(card(appearance_card));
         auto launch_card = ref new StackPanel();
         launch_card->Children->Append(text(L"Launch settings", 18));
         auto renderers = ref new ComboBox(); renderers->Header = L"Renderer";
-        auto angle = ref new ComboBoxItem();
-        angle->Content = renderer_known && renderer_available ? renderer_label() :
-            renderer_known ? L"No compatible renderer detected" : L"Checking this device…";
-        angle->IsEnabled = renderer_known && renderer_available;
-        renderers->Items->Append(angle);
-        renderers->SelectedIndex = 0;
+        int selected_index = -1;
+        for (unsigned id = 0; id != 3; ++id) {
+            if (!renderer_packaged(id)) continue;
+            auto item = ref new ComboBoxItem();
+            item->Content = renderer_label(id);
+            item->Tag = PropertyValue::CreateUInt32(id);
+            item->IsEnabled = renderer_known && renderer_availability[id];
+            if (id == selected_renderer.load(std::memory_order_acquire)) selected_index = static_cast<int>(renderers->Items->Size);
+            renderers->Items->Append(item);
+        }
+        if (renderers->Items->Size == 0) {
+            auto item = ref new ComboBoxItem(); item->Content = L"No renderer is included in this package"; item->IsEnabled = false;
+            renderers->Items->Append(item);
+        }
+        if (selected_index < 0) selected_index = 0;
+        renderers->SelectedIndex = selected_index;
         launch_card->Children->Append(renderers);
+        renderers->SelectionChanged += ref new SelectionChangedEventHandler(
+            [renderers](Platform::Object^, SelectionChangedEventArgs^) {
+                auto item = dynamic_cast<ComboBoxItem^>(renderers->SelectedItem);
+                if (!item || !item->Tag) return;
+                const unsigned id = safe_cast<IPropertyValue^>(item->Tag)->GetUInt32();
+                if (id > 2 || !renderer_availability[id]) return;
+                selected_renderer.store(id, std::memory_order_release);
+                renderer_available = true;
+                ApplicationData::Current->LocalSettings->Values->Insert(L"game-renderer", PropertyValue::CreateUInt32(id));
+                if (renderer_status) renderer_status->Text = Platform::String::Concat(renderer_label(id), L" passed this device's graphics check.");
+            });
         renderer_status = text(renderer_known
-#ifdef HORIZON_UWP_NATIVE_D3D11
-            ? (renderer_available ? L"This device supports Direct3D 11 feature level 9_1. The game checks its presentation surface when it starts." :
-                (renderer_failure ? renderer_failure : L"The native Direct3D 11 device could not be created."))
-#else
-            ? (renderer_available ? L"The client configured and presented through this renderer on this device." : L"The client could not open a compatible graphics device and presentation surface on this device.")
-#endif
+            ? (renderer_available ? Platform::String::Concat(renderer_label(selected_renderer.load()), L" passed this device's graphics check.")
+                : (renderer_failure ? renderer_failure : L"No compatible packaged renderer was detected."))
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
+        auto exit_card = ref new StackPanel();
+        exit_card->Children->Append(text(L"When Minecraft quits", 18));
+        auto exit_behavior = ref new ComboBox();
+        exit_behavior->Header = L"After selecting Quit Game";
+        for (auto label : { L"Return to Horizon home page", L"Close Horizon" }) {
+            auto item = ref new ComboBoxItem(); item->Content = ref new Platform::String(label);
+            exit_behavior->Items->Append(item);
+        }
+        exit_behavior->SelectedIndex = game_exit_behavior.load(std::memory_order_acquire);
+        exit_behavior->SelectionChanged += ref new SelectionChangedEventHandler(
+            [exit_behavior](Platform::Object^, SelectionChangedEventArgs^) {
+                const int selected = exit_behavior->SelectedIndex;
+                if (selected < 0 || selected > 1) return;
+                game_exit_behavior.store(selected, std::memory_order_release);
+                ApplicationData::Current->LocalSettings->Values->Insert(
+                    L"game-quit-behavior", PropertyValue::CreateInt32(selected));
+            });
+        exit_card->Children->Append(exit_behavior);
+        exit_card->Children->Append(text(
+            L"Returning to Horizon ends the current game session and lets you start again with another account or the available renderer settings.", 14));
+        panel->Children->Append(card(exit_card));
 #ifdef HORIZON_UWP_TOUCH_MOD
         auto touch_card = ref new StackPanel();
         touch_card->Children->Append(text(L"Touch controls", 18));
@@ -1257,8 +1473,17 @@ void refresh() {
         auto log = ref new TextBox(); log->IsReadOnly = true; log->AcceptsReturn = true;
         log->TextWrapping = TextWrapping::Wrap; log->MinHeight = 240;
         panel->Children->Append(log);
-        panel->Children->Append(action_button(L"Refresh", ref new RoutedEventHandler([log](Platform::Object^, RoutedEventArgs^) { load_latest_log(log); })));
+        panel->Children->Append(text(L"Launcher and renderer handoff", 18));
+        auto shell_log = ref new TextBox(); shell_log->IsReadOnly = true; shell_log->AcceptsReturn = true;
+        shell_log->TextWrapping = TextWrapping::Wrap; shell_log->MinHeight = 160;
+        panel->Children->Append(shell_log);
+        panel->Children->Append(action_button(L"Refresh", ref new RoutedEventHandler(
+            [log, shell_log](Platform::Object^, RoutedEventArgs^) {
+                load_latest_log(log);
+                load_shell_log(shell_log);
+            })));
         load_latest_log(log);
+        load_shell_log(shell_log);
     } else if (show_news && prompt_kind == 0) {
         panel->Children->Append(text(L"What's new", 28));
         panel->Children->Append(text(installed_release(), 18));
@@ -1276,12 +1501,8 @@ void refresh() {
         panel->Children->Append(text(L"Horizon", 32));
         panel->Children->Append(text(prompt_text, 16));
         panel->Children->Append(text(renderer_known
-#ifdef HORIZON_UWP_NATIVE_D3D11
-            ? (renderer_available ? Platform::String::Concat(renderer_label(), L" is ready. The game checks presentation when it starts.") :
-                (renderer_failure ? renderer_failure : L"No compatible renderer was detected."))
-#else
-            ? (renderer_available ? Platform::String::Concat(renderer_label(), L" is ready.") : L"No compatible renderer was detected.")
-#endif
+            ? (renderer_available ? Platform::String::Concat(renderer_label(selected_renderer.load()), L" is ready.")
+                : (renderer_failure ? renderer_failure : L"No compatible renderer was detected."))
             : L"Checking graphics support…", 14));
         panel->Children->Append(profile_card());
         panel->Children->Append(button(L"Start game", 1));
@@ -1299,8 +1520,9 @@ ref class ShellApp sealed : Application, Windows::UI::Xaml::Markup::IXamlMetadat
     Microsoft::UI::Xaml::XamlTypeInfo::XamlControlsXamlMetaDataProvider^ metadata_;
 public:
     ShellApp() {
-        try { metadata_ = ref new Microsoft::UI::Xaml::XamlTypeInfo::XamlControlsXamlMetaDataProvider(); }
-        catch (Platform::Exception^) { metadata_ = nullptr; }
+        // WinUI activation is deferred until OnLaunched, after the UWP XAML
+        // application runtime has initialized.
+        metadata_ = nullptr;
     }
     virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Windows::UI::Xaml::Interop::TypeName type) {
         return metadata_ ? metadata_->GetXamlType(type) : nullptr;
@@ -1313,6 +1535,7 @@ public:
     }
 protected:
     virtual void OnLaunched(LaunchActivatedEventArgs^) override {
+        try {
         PROBE_STAGE(L"OnLaunched");
         auto window = Window::Current;
         dispatcher = window->Dispatcher;
@@ -1324,6 +1547,13 @@ protected:
         ui_settings = ref new UISettings();
         accessibility = ref new AccessibilitySettings();
         auto values = ApplicationData::Current->LocalSettings->Values;
+        int saved_exit_behavior = 0;
+        if (values->HasKey(L"game-quit-behavior")) {
+            try { saved_exit_behavior = safe_cast<IPropertyValue^>(values->Lookup(L"game-quit-behavior"))->GetInt32(); }
+            catch (Platform::Exception^) {}
+        }
+        if (saved_exit_behavior < 0 || saved_exit_behavior > 1) saved_exit_behavior = 0;
+        game_exit_behavior.store(saved_exit_behavior, std::memory_order_release);
 #ifdef HORIZON_UWP_TOUCH_MOD
         bool saved_gyro_enabled = false;
         double saved_gyro_sensitivity = 1.0;
@@ -1364,6 +1594,16 @@ protected:
         if (stored < 0 || stored > 3) stored = 0;
         selected_appearance = static_cast<AppAppearance>(stored);
         startup_appearance = selected_appearance;
+        unsigned saved_renderer = default_renderer();
+        if (values->HasKey(L"game-renderer")) {
+            try { saved_renderer = safe_cast<IPropertyValue^>(values->Lookup(L"game-renderer"))->GetUInt32(); }
+            catch (Platform::Exception^) {}
+        }
+        if (saved_renderer > 2 || !renderer_packaged(saved_renderer)) {
+            saved_renderer = 0;
+            while (saved_renderer < 3 && !renderer_packaged(saved_renderer)) ++saved_renderer;
+        }
+        selected_renderer.store(saved_renderer < 3 ? saved_renderer : 0, std::memory_order_release);
         int saved_tile_mode = 0;
         auto saved_tile = values->HasKey(L"live-tile-mode") ? values->Lookup(L"live-tile-mode") : nullptr;
         if (saved_tile) { try { saved_tile_mode = safe_cast<IPropertyValue^>(saved_tile)->GetInt32(); } catch (Platform::Exception^) {} }
@@ -1374,6 +1614,13 @@ protected:
 #ifdef HORIZON_UWP_SHELL_PLAIN_PROBE
             throw ref new Platform::FailureException();
 #endif
+            // Activate the provider only after the UWP XAML Application has
+            // reached OnLaunched; activating it from ShellApp's constructor
+            // runs before the framework's package activation context is ready.
+            PROBE_STAGE(L"Before WinUI metadata provider");
+            metadata_ = ref new Microsoft::UI::Xaml::XamlTypeInfo::XamlControlsXamlMetaDataProvider();
+            PROBE_STAGE(L"WinUI metadata provider created");
+            horizon_uwp_trace_shell_event("WinUI metadata provider initialized");
             auto control_resources = ref new muxc::XamlControlsResources();
             control_resources->ControlsResourcesVersion = resolved_appearance(selected_appearance) == AppAppearance::Windows11SunValley
                 ? muxc::ControlsResourcesVersion::Version2 : muxc::ControlsResourcesVersion::Version1;
@@ -1382,7 +1629,10 @@ protected:
             navigation->PaneDisplayMode = muxc::NavigationViewPaneDisplayMode::LeftCompact;
             navigation->IsBackButtonVisible = muxc::NavigationViewBackButtonVisible::Collapsed;
             navigation->IsBackEnabled = false;
-            navigation->IsTitleBarAutoPaddingEnabled = true;
+            // The host creates a separate 32-DIP titlebar row and applies the
+            // system overlay insets there. NavigationView must not add a
+            // second titlebar inset of its own.
+            navigation->IsTitleBarAutoPaddingEnabled = false;
             navigation->Loaded += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { apply_theme(); });
             auto home = ref new muxc::NavigationViewItem();
             home->Content = L"Home"; home->Tag = L"home"; home->Icon = ref new SymbolIcon(Symbol::Home);
@@ -1426,32 +1676,83 @@ protected:
             page->Content = navigation;
             has_winui = true;
             PROBE_STAGE(L"WinUI ready");
-        } catch (Platform::Exception^) {
-            PROBE_STAGE(L"WinUI fallback");
-            // A damaged or unavailable WinUI framework must not prevent the
-            // plain system XAML page from opening.
-            auto split = ref new SplitView();
-            split->DisplayMode = SplitViewDisplayMode::Inline;
-            split->OpenPaneLength = 150;
-            split->IsPaneOpen = true;
-            auto pane = ref new StackPanel();
-            auto home = ref new Button(); home->Content = L"Home";
-            home->Click += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { if (prompt_kind == 0) { show_settings = false; show_logs = false; show_news = false; refresh(); } });
-            auto logs = ref new Button(); logs->Content = L"Logs";
-            logs->Click += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { if (prompt_kind == 0) { show_settings = false; show_logs = true; show_news = false; refresh(); } });
-            auto news = ref new Button(); news->Content = L"What's new";
-            news->Click += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { if (prompt_kind == 0) { show_settings = false; show_logs = false; show_news = true; refresh(); } });
-            auto settings = ref new Button(); settings->Content = L"Settings";
-            settings->Click += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { if (prompt_kind == 0) { show_settings = true; show_logs = false; show_news = false; refresh(); } });
-            fallback_profile = ref new Button();
-            fallback_profile->Click += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { if (prompt_kind == 0) choose(2, displayed_generation); });
-            update_profile_navigation();
-            pane->Children->Append(home); pane->Children->Append(logs); pane->Children->Append(news); pane->Children->Append(fallback_profile); pane->Children->Append(settings);
-            split->Pane = pane; split->Content = content; page->Content = split;
+        } catch (Platform::Exception^ error) {
+            trace_platform_error("WinUI initialization failed", error);
+            throw;
         }
+        auto page_content = safe_cast<FrameworkElement^>(page->Content);
+        // A XAML element can only have one visual-tree parent. Move the
+        // NavigationView from the page into the shared titlebar/page layout.
+        page->Content = nullptr;
+        auto page_layout = ref new Grid();
+        const bool desktop_window = Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamily == L"Windows.Desktop";
+        if (desktop_window) {
+            auto title_bar_row = ref new RowDefinition();
+            title_bar_row->Height = GridLength(32);
+            page_layout->RowDefinitions->Append(title_bar_row);
+            auto page_row = ref new RowDefinition();
+            page_row->Height = GridLength(1, GridUnitType::Star);
+            page_layout->RowDefinitions->Append(page_row);
+            app_title_bar = ref new Grid();
+            app_title_bar->Height = 32;
+            app_title_bar->Background = ref new SolidColorBrush(Colors::Transparent);
+            app_title_bar->ColumnDefinitions->Append(title_bar_left_padding = ref new ColumnDefinition());
+            app_title_bar->ColumnDefinitions->Append(ref new ColumnDefinition());
+            app_title_bar->ColumnDefinitions->Append(title_bar_right_padding = ref new ColumnDefinition());
+            auto title = text(L"Horizon", 14);
+            title->Margin = Thickness(16, 0, 0, 0);
+            title->VerticalAlignment = VerticalAlignment::Center;
+            app_title_bar->Children->Append(title);
+            Grid::SetColumn(title, 1);
+            page_layout->Children->Append(app_title_bar);
+            Grid::SetRow(page_content, 1);
+            CoreApplicationViewTitleBar^ title_bar = CoreApplication::GetCurrentView()->TitleBar;
+            title_bar->ExtendViewIntoTitleBar = true;
+            title_bar->LayoutMetricsChanged += ref new TypedEventHandler<CoreApplicationViewTitleBar^, Platform::Object^>(
+                [](CoreApplicationViewTitleBar^ current, Platform::Object^) {
+                    if (title_bar_left_padding) title_bar_left_padding->Width = GridLength(current->SystemOverlayLeftInset);
+                    if (title_bar_right_padding) title_bar_right_padding->Width = GridLength(current->SystemOverlayRightInset);
+                });
+            title_bar_left_padding->Width = GridLength(title_bar->SystemOverlayLeftInset);
+            title_bar_right_padding->Width = GridLength(title_bar->SystemOverlayRightInset);
+            auto app_view_title_bar = ApplicationView::GetForCurrentView()->TitleBar;
+            app_view_title_bar->ButtonBackgroundColor = Colors::Transparent;
+            app_view_title_bar->ButtonInactiveBackgroundColor = Colors::Transparent;
+            Window::Current->SetTitleBar(app_title_bar);
+        } else {
+            auto page_row = ref new RowDefinition();
+            page_row->Height = GridLength(1, GridUnitType::Star);
+            page_layout->RowDefinitions->Append(page_row);
+            Grid::SetRow(page_content, 0);
+        }
+        page_layout->Children->Append(page_content);
+        page->Content = page_layout;
         apply_theme();
         PROBE_STAGE(L"Theme ready");
-        window->Content = page;
+#ifdef HORIZON_UWP_NATIVE_D3D11
+        shell_root = ref new Grid();
+        shell_root->Children->Append(page);
+        game_surface = ref new SwapChainPanel();
+        game_surface->HorizontalAlignment = HorizontalAlignment::Stretch;
+        game_surface->VerticalAlignment = VerticalAlignment::Stretch;
+        // Keep the panel laid out at the window's real XAML size while the
+        // launcher is shown. The game later reveals it without replacing the
+        // Window content or opening another view.
+        game_surface->Opacity = 0.0;
+        game_surface->IsHitTestVisible = false;
+        game_surface->SizeChanged += ref new SizeChangedEventHandler(
+            [](Platform::Object^, SizeChangedEventArgs^) { update_game_surface_metrics(); });
+        game_surface->CompositionScaleChanged += ref new TypedEventHandler<SwapChainPanel^, Platform::Object^>(
+            [](SwapChainPanel^, Platform::Object^) { update_game_surface_metrics(); });
+        game_surface->Loaded += ref new RoutedEventHandler(
+            [](Platform::Object^, RoutedEventArgs^) { update_game_surface_metrics(); });
+        shell_root->Children->Append(game_surface);
+        window->Content = shell_root;
+#else
+        shell_root = ref new Grid();
+        shell_root->Children->Append(page);
+        window->Content = shell_root;
+#endif
         window->Activate();
         update_live_tile();
         ui_settings->ColorValuesChanged += ref new TypedEventHandler<UISettings^, Platform::Object^>(
@@ -1465,40 +1766,111 @@ protected:
                 catch (...) {}
             });
         PROBE_STAGE(L"Window activated");
-#ifdef HORIZON_UWP_NATIVE_D3D11
-        renderer_known = true;
-        const auto probe = probe_native_renderer();
-        renderer_available = SUCCEEDED(probe.result);
-        if (!renderer_available) {
-            wchar_t message[192];
-            swprintf_s(message, L"Horizon could not create a Direct3D 11 feature level 9_1 device (HRESULT 0x%08X).",
-                static_cast<unsigned>(probe.result));
-            renderer_failure = ref new Platform::String(message);
-        }
-#else
-        renderer_known = true;
-#ifdef HORIZON_UWP_DX12
-        constexpr unsigned renderer_backend = 2;
-#else
-        constexpr unsigned renderer_backend = 1;
-#endif
         auto coreWindow = CoreWindow::GetForCurrentThread();
         auto bounds = coreWindow->Bounds;
         const double scale = DisplayInformation::GetForCurrentView()->RawPixelsPerViewPixel;
         const auto width = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Width * scale)));
         const auto height = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Height * scale)));
-        renderer_available = horizon_uwp_probe_renderer(
-            reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(coreWindow)), renderer_backend, width, height) != 0;
+#ifdef HORIZON_UWP_NATIVE_D3D11
+        const auto d3d11_probe = probe_native_renderer();
+        renderer_availability[0] = SUCCEEDED(d3d11_probe.result);
 #endif
+#ifdef HORIZON_UWP_ANGLE
+        renderer_availability[1] = horizon_uwp_probe_renderer(
+            reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(coreWindow)), 1, width, height) != 0;
+#endif
+#ifdef HORIZON_UWP_DX12
+        renderer_availability[2] = horizon_uwp_probe_renderer(
+            reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(coreWindow)), 2, width, height) != 0;
+#endif
+        char probe_event[160];
+        sprintf_s(probe_event, "renderer probes D3D11=%d ANGLE=%d DX12=%d",
+            renderer_availability[0] ? 1 : 0,
+            renderer_availability[1] ? 1 : 0,
+            renderer_availability[2] ? 1 : 0);
+        horizon_uwp_trace_shell_event(probe_event);
+        renderer_known = true;
+        unsigned chosen = selected_renderer.load(std::memory_order_acquire);
+        if (chosen > 2 || !renderer_availability[chosen]) {
+            chosen = 0;
+            while (chosen < 3 && !renderer_availability[chosen]) ++chosen;
+            if (chosen >= 3) {
+                renderer_failure = L"No compatible packaged graphics backend could create a device and presentation surface.";
+                renderer_available = false;
+                selected_renderer.store(0, std::memory_order_release);
+            } else {
+                selected_renderer.store(chosen, std::memory_order_release);
+                values->Insert(L"game-renderer", PropertyValue::CreateUInt32(chosen));
+                renderer_available = true;
+            }
+        } else {
+            renderer_available = true;
+        }
         if (prompt_kind == 0) refresh();
         ThreadPool::RunAsync(ref new WorkItemHandler([](IAsyncAction^) {
             PROBE_STAGE(L"Worker started");
+            horizon_uwp_trace_shell_event("initial game-session preparation started");
             auto local = ApplicationData::Current->LocalFolder->Path;
             auto game = Platform::String::Concat(local, L"\\game");
             const int result = horizon_uwp_prepare(reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
+            char event[96];
+            sprintf_s(event, "initial game-session preparation returned %d", result);
+            horizon_uwp_trace_shell_event(event);
             if (result == 1) dispatcher->RunAsync(CoreDispatcherPriority::Normal,
                 ref new DispatchedHandler([]() { horizon_uwp_open_game_view(); }));
         }));
+        } catch (Platform::Exception^ error) {
+            trace_platform_error("startup exception", error);
+            try {
+                wchar_t message[1024];
+                const wchar_t* detail = error->Message ? error->Message->Data() : L"No additional error detail was provided.";
+                swprintf_s(message, sizeof(message) / sizeof(message[0]),
+                    L"Horizon could not finish starting during %hs.\n\nError 0x%08X: %s\n\nA diagnostic was saved in app storage.",
+                    last_shell_stage, static_cast<unsigned>(error->HResult), detail);
+                auto panel = ref new StackPanel();
+                panel->Margin = Thickness(24);
+                auto title = ref new TextBlock();
+                title->Text = L"Horizon startup error";
+                title->FontSize = 28;
+                title->Margin = Thickness(0, 0, 0, 16);
+                auto body = ref new TextBlock();
+                body->Text = ref new Platform::String(message);
+                body->TextWrapping = TextWrapping::Wrap;
+                body->IsTextSelectionEnabled = true;
+                panel->Children->Append(title);
+                panel->Children->Append(body);
+                auto scroll = ref new ScrollViewer();
+                scroll->Content = panel;
+                auto window = Window::Current;
+                window->Content = scroll;
+                window->Activate();
+            } catch (...) {
+                horizon_uwp_trace_shell_event("could not render startup error page");
+            }
+        } catch (...) {
+            char event[256];
+            sprintf_s(event, "unknown startup exception at %s", last_shell_stage);
+            horizon_uwp_trace_shell_event(event);
+            try {
+                auto panel = ref new StackPanel();
+                panel->Margin = Thickness(24);
+                auto title = ref new TextBlock();
+                title->Text = L"Horizon startup error";
+                title->FontSize = 28;
+                auto body = ref new TextBlock();
+                body->Text = L"Horizon hit an unexpected error during startup. A diagnostic was saved in app storage.";
+                body->TextWrapping = TextWrapping::Wrap;
+                panel->Children->Append(title);
+                panel->Children->Append(body);
+                auto scroll = ref new ScrollViewer();
+                scroll->Content = panel;
+                auto window = Window::Current;
+                window->Content = scroll;
+                window->Activate();
+            } catch (...) {
+                horizon_uwp_trace_shell_event("could not render unknown startup error page");
+            }
+        }
     }
 };
 }
@@ -1596,6 +1968,37 @@ extern "C" size_t __cdecl horizon_uwp_page_switch_error(unsigned char* buffer, s
     }
     return length;
 }
+extern "C" int __cdecl horizon_uwp_page_exit_after_game() {
+    return game_exit_behavior.load(std::memory_order_acquire) == 1 ? 1 : 0;
+}
+extern "C" int __cdecl horizon_uwp_page_selected_renderer() {
+    return static_cast<int>(selected_renderer.load(std::memory_order_acquire));
+}
+#ifdef HORIZON_UWP_NATIVE_D3D11
+extern "C" int32_t __cdecl horizon_uwp_attach_game_swapchain(void* swap_chain) {
+    if (!dispatcher || !dispatcher->HasThreadAccess) return RPC_E_WRONG_THREAD;
+    if (!game_surface || !swap_chain) return E_POINTER;
+    Microsoft::WRL::ComPtr<ISwapChainPanelNative> panel;
+    const HRESULT query = reinterpret_cast<IUnknown*>(game_surface)->QueryInterface(IID_PPV_ARGS(&panel));
+    if (FAILED(query)) return query;
+    update_game_surface_metrics();
+#ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
+    DXGI_SWAP_CHAIN_DESC1 description = {};
+    const HRESULT description_result = reinterpret_cast<IDXGISwapChain1*>(swap_chain)->GetDesc1(&description);
+    if (SUCCEEDED(description_result))
+        horizon_uwp_trace_game_swapchain(description.Width, description.Height);
+#endif
+    return panel->SetSwapChain(reinterpret_cast<IDXGISwapChain*>(swap_chain));
+}
+
+static HRESULT detach_game_swapchain() {
+    if (!game_surface) return S_OK;
+    Microsoft::WRL::ComPtr<ISwapChainPanelNative> panel;
+    const HRESULT query = reinterpret_cast<IUnknown*>(game_surface)->QueryInterface(IID_PPV_ARGS(&panel));
+    if (FAILED(query)) return query;
+    return panel->SetSwapChain(nullptr);
+}
+#endif
 extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
     page_switch_error[0] = 0;
     if (!dispatcher) {
@@ -1616,16 +2019,43 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
         return E_HANDLE;
     }
     try {
-        if (show) {
-            auto current_content = window->Content;
-            if (current_content == nullptr) return S_OK;
-            if (current_content != page) {
-                strcpy_s(page_switch_error, "The current window content is not the pre-game page.");
+        if (selected_renderer.load(std::memory_order_acquire) == 0) {
+#ifdef HORIZON_UWP_NATIVE_D3D11
+            if (!game_surface) {
+                strcpy_s(page_switch_error, "The native Direct3D game surface was not initialized.");
+                return E_POINTER;
+            }
+            if (show > 0) {
+                horizon_uwp_set_game_surface_active(1);
+                game_surface->Opacity = 1.0;
+                game_surface->IsHitTestVisible = true;
+                update_game_surface_metrics();
+                page->Visibility = Visibility::Collapsed;
+            } else {
+                const HRESULT detach = detach_game_swapchain();
+                if (FAILED(detach)) {
+                    sprintf_s(page_switch_error, "Releasing the Direct3D game surface failed (0x%08X).",
+                        static_cast<unsigned>(detach));
+                    return detach;
+                }
+                game_surface->Opacity = 0.0;
+                game_surface->IsHitTestVisible = false;
+                horizon_uwp_set_game_surface_active(0);
+                page->Visibility = show == 0 ? Visibility::Visible : Visibility::Collapsed;
+                if (show == 0 && prompt_kind == 0) refresh();
+            }
+#else
+            strcpy_s(page_switch_error, "The native Direct3D 11 renderer is not in this package.");
+            return E_NOTIMPL;
+#endif
+        } else if (show > 0) {
+            if (window->Content != shell_root && window->Content != nullptr) {
+                strcpy_s(page_switch_error, "The current window content is not the Horizon shell.");
                 return E_UNEXPECTED;
             }
             window->Content = nullptr;
-        } else {
-            window->Content = page;
+        } else if (show == 0) {
+            window->Content = shell_root;
             apply_theme();
             if (prompt_kind == 0) refresh();
         }

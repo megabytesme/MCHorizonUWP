@@ -22,6 +22,21 @@ if ($LASTEXITCODE -ne 0) { throw "Compiling link sentinels failed: $LASTEXITCODE
 $linkArgs = @('/nologo', '/APPCONTAINER', '/SUBSYSTEM:WINDOWS', "/MACHINE:$Machine", '/OPT:REF',
     '/NODEFAULTLIB:kernel32.lib', "/MAP:$mapPath", "/OUT:$outputPath") +
     $Objects + @($stubObj, 'WindowsApp.lib', 'ntdll.lib') + $ExtraLibraries + @($RustLibrary)
+# Rust's MSVC-target standard library can emit compiler-rt half-float helpers.
+# The Rust static library intentionally leaves these intrinsic symbols for the
+# final native link, so add the matching Microsoft compiler-rt archive when it
+# is installed. Do not mix architectures or fall back to desktop CRT libraries.
+$runtimeRelativePath = switch ($Machine) {
+    'X64' { 'lib\x64\clang_rt.builtins-x86_64.lib' }
+    'ARM64' { 'lib\arm64\clang_rt.builtins-aarch64.lib' }
+    'ARM' { 'lib\arm\clang_rt.builtins-arm.lib' }
+}
+if ($runtimeRelativePath -and $env:VCToolsInstallDir) {
+    $compilerRuntime = Join-Path $env:VCToolsInstallDir $runtimeRelativePath
+    if (Test-Path -LiteralPath $compilerRuntime -PathType Leaf) {
+        $linkArgs += $compilerRuntime
+    }
+}
 if ($StackReserve -gt 0) { $linkArgs += "/STACK:$StackReserve" }
 & link @linkArgs
 if ($LASTEXITCODE -ne 0) { throw "Strict UWP link failed: $LASTEXITCODE" }

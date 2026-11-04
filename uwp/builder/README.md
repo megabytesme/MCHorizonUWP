@@ -62,15 +62,17 @@ public nightly release metadata and reports when its source differs; a failed
 check does not prevent an offline build from the pinned source. The check
 does not download or execute the new release. Minecraft resource framework versions
 remain tied to the Minecraft resources, not to the Horizon nightly date.
-The renderer build choices vary only with available runtime and compiler inputs:
-native D3D11 is built for x64 and ARM32, ANGLE is packaged for x64, and the
-Direct3D 12 CoreWindow backend currently builds for x64. The ARM32 DX12 build
-fails in the upstream Windows bindings before linking; ANGLE has no ARM32 DLL
-set in this recipe. These are build-input constraints, not assumptions about
-the device GPU. The native D3D11 pre-game check creates a feature-level 9_1
-device while XAML owns the view; the game checks its CoreWindow presentation
-surface after the shell detaches its page. This avoids treating XAML's active
-compositor as a failed game swap chain. On Windows 10 Mobile, input handlers
+The x64 client includes native D3D11 and WGPU's DX12 backend; it also includes
+ANGLE when the matching x64 UWP DLLs are available in the selected checkout.
+The ARM32 client includes native D3D11 only. Runtime device and surface probes
+show only renderers that the installed package can use on that device. DX12
+and ANGLE are package inputs on x64; the ARM32 DX12 build fails in the upstream
+Windows bindings before linking, and this recipe has no ARM32 ANGLE runtime.
+These are build-input constraints, not assumptions about the device GPU. The
+native D3D11 pre-game check creates a feature-level 9_1 device while XAML owns
+the view; the game checks its CoreWindow presentation surface after the shell
+detaches its page. This avoids treating XAML's active compositor as a failed
+game swap chain. On Windows 10 Mobile, input handlers
 are registered before the XAML page is detached; the game receives its initial
 size after the handoff. The pre-game page and gameplay share one CoreWindow on
 every target, including desktop and Windows 10 Mobile. The preview runs x64

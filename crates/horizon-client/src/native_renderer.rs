@@ -101,6 +101,16 @@ pub struct NativeRenderer {
     timings: Option<NativeTimings>,
 }
 
+/// Create the CoreWindow swap chain before the XAML dispatcher callback
+/// returns. The game thread consumes it when the title renderer is created.
+#[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+pub fn prepare_window_renderer_on_ui_thread() -> i32 {
+    match WindowRenderer::prepare_on_ui_thread() {
+        Ok(()) => 0,
+        Err(error) => error.code().0,
+    }
+}
+
 impl NativeRenderer {
     pub fn new(
         atlas: &HudAtlas,
@@ -182,7 +192,7 @@ impl NativeRenderer {
         if viewport.contains(&0) || viewport == self.viewport {
             return Ok(());
         }
-        self.window.renderer_mut().resize()?;
+        self.window.resize(viewport[0], viewport[1])?;
         self.viewport = viewport;
         Ok(())
     }

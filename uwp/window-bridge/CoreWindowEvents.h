@@ -49,6 +49,7 @@ struct HorizonUwpEvent {
 static_assert(sizeof(HorizonUwpEvent) == 56, "Rust event ABI must match");
 
 typedef void (__cdecl *HorizonUwpEventCallback)(void*, const HorizonUwpEvent*);
+extern "C" uint32_t __cdecl horizon_uwp_window_size_stage();
 
 namespace horizon_uwp {
 
@@ -86,6 +87,9 @@ private:
     Windows::Devices::Input::MouseDevice^ mouse_;
     HorizonUwpEventCallback callback_;
     void* context_;
+    float scale_factor_ = 1.0f;
+    float width_ = 0.0f;
+    float height_ = 0.0f;
     Windows::Foundation::EventRegistrationToken size_, dpi_, focus_, visibility_, close_;
     Windows::Foundation::EventRegistrationToken key_down_, key_up_, character_;
     Windows::Foundation::EventRegistrationToken pointer_move_, pointer_down_, pointer_up_, pointer_cancel_, pointer_wheel_;

@@ -32,12 +32,13 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("Choose a resource directory that does not contain the builder workspace.");
         ValidateResourceTree(resources);
         string? angleBin = null;
-        if (selection.ValidatedRenderer == "angle")
+        if (selection.Target == TargetProfile.DesktopX64)
         {
-            angleBin = Path.Combine(Path.GetFullPath(source), ".local", "vcpkg-x64", "installed", "x64-uwp-local", "bin");
-            foreach (var name in new[] { "libEGL.dll", "libGLESv2.dll" })
-                if (!File.Exists(Path.Combine(angleBin, name)))
-                    throw new FileNotFoundException($"The selected ANGLE build needs {name} in the source checkout's x64 UWP vcpkg output.", Path.Combine(angleBin, name));
+            var candidate = Path.Combine(Path.GetFullPath(source), ".local", "vcpkg-x64", "installed", "x64-uwp-local", "bin");
+            if (new[] { "libEGL.dll", "libGLESv2.dll" }.All(name => File.Exists(Path.Combine(candidate, name))))
+                angleBin = candidate;
+            else if (selection.ValidatedRenderer == "angle")
+                throw new FileNotFoundException("ANGLE was selected, but its UWP runtime DLLs are missing. Install/build ANGLE for the x64-uwp-local vcpkg triplet, then retry.", candidate);
         }
         var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
@@ -115,9 +116,11 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_GAMEPAD"] = "1";
         vcEnvironment["HORIZON_UWP_ACCOUNT"] = "1";
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
-        vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = selection.ValidatedRenderer == "native-d3d11" ? "1" : "";
+        vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = "1";
         vcEnvironment["HORIZON_UWP_TOUCH_MOD"] = selection.IncludesNativeTouchMod ? "1" : "";
-        vcEnvironment["HORIZON_UWP_DX12"] = selection.ValidatedRenderer == "dx12" ? "1" : "";
+        vcEnvironment["HORIZON_UWP_DX12"] = arm ? "" : "1";
+        vcEnvironment["HORIZON_UWP_ANGLE"] = angleBin is null ? "" : "1";
+        vcEnvironment["HORIZON_UWP_DEFAULT_RENDERER"] = selection.ValidatedRenderer;
         vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
         var hostOutput = Path.Combine(root, "native-host", "game-" + arch);
@@ -151,7 +154,7 @@ public static class LocalBuildRunner
         progress?.Report("Packaging the unsigned client.");
         var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
-            "-IdentityName", "HorizonUWPLatestPreview", "-WinUIFramework", arm ? "2.7" : "2.8",
+            "-IdentityName", "HorizonUWPLatestPreview", "-WinUIFramework", "2.7",
             framework is null ? "-Resources" : "-ResourceFrameworkName", framework?.Name ?? packageResources };
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
         if (releaseNotesPath is not null) { packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath); }
