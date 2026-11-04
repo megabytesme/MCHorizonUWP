@@ -259,7 +259,7 @@ Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("t
     && fetchStep.Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml"), "fetch uses target, host and overrides");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
-Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https,uwp-controller,uwp-account"), "touch and controller build features");
+Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell"), "touch and controller build features");
 var withDevice = new BuildSelection(TargetProfile.WindowsMobile, true, NativeDeviceVibration: true);
 Require(withDevice.ModIds.Contains(BuildSelection.DeviceVibrationModId)
     && withDevice.Features.Contains("native-device-vibration-mod"), "device vibration is an optional native mod");
@@ -293,10 +293,10 @@ Require(new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "
 try { _ = new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "not-an-id").ValidatedMicrosoftClientId; throw new Exception("invalid client ID accepted"); }
 catch (ArgumentException) { }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
-Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "uwp-account"]), "native touch feature selection");
+Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "native touch feature selection");
 Require(selection.ModIds.SequenceEqual(["horizon_touch"]), "stable native touch mod ID");
 Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");
-Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-audio", "uwp-https", "uwp-controller", "uwp-account"]), "touch can be omitted");
+Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-dx12-renderer", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "touch can be omitted");
 Require(new BuildSelection(TargetProfile.DesktopX64, false).ModIds.Count == 0, "omitted mod ID");
 try { _ = new BuildSelection((TargetProfile)99, false).RustTarget; throw new Exception("invalid target accepted"); }
 catch (ArgumentOutOfRangeException) { }
