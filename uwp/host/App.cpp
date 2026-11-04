@@ -13,7 +13,6 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
-#include <roapi.h>
 #include <wrl/client.h>
 #include <windows.applicationmodel.h>
 #include <windows.foundation.metadata.h>
@@ -35,10 +34,14 @@ extern "C" void __cdecl horizon_uwp_gyro_set_visible(int visible);
 static Windows::UI::Core::CoreWindow^ primary_window;
 static Windows::UI::Core::CoreDispatcher^ primary_dispatcher;
 static DWORD primary_window_thread = 0;
-static Microsoft::WRL::ComPtr<IAgileReference> primary_window_agile;
-static HRESULT primary_window_agile_result = E_PENDING;
-static Microsoft::WRL::ComPtr<IUnknown> worker_window_proxy;
-static std::mutex worker_window_mutex;
+// Keep the original CoreWindow COM identity alive for raw renderer APIs.
+// EGL's WinRT surface creation consumes the actual CoreWindow pointer and
+// cannot use the IAgileReference proxy returned by RoGetAgileReference.
+static Microsoft::WRL::ComPtr<IUnknown> primary_window_native;
+// ANGLE uses the existing XAML SwapChainPanel as its EGL window target. Keep
+// the panel's original WinRT identity alive; apartment proxies aren't valid
+// native EGL window handles.
+static Microsoft::WRL::ComPtr<IUnknown> game_surface_native;
 static horizon_uwp::CoreWindowEvents^ active_game_events;
 static Windows::UI::ViewManagement::ApplicationView^ game_application_view;
 static bool game_phone = false;
@@ -64,11 +67,7 @@ extern "C" void __cdecl horizon_uwp_attach_shell(Windows::UI::Core::CoreWindow^ 
     primary_window = window;
     primary_dispatcher = window->Dispatcher;
     primary_window_thread = GetCurrentThreadId();
-    Microsoft::WRL::ComPtr<IUnknown> unknown;
-    unknown = reinterpret_cast<IUnknown*>(window);
-    const HRESULT agile_result = RoGetAgileReference(
-        AGILEREFERENCE_DEFAULT, IID_IUnknown, unknown.Get(), &primary_window_agile);
-    primary_window_agile_result = agile_result;
+    primary_window_native = reinterpret_cast<IUnknown*>(window);
 #endif
     account_window_closed.store(false);
     account_window_visible.store(true);
@@ -89,6 +88,13 @@ extern "C" void __cdecl horizon_uwp_attach_shell(Windows::UI::Core::CoreWindow^ 
         });
 }
 #endif
+extern "C" void __cdecl horizon_uwp_register_game_surface(void* surface) {
+#ifdef HORIZON_UWP_XAML_SHELL
+    if (surface) game_surface_native = reinterpret_cast<IUnknown*>(surface);
+#else
+    (void)surface;
+#endif
+}
 #endif
 static HorizonUwpEvent pending_events[4096];
 static uint32_t event_read, event_write;
@@ -97,6 +103,7 @@ static uint32_t cached_width, cached_height;
 static double cached_scale = 1.0;
 static uint32_t game_surface_width, game_surface_height;
 static double game_surface_scale_x = 1.0, game_surface_scale_y = 1.0;
+static double game_surface_input_origin_y;
 static std::atomic<bool> game_surface_active{false};
 
 #ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
@@ -136,7 +143,7 @@ static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
                        adjusted.kind == HORIZON_UWP_POINTER_CANCEL) {
                 const double event_scale = adjusted.scale_factor > 0.0f ? adjusted.scale_factor : 1.0;
                 adjusted.x = static_cast<float>(adjusted.x * game_surface_scale_x / event_scale);
-                adjusted.y = static_cast<float>(adjusted.y * game_surface_scale_y / event_scale);
+                adjusted.y = static_cast<float>(adjusted.y * game_surface_scale_y / event_scale - game_surface_input_origin_y);
             }
             adjusted.scale_factor = static_cast<float>(game_surface_scale_x);
         }
@@ -186,7 +193,7 @@ static void __cdecl queue_event(void*, const HorizonUwpEvent* event) {
 }
 
 extern "C" void __cdecl horizon_uwp_set_game_surface_metrics(
-    uint32_t width, uint32_t height, double scale_x, double scale_y) {
+    uint32_t width, uint32_t height, double scale_x, double scale_y, double input_origin_y) {
     if (!width || !height || scale_x <= 0.0 || scale_y <= 0.0) return;
     {
         std::lock_guard<std::mutex> lock(event_queue_mutex);
@@ -194,6 +201,7 @@ extern "C" void __cdecl horizon_uwp_set_game_surface_metrics(
         game_surface_height = height;
         game_surface_scale_x = scale_x;
         game_surface_scale_y = scale_y;
+        game_surface_input_origin_y = (std::max)(0.0, input_origin_y);
     }
     HorizonUwpEvent resize{};
     resize.kind = HORIZON_UWP_RESIZE;
@@ -290,17 +298,17 @@ static Platform::String^ resolve_resources(Platform::String^ local_path) {
 
 extern "C" void* __cdecl horizon_uwp_window_handle() {
 #ifdef HORIZON_UWP_XAML_SHELL
+    const char* renderer = getenv("HORIZON_UWP_RENDERER");
+    if (renderer && strcmp(renderer, "angle") == 0 && game_surface_native)
+        return game_surface_native.Get();
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
     if (!owner || !current_window) return nullptr;
     if (GetCurrentThreadId() == owner) return reinterpret_cast<void*>(current_window);
-    if (FAILED(primary_window_agile_result)) return nullptr;
-    std::lock_guard<std::mutex> lock(worker_window_mutex);
-    if (!worker_window_proxy && primary_window_agile) {
-        Microsoft::WRL::ComPtr<IUnknown> proxy;
-        if (SUCCEEDED(primary_window_agile->Resolve(IID_IUnknown, &proxy)))
-            worker_window_proxy = std::move(proxy);
-    }
-    return worker_window_proxy.Get();
+    // WGPU's EGL WinRT backend passes this value straight to EGL. A COM
+    // apartment proxy looks valid as IUnknown but is not the native XAML
+    // surface handle ANGLE expects. The UI host retains this identity;
+    // game-window operations still marshal through the XAML dispatcher.
+    return primary_window_native.Get();
 #else
     // CoreWindow must only be handed out on its owning UI thread.
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
@@ -387,10 +395,11 @@ extern "C" void __cdecl horizon_uwp_set_ime_allowed(int allowed) {
 extern "C" int __cdecl horizon_uwp_set_cursor_position(double x, double y) {
     if (!current_window) return 0;
     double scale = 1.0;
-    { std::lock_guard<std::mutex> lock(event_queue_mutex); scale = cached_scale; }
-    auto set_position = [x, y, scale]() {
+    double origin_y = 0.0;
+    { std::lock_guard<std::mutex> lock(event_queue_mutex); scale = cached_scale; origin_y = game_surface_input_origin_y; }
+    auto set_position = [x, y, scale, origin_y]() {
         try { if (current_window) current_window->PointerPosition = Windows::Foundation::Point(
-            static_cast<float>(x / scale), static_cast<float>(y / scale)); }
+            static_cast<float>(x / scale), static_cast<float>((y + origin_y) / scale)); }
         catch (Platform::Exception^) {}
     };
     if (current_window_thread.load(std::memory_order_acquire) == GetCurrentThreadId()) {
@@ -474,6 +483,43 @@ static void show_fatal(Platform::String^ text) {
 extern "C" int __cdecl horizon_uwp_is_ui_thread() {
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
     return owner && owner == GetCurrentThreadId();
+}
+using HorizonUwpUiCallback = void(__cdecl*)(void*);
+extern "C" int32_t __cdecl horizon_uwp_dispatch_ui_sync(
+    HorizonUwpUiCallback callback, void* context) {
+#ifdef HORIZON_UWP_XAML_SHELL
+    if (!callback || !primary_dispatcher) return E_POINTER;
+    auto invoke = [callback, context]() -> int32_t {
+        try { callback(context); return S_OK; }
+        catch (Platform::Exception^ error) { return error->HResult; }
+        catch (...) { return E_FAIL; }
+    };
+    if (GetCurrentThreadId() == primary_window_thread) return invoke();
+    HANDLE completed = CreateEventEx(nullptr, nullptr, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+    if (!completed) return HRESULT_FROM_WIN32(GetLastError());
+    std::atomic<int32_t> result{S_OK};
+    try {
+        primary_dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::High,
+            ref new Windows::UI::Core::DispatchedHandler([invoke, completed, &result]() {
+                result.store(invoke(), std::memory_order_release);
+                SetEvent(completed);
+            }));
+    } catch (Platform::Exception^ error) {
+        CloseHandle(completed);
+        return error->HResult;
+    } catch (...) {
+        CloseHandle(completed);
+        return E_FAIL;
+    }
+    const DWORD wait = WaitForSingleObject(completed, INFINITE);
+    const int32_t status = result.load(std::memory_order_acquire);
+    CloseHandle(completed);
+    return wait == WAIT_OBJECT_0 ? status : HRESULT_FROM_WIN32(GetLastError());
+#else
+    if (!callback) return E_POINTER;
+    try { callback(context); return S_OK; }
+    catch (...) { return E_FAIL; }
+#endif
 }
 extern "C" int __cdecl horizon_uwp_fatal_done() { return fatal_done.load() ? 1 : 0; }
 extern "C" void __cdecl horizon_uwp_fatal_begin(const uint8_t* text, size_t len) {

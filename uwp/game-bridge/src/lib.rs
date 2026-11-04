@@ -143,6 +143,19 @@ fn take_touch_gyro() -> Option<(f32, f32, i32)> {
 }
 
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+unsafe extern "C" {
+    fn horizon_uwp_trace_shell_event(message: *const std::ffi::c_char);
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+fn trace_renderer_probe(message: &str) {
+    let Ok(message) = std::ffi::CString::new(message) else {
+        return;
+    };
+    unsafe { horizon_uwp_trace_shell_event(message.as_ptr()) };
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_probe_renderer(
     surface_handle: *mut std::ffi::c_void,
@@ -151,6 +164,11 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
     height: u32,
 ) -> i32 {
     install_panic_reporter();
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: instance creation starting"
+    } else {
+        "ANGLE probe: instance creation starting"
+    });
     let Some(surface_handle) = std::ptr::NonNull::new(surface_handle) else {
         return 0;
     };
@@ -162,6 +180,11 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
     descriptor.backends = backend;
     let instance = wgpu::Instance::new(descriptor);
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: instance created"
+    } else {
+        "ANGLE probe: instance created"
+    });
     let target = match renderer {
         1 => wgpu::SurfaceTargetUnsafe::RawHandle {
             raw_display_handle: Some(raw_window_handle::RawDisplayHandle::Windows(
@@ -183,39 +206,198 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
         }
         _ => return 0,
     };
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: surface creation starting"
+    } else {
+        "ANGLE probe: surface creation starting"
+    });
     let Ok(surface) = (unsafe { instance.create_surface_unsafe(target) }) else {
         return 0;
     };
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: surface created"
+    } else {
+        "ANGLE probe: surface created"
+    });
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: adapter request starting"
+    } else {
+        "ANGLE probe: adapter request starting"
+    });
     let Ok(adapter) = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         compatible_surface: Some(&surface),
         ..Default::default()
     })) else {
         return 0;
     };
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: adapter returned"
+    } else {
+        "ANGLE probe: adapter returned"
+    });
     if adapter.get_info().backend != expected_backend {
         return 0;
     }
     let limits = adapter.limits();
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: device request starting"
+    } else {
+        "ANGLE probe: device request starting"
+    });
     let Ok((device, queue)) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         required_limits: limits,
         ..Default::default()
     })) else {
         return 0;
     };
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: device returned"
+    } else {
+        "ANGLE probe: device returned"
+    });
     device.on_uncaptured_error(std::sync::Arc::new(|_| {}));
     let Some(configuration) = surface.get_default_config(&adapter, width.max(1), height.max(1))
     else {
         return 0;
     };
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: surface configuration starting"
+    } else {
+        "ANGLE probe: surface configuration starting"
+    });
     surface.configure(&device, &configuration);
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: surface configured"
+    } else {
+        "ANGLE probe: surface configured"
+    });
     let frame = match surface.get_current_texture() {
         wgpu::CurrentSurfaceTexture::Success(frame)
         | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
         _ => return 0,
     };
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: frame acquired"
+    } else {
+        "ANGLE probe: frame acquired"
+    });
     queue.present(frame);
+    trace_renderer_probe(if renderer == 2 {
+        "DX12 probe: frame presented"
+    } else {
+        "ANGLE probe: frame presented"
+    });
     1
 }
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_server_list_read(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    output: *mut u8,
+    capacity: usize,
+) -> isize {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null() || output.is_null() {
+        return -1;
+    }
+    let wide = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
+    let file = std::path::PathBuf::from(std::ffi::OsString::from_wide(wide)).join("servers.dat");
+    let entries = horizon_protocol::servers::load(&file);
+    let mut encoded = Vec::new();
+    for entry in entries.into_iter().take(64) {
+        let name = entry.name.as_bytes();
+        let address = entry.ip.as_bytes();
+        if name.len() > u16::MAX as usize || address.len() > u16::MAX as usize {
+            continue;
+        }
+        let needed = 4 + name.len() + address.len();
+        if encoded.len() + needed > capacity {
+            return -1;
+        }
+        encoded.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        encoded.extend_from_slice(&(address.len() as u16).to_le_bytes());
+        encoded.extend_from_slice(name);
+        encoded.extend_from_slice(address);
+    }
+    unsafe { std::ptr::copy_nonoverlapping(encoded.as_ptr(), output, encoded.len()) };
+    encoded.len() as isize
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_server_list_add(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    name: *const u8,
+    name_len: usize,
+    address: *const u8,
+    address_len: usize,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null() || name.is_null() || address.is_null() {
+        return -1;
+    }
+    let game_dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(unsafe {
+        std::slice::from_raw_parts(game_dir, game_dir_len)
+    }));
+    let name = match std::str::from_utf8(unsafe { std::slice::from_raw_parts(name, name_len) }) {
+        Ok(name) if !name.trim().is_empty() && name.len() <= 256 => name,
+        _ => return -1,
+    };
+    let address =
+        match std::str::from_utf8(unsafe { std::slice::from_raw_parts(address, address_len) }) {
+            Ok(address) if horizon_protocol::servers::parse_address(address).is_some() => address,
+            _ => return -1,
+        };
+    let file = game_dir.join("servers.dat");
+    let entries = horizon_protocol::servers::load(&file);
+    if entries
+        .iter()
+        .any(|entry| entry.ip.eq_ignore_ascii_case(address))
+    {
+        return 1;
+    }
+    match horizon_protocol::servers::prepend(
+        &file,
+        &horizon_protocol::servers::ServerEntry::new(name.trim(), address.trim()),
+    ) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_server_list_remove(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    address: *const u8,
+    address_len: usize,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null() || address.is_null() {
+        return -1;
+    }
+    let game_dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(unsafe {
+        std::slice::from_raw_parts(game_dir, game_dir_len)
+    }));
+    let address =
+        match std::str::from_utf8(unsafe { std::slice::from_raw_parts(address, address_len) }) {
+            Ok(address) => address,
+            Err(_) => return -1,
+        };
+    match horizon_protocol::servers::remove(&game_dir.join("servers.dat"), address) {
+        Ok(true) => 0,
+        Ok(false) => 1,
+        Err(_) => -1,
+    }
+}
+
 #[cfg(target_vendor = "uwp")]
 fn report_failure(message: &str) {
     use std::time::{Duration, Instant};

@@ -5,7 +5,7 @@
 //! process's memory: it is never logged, printed or written anywhere.
 use std::{
     path::Path,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex, RwLock},
     time::{Duration, SystemTime},
 };
 
@@ -103,7 +103,7 @@ impl AuthSession {
     }
 }
 
-static CURRENT: OnceLock<Arc<AuthSession>> = OnceLock::new();
+static CURRENT: RwLock<Option<Arc<AuthSession>>> = RwLock::new(None);
 
 /// The account this game was started with (set once at start).
 pub fn set_current(session: AuthSession) {
@@ -115,15 +115,36 @@ pub fn try_set_current(session: AuthSession) -> Result<(), &'static str> {
     install_session(&CURRENT, session)
 }
 
+/// Clear the in-memory account after a hosted game session ends.
+///
+/// Standalone launches exit with the process. Reusable hosts such as UWP keep
+/// the process alive between games, so they must release the session before a
+/// later launch can select the same or a different account.
+pub fn clear_current() {
+    clear_session(&CURRENT);
+}
+
 fn install_session(
-    slot: &OnceLock<Arc<AuthSession>>,
+    slot: &RwLock<Option<Arc<AuthSession>>>,
     session: AuthSession,
 ) -> Result<(), &'static str> {
-    slot.set(Arc::new(session))
-        .map_err(|_| "an account is already active in this process")
+    let mut current = slot.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if current.is_some() {
+        return Err("an account is already active in this process");
+    }
+    *current = Some(Arc::new(session));
+    Ok(())
 }
+
+fn clear_session(slot: &RwLock<Option<Arc<AuthSession>>>) {
+    *slot.write().unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+}
+
 pub fn current() -> Option<Arc<AuthSession>> {
-    CURRENT.get().cloned()
+    CURRENT
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
 }
 
 /// Why joining a server through the session service failed, like the
@@ -764,6 +785,24 @@ pub fn parse_joined(body: &str) -> Option<JoinedProfile> {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn hosted_game_session_releases_account_for_the_next_launch() {
+        use super::{AuthSession, clear_session, install_session};
+        use std::sync::{Arc, RwLock};
+
+        let current = RwLock::new(None);
+        install_session(&current, AuthSession::new("FirstPlayer", 1, "first-token")).unwrap();
+        assert_eq!(
+            install_session(&current, AuthSession::new("SecondPlayer", 2, "second-token")),
+            Err("an account is already active in this process")
+        );
+
+        clear_session(&current);
+        install_session(&current, AuthSession::new("SecondPlayer", 2, "second-token")).unwrap();
+        let active: Option<Arc<AuthSession>> = current.read().unwrap().clone();
+        assert_eq!(active.unwrap().name, "SecondPlayer");
+    }
+
+    #[test]
     fn uwp_session_http_statuses() {
         use super::{JoinError, uwp_join_result, uwp_verify_result};
         assert_eq!(uwp_join_result(204, ""), Ok(()));
@@ -780,13 +819,14 @@ mod tests {
 
     #[test]
     fn installing_a_second_account_fails_without_exposing_tokens() {
-        let slot = OnceLock::new();
+        let slot = RwLock::new(None);
         install_session(&slot, AuthSession::new("First", UUID, "first-secret")).unwrap();
         let error =
             install_session(&slot, AuthSession::new("Second", UUID, "second-secret")).unwrap_err();
         assert!(!error.contains("secret"));
-        assert_eq!(slot.get().unwrap().name, "First");
-        assert!(!format!("{:?}", slot.get().unwrap()).contains("first-secret"));
+        let current = slot.read().unwrap().clone().unwrap();
+        assert_eq!(current.name, "First");
+        assert!(!format!("{current:?}").contains("first-secret"));
     }
 
     /// Runs `with_one_retry` over these answers, in order: the result and how

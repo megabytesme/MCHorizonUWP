@@ -1480,6 +1480,7 @@ dependencies = [
  "horizon-account-core",
  "horizon-client",
  "horizon-core",
+ "horizon-protocol",
  "horizon-threads",
  "pollster",
  "raw-window-handle",

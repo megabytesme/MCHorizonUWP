@@ -75,12 +75,17 @@ and ANGLE are package inputs on x64 and ARM64; this recipe has no ARM32 ANGLE
 runtime and does not include DX12 in ARM32 packages.
 These are build-input constraints, not assumptions about the device GPU. The
 native D3D11 pre-game check creates a feature-level 9_1 device while XAML owns
-the view; the game checks its CoreWindow presentation surface after the shell
-detaches its page. This avoids treating XAML's active compositor as a failed
-game swap chain. On Windows 10 Mobile, input handlers
-are registered before the XAML page is detached; the game receives its initial
-size after the handoff. The pre-game page and gameplay share one CoreWindow on
-every target, including desktop and Windows 10 Mobile. The preview runs x64,
+the view. The launcher and game share one attached XAML root and one
+`SwapChainPanel`; D3D11, DX12, and ANGLE all present through that panel. Renderer
+probes release their temporary swap chains before another backend is tested or
+the game starts. The desktop panel begins below the custom titlebar, and its
+physical size and input origin are shared with the game so the viewport and
+pointer coordinates use the same scale. The launcher page is collapsed during
+play, keeping the presentation surface valid. On Windows 10 Mobile, input
+handlers are registered before gameplay
+starts, and the game receives its initial size after the shared surface is
+shown. The pre-game page and gameplay share one CoreWindow on every target,
+including desktop and Windows 10 Mobile. The preview runs x64,
 ARM64 and ARM32 plans in fresh builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
 Cargo fetches missing dependencies for the selected target and x64 build host

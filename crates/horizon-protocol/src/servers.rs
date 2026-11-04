@@ -122,6 +122,32 @@ pub fn prepend(path: &Path, entry: &ServerEntry) -> std::io::Result<()> {
     }
     write(path, &root)
 }
+
+/// Removes every visible server with this address while preserving the other
+/// fields and hidden entries in `servers.dat`.
+pub fn remove(path: &Path, address: &str) -> std::io::Result<bool> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error),
+    };
+    let (mut root, _) =
+        nbt::read_named(&bytes, nbt::Limits::default()).map_err(std::io::Error::other)?;
+    let Some(Tag::List(entries)) = root.tag.get_mut("servers") else {
+        return Ok(false);
+    };
+    let before = entries.len();
+    entries.retain(|entry| match entry.get("ip") {
+        Some(Tag::String(ip)) => ip.to_string_lossy() != address,
+        _ => true,
+    });
+    if entries.len() == before {
+        return Ok(false);
+    }
+    write(path, &root)?;
+    Ok(true)
+}
+
 fn write(path: &Path, root: &NamedTag) -> std::io::Result<()> {
     let bytes = nbt::write_named(root, nbt::Limits::default()).map_err(std::io::Error::other)?;
     let tmp = path.with_extension("dat_tmp");

@@ -113,6 +113,12 @@ use windows::{
     },
 };
 
+#[cfg(target_vendor = "uwp")]
+unsafe extern "C" {
+    fn horizon_uwp_attach_game_swapchain(swap_chain: *mut core::ffi::c_void) -> i32;
+    fn horizon_uwp_detach_game_swapchain() -> i32;
+}
+
 use self::dcomp::DCompLib;
 use crate::auxil::{
     self,
@@ -1654,6 +1660,27 @@ impl crate::Surface for Surface {
                         }
                     }
                     SurfaceTarget::SwapChainPanel(swap_chain_panel) => {
+                        #[cfg(target_vendor = "uwp")]
+                        {
+                            let _ = swap_chain_panel;
+                            // The XAML panel belongs to the UI apartment. The UWP host
+                            // marshals this attachment back to that apartment before
+                            // querying ISwapChainPanelNative and calling SetSwapChain.
+                            let result = unsafe {
+                                horizon_uwp_attach_game_swapchain(
+                                    swap_chain1.as_raw(),
+                                )
+                            };
+                            if result < 0 {
+                                log::error!(
+                                    "Unable to SetSwapChain on the UWP UI thread: HRESULT 0x{result:08X}"
+                                );
+                                return Err(crate::SurfaceError::Other(
+                                    "ISwapChainPanelNative::SetSwapChain on the UWP UI thread",
+                                ));
+                            }
+                        }
+                        #[cfg(not(target_vendor = "uwp"))]
                         if let Err(err) = unsafe { swap_chain_panel.SetSwapChain(&swap_chain1) } {
                             log::error!("Unable to SetSwapChain: {err}");
                             return Err(crate::SurfaceError::Other(
@@ -1738,7 +1765,22 @@ impl crate::Surface for Surface {
     }
 
     unsafe fn unconfigure(&self, device: &Device) {
-        if let Some(sc) = self.swap_chain.write().take() {
+        let mut swap_chain = self.swap_chain.write();
+        if swap_chain.is_some() {
+            // A SwapChainPanel retains its attached DXGI swap chain. Detach it
+            // on the XAML dispatcher before releasing WGPU's last COM refs;
+            // releasing first can crash D3D12Core while it still owns the chain.
+            #[cfg(target_vendor = "uwp")]
+            if matches!(&self.target, SurfaceTarget::SwapChainPanel(_)) {
+                let result = unsafe { horizon_uwp_detach_game_swapchain() };
+                if result < 0 {
+                    log::error!(
+                        "Unable to detach the UWP SwapChainPanel before releasing the DX12 surface: HRESULT 0x{result:08X}"
+                    );
+                }
+            }
+        }
+        if let Some(sc) = swap_chain.take() {
             unsafe {
                 // While `unconfigure`s contract ensures that no work on the GPU's main queues
                 // are in flight, we still need to wait for the present queue to be idle.

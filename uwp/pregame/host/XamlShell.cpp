@@ -41,6 +41,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cwctype>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -86,6 +87,11 @@ extern "C" size_t __cdecl horizon_uwp_upstream_release(unsigned char*, size_t);
 extern "C" size_t __cdecl horizon_uwp_upstream_ref(unsigned char*, size_t);
 extern "C" size_t __cdecl horizon_uwp_port_ref(unsigned char*, size_t);
 extern "C" int __cdecl horizon_uwp_probe_renderer(void*, unsigned, unsigned, unsigned);
+extern "C" ptrdiff_t __cdecl horizon_uwp_server_list_read(const uint16_t*, size_t, uint8_t*, size_t);
+extern "C" int32_t __cdecl horizon_uwp_server_list_add(const uint16_t*, size_t, const uint8_t*, size_t, const uint8_t*, size_t);
+extern "C" int32_t __cdecl horizon_uwp_server_list_remove(const uint16_t*, size_t, const uint8_t*, size_t);
+extern "C" int32_t __cdecl horizon_uwp_dispatch_ui_sync(void(__cdecl*)(void*), void*);
+extern "C" void __cdecl horizon_uwp_register_game_surface(void*);
 #ifdef HORIZON_UWP_NATIVE_D3D11
 extern "C" void* __cdecl horizon_uwp_acquire_game_swapchain_panel();
 extern "C" void __cdecl horizon_uwp_release_game_swapchain_panel(void*);
@@ -96,6 +102,7 @@ extern "C" int __cdecl horizon_uwp_gyro_available();
 
 namespace {
 char last_shell_stage[128] = "process startup";
+constexpr double custom_title_bar_height = 32.0;
 
 void trace_platform_error(const char* stage, Platform::Exception^ error) {
     try {
@@ -142,8 +149,15 @@ ColumnDefinition^ title_bar_right_padding;
 ContentControl^ content;
 #ifdef HORIZON_UWP_NATIVE_D3D11
 SwapChainPanel^ game_surface;
+HRESULT detach_game_swapchain() {
+    if (!game_surface) return S_OK;
+    Microsoft::WRL::ComPtr<ISwapChainPanelNative> panel;
+    const HRESULT query = reinterpret_cast<IUnknown*>(game_surface)->QueryInterface(IID_PPV_ARGS(&panel));
+    if (FAILED(query)) return query;
+    return panel->SetSwapChain(nullptr);
+}
 extern "C" void __cdecl horizon_uwp_set_game_surface_metrics(
-    uint32_t width, uint32_t height, double scale_x, double scale_y);
+    uint32_t width, uint32_t height, double scale_x, double scale_y, double input_origin_y);
 extern "C" void __cdecl horizon_uwp_set_game_surface_active(int active);
 #ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
 extern "C" void __cdecl horizon_uwp_trace_game_surface(
@@ -170,7 +184,8 @@ void update_game_surface_metrics() {
 #endif
     horizon_uwp_set_game_surface_metrics(
         static_cast<uint32_t>(std::ceil(pixel_width)),
-        static_cast<uint32_t>(std::ceil(pixel_height)), scale_x, scale_y);
+        static_cast<uint32_t>(std::ceil(pixel_height)), scale_x, scale_y,
+        game_surface->Margin.Top * scale_y);
 }
 #endif
 muxc::NavigationView^ navigation;
@@ -179,8 +194,6 @@ muxc::NavigationViewItem^ servers_navigation;
 muxc::NavigationViewItem^ home_navigation;
 Flyout^ profile_flyout;
 Button^ fallback_profile;
-Platform::Object^ last_navigation_selection;
-bool restoring_navigation = false;
 ContentDialog^ active_dialog;
 int dialog_result = -1;
 Platform::String^ profile = L"Profile";
@@ -514,6 +527,22 @@ Platform::String^ decode(const unsigned char* bytes, size_t length) {
     return ref new Platform::String(buffer.data(), count);
 }
 
+std::string encode_utf8(const std::wstring& value) {
+    if (value.empty()) return {};
+    const int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
+        static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    if (length <= 0) return {};
+    std::string result(length, '\0');
+    if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
+        static_cast<int>(value.size()), result.data(), length, nullptr, nullptr) != length) return {};
+    return result;
+}
+
+std::wstring decode_utf8(const uint8_t* bytes, size_t length) {
+    auto value = decode(bytes, length);
+    return value ? std::wstring(value->Data(), value->Length()) : std::wstring();
+}
+
 void choose(int value, unsigned generation) {
     if (generation != prompt_generation.load()) {
         horizon_uwp_trace_shell_event("ignored stale start or account selection");
@@ -611,44 +640,102 @@ void update_profile_navigation() {
 
 bool valid_server_address(const std::wstring& address) {
     if (address.empty() || address.size() > 255) return false;
-    for (wchar_t ch : address) {
-        if (!((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') ||
-              (ch >= L'0' && ch <= L'9') || ch == L'.' || ch == L'-' ||
-              ch == L'_' || ch == L':' || ch == L'[' || ch == L']')) return false;
+    auto is_host_char = [](wchar_t ch) {
+        return (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') ||
+            (ch >= L'0' && ch <= L'9') || ch == L'.' || ch == L'-' || ch == L'_';
+    };
+    auto valid_port = [&address](size_t start) {
+        if (start >= address.size()) return false;
+        unsigned port = 0;
+        for (size_t i = start; i < address.size(); ++i) {
+            if (address[i] < L'0' || address[i] > L'9') return false;
+            port = port * 10 + static_cast<unsigned>(address[i] - L'0');
+            if (port > 65535) return false;
+        }
+        return port > 0;
+    };
+    if (address.front() == L'[') {
+        const auto close = address.find(L']');
+        if (close == std::wstring::npos || close <= 1) return false;
+        bool has_colon = false;
+        for (size_t i = 1; i < close; ++i) {
+            const wchar_t ch = address[i];
+            if (ch == L':') has_colon = true;
+            else if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f') ||
+                       (ch >= L'A' && ch <= L'F') || ch == L'.')) return false;
+        }
+        if (!has_colon) return false;
+        if (close + 1 == address.size()) return true;
+        return address[close + 1] == L':' && valid_port(close + 2);
     }
-    return true;
-}
-
-void persist_server_entries() {
-    std::wstring stored;
-    for (const auto& server : server_entries) {
-        stored.append(server.name).append(L"\t").append(server.address).append(L"\n");
-    }
-    ApplicationData::Current->LocalSettings->Values->Insert(
-        L"server-list", ref new Platform::String(stored.c_str()));
+    const auto colon = address.find(L':');
+    const auto host_end = colon == std::wstring::npos ? address.size() : colon;
+    if (host_end == 0) return false;
+    for (size_t i = 0; i < host_end; ++i) if (!is_host_char(address[i])) return false;
+    if (colon == std::wstring::npos) return true;
+    if (address.find(L':', colon + 1) != std::wstring::npos) return false;
+    return valid_port(colon + 1);
 }
 
 void load_server_entries() {
     server_entries.clear();
     try {
         auto values = ApplicationData::Current->LocalSettings->Values;
-        if (!values->HasKey(L"server-list")) return;
-        auto text_value = dynamic_cast<Platform::String^>(values->Lookup(L"server-list"));
-        if (!text_value) return;
-        const std::wstring stored(text_value->Data(), text_value->Length());
-        size_t start = 0;
-        while (start < stored.size() && server_entries.size() < 64) {
-            const auto end = stored.find(L'\n', start);
-            const auto line_end = end == std::wstring::npos ? stored.size() : end;
-            const auto separator = stored.find(L'\t', start);
-            if (separator != std::wstring::npos && separator < line_end) {
-                SavedServer server{stored.substr(start, separator - start),
-                    stored.substr(separator + 1, line_end - separator - 1)};
-                if (!server.name.empty() && server.name.size() <= 64 &&
-                    valid_server_address(server.address)) server_entries.push_back(std::move(server));
+        auto local = ApplicationData::Current->LocalFolder->Path;
+        auto game_path = Platform::String::Concat(local, L"\\game");
+        const auto* wide_path = reinterpret_cast<const uint16_t*>(game_path->Data());
+        const auto path_length = game_path->Length();
+
+        // Migrate the first launcher-only server list into Horizon's own
+        // servers.dat once, keeping the old setting intact as a recoverable copy.
+        if (values->HasKey(L"server-list") && !values->HasKey(L"server-list-migrated")) {
+            bool migrated = true;
+            auto legacy = dynamic_cast<Platform::String^>(values->Lookup(L"server-list"));
+            if (legacy) {
+                const std::wstring stored(legacy->Data(), legacy->Length());
+                size_t start = 0;
+                while (start < stored.size()) {
+                    const auto end = stored.find(L'\n', start);
+                    const auto line_end = end == std::wstring::npos ? stored.size() : end;
+                    const auto separator = stored.find(L'\t', start);
+                    if (separator != std::wstring::npos && separator < line_end) {
+                        std::wstring name = stored.substr(start, separator - start);
+                        std::wstring address = stored.substr(separator + 1, line_end - separator - 1);
+                        if (valid_server_address(address)) {
+                            auto name_utf8 = encode_utf8(name);
+                            auto address_utf8 = encode_utf8(address);
+                            if (name_utf8.empty() || address_utf8.empty() ||
+                                horizon_uwp_server_list_add(wide_path, path_length,
+                                    reinterpret_cast<const uint8_t*>(name_utf8.data()), name_utf8.size(),
+                                    reinterpret_cast<const uint8_t*>(address_utf8.data()), address_utf8.size()) < 0) {
+                                migrated = false;
+                            }
+                        }
+                    }
+                    if (end == std::wstring::npos) break;
+                    start = end + 1;
+                }
             }
-            if (end == std::wstring::npos) break;
-            start = end + 1;
+            if (migrated)
+                values->Insert(L"server-list-migrated", PropertyValue::CreateBoolean(true));
+        }
+
+        std::vector<uint8_t> encoded(64 * 1024);
+        const auto written = horizon_uwp_server_list_read(wide_path, path_length,
+            encoded.data(), encoded.size());
+        if (written < 0 || static_cast<size_t>(written) > encoded.size()) return;
+        size_t offset = 0;
+        while (offset + 4 <= static_cast<size_t>(written) && server_entries.size() < 64) {
+            const size_t name_length = encoded[offset] | (static_cast<size_t>(encoded[offset + 1]) << 8);
+            const size_t address_length = encoded[offset + 2] | (static_cast<size_t>(encoded[offset + 3]) << 8);
+            offset += 4;
+            if (offset + name_length + address_length > static_cast<size_t>(written)) break;
+            SavedServer server{
+                decode_utf8(encoded.data() + offset, name_length),
+                decode_utf8(encoded.data() + offset + name_length, address_length)};
+            offset += name_length + address_length;
+            if (!server.name.empty() && server.name.size() <= 64 &&
+                valid_server_address(server.address)) server_entries.push_back(std::move(server));
         }
     } catch (Platform::Exception^) {}
 }
@@ -987,70 +1074,128 @@ void show_about() {
         package_version.Build, package_version.Revision);
     auto upstream_ref = build_label(horizon_uwp_upstream_ref);
     auto port_ref = build_label(horizon_uwp_port_ref);
-    auto upstream_text = std::wstring(upstream_ref->Data(), upstream_ref->Length());
-    auto port_text = std::wstring(port_ref->Data(), port_ref->Length());
-    const auto upstream_commit_url = L"https://github.com/horizon-rust/horizon/commit/" + upstream_text;
-    auto details = ref new StackPanel();
-    details->Spacing = 8;
-    auto heading = ref new Grid();
-    auto icon_column = ref new ColumnDefinition(); icon_column->Width = GridLength(1, GridUnitType::Auto);
-    auto label_column = ref new ColumnDefinition(); label_column->Width = GridLength(1, GridUnitType::Star);
-    heading->ColumnDefinitions->Append(icon_column); heading->ColumnDefinitions->Append(label_column);
-    auto app_icon = ref new Image();
-    auto app_icon_bitmap = ref new BitmapImage();
-    app_icon_bitmap->UriSource = ref new Uri(L"ms-appx:///Assets/Square150x150Logo.png");
-    app_icon->Source = app_icon_bitmap; app_icon->Width = 56; app_icon->Height = 56;
-    app_icon->Margin = Thickness(0, 0, 14, 0);
-    heading->Children->Append(app_icon);
-    auto heading_text = ref new StackPanel(); heading_text->VerticalAlignment = VerticalAlignment::Center;
-    auto title = text(L"Horizon", 22); title->FontWeight = Windows::UI::Text::FontWeights::SemiBold; title->Margin = Thickness(0);
-    auto subtitle = text(L"Play Minecraft: Java Edition with Horizon.", 14); subtitle->Opacity = 0.75; subtitle->Margin = Thickness(0);
-    heading_text->Children->Append(title); heading_text->Children->Append(subtitle);
-    Grid::SetColumn(heading_text, 1); heading->Children->Append(heading_text);
-    auto header_card = ref new StackPanel(); header_card->Children->Append(heading);
-    details->Children->Append(card(header_card));
+    const std::wstring upstream_text(upstream_ref->Data(), upstream_ref->Length());
+    const std::wstring port_text(port_ref->Data(), port_ref->Length());
+    auto about_text = ref new TextBlock();
+    about_text->TextWrapping = TextWrapping::Wrap;
+    about_text->FontSize = 14;
+    auto add_run = [about_text](const std::wstring& value, bool bold = false, double size = 14.0) {
+        auto run = ref new Run();
+        run->Text = ref new Platform::String(value.c_str());
+        run->FontSize = size;
+        if (bold) run->FontWeight = Windows::UI::Text::FontWeights::Bold;
+        about_text->Inlines->Append(run);
+    };
+    auto add_break = [about_text]() { about_text->Inlines->Append(ref new LineBreak()); };
+    auto add_link = [about_text](const std::wstring& label, const std::wstring& target) {
+        auto link = ref new Hyperlink();
+        link->NavigateUri = ref new Uri(ref new Platform::String(target.c_str()));
+        auto run = ref new Run();
+        run->Text = ref new Platform::String(label.c_str());
+        link->Inlines->Append(run);
+        about_text->Inlines->Append(link);
+    };
+    auto release = installed_release();
+    auto architecture = package_architecture();
+    add_run(L"Horizon UWP", true, 18);
+    add_break();
+    add_run(std::wstring(L"Version ") + version + L" (" + windows_version_label() + L") " +
+        std::wstring(architecture->Data(), architecture->Length()));
+    add_break();
+    add_run(L"Horizon 26.3 (nightly build)");
+    add_break();
+    add_run(L"Horizon release: ");
+    add_run(std::wstring(release->Data(), release->Length()));
+    add_break();
+    add_run(L"Horizon commit: ");
+    add_link(upstream_text, L"https://github.com/horizon-rust/horizon/commit/" + upstream_text);
+    add_break();
+    add_run(L"UWP integration: ");
+    add_link(port_text, L"https://github.com/horizon-rust/horizon/commits/" + port_text);
+    add_break(); add_break();
+    add_run(L"Copyright \u00A9 2026 Horizon contributors");
+    add_break(); add_break();
+    add_run(L"A community-built Windows client for Horizon. Minecraft is a trademark of Microsoft Corporation and Mojang AB. This project is not affiliated with or endorsed by them.");
+    add_break(); add_break();
+    add_run(L"Source code available on ");
+    add_link(L"GitHub", L"https://github.com/horizon-rust/horizon");
+    add_break();
+    add_run(L"Found a bug? Report it here: ");
+    add_link(L"Issue Tracker", L"https://github.com/horizon-rust/horizon/issues");
+    add_break(); add_break();
+    add_link(L"License: MIT", L"https://github.com/horizon-rust/horizon/blob/main/LICENSE");
 
-    auto version_card = ref new StackPanel();
-    version_card->Children->Append(text(L"Version information", 17));
-    version_card->Children->Append(text(Platform::String::Concat(L"Horizon UWP ", ref new Platform::String(version)), 14));
-    version_card->Children->Append(text(Platform::String::Concat(L"Architecture: ", package_architecture()), 14));
-    version_card->Children->Append(text(Platform::String::Concat(L"Horizon release: ", installed_release()), 14));
-    version_card->Children->Append(text(L"Minecraft: Java Edition 26.3", 14));
-    version_card->Children->Append(text(ref new Platform::String(windows_version_label().c_str()), 14));
-    details->Children->Append(card(version_card));
-
-    auto build_card = ref new StackPanel();
-    build_card->Children->Append(text(L"Build", 17));
-    auto upstream_line = ref new TextBlock(); upstream_line->TextWrapping = TextWrapping::Wrap;
-    auto upstream_label = ref new Run(); upstream_label->Text = L"Horizon commit: "; upstream_line->Inlines->Append(upstream_label);
-    auto upstream_link = ref new Hyperlink(); upstream_link->NavigateUri = ref new Uri(ref new Platform::String(upstream_commit_url.c_str()));
-    auto upstream_run = ref new Run(); upstream_run->Text = upstream_ref; upstream_link->Inlines->Append(upstream_run); upstream_line->Inlines->Append(upstream_link);
-    build_card->Children->Append(upstream_line);
-    auto port_line = ref new TextBlock(); port_line->TextWrapping = TextWrapping::Wrap;
-    auto port_label = ref new Run(); port_label->Text = L"UWP integration: "; port_line->Inlines->Append(port_label);
-    auto port_link = ref new Hyperlink(); port_link->NavigateUri = ref new Uri(ref new Platform::String((L"https://github.com/horizon-rust/horizon/commits/" + port_text).c_str()));
-    auto port_run = ref new Run(); port_run->Text = port_ref; port_link->Inlines->Append(port_run); port_line->Inlines->Append(port_link);
-    build_card->Children->Append(port_line);
-    build_card->Children->Append(text(L"A community-built Windows client for Horizon. Minecraft is a trademark of Microsoft Corporation and Mojang AB. This project is not affiliated with or endorsed by them.", 14));
-    details->Children->Append(card(build_card));
-
-    auto links_card = ref new StackPanel();
-    links_card->Children->Append(text(L"Project links", 17));
-    links_card->Children->Append(action_button(L"Horizon source code", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { open_web_link(L"https://github.com/horizon-rust/horizon"); })));
-    links_card->Children->Append(action_button(L"Report an issue", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { open_web_link(L"https://github.com/horizon-rust/horizon/issues"); })));
-    links_card->Children->Append(action_button(L"Horizon license", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { open_web_link(L"https://github.com/horizon-rust/horizon/blob/main/LICENSE"); })));
-    links_card->Children->Append(action_button(L"UWP client license", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { open_web_link(L"https://github.com/horizon-rust/horizon/blob/main/LICENSE"); })));
-    details->Children->Append(card(links_card));
     auto scroll = ref new ScrollViewer();
     scroll->MaxHeight = 600;
     scroll->MaxWidth = 560;
     scroll->VerticalScrollBarVisibility = ScrollBarVisibility::Auto;
-    scroll->Content = details;
+    scroll->Content = about_text;
     auto dialog = ref new ContentDialog();
-    dialog->Title = L"About Horizon";
+    dialog->Title = L"About";
     dialog->Content = scroll;
     dialog->PrimaryButtonText = L"OK";
     dialog->ShowAsync();
+}
+
+void show_server_dialog(bool direct_connect) {
+    auto content = ref new StackPanel();
+    content->Spacing = 8;
+    auto name = ref new TextBox();
+    name->Header = L"Server name";
+    name->MaxLength = 64;
+    name->Visibility = direct_connect ? Visibility::Collapsed : Visibility::Visible;
+    auto address = ref new TextBox();
+    address->Header = L"Server address";
+    address->PlaceholderText = L"example.org:25565";
+    address->MaxLength = 255;
+    content->Children->Append(name);
+    content->Children->Append(address);
+
+    auto dialog = ref new ContentDialog();
+    dialog->Title = direct_connect ? L"Direct connect" : L"Add server";
+    dialog->Content = content;
+    dialog->PrimaryButtonText = direct_connect ? L"Connect" : L"Add";
+    dialog->CloseButtonText = L"Cancel";
+    auto operation = dialog->ShowAsync();
+    auto context = task_continuation_context::use_current();
+    create_task(operation).then([direct_connect, name, address](ContentDialogResult result) {
+        if (result != ContentDialogResult::Primary) return;
+        std::wstring server_name(name->Text->Data(), name->Text->Length());
+        std::wstring server_address(address->Text->Data(), address->Text->Length());
+        while (!server_address.empty() && iswspace(server_address.front())) server_address.erase(0, 1);
+        while (!server_address.empty() && iswspace(server_address.back())) server_address.pop_back();
+        if (!valid_server_address(server_address)) {
+            show_message(L"Server address", L"Enter a valid hostname or IP address with an optional port.");
+            return;
+        }
+        if (direct_connect) {
+            quick_connect_address = std::move(server_address);
+            choose(1, displayed_generation);
+            return;
+        }
+        for (auto& ch : server_name) if (ch == L'\t' || ch == L'\r' || ch == L'\n') ch = L' ';
+        if (server_name.empty()) server_name = server_address;
+        if (server_name.size() > 64) server_name.resize(64);
+        auto name_utf8 = encode_utf8(server_name);
+        auto address_utf8 = encode_utf8(server_address);
+        auto local = ApplicationData::Current->LocalFolder->Path;
+        auto game_path = Platform::String::Concat(local, L"\\game");
+        const auto result_code = name_utf8.empty() || address_utf8.empty() ? -1 :
+            horizon_uwp_server_list_add(reinterpret_cast<const uint16_t*>(game_path->Data()),
+                game_path->Length(), reinterpret_cast<const uint8_t*>(name_utf8.data()), name_utf8.size(),
+                reinterpret_cast<const uint8_t*>(address_utf8.data()), address_utf8.size());
+        if (result_code == 1) {
+            show_message(L"Server already saved", L"That server address is already in your server list.");
+            return;
+        }
+        if (result_code != 0) {
+            show_message(L"Could not save server", L"Horizon could not update the Minecraft server list.");
+            return;
+        }
+        load_server_entries();
+        update_live_tile();
+        refresh();
+    }, context);
 }
 
 void import_content(unsigned kind) {
@@ -1573,42 +1718,25 @@ void refresh() {
         about_card->Children->Append(action_button(L"About Horizon UWP", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_about(); })));
         panel->Children->Append(card(about_card));
     } else if (show_servers && prompt_kind == 0) {
+        load_server_entries();
         panel->Children->Append(text(L"Servers", 28));
-        panel->Children->Append(text(L"Save Minecraft: Java Edition servers here, then connect with your selected account.", 14));
-        auto name_input = ref new TextBox();
-        name_input->Header = L"Server name";
-        name_input->MaxLength = 64;
-        panel->Children->Append(name_input);
-        auto address_input = ref new TextBox();
-        address_input->Header = L"Server address";
-        address_input->MaxLength = 255;
-        panel->Children->Append(address_input);
-        panel->Children->Append(action_button(L"Add server", ref new RoutedEventHandler(
-            [name_input, address_input](Platform::Object^, RoutedEventArgs^) {
-                std::wstring name(name_input->Text->Data(), name_input->Text->Length());
-                std::wstring address(address_input->Text->Data(), address_input->Text->Length());
-                if (!valid_server_address(address)) {
-                    show_message(L"Server address", L"Enter a hostname or IP address with an optional port.");
-                    return;
-                }
-                for (auto& ch : name) if (ch == L'\t' || ch == L'\r' || ch == L'\n') ch = L' ';
-                if (name.empty()) name = address;
-                if (name.size() > 64) name.resize(64);
-                if (server_entries.size() >= 64) {
-                    show_message(L"Server list full", L"Remove a saved server before adding another one.");
-                    return;
-                }
-                const auto duplicate = std::find_if(server_entries.begin(), server_entries.end(),
-                    [&address](const SavedServer& server) { return server.address == address; });
-                if (duplicate != server_entries.end()) {
-                    show_message(L"Server already saved", L"That server address is already in your list.");
-                    return;
-                }
-                server_entries.push_back({std::move(name), std::move(address)});
-                persist_server_entries();
-                update_live_tile();
-                refresh();
-            })));
+        panel->Children->Append(text(L"Saved servers are shared with Minecraft's multiplayer screen.", 14));
+        auto commands = ref new CommandBar();
+        auto add_server = ref new AppBarButton();
+        add_server->Label = L"Add server";
+        add_server->Icon = ref new SymbolIcon(Symbol::Add);
+        add_server->Click += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
+            show_server_dialog(false);
+        });
+        commands->PrimaryCommands->Append(add_server);
+        auto direct_connect = ref new AppBarButton();
+        direct_connect->Label = L"Direct connect";
+        direct_connect->Icon = ref new SymbolIcon(Symbol::Link);
+        direct_connect->Click += ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
+            show_server_dialog(true);
+        });
+        commands->PrimaryCommands->Append(direct_connect);
+        panel->Children->Append(commands);
         if (server_entries.empty()) panel->Children->Append(text(L"No servers saved yet.", 14));
         for (const auto& server : server_entries) {
             auto server_card = ref new StackPanel();
@@ -1620,14 +1748,19 @@ void refresh() {
                     quick_connect_address = address;
                     choose(1, displayed_generation);
                 })));
-            const auto name = server.name;
             server_card->Children->Append(action_button(L"Remove", ref new RoutedEventHandler(
-                [address, name](Platform::Object^, RoutedEventArgs^) {
-                    server_entries.erase(std::remove_if(server_entries.begin(), server_entries.end(),
-                        [&address, &name](const SavedServer& server) {
-                            return server.address == address && server.name == name;
-                        }), server_entries.end());
-                    persist_server_entries();
+                [address](Platform::Object^, RoutedEventArgs^) {
+                    auto address_utf8 = encode_utf8(address);
+                    auto local = ApplicationData::Current->LocalFolder->Path;
+                    auto game_path = Platform::String::Concat(local, L"\\game");
+                    const auto result = horizon_uwp_server_list_remove(
+                        reinterpret_cast<const uint16_t*>(game_path->Data()), game_path->Length(),
+                        reinterpret_cast<const uint8_t*>(address_utf8.data()), address_utf8.size());
+                    if (result != 0) {
+                        show_message(L"Could not remove server", L"Horizon could not update the Minecraft server list.");
+                        return;
+                    }
+                    load_server_entries();
                     update_live_tile();
                     refresh();
                 })));
@@ -1824,25 +1957,26 @@ protected:
             navigation->MenuItems->Append(news);
             profile_navigation = ref new muxc::NavigationViewItem();
             profile_navigation->Tag = L"profile";
+            profile_navigation->SelectsOnInvoked = false;
             update_profile_navigation();
+            profile_flyout = ref new Flyout();
+            profile_flyout->Content = profile_card();
+            FlyoutBase::SetAttachedFlyout(profile_navigation, profile_flyout);
             navigation->FooterMenuItems->Append(profile_navigation);
             navigation->Content = content;
+            navigation->ItemInvoked += ref new Windows::Foundation::TypedEventHandler<
+                muxc::NavigationView^, muxc::NavigationViewItemInvokedEventArgs^>(
+                [](muxc::NavigationView^, muxc::NavigationViewItemInvokedEventArgs^ args) {
+                    auto invoked = args->InvokedItemContainer;
+                    auto tag = invoked ? dynamic_cast<Platform::String^>(invoked->Tag) : nullptr;
+                    if (!tag || tag != L"profile" || !profile_flyout) return;
+                    profile_flyout->Content = profile_card();
+                    profile_flyout->ShowAt(invoked);
+                    horizon_uwp_trace_shell_event("profile navigation flyout opened");
+                });
             navigation->SelectionChanged += ref new Windows::Foundation::TypedEventHandler<muxc::NavigationView^, muxc::NavigationViewSelectionChangedEventArgs^>(
-                [](muxc::NavigationView^ sender, muxc::NavigationViewSelectionChangedEventArgs^ args) {
-                    if (restoring_navigation) return;
+                [](muxc::NavigationView^, muxc::NavigationViewSelectionChangedEventArgs^ args) {
                     if (prompt_kind != 0) return;
-                    if (args->SelectedItem == profile_navigation) {
-                        profile_flyout = ref new Flyout();
-                        profile_flyout->Content = profile_card();
-                        profile_flyout->ShowAt(profile_navigation);
-                        if (last_navigation_selection) {
-                            restoring_navigation = true;
-                            sender->SelectedItem = last_navigation_selection;
-                            restoring_navigation = false;
-                        }
-                        return;
-                    }
-                    last_navigation_selection = args->SelectedItem;
                     show_settings = args->IsSettingsSelected;
                     show_logs = false; show_news = false; show_servers = false;
                     if (!show_settings) {
@@ -1870,13 +2004,13 @@ protected:
         const bool desktop_window = Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamily == L"Windows.Desktop";
         if (desktop_window) {
             auto title_bar_row = ref new RowDefinition();
-            title_bar_row->Height = GridLength(32);
+            title_bar_row->Height = GridLength(custom_title_bar_height);
             page_layout->RowDefinitions->Append(title_bar_row);
             auto page_row = ref new RowDefinition();
             page_row->Height = GridLength(1, GridUnitType::Star);
             page_layout->RowDefinitions->Append(page_row);
             app_title_bar = ref new Grid();
-            app_title_bar->Height = 32;
+            app_title_bar->Height = custom_title_bar_height;
             app_title_bar->Background = ref new SolidColorBrush(Colors::Transparent);
             app_title_bar->ColumnDefinitions->Append(title_bar_left_padding = ref new ColumnDefinition());
             app_title_bar->ColumnDefinitions->Append(ref new ColumnDefinition());
@@ -1930,6 +2064,7 @@ protected:
         game_surface = ref new SwapChainPanel();
         game_surface->HorizontalAlignment = HorizontalAlignment::Stretch;
         game_surface->VerticalAlignment = VerticalAlignment::Stretch;
+        game_surface->Margin = Thickness(0.0, desktop_window ? custom_title_bar_height : 0.0, 0.0, 0.0);
         // Keep the panel laid out at the window's real XAML size while the
         // launcher is shown. The game later reveals it without replacing the
         // Window content or opening another view.
@@ -1941,6 +2076,7 @@ protected:
             [](SwapChainPanel^, Platform::Object^) { update_game_surface_metrics(); });
         game_surface->Loaded += ref new RoutedEventHandler(
             [](Platform::Object^, RoutedEventArgs^) { update_game_surface_metrics(); });
+        horizon_uwp_register_game_surface(reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(game_surface)));
         shell_root->Children->Append(game_surface);
         window->Content = shell_root;
 #else
@@ -1964,22 +2100,58 @@ protected:
         auto coreWindow = CoreWindow::GetForCurrentThread();
         auto bounds = coreWindow->Bounds;
         const double scale = DisplayInformation::GetForCurrentView()->RawPixelsPerViewPixel;
-        const auto width = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Width * scale)));
-        const auto height = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Height * scale)));
+        auto width = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Width * scale)));
+        auto height = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Height * scale)));
 #ifdef HORIZON_UWP_NATIVE_D3D11
+        shell_root->UpdateLayout();
+        update_game_surface_metrics();
+        if (game_surface && game_surface->ActualWidth > 0.0 && game_surface->ActualHeight > 0.0) {
+            const double panel_width = game_surface->ActualWidth * game_surface->CompositionScaleX;
+            const double panel_height = game_surface->ActualHeight * game_surface->CompositionScaleY;
+            if (std::isfinite(panel_width) && std::isfinite(panel_height) && panel_width >= 1.0 && panel_height >= 1.0) {
+                width = static_cast<unsigned>(std::ceil(panel_width));
+                height = static_cast<unsigned>(std::ceil(panel_height));
+            }
+        }
+        horizon_uwp_trace_shell_event("D3D11 renderer probe starting");
         const auto d3d11_probe = probe_native_renderer();
         renderer_availability[0] = SUCCEEDED(d3d11_probe.result);
+        horizon_uwp_trace_shell_event(renderer_availability[0]
+            ? "D3D11 renderer probe succeeded" : "D3D11 renderer probe failed");
 #endif
 #ifdef HORIZON_UWP_ANGLE
-        renderer_availability[1] = horizon_uwp_probe_renderer(
-            reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(coreWindow)), 1, width, height) != 0;
+        horizon_uwp_trace_shell_event("ANGLE renderer probe starting");
+        const bool angle_probe_succeeded = horizon_uwp_probe_renderer(
+            reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(game_surface)), 1, width, height) != 0;
+        const HRESULT angle_detach_result = detach_game_swapchain();
+        renderer_availability[1] = angle_probe_succeeded && SUCCEEDED(angle_detach_result);
+        horizon_uwp_trace_shell_event(renderer_availability[1]
+            ? "ANGLE renderer probe succeeded" : "ANGLE renderer probe failed");
+        if (FAILED(angle_detach_result)) {
+            char detach_event[128];
+            sprintf_s(detach_event, "ANGLE renderer probe could not release its temporary swap chain (0x%08X)",
+                static_cast<unsigned>(angle_detach_result));
+            horizon_uwp_trace_shell_event(detach_event);
+        }
 #endif
 #ifdef HORIZON_UWP_DX12
+        horizon_uwp_trace_shell_event("DX12 renderer probe starting");
         auto dx12_panel = horizon_uwp_acquire_game_swapchain_panel();
         if (dx12_panel) {
-            renderer_availability[2] = horizon_uwp_probe_renderer(dx12_panel, 2, width, height) != 0;
+            const bool dx12_probe_succeeded =
+                horizon_uwp_probe_renderer(dx12_panel, 2, width, height) != 0;
+            const HRESULT detach_result = detach_game_swapchain();
+            renderer_availability[2] = dx12_probe_succeeded && SUCCEEDED(detach_result);
+            horizon_uwp_trace_shell_event(renderer_availability[2]
+                ? "DX12 renderer probe succeeded" : "DX12 renderer probe failed");
+            if (FAILED(detach_result)) {
+                char detach_event[128];
+                sprintf_s(detach_event, "DX12 renderer probe could not release its temporary swap chain (0x%08X)",
+                    static_cast<unsigned>(detach_result));
+                horizon_uwp_trace_shell_event(detach_event);
+            }
             horizon_uwp_release_game_swapchain_panel(dx12_panel);
-        }
+        } else horizon_uwp_trace_shell_event("DX12 renderer probe could not acquire the XAML panel");
 #endif
         char probe_event[160];
         sprintf_s(probe_event, "renderer probes D3D11=%d ANGLE=%d DX12=%d",
@@ -2201,29 +2373,63 @@ extern "C" void __cdecl horizon_uwp_release_game_swapchain_panel(void* panel) {
     if (panel) reinterpret_cast<IUnknown*>(panel)->Release();
 }
 
-extern "C" int32_t __cdecl horizon_uwp_attach_game_swapchain(void* swap_chain) {
-    if (!dispatcher || !dispatcher->HasThreadAccess) return RPC_E_WRONG_THREAD;
-    if (!game_surface || !swap_chain) return E_POINTER;
+struct AttachGameSwapchainContext {
+    void* swap_chain;
+    int32_t result;
+};
+
+static void __cdecl attach_game_swapchain_on_ui(void* raw_context) {
+    auto context = static_cast<AttachGameSwapchainContext*>(raw_context);
+    if (!dispatcher || !dispatcher->HasThreadAccess) {
+        context->result = RPC_E_WRONG_THREAD;
+        return;
+    }
+    if (!game_surface || !context->swap_chain) {
+        context->result = E_POINTER;
+        return;
+    }
     Microsoft::WRL::ComPtr<ISwapChainPanelNative> panel;
     const HRESULT query = reinterpret_cast<IUnknown*>(game_surface)->QueryInterface(IID_PPV_ARGS(&panel));
-    if (FAILED(query)) return query;
+    if (FAILED(query)) {
+        context->result = query;
+        return;
+    }
     update_game_surface_metrics();
 #ifdef HORIZON_UWP_DISPLAY_DIAGNOSTICS
     DXGI_SWAP_CHAIN_DESC1 description = {};
-    const HRESULT description_result = reinterpret_cast<IDXGISwapChain1*>(swap_chain)->GetDesc1(&description);
+    const HRESULT description_result = reinterpret_cast<IDXGISwapChain1*>(context->swap_chain)->GetDesc1(&description);
     if (SUCCEEDED(description_result))
         horizon_uwp_trace_game_swapchain(description.Width, description.Height);
 #endif
-    return panel->SetSwapChain(reinterpret_cast<IDXGISwapChain*>(swap_chain));
+    context->result = panel->SetSwapChain(reinterpret_cast<IDXGISwapChain*>(context->swap_chain));
 }
 
-static HRESULT detach_game_swapchain() {
-    if (!game_surface) return S_OK;
-    Microsoft::WRL::ComPtr<ISwapChainPanelNative> panel;
-    const HRESULT query = reinterpret_cast<IUnknown*>(game_surface)->QueryInterface(IID_PPV_ARGS(&panel));
-    if (FAILED(query)) return query;
-    return panel->SetSwapChain(nullptr);
+struct DetachGameSwapchainContext {
+    HRESULT result;
+};
+
+static void __cdecl detach_game_swapchain_on_ui(void* raw_context) {
+    auto context = static_cast<DetachGameSwapchainContext*>(raw_context);
+    if (!dispatcher || !dispatcher->HasThreadAccess) {
+        context->result = RPC_E_WRONG_THREAD;
+        return;
+    }
+    context->result = detach_game_swapchain();
 }
+
+extern "C" int32_t __cdecl horizon_uwp_detach_game_swapchain() {
+    DetachGameSwapchainContext context{ E_FAIL };
+    const int32_t dispatch = horizon_uwp_dispatch_ui_sync(detach_game_swapchain_on_ui, &context);
+    return FAILED(dispatch) ? dispatch : context.result;
+}
+
+extern "C" int32_t __cdecl horizon_uwp_attach_game_swapchain(void* swap_chain) {
+    if (!swap_chain) return E_POINTER;
+    AttachGameSwapchainContext context{ swap_chain, E_FAIL };
+    const int32_t dispatch = horizon_uwp_dispatch_ui_sync(attach_game_swapchain_on_ui, &context);
+    return FAILED(dispatch) ? dispatch : context.result;
+}
+
 #endif
 extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
     page_switch_error[0] = 0;
@@ -2246,52 +2452,39 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
     }
     try {
         const unsigned renderer = selected_renderer.load(std::memory_order_acquire);
-        if (renderer == 0 || renderer == 2) {
 #ifdef HORIZON_UWP_NATIVE_D3D11
-            if (!game_surface) {
-                strcpy_s(page_switch_error, "The UWP game surface was not initialized.");
-                return E_POINTER;
-            }
-            if (show > 0) {
-                horizon_uwp_set_game_surface_active(1);
-                game_surface->Opacity = 1.0;
-                game_surface->IsHitTestVisible = true;
-                update_game_surface_metrics();
-                page->Visibility = Visibility::Collapsed;
-            } else {
+        if (!game_surface || !shell_root) {
+            strcpy_s(page_switch_error, "The shared Horizon game surface was not initialized.");
+            return E_POINTER;
+        }
+        if (window->Content == nullptr) window->Content = shell_root;
+        if (window->Content != shell_root) {
+            strcpy_s(page_switch_error, "The current window content is not the Horizon shell.");
+            return E_UNEXPECTED;
+        }
+        if (show > 0) {
+            horizon_uwp_set_game_surface_active(1);
+            // All three renderers present through the same XAML composition
+            // panel, keeping the game viewport below the desktop title bar.
+            const bool panel_renderer = renderer <= 2;
+            game_surface->Opacity = panel_renderer ? 1.0 : 0.0;
+            game_surface->IsHitTestVisible = panel_renderer;
+            update_game_surface_metrics();
+            page->Visibility = Visibility::Collapsed;
+        } else {
+            if (renderer <= 2) {
                 const HRESULT detach = detach_game_swapchain();
                 if (FAILED(detach)) {
                     sprintf_s(page_switch_error, "Releasing the UWP game surface failed (0x%08X).",
                         static_cast<unsigned>(detach));
                     return detach;
                 }
-                game_surface->Opacity = 0.0;
-                game_surface->IsHitTestVisible = false;
-                horizon_uwp_set_game_surface_active(0);
-                page->Visibility = show == 0 ? Visibility::Visible : Visibility::Collapsed;
-                if (show == 0 && prompt_kind == 0) {
-                    if (navigation && home_navigation && navigation->SelectedItem != home_navigation)
-                        navigation->SelectedItem = home_navigation;
-                    else {
-                        show_settings = show_logs = show_news = show_servers = false;
-                        refresh();
-                    }
-                }
             }
-#else
-            strcpy_s(page_switch_error, "The native Direct3D 11 renderer is not in this package.");
-            return E_NOTIMPL;
-#endif
-        } else if (show > 0) {
-            if (window->Content != shell_root && window->Content != nullptr) {
-                strcpy_s(page_switch_error, "The current window content is not the Horizon shell.");
-                return E_UNEXPECTED;
-            }
-            window->Content = nullptr;
-        } else if (show == 0) {
-            window->Content = shell_root;
-            apply_theme();
-            if (prompt_kind == 0) {
+            game_surface->Opacity = 0.0;
+            game_surface->IsHitTestVisible = false;
+            horizon_uwp_set_game_surface_active(0);
+            page->Visibility = show == 0 ? Visibility::Visible : Visibility::Collapsed;
+            if (show == 0 && prompt_kind == 0) {
                 if (navigation && home_navigation && navigation->SelectedItem != home_navigation)
                     navigation->SelectedItem = home_navigation;
                 else {
@@ -2299,7 +2492,12 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
                     refresh();
                 }
             }
+            apply_theme();
         }
+#else
+        strcpy_s(page_switch_error, "The shared UWP game surface is not in this package.");
+        return E_NOTIMPL;
+#endif
         return S_OK;
     } catch (Platform::Exception^ error) {
         const auto detail = error->Message;

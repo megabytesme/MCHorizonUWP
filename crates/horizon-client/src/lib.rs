@@ -56,7 +56,12 @@ pub fn run_uwp_with_session(
     };
     let smoke_diagnostics = cfg!(feature = "native-d3d11-readback")
         && game_dir.join("native-world-smoke.enable").is_file();
-    game::run_with_args(args, smoke_diagnostics, session)
+    let result = game::run_with_args(args, smoke_diagnostics, session);
+    // UWP hosts reuse the process after the game's window closes. Release the
+    // in-memory account only after the game and its worker threads have ended,
+    // so the next launch can select an account independently.
+    auth::clear_current();
+    result
 }
 #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
 pub mod native_renderer;

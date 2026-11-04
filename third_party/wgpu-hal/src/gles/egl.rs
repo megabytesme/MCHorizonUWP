@@ -444,7 +444,8 @@ impl Inner {
             egl.get_configs(display, &mut configurations)
                 .map_err(instance_err("failed to get configs"))?;
             for &config in configurations.iter() {
-                log::trace!("\tCONFORMANT=0x{:X?}, RENDERABLE=0x{:X?}, NATIVE_RENDERABLE=0x{:X?}, SURFACE_TYPE=0x{:X?}, ALPHA_SIZE={:?}",
+                log::trace!(
+                    "\tCONFORMANT=0x{:X?}, RENDERABLE=0x{:X?}, NATIVE_RENDERABLE=0x{:X?}, SURFACE_TYPE=0x{:X?}, ALPHA_SIZE={:?}",
                     egl.get_config_attrib(display, config, khronos_egl::CONFORMANT),
                     egl.get_config_attrib(display, config, khronos_egl::RENDERABLE_TYPE),
                     egl.get_config_attrib(display, config, khronos_egl::NATIVE_RENDERABLE),
@@ -455,6 +456,8 @@ impl Inner {
         }
 
         let (config, supports_native_window) = choose_config(&egl, display, srgb_kind)?;
+        #[cfg(target_vendor = "uwp")]
+        log::info!("UWP ANGLE EGL selected window-presentable config: {supports_native_window}");
 
         let supports_opengl = if version >= (1, 4) {
             let client_apis = egl
@@ -695,6 +698,28 @@ pub struct Instance {
     inner: Mutex<Inner>,
 }
 
+#[cfg(target_vendor = "uwp")]
+struct InitOnUi {
+    descriptor: *const ffi::c_void,
+    result: Option<Result<Instance, crate::InstanceError>>,
+}
+
+#[cfg(target_vendor = "uwp")]
+unsafe extern "C" fn init_on_ui(context: *mut ffi::c_void) {
+    let context = unsafe { &mut *context.cast::<InitOnUi>() };
+    let descriptor = unsafe { &*context.descriptor.cast::<crate::InstanceDescriptor<'_>>() };
+    context.result = Some(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+            <Instance as crate::Instance>::init(descriptor)
+        }))
+        .unwrap_or_else(|_| {
+            Err(crate::InstanceError::new(
+                "ANGLE initialization panicked on the UWP UI thread".into(),
+            ))
+        }),
+    );
+}
+
 impl Instance {
     pub fn raw_display(&self) -> khronos_egl::Display {
         self.inner
@@ -727,6 +752,30 @@ impl crate::Instance for Instance {
     type A = super::Api;
 
     unsafe fn init(desc: &crate::InstanceDescriptor<'_>) -> Result<Self, crate::InstanceError> {
+        #[cfg(target_vendor = "uwp")]
+        if unsafe { horizon_uwp_is_ui_thread() == 0 } {
+            let mut context = InitOnUi {
+                descriptor: ptr::from_ref(desc).cast(),
+                result: None,
+            };
+            let status = unsafe {
+                horizon_uwp_dispatch_ui_sync(
+                    init_on_ui,
+                    ptr::from_mut(&mut context).cast(),
+                )
+            };
+            if status < 0 {
+                return Err(crate::InstanceError::new(format!(
+                    "dispatching ANGLE initialization to the UWP UI thread failed (HRESULT 0x{status:08X})"
+                )));
+            }
+            return context.result.unwrap_or_else(|| {
+                Err(crate::InstanceError::new(
+                    "the UWP UI thread did not initialize ANGLE".into(),
+                ))
+            });
+        }
+
         use raw_window_handle::RawDisplayHandle as Rdh;
 
         profiling::scope!("Init OpenGL (EGL) Backend");
@@ -743,9 +792,12 @@ impl crate::Instance for Instance {
             let name: Vec<u16> = "libEGL.dll".encode_utf16().chain(Some(0)).collect();
             let module = LoadPackagedLibrary(name.as_ptr(), 0);
             if module == 0 {
-                return Err(crate::InstanceError::new("LoadPackagedLibrary(libEGL.dll) failed".into()));
+                return Err(crate::InstanceError::new(
+                    "LoadPackagedLibrary(libEGL.dll) failed".into(),
+                ));
             }
-            let library: libloading::Library = libloading::os::windows::Library::from_raw(module).into();
+            let library: libloading::Library =
+                libloading::os::windows::Library::from_raw(module).into();
             khronos_egl::DynamicInstance::<khronos_egl::EGL1_4>::load_required_from(library)
         };
 
@@ -788,7 +840,9 @@ impl crate::Instance for Instance {
 
         #[cfg(all(windows, target_vendor = "uwp"))]
         if !client_ext_str.contains("EGL_ANGLE_platform_angle") {
-            return Err(crate::InstanceError::new("UWP requires ANGLE with D3D11".into()));
+            return Err(crate::InstanceError::new(
+                "UWP requires ANGLE with D3D11".into(),
+            ));
         }
         let (display, wsi_kind) = match (desc.display.map(|d| d.as_raw()), egl1_5) {
             (Some(Rdh::Wayland(wayland_display_handle)), Some(egl))
@@ -869,18 +923,36 @@ impl crate::Instance for Instance {
             }
             #[cfg(all(windows, target_vendor = "uwp"))]
             _ if client_ext_str.contains("EGL_ANGLE_platform_angle") => {
-                type GetPlatformDisplay = unsafe extern "system" fn(u32, *mut ffi::c_void, *const i32) -> *mut ffi::c_void;
+                type GetPlatformDisplay = unsafe extern "system" fn(
+                    u32,
+                    *mut ffi::c_void,
+                    *const i32,
+                )
+                    -> *mut ffi::c_void;
                 let get_display: GetPlatformDisplay = unsafe {
-                    core::mem::transmute(egl.get_proc_address("eglGetPlatformDisplayEXT")
-                        .ok_or_else(|| crate::InstanceError::new("ANGLE missing eglGetPlatformDisplayEXT".into()))?)
+                    core::mem::transmute(
+                        egl.get_proc_address("eglGetPlatformDisplayEXT")
+                            .ok_or_else(|| {
+                                crate::InstanceError::new(
+                                    "ANGLE missing eglGetPlatformDisplayEXT".into(),
+                                )
+                            })?,
+                    )
                 };
                 // Request D3D11 explicitly, excluding ANGLE's other renderers.
                 let attrs = [0x3203, 0x3208, khronos_egl::NONE];
-                let raw = unsafe { get_display(EGL_PLATFORM_ANGLE_ANGLE, ptr::null_mut(), attrs.as_ptr()) };
+                let raw = unsafe {
+                    get_display(EGL_PLATFORM_ANGLE_ANGLE, ptr::null_mut(), attrs.as_ptr())
+                };
                 if raw.is_null() {
-                    return Err(crate::InstanceError::new("ANGLE D3D11 display unavailable".into()));
+                    return Err(crate::InstanceError::new(
+                        "ANGLE D3D11 display unavailable".into(),
+                    ));
                 }
-                (unsafe { khronos_egl::Display::from_ptr(raw) }, WindowKind::Unknown)
+                (
+                    unsafe { khronos_egl::Display::from_ptr(raw) },
+                    WindowKind::Unknown,
+                )
             }
             x if client_ext_str.contains("EGL_MESA_platform_surfaceless") => {
                 log::debug!(
@@ -1240,10 +1312,7 @@ impl Surface {
     unsafe fn unconfigure_impl(
         &self,
         device: &super::Device,
-    ) -> Option<(
-        khronos_egl::Surface,
-        Option<*mut WaylandWindow>,
-    )> {
+    ) -> Option<(khronos_egl::Surface, Option<*mut WaylandWindow>)> {
         let gl = &device.shared.context.lock();
         match self.swapchain.write().take() {
             Some(sc) => {
@@ -1263,6 +1332,36 @@ impl Surface {
     }
 }
 
+#[cfg(target_vendor = "uwp")]
+unsafe extern "C" {
+    fn horizon_uwp_is_ui_thread() -> i32;
+    fn horizon_uwp_dispatch_ui_sync(
+        callback: unsafe extern "C" fn(*mut std::ffi::c_void),
+        context: *mut std::ffi::c_void,
+    ) -> i32;
+}
+
+#[cfg(target_vendor = "uwp")]
+struct ConfigureOnUi {
+    surface: *const Surface,
+    device: *const super::Device,
+    config: *const crate::SurfaceConfiguration,
+    result: Option<Result<(), crate::SurfaceError>>,
+}
+
+#[cfg(target_vendor = "uwp")]
+unsafe extern "C" fn configure_on_ui(context: *mut std::ffi::c_void) {
+    // SAFETY: dispatch_ui_sync keeps the stack context alive and blocks until
+    // this callback has returned. The three pointed-to values are shared by
+    // WGPU's thread-safe surface configure path.
+    let context = unsafe { &mut *context.cast::<ConfigureOnUi>() };
+    let surface = unsafe { &*context.surface };
+    let device = unsafe { &*context.device };
+    let config = unsafe { &*context.config };
+    context.result =
+        Some(unsafe { <Surface as crate::Surface>::configure(surface, device, config) });
+}
+
 impl crate::Surface for Surface {
     type A = super::Api;
 
@@ -1272,6 +1371,38 @@ impl crate::Surface for Surface {
         config: &crate::SurfaceConfiguration,
     ) -> Result<(), crate::SurfaceError> {
         use raw_window_handle::RawWindowHandle as Rwh;
+
+        #[cfg(target_vendor = "uwp")]
+        if matches!(self.raw_window_handle, Rwh::WinRt(_))
+            && unsafe { horizon_uwp_is_ui_thread() == 0 }
+        {
+            let mut context = ConfigureOnUi {
+                surface: self,
+                device,
+                config,
+                result: None,
+            };
+            let status = unsafe {
+                horizon_uwp_dispatch_ui_sync(
+                    configure_on_ui,
+                    ptr::from_mut(&mut context).cast(),
+                )
+            };
+            if status < 0 {
+                log::error!("UWP ANGLE surface dispatch failed: HRESULT 0x{status:08X}");
+                return Err(crate::SurfaceError::Other(
+                    "dispatching the ANGLE surface to the UWP UI thread failed",
+                ));
+            }
+            return context.result.unwrap_or(Err(crate::SurfaceError::Other(
+                "the UWP UI thread did not configure the ANGLE surface",
+            )));
+        }
+
+        #[cfg(target_vendor = "uwp")]
+        if matches!(self.raw_window_handle, Rwh::WinRt(_)) {
+            log::debug!("Configuring the UWP ANGLE EGL surface against the XAML SwapChainPanel");
+        }
 
         let (surface, wl_window) = match unsafe { self.unconfigure_impl(device) } {
             Some((sc, wl_window)) => {
@@ -1422,8 +1553,14 @@ impl crate::Surface for Surface {
                 match raw_result {
                     Ok(raw) => (raw, wl_window),
                     Err(e) => {
-                        log::warn!("Error in create_window_surface: {e:?}");
-                        return Err(crate::SurfaceError::Lost);
+                        log::error!(
+                            "UWP ANGLE eglCreateWindowSurface failed: {e:?}; raw window handle={:?}; native handle={native_window_ptr:p}; presentable={}",
+                            self.raw_window_handle,
+                            self.presentable,
+                        );
+                        return Err(crate::SurfaceError::Other(
+                            "UWP ANGLE could not create a SwapChainPanel surface; see the preceding EGL error",
+                        ));
                     }
                 }
             }

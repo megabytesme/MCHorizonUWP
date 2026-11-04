@@ -1695,6 +1695,7 @@ name = "horizon-native-window"
 version = "0.1.0"
 dependencies = [
  "horizon-uwp-d3d11",
+ "log",
  "windows 0.62.2",
 ]
 

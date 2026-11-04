@@ -24,6 +24,7 @@ xaml-shell = ["uwp-account"]
 [dependencies]
 horizon-client = { path = "../../crates/horizon-client", default-features = false }
 pollster = "0.4"
+horizon-protocol = { path = "../../crates/horizon-protocol" }
 
 [target.'cfg(target_vendor = "uwp")'.dependencies]
 horizon-threads = { path = "../../crates/horizon-threads" }
