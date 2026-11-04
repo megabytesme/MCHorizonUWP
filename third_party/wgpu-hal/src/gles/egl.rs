@@ -759,10 +759,7 @@ impl crate::Instance for Instance {
                 result: None,
             };
             let status = unsafe {
-                horizon_uwp_dispatch_ui_sync(
-                    init_on_ui,
-                    ptr::from_mut(&mut context).cast(),
-                )
+                horizon_uwp_dispatch_ui_sync(init_on_ui, ptr::from_mut(&mut context).cast())
             };
             if status < 0 {
                 return Err(crate::InstanceError::new(format!(
@@ -1339,6 +1336,13 @@ unsafe extern "C" {
         callback: unsafe extern "C" fn(*mut std::ffi::c_void),
         context: *mut std::ffi::c_void,
     ) -> i32;
+    fn horizon_uwp_angle_window_properties(
+        window: *mut std::ffi::c_void,
+        width: u32,
+        height: u32,
+        result: *mut *mut std::ffi::c_void,
+    ) -> i32;
+    fn horizon_uwp_release_angle_window_properties(properties: *mut std::ffi::c_void);
 }
 
 #[cfg(target_vendor = "uwp")]
@@ -1383,10 +1387,7 @@ impl crate::Surface for Surface {
                 result: None,
             };
             let status = unsafe {
-                horizon_uwp_dispatch_ui_sync(
-                    configure_on_ui,
-                    ptr::from_mut(&mut context).cast(),
-                )
+                horizon_uwp_dispatch_ui_sync(configure_on_ui, ptr::from_mut(&mut context).cast())
             };
             if status < 0 {
                 log::error!("UWP ANGLE surface dispatch failed: HRESULT 0x{status:08X}");
@@ -1404,7 +1405,23 @@ impl crate::Surface for Surface {
             log::debug!("Configuring the UWP ANGLE EGL surface against the XAML SwapChainPanel");
         }
 
-        let (surface, wl_window) = match unsafe { self.unconfigure_impl(device) } {
+        #[cfg_attr(not(target_vendor = "uwp"), allow(unused_mut))]
+        let mut old_surface = unsafe { self.unconfigure_impl(device) };
+        #[cfg(target_vendor = "uwp")]
+        if matches!(self.raw_window_handle, Rwh::WinRt(_)) {
+            // ANGLE's explicit pixel size is fixed for the lifetime of the EGL
+            // surface, so recreate it whenever wgpu reconfigures the window.
+            if let Some((surface, _)) = old_surface.take() {
+                self.egl
+                    .instance
+                    .destroy_surface(self.egl.display, surface)
+                    .map_err(|e| {
+                        log::error!("Destroying the UWP ANGLE surface failed: {e:?}");
+                        crate::SurfaceError::Lost
+                    })?;
+            }
+        }
+        let (surface, wl_window) = match old_surface {
             Some((sc, wl_window)) => {
                 #[cfg(unix)]
                 if let Some(window) = wl_window {
@@ -1525,6 +1542,33 @@ impl crate::Surface for Surface {
                 let egl1_5: Option<&Arc<EglInstance>> = Some(&self.egl.instance);
 
                 // Careful, we can still be in 1.4 version even if `upcast` succeeds
+                #[cfg(target_vendor = "uwp")]
+                let mut angle_properties = ptr::null_mut();
+                #[cfg(target_vendor = "uwp")]
+                let native_window_ptr = if matches!(self.raw_window_handle, Rwh::WinRt(_)) {
+                    let status = unsafe {
+                        horizon_uwp_angle_window_properties(
+                            native_window_ptr,
+                            config.extent.width,
+                            config.extent.height,
+                            &mut angle_properties,
+                        )
+                    };
+                    if status < 0 {
+                        log::error!(
+                            "Creating UWP ANGLE window properties failed: HRESULT 0x{status:08X}"
+                        );
+                        return Err(crate::SurfaceError::Other("UWP ANGLE window properties"));
+                    }
+                    if angle_properties.is_null() {
+                        native_window_ptr
+                    } else {
+                        angle_properties
+                    }
+                } else {
+                    native_window_ptr
+                };
+
                 let raw_result = match egl1_5 {
                     Some(egl) if self.wsi.kind != WindowKind::Unknown => {
                         let attributes_usize = attributes
@@ -1550,17 +1594,22 @@ impl crate::Surface for Surface {
                     },
                 };
 
+                #[cfg(target_vendor = "uwp")]
+                unsafe {
+                    horizon_uwp_release_angle_window_properties(angle_properties)
+                };
+
                 match raw_result {
                     Ok(raw) => (raw, wl_window),
                     Err(e) => {
                         #[cfg(target_vendor = "uwp")]
                         {
-                        log::error!(
+                            log::error!(
                             "UWP ANGLE eglCreateWindowSurface failed: {e:?}; raw window handle={:?}; native handle={native_window_ptr:p}; presentable={}",
                             self.raw_window_handle,
                             self.presentable,
                         );
-                        return Err(crate::SurfaceError::Other(
+                            return Err(crate::SurfaceError::Other(
                             "UWP ANGLE could not create a SwapChainPanel surface; see the preceding EGL error",
                         ));
                         }

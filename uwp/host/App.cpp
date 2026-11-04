@@ -318,6 +318,40 @@ extern "C" void* __cdecl horizon_uwp_window_handle() {
     return reinterpret_cast<void*>(current_window);
 #endif
 }
+
+// ANGLE otherwise sizes a SwapChainPanel in XAML's logical pixels, while the
+// game renders at physical-pixel resolution. Its property set lets ANGLE
+// create and scale a swap chain that matches the game framebuffer.
+extern "C" int32_t __cdecl horizon_uwp_angle_window_properties(
+    void* window, uint32_t width, uint32_t height, void** result) {
+    if (!result) return E_POINTER;
+    *result = nullptr;
+#ifdef HORIZON_UWP_XAML_SHELL
+    if (!game_surface_native || window != game_surface_native.Get()) return S_FALSE;
+    if (!width || !height) return E_INVALIDARG;
+    try {
+        auto properties = ref new Windows::Foundation::Collections::PropertySet();
+        properties->Insert(L"EGLNativeWindowTypeProperty", reinterpret_cast<Platform::Object^>(window));
+        properties->Insert(L"EGLRenderSurfaceSizeProperty",
+            Windows::Foundation::PropertyValue::CreateSize(
+                Windows::Foundation::Size(static_cast<float>(width), static_cast<float>(height))));
+        auto native = reinterpret_cast<IUnknown*>(properties);
+        native->AddRef();
+        *result = native;
+        return S_OK;
+    } catch (Platform::Exception^ error) {
+        return error->HResult;
+    }
+#else
+    (void)window; (void)width; (void)height;
+    return S_FALSE;
+#endif
+}
+
+extern "C" void __cdecl horizon_uwp_release_angle_window_properties(void* properties) {
+    if (properties) reinterpret_cast<IUnknown*>(properties)->Release();
+}
+
 extern "C" void __cdecl horizon_uwp_pump_events() {
     // The XAML account state machine runs on a worker. Only the owning UI
     // thread may pump a CoreWindow dispatcher.
