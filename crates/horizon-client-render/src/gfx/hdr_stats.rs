@@ -9,17 +9,13 @@ use super::hdr::Masks;
 pub struct EmissionStats {
     /// One texel per sprite: x the layer in its array, y the array.
     pub view: wgpu::TextureView,
-    measurement: Option<Measurement>,
-}
-
-struct Measurement {
     layout: wgpu::BindGroupLayout,
     pipeline: wgpu::RenderPipeline,
     params: wgpu::Buffer,
 }
 
 impl EmissionStats {
-    pub fn new(device: &wgpu::Device, split: u32, arrays: u32, backend: wgpu::Backend) -> Self {
+    pub fn new(device: &wgpu::Device, split: u32, arrays: u32) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Horizon HDR emission thresholds"),
             size: wgpu::Extent3d {
@@ -35,16 +31,6 @@ impl EmissionStats {
             view_formats: &[],
         });
         let view = texture.create_view(&Default::default());
-        // wgpu's GL backend exposes only the sRGB surface color space, so it
-        // cannot present HDR. Its GLSL ES translator also cannot build this
-        // textureLoad-based pipeline. Keep the zero-initialized texture for
-        // the terrain bindings, but do not create an unusable HDR pipeline.
-        if backend == wgpu::Backend::Gl {
-            return Self {
-                view,
-                measurement: None,
-            };
-        }
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Horizon HDR emission thresholds"),
             source: wgpu::ShaderSource::Wgsl(include_str!("../hdr_stats.wgsl").into()),
@@ -113,11 +99,9 @@ impl EmissionStats {
         });
         Self {
             view,
-            measurement: Some(Measurement {
-                layout,
-                pipeline,
-                params,
-            }),
+            layout,
+            pipeline,
+            params,
         }
     }
 
@@ -129,13 +113,10 @@ impl EmissionStats {
         sprites: &[wgpu::TextureView],
         masks: Masks,
     ) {
-        let Some(measurement) = &self.measurement else {
-            return;
-        };
         let mut params = [0u8; 16];
         params[..4].copy_from_slice(&masks.parts.to_le_bytes());
         params[4..8].copy_from_slice(&masks.whole.to_le_bytes());
-        queue.write_buffer(&measurement.params, 0, &params);
+        queue.write_buffer(&self.params, 0, &params);
         let mut entries: Vec<_> = sprites
             .iter()
             .enumerate()
@@ -146,11 +127,11 @@ impl EmissionStats {
             .collect();
         entries.push(wgpu::BindGroupEntry {
             binding: super::SPRITE_ARRAYS,
-            resource: measurement.params.as_entire_binding(),
+            resource: self.params.as_entire_binding(),
         });
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Horizon HDR emission thresholds"),
-            layout: &measurement.layout,
+            layout: &self.layout,
             entries: &entries,
         });
         let mut encoder = device.create_command_encoder(&Default::default());
@@ -168,7 +149,7 @@ impl EmissionStats {
                 })],
                 ..Default::default()
             });
-            pass.set_pipeline(&measurement.pipeline);
+            pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &group, &[]);
             pass.draw(0..3, 0..1);
         }

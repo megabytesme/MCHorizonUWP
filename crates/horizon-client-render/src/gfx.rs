@@ -2807,12 +2807,8 @@ impl Renderer {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-        let emission_stats = hdr_stats::EmissionStats::new(
-            &device,
-            split,
-            sprite_textures.len() as u32,
-            info.backend,
-        );
+        let emission_stats =
+            hdr_stats::EmissionStats::new(&device, split, sprite_textures.len() as u32);
         let group = terrain_group(
             &device,
             "Horizon terrain resources",
