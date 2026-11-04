@@ -117,6 +117,12 @@ use windows::{
 unsafe extern "C" {
     fn horizon_uwp_attach_game_swapchain(swap_chain: *mut core::ffi::c_void) -> i32;
     fn horizon_uwp_detach_game_swapchain() -> i32;
+    fn horizon_uwp_get_surface_metrics(
+        width: *mut u32,
+        height: *mut u32,
+        scale_x: *mut f64,
+        scale_y: *mut f64,
+    );
 }
 
 use self::dcomp::DCompLib;
@@ -1696,6 +1702,33 @@ impl crate::Surface for Surface {
                 })?
             }
         };
+
+        #[cfg(target_vendor = "uwp")]
+        if matches!(&self.target, SurfaceTarget::SwapChainPanel(_)) {
+            let (mut width, mut height, mut scale_x, mut scale_y) = (0, 0, 1.0, 1.0);
+            unsafe {
+                horizon_uwp_get_surface_metrics(
+                    &mut width,
+                    &mut height,
+                    &mut scale_x,
+                    &mut scale_y,
+                );
+            }
+            if !scale_x.is_finite() || !scale_y.is_finite() || scale_x <= 0.0 || scale_y <= 0.0 {
+                return Err(crate::SurfaceError::Other("invalid UWP composition scale"));
+            }
+            // The buffers are already sized in physical pixels. Cancel XAML's
+            // scale, just as the native D3D11 composition renderer does.
+            let matrix = Dxgi::DXGI_MATRIX_3X2_F {
+                _11: (1.0 / scale_x) as f32,
+                _22: (1.0 / scale_y) as f32,
+                ..Default::default()
+            };
+            unsafe { swap_chain.SetMatrixTransform(&matrix) }.map_err(|err| {
+                log::error!("SetMatrixTransform failed: {err}");
+                crate::SurfaceError::Other("UWP swapchain composition scale")
+            })?;
+        }
 
         // Apply the color space unconditionally (even for sRGB) so that
         // reconfiguring away from HDR10 resets the swapchain's state.
