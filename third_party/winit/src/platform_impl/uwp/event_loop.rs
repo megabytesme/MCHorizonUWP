@@ -35,6 +35,14 @@ pub struct EventLoop<T> { target: event_loop::ActiveEventLoop, sender: mpsc::Sen
 pub struct EventLoopProxy<T> { sender: mpsc::Sender<T> }
 #[derive(Clone)] pub(crate) struct OwnedDisplayHandle;
 
+// Unlike the desktop backends, this loop only borrows the host's existing
+// dispatcher. Once it ends the launcher may start a fresh game in-process.
+impl<T> Drop for EventLoop<T> {
+    fn drop(&mut self) {
+        event_loop::EventLoopBuilder::<()>::release_uwp_event_loop();
+    }
+}
+
 impl<T: 'static> EventLoop<T> {
     pub(crate) fn new(_: &PlatformSpecificEventLoopAttributes) -> Result<Self, crate::error::EventLoopError> {
         if unsafe { horizon_uwp_window_handle() }.is_null() {

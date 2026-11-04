@@ -115,16 +115,28 @@ impl<T> EventLoopBuilder<T> {
     pub fn build(&mut self) -> Result<EventLoop<T>, EventLoopError> {
         let _span = tracing::debug_span!("winit::EventLoopBuilder::build").entered();
 
-        if EVENT_LOOP_CREATED.swap(true, Ordering::Relaxed) {
+        if EVENT_LOOP_CREATED.swap(true, Ordering::AcqRel) {
             return Err(EventLoopError::RecreationAttempt);
         }
 
         // Certain platforms accept a mutable reference in their API.
         #[allow(clippy::unnecessary_mut_passed)]
+        let event_loop = platform_impl::EventLoop::new(&mut self.platform_specific);
+        // The UWP host can return to its launcher and try again even when
+        // constructing the game loop failed.
+        #[cfg(target_vendor = "uwp")]
+        if event_loop.is_err() {
+            EVENT_LOOP_CREATED.store(false, Ordering::Release);
+        }
         Ok(EventLoop {
-            event_loop: platform_impl::EventLoop::new(&mut self.platform_specific)?,
+            event_loop: event_loop?,
             _marker: PhantomData,
         })
+    }
+
+    #[cfg(target_vendor = "uwp")]
+    pub(crate) fn release_uwp_event_loop() {
+        EVENT_LOOP_CREATED.store(false, Ordering::Release);
     }
 
     #[cfg(web_platform)]
