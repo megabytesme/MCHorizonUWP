@@ -65,9 +65,8 @@ pub struct HudAtlas {
     /// RGBA8, `width` by `height`, as built: empty once `pack_pixels` has
     /// compressed them (read them through `pixels()`).
     pub pixels: Vec<u8>,
-    /// `pixels` compressed (lz4) on a thread of its own once the renderer
-    /// has uploaded them: only rebuilding a renderer reads them again.
-    packed: Option<Arc<OnceLock<Vec<u8>>>>,
+    /// The uploaded pixels, compressed on a worker when memory allows.
+    packed: Option<Arc<OnceLock<PackedPixels>>>,
     /// The width each Standard Galactic letter uses in `font/ascii_sga`'s
     /// cell, by ASCII code (the enchanting table's text), read when built.
     pub galactic_widths: [u16; 128],
@@ -103,6 +102,42 @@ pub struct HudAtlas {
     /// ETF's blinking frames (`_blink`), packed here too.
     pub blinks: horizon_optifine::blink::Blinks,
     white: Rect,
+}
+
+enum PackedPixels {
+    Compressed(Vec<u8>),
+    /// Keep the original atlas if the temporary compression buffer cannot be allocated.
+    Raw(Arc<Vec<u8>>),
+}
+
+fn try_compress_pixels(raw: &[u8]) -> Option<Vec<u8>> {
+    let size = u32::try_from(raw.len()).ok()?;
+    let capacity = lz4_flex::block::get_maximum_output_size(raw.len()).checked_add(4)?;
+    let mut compressed = Vec::new();
+    compressed.try_reserve_exact(capacity).ok()?;
+    compressed.resize(capacity, 0);
+    compressed[..4].copy_from_slice(&size.to_le_bytes());
+    let written = lz4_flex::block::compress_into(raw, &mut compressed[4..]).ok()?;
+    compressed.truncate(4 + written);
+    compressed.shrink_to_fit();
+    Some(compressed)
+}
+
+fn pack_pixel_data_with(
+    raw: Arc<Vec<u8>>,
+    compress: impl FnOnce(&[u8]) -> Option<Vec<u8>>,
+) -> PackedPixels {
+    match compress(&raw) {
+        Some(compressed) => PackedPixels::Compressed(compressed),
+        None => {
+            log::warn!("Horizon: not enough memory to compress the UI atlas; retaining its pixels");
+            PackedPixels::Raw(raw)
+        }
+    }
+}
+
+fn pack_pixel_data(raw: Arc<Vec<u8>>) -> PackedPixels {
+    pack_pixel_data_with(raw, try_compress_pixels)
 }
 /// Atlas rows reserved for glyphs rasterized at run time.
 pub const GLYPH_ROWS: u32 = 512;
@@ -733,12 +768,15 @@ impl HudAtlas {
             return std::borrow::Cow::Borrowed(&self.pixels);
         };
         let size = (self.width * self.height * 4) as usize;
-        std::borrow::Cow::Owned(
-            lz4_flex::decompress_size_prepended(packed.wait())
-                .ok()
-                .filter(|p| p.len() == size)
-                .unwrap_or_else(|| vec![0; size]),
-        )
+        match packed.wait() {
+            PackedPixels::Raw(raw) => std::borrow::Cow::Borrowed(raw.as_slice()),
+            PackedPixels::Compressed(compressed) => std::borrow::Cow::Owned(
+                lz4_flex::decompress_size_prepended(compressed)
+                    .ok()
+                    .filter(|p| p.len() == size)
+                    .unwrap_or_else(|| vec![0; size]),
+            ),
+        }
     }
     /// Keep the pixels compressed from now on, once a renderer has them: the
     /// window's GPU holds the atlas, and a copy as built only serves a
@@ -755,10 +793,10 @@ impl HudAtlas {
         let spawned = std::thread::Builder::new()
             .name("Atlas packing".into())
             .spawn(move || {
-                let _ = job_slot.set(lz4_flex::compress_prepend_size(&job_raw));
+                let _ = job_slot.set(pack_pixel_data(job_raw));
             });
         if spawned.is_err() {
-            let _ = slot.set(lz4_flex::compress_prepend_size(&raw));
+            let _ = slot.set(pack_pixel_data(raw));
         }
         self.packed = Some(slot);
     }
@@ -3227,6 +3265,16 @@ mod tests {
         // Packing again keeps the same image.
         atlas.pack_pixels();
         assert!(atlas.pixels() == built.as_slice());
+    }
+    #[test]
+    fn atlas_pixels_remain_available_when_compression_cannot_allocate() {
+        let root = animated_root();
+        let mut atlas = HudAtlas::build(&root).unwrap();
+        let raw = Arc::new(std::mem::take(&mut atlas.pixels));
+        let packed = pack_pixel_data_with(raw.clone(), |_| None);
+        atlas.packed = Some(Arc::new(OnceLock::from(packed)));
+        assert!(matches!(atlas.pixels(), std::borrow::Cow::Borrowed(_)));
+        assert_eq!(atlas.pixels().as_ref(), raw.as_slice());
     }
     #[test]
     fn a_strip_frames_size_comes_from_its_mcmeta() {
