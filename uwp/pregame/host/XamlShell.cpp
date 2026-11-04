@@ -732,10 +732,10 @@ void apply_server_details(const ServerView& view, const ServerDetails& details) 
     view.players->Text = ref new Platform::String(details.players.c_str());
     if (!details.image.empty()) {
         try {
+            view.placeholder->Visibility = Visibility::Visible;
             auto bitmap = ref new BitmapImage();
             bitmap->UriSource = ref new Uri(ref new Platform::String(details.image.c_str()));
             view.image->Source = bitmap;
-            view.placeholder->Visibility = Visibility::Collapsed;
         } catch (Platform::Exception^) {}
     }
 }
@@ -1520,7 +1520,7 @@ void refresh_save_list(StackPanel^ output) {
     output->Children->Append(text(L"Calculating save sizes…", 14));
     auto local = ApplicationData::Current->LocalFolder->Path;
     auto root = Platform::String::Concat(Platform::String::Concat(local, L"\\game\\"), L"saves");
-    ThreadPool::RunAsync(ref new WorkItemHandler([output, root](IAsyncAction^) {
+    ThreadPool::RunAsync(ref new WorkItemHandler([output, root, local](IAsyncAction^) {
         struct SaveInfo { std::wstring name; std::wstring path; std::uint64_t bytes; };
         std::vector<SaveInfo> saves;
         const std::wstring save_root(root->Data(), root->Length());
@@ -1539,7 +1539,7 @@ void refresh_save_list(StackPanel^ output) {
             FindClose(find);
         }
         try {
-            dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([output, saves, total]() {
+            dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([output, saves, total, local]() {
                 output->Children->Clear();
                 output->Children->Append(action_button(L"Import save", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
                     auto local = ApplicationData::Current->LocalFolder->Path;
@@ -1556,9 +1556,36 @@ void refresh_save_list(StackPanel^ output) {
                 if (saves.empty()) output->Children->Append(text(L"No worlds yet.", 14));
                 for (const auto& save : saves) {
                     auto row = ref new StackPanel();
+                    auto details = ref new Grid();
+                    auto icon_column = ref new ColumnDefinition(); icon_column->Width = GridLength(1, GridUnitType::Auto);
+                    auto info_column = ref new ColumnDefinition(); info_column->Width = GridLength(1, GridUnitType::Star);
+                    details->ColumnDefinitions->Append(icon_column); details->ColumnDefinitions->Append(info_column);
+                    auto icon_box = ref new Grid(); icon_box->Width = 56; icon_box->Height = 56; icon_box->Margin = Thickness(0, 0, 12, 0);
+                    auto placeholder = ref new SymbolIcon(Symbol::Globe);
+                    auto image = ref new Image(); image->Width = 56; image->Height = 56; image->Stretch = Stretch::Uniform;
+                    image->ImageOpened += ref new RoutedEventHandler([placeholder](Platform::Object^, RoutedEventArgs^) {
+                        placeholder->Visibility = Visibility::Collapsed;
+                    });
+                    image->ImageFailed += ref new ExceptionRoutedEventHandler([placeholder](Platform::Object^, ExceptionRoutedEventArgs^) {
+                        placeholder->Visibility = Visibility::Visible;
+                    });
+                    icon_box->Children->Append(placeholder); icon_box->Children->Append(image);
+                    details->Children->Append(icon_box);
                     auto label = text(ref new Platform::String((save.name + L" · " + format_bytes(save.bytes)).c_str()), 14);
                     label->VerticalAlignment = VerticalAlignment::Center;
-                    row->Children->Append(label);
+                    auto info = ref new StackPanel(); Grid::SetColumn(info, 1); info->VerticalAlignment = VerticalAlignment::Center;
+                    info->Children->Append(label);
+                    details->Children->Append(info);
+                    row->Children->Append(details);
+                    RecentWorld world{save.name, save.path, {}};
+                    const auto icon_uri = world_tile_icon(world, local);
+                    if (!icon_uri.empty()) {
+                        try {
+                            auto bitmap = ref new BitmapImage();
+                            bitmap->UriSource = ref new Uri(ref new Platform::String(icon_uri.c_str()));
+                            image->Source = bitmap;
+                        } catch (Platform::Exception^) {}
+                    }
                     auto commands = ref new CommandBar();
                     auto play = ref new AppBarButton(); play->Label = L"Play"; play->Icon = ref new SymbolIcon(Symbol::Play);
                     const auto name = save.name; const auto generation = displayed_generation;
@@ -2040,7 +2067,10 @@ void refresh() {
             row->ColumnDefinitions->Append(icon_col); row->ColumnDefinitions->Append(info_col);
             auto icon_box = ref new Grid(); icon_box->Width = 56; icon_box->Height = 56; icon_box->Margin = Thickness(0, 0, 12, 0);
             auto placeholder = ref new SymbolIcon(Symbol::Globe);
-            auto image = ref new Image(); image->Stretch = Stretch::Uniform;
+            auto image = ref new Image(); image->Width = 56; image->Height = 56; image->Stretch = Stretch::Uniform;
+            image->ImageOpened += ref new RoutedEventHandler([placeholder](Platform::Object^, RoutedEventArgs^) {
+                placeholder->Visibility = Visibility::Collapsed;
+            });
             image->ImageFailed += ref new ExceptionRoutedEventHandler([placeholder](Platform::Object^, ExceptionRoutedEventArgs^) {
                 placeholder->Visibility = Visibility::Visible;
             });
@@ -2061,7 +2091,7 @@ void refresh() {
             auto server_commands = ref new CommandBar();
             auto connect = ref new AppBarButton();
             connect->Label = L"Connect";
-            connect->Icon = ref new SymbolIcon(Symbol::AddFriend);
+            connect->Icon = ref new SymbolIcon(Symbol::Play);
             connect->Click += ref new RoutedEventHandler([address](Platform::Object^, RoutedEventArgs^) {
                     quick_connect_address = address;
                     quick_play_world.clear(); quick_benchmark = false;

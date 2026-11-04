@@ -20746,7 +20746,9 @@ fn start_game<'a>(
         // Minecraft.clearResourcePacksOnError: the selection is cleared and
         // saved, so the next launch starts without the packs.
         game.settings.resource_packs.clear();
-        game.settings.save(&Game::options_path());
+        if game.options.benchmark.is_none() {
+            game.settings.save(&Game::options_path());
+        }
         game.open_options_at(true, horizon_client::options_ui::Page::Packs);
         game.ui.options.resource_error = Some(error);
     }
@@ -20896,6 +20898,28 @@ fn leave_fullscreen_after(
         log::warn!(
             "the window system closed the game in fullscreen; the next start opens windowed"
         );
+    }
+}
+
+/// Mark a successful launch without persisting benchmark-only runtime options.
+fn mark_startup_clean(settings: &mut Settings, benchmark: bool) {
+    let path = Game::options_path();
+    if benchmark {
+        // start_game temporarily disables VSync and the frame cap for an
+        // official benchmark run. Reload the saved player options so those
+        // run-only overrides do not replace them in options.txt.
+        let mut persisted = Settings::load(&path);
+        persisted.file.set(
+            "startedCleanly",
+            horizon_client::options_file::V::Bool(true),
+        );
+        persisted.save(&path);
+    } else {
+        settings.file.set(
+            "startedCleanly",
+            horizon_client::options_file::V::Bool(true),
+        );
+        settings.save(&path);
     }
 }
 
@@ -21338,11 +21362,7 @@ impl Loading {
         game.apply_settings();
         game.previous = Instant::now();
         // Minecraft.onGameLoadFinished: a start that made it this far is clean.
-        game.settings.file.set(
-            "startedCleanly",
-            horizon_client::options_file::V::Bool(true),
-        );
-        game.settings.save(&Game::options_path());
+        mark_startup_clean(&mut game.settings, game.options.benchmark.is_some());
         log::info!(
             "Horizon: startup handoff {} ms (renderer {} ms, start_game {} ms)",
             handoff_at.elapsed().as_millis(),
@@ -21713,11 +21733,7 @@ fn run_with_options(options: Option<Options>) -> Result<()> {
     if let Some(mut game) = game {
         // Minecraft.onGameLoadFinished: a start that made it this far is clean.
         if game.options.execution_role.is_client() {
-            game.settings.file.set(
-                "startedCleanly",
-                horizon_client::options_file::V::Bool(true),
-            );
-            game.settings.save(&Game::options_path());
+            mark_startup_clean(&mut game.settings, game.options.benchmark.is_some());
         }
         run_event_loop(game)?;
     }
