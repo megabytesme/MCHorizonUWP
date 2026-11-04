@@ -211,6 +211,43 @@ pub fn keep_benchmark(home: &Path, report: &horizon_bench::Report) {
     }
 }
 
+#[cfg(any(test, all(target_vendor = "uwp", feature = "uwp-https")))]
+fn benchmark_batch(report: &horizon_bench::Report, install_id: &str) -> Result<Vec<u8>, String> {
+    let data = serde_json::to_value(report.for_upload()).map_err(|e| e.to_string())?;
+    let item = Item::new(Source::Game, version(), Payload::Benchmark(data));
+    item.validate()?;
+    let batch = horizon_telemetry::batch::Batch::new(install_id, vec![item]);
+    let body = horizon_telemetry::batch::encode(&batch);
+    if body.len() > horizon_telemetry::batch::MAX_COMPRESSED {
+        return Err("Benchmark report is too large to upload".into());
+    }
+    Ok(body)
+}
+
+/// Send one explicitly requested UWP benchmark using Horizon's upload format.
+#[cfg(all(target_vendor = "uwp", feature = "uwp-https"))]
+pub fn contribute_benchmark(home: &Path, report: &horizon_bench::Report) -> Result<(), String> {
+    let endpoint = horizon_telemetry::endpoint().ok_or("Benchmark uploads are disabled")?;
+    // A one-shot contribution does not change the player's other telemetry
+    // choices or send any existing queued reports.
+    let mut consent = horizon_telemetry::Consent::load(home);
+    if !horizon_telemetry::consent::is_install_id(&consent.install_id) {
+        consent.install_id = horizon_telemetry::consent::new_install_id();
+        consent.save(home).map_err(|e| e.to_string())?;
+    }
+    let body = benchmark_batch(report, &consent.install_id)?;
+    let response =
+        horizon_uwp_https_bridge::post_zstd(&format!("{endpoint}/v1/batch"), &body, 64 * 1024)
+            .ok_or("Could not reach the Horizon benchmark service")?;
+    if !(200..300).contains(&response.status) {
+        return Err(format!(
+            "Benchmark service returned HTTP {}",
+            response.status
+        ));
+    }
+    Ok(())
+}
+
 /// One play session's performance, from entering a world to leaving it: frame and tick
 /// times as [`Timings`] (fixed size whatever the length), never the frames themselves.
 #[derive(Default)]
@@ -469,6 +506,21 @@ mod tests {
             text.contains("2026-10-15T00:00:00Z") && !text.contains("my machine"),
             "{text}"
         );
+    }
+
+    #[test]
+    fn one_shot_benchmark_batch_excludes_local_fields() {
+        let mut report = horizon_bench::Report::new(horizon_bench::Kind::Game, Default::default());
+        report.created = "2026-10-15T14:03:27Z".into();
+        report.label = Some("private label".into());
+        report.local.push("/private/path".into());
+        let id = "1234567890abcdef1234567890abcdef";
+        let batch =
+            horizon_telemetry::batch::decode(&benchmark_batch(&report, id).unwrap()).unwrap();
+        let json = serde_json::to_string(&batch).unwrap();
+        assert_eq!(batch.install_id, id);
+        assert!(!json.contains("private label") && !json.contains("/private/path"));
+        assert!(json.contains("2026-10-15T00:00:00Z"));
     }
 
     #[test]

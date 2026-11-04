@@ -147,12 +147,13 @@ extern "C" int __cdecl horizon_uwp_http_get(const unsigned char *url,
 
 // Authenticated requests never follow redirects: a bearer token and POST body
 // must not be forwarded to a different endpoint implicitly.
-extern "C" int __cdecl horizon_uwp_http_request(
+static int http_request_impl(
     const unsigned char *url, size_t url_len, int post,
     const unsigned char *authorization, size_t authorization_len,
     const unsigned char *content_type, size_t content_type_len,
     const unsigned char *body, size_t body_len, size_t limit,
-    unsigned int *http_status, unsigned char **output, size_t *output_len) {
+    unsigned int *http_status, unsigned char **output, size_t *output_len,
+    bool zstd) {
   if (!url || !output || !output_len || !http_status || !url_len ||
       url_len > 8192 || authorization_len > 16384 || content_type_len > 256 ||
       body_len > 1024 * 1024 || limit > 16 * 1024 * 1024 ||
@@ -217,6 +218,8 @@ extern "C" int __cdecl horizon_uwp_http_request(
           !request->Content->Headers->TryAppendWithoutValidation(
               L"Content-Type", header(content_type, content_type_len)))
         throw ref new Platform::InvalidArgumentException();
+      if (zstd && !request->Content->Headers->TryAppendWithoutValidation(L"Content-Encoding", L"zstd"))
+        throw ref new Platform::InvalidArgumentException();
     } else if (body_len || content_type_len)
       throw ref new Platform::InvalidArgumentException();
     auto response = await_with_timeout(client->SendRequestAsync(
@@ -236,6 +239,24 @@ extern "C" int __cdecl horizon_uwp_http_request(
   }
   RoUninitialize();
   return result;
+}
+
+extern "C" int __cdecl horizon_uwp_http_request(
+    const unsigned char *url, size_t url_len, int post,
+    const unsigned char *authorization, size_t authorization_len,
+    const unsigned char *content_type, size_t content_type_len,
+    const unsigned char *body, size_t body_len, size_t limit,
+    unsigned int *http_status, unsigned char **output, size_t *output_len) {
+  return http_request_impl(url, url_len, post, authorization, authorization_len,
+      content_type, content_type_len, body, body_len, limit, http_status, output, output_len, false);
+}
+
+extern "C" int __cdecl horizon_uwp_http_post_zstd(
+    const unsigned char *url, size_t url_len, const unsigned char *body, size_t body_len,
+    size_t limit, unsigned int *http_status, unsigned char **output, size_t *output_len) {
+  static const unsigned char json[] = "application/json";
+  return http_request_impl(url, url_len, 1, nullptr, 0, json, sizeof(json) - 1,
+      body, body_len, limit, http_status, output, output_len, true);
 }
 
 extern "C" void __cdecl horizon_uwp_http_free(void *data) { free(data); }

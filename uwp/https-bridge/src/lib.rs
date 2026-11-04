@@ -26,6 +26,16 @@ unsafe extern "C" {
         data_len: *mut usize,
     ) -> i32;
     fn horizon_uwp_http_free(data: *mut c_void);
+    fn horizon_uwp_http_post_zstd(
+        url: *const u8,
+        url_len: usize,
+        body: *const u8,
+        body_len: usize,
+        limit: usize,
+        http_status: *mut u32,
+        data: *mut *mut u8,
+        data_len: *mut usize,
+    ) -> i32;
 }
 
 /// Fetch a successful HTTP response, with OS TLS verification and a hard body limit.
@@ -50,6 +60,34 @@ pub fn get(url: &str, limit: usize) -> Option<Vec<u8>> {
 pub struct Response {
     pub status: u32,
     pub body: Vec<u8>,
+}
+
+/// Send a zstd-compressed JSON payload without redirects, using Windows TLS.
+pub fn post_zstd(url: &str, body: &[u8], limit: usize) -> Option<Response> {
+    let mut data = ptr::null_mut();
+    let mut len = 0;
+    let mut status = 0;
+    let result = unsafe {
+        horizon_uwp_http_post_zstd(
+            url.as_ptr(),
+            url.len(),
+            body.as_ptr(),
+            body.len(),
+            limit,
+            &mut status,
+            &mut data,
+            &mut len,
+        )
+    };
+    if result != 0 || data.is_null() || len > limit {
+        if !data.is_null() {
+            unsafe { horizon_uwp_http_free(data.cast()) };
+        }
+        return None;
+    }
+    let body = unsafe { std::slice::from_raw_parts(data, len) }.to_vec();
+    unsafe { horizon_uwp_http_free(data.cast()) };
+    Some(Response { status, body })
 }
 
 /// Perform an HTTPS GET or POST without automatic redirects.

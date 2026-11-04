@@ -19,11 +19,22 @@ nightly and upstream source commit, and the UWP port commit. The About page show
 those build details, architecture, Windows device family and package version;
 What's New uses notes fetched for the exact pinned release.
 
-The Start page profile image opens account management. Settings can opt into a
-live tile showing recent worlds, the selected account and its downloaded
-Minecraft face, or a rotating mix. The tile is disabled until selected. Pin the
-app to Start for Windows to display its tile updates. Face images are reduced to
-an 8-by-8 local tile image; access and refresh tokens are never included.
+The Start page profile image opens account management. Settings control the
+primary live tile's rotating account, recent-world and server updates. World
+updates include the save icon and summary when available; server updates show
+the status, player count and icon. Status is refreshed while the launcher is
+running, rather than by a background service. Servers and worlds can also be
+pinned separately from their pages; opening one of those tiles starts that
+saved server or world. Windows controls whether live tiles are displayed. Face
+images are reduced to an 8-by-8 local tile image; access and refresh tokens are
+never included.
+
+Settings can start Horizon's `--benchmark standard` game benchmark. It keeps its
+JSON reports in `game/benchmarks`, accessible from the reports button. The
+benchmark creates its own marked world and replaces only that world on later
+runs. The optional contribution checkbox applies to the current run: it sends a
+privacy-filtered report and hardware details to Horizon, without changing any
+other telemetry choices. If uploading fails, the local report is still saved.
 
 The pre-game page and game use the same app view and CoreWindow on every device.
 The host clears the XAML root while the game renders into that window, then

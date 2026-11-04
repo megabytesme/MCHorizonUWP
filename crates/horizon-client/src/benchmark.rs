@@ -311,10 +311,23 @@ fn run(control: &Control, setup: Setup) -> Result<PathBuf, String> {
     if let Ok(meta) = std::env::current_exe().and_then(std::fs::metadata) {
         report.metric("game.binary_bytes", &[meta.len() as f64]);
     }
+    // UWP's checkbox controls this run explicitly; do not also queue it under
+    // a separate, potentially older launcher-wide telemetry setting.
+    #[cfg(not(target_vendor = "uwp"))]
     crate::telemetry::keep_benchmark(&crate::logging::game_home(), &report);
-    report
+    let path = report
         .write_to(&setup.game_dir.join("benchmarks"))
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-https"))]
+    if std::env::var("HORIZON_UWP_BENCHMARK_CONTRIBUTE").as_deref() == Ok("1") {
+        match crate::telemetry::contribute_benchmark(&crate::logging::game_home(), &report) {
+            Ok(()) => log::info!("Horizon: benchmark contribution sent"),
+            Err(error) => log::warn!(
+                "Horizon: benchmark contribution failed: {error}; the local report is still available"
+            ),
+        }
+    }
+    Ok(path)
 }
 
 /// Removes the previous run's world, never one the benchmark didn't create.

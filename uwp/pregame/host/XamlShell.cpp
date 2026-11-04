@@ -23,6 +23,7 @@
 #include <windows.ui.text.h>
 #include <windows.ui.viewmanagement.h>
 #include <windows.ui.notifications.h>
+#include <windows.ui.startscreen.h>
 #include <windows.system.h>
 #include <windows.ui.xaml.h>
 #include <windows.ui.xaml.input.h>
@@ -44,6 +45,7 @@
 #include <cwctype>
 #include <cstring>
 #include <mutex>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -56,6 +58,7 @@ using namespace Windows::Graphics::Imaging;
 
 using namespace Windows::Storage;
 using namespace Windows::Storage::Streams;
+using namespace Windows::UI::StartScreen;
 using namespace Windows::Data::Json;
 using namespace Windows::Data::Xml::Dom;
 using namespace Windows::System::Threading;
@@ -90,6 +93,8 @@ extern "C" int __cdecl horizon_uwp_probe_renderer(void*, unsigned, unsigned, uns
 extern "C" ptrdiff_t __cdecl horizon_uwp_server_list_read(const uint16_t*, size_t, uint8_t*, size_t);
 extern "C" int32_t __cdecl horizon_uwp_server_list_add(const uint16_t*, size_t, const uint8_t*, size_t, const uint8_t*, size_t);
 extern "C" int32_t __cdecl horizon_uwp_server_list_remove(const uint16_t*, size_t, const uint8_t*, size_t);
+extern "C" ptrdiff_t __cdecl horizon_uwp_server_status(const uint8_t*, size_t, uint8_t*, size_t);
+extern "C" ptrdiff_t __cdecl horizon_uwp_world_summary(const uint16_t*, size_t, uint8_t*, size_t);
 extern "C" int32_t __cdecl horizon_uwp_dispatch_ui_sync(void(__cdecl*)(void*), void*);
 extern "C" void __cdecl horizon_uwp_register_game_surface(void*);
 #ifdef HORIZON_UWP_NATIVE_D3D11
@@ -194,6 +199,7 @@ void update_game_surface_metrics() {
 muxc::NavigationView^ navigation;
 muxc::NavigationViewItem^ profile_navigation;
 muxc::NavigationViewItem^ servers_navigation;
+muxc::NavigationViewItem^ saves_navigation;
 muxc::NavigationViewItem^ home_navigation;
 Flyout^ profile_flyout;
 Button^ fallback_profile;
@@ -247,14 +253,24 @@ bool show_settings = false;
 bool show_logs = false;
 bool show_news = false;
 bool show_servers = false;
+bool show_saves = false;
 bool has_winui = false;
 std::atomic<int> game_exit_behavior{0};
 unsigned profile_kind = 0;
 unsigned live_tile_options = 7;
 bool tile_skin_available = false;
 struct SavedServer { std::wstring name; std::wstring address; };
+struct ServerDetails { std::wstring motd; std::wstring players; std::wstring image; bool online = false; bool pending = false; ULONGLONG checked = 0; };
+struct ServerView { TextBlock^ motd; TextBlock^ players; Image^ image; SymbolIcon^ placeholder; };
 std::vector<SavedServer> server_entries;
+std::map<std::wstring, ServerDetails> server_details;
+std::map<std::wstring, ServerView> server_views;
+std::atomic<unsigned> tile_generation{0};
 std::wstring quick_connect_address;
+std::wstring quick_play_world;
+std::wstring pending_tile_launch;
+bool quick_benchmark = false;
+bool quick_benchmark_contribute = false;
 UISettings^ ui_settings;
 AccessibilitySettings^ accessibility;
 
@@ -266,6 +282,11 @@ Platform::String^ decode(const unsigned char* bytes, size_t length);
 void update_live_tile();
 void persist_tile_skin(WriteableBitmap^ image, unsigned generation);
 void clear_tile_skin();
+void request_server_status(const std::wstring& address);
+void try_pending_tile_launch(unsigned generation);
+void show_message(Platform::String^ title, Platform::String^ message);
+void update_server_secondary_tile(const SavedServer& server, const ServerDetails& details);
+std::wstring secondary_tile_id(const std::wstring& kind, const std::wstring& target);
 
 Platform::String^ installed_release() {
     unsigned char buffer[256];
@@ -449,23 +470,34 @@ void load_installed_notes(TextBlock^ output) {
 }
 
 bool supports_acrylic() {
-    auto version = Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamilyVersion;
-    const auto packed = _wcstoui64(version->Data(), nullptr, 10);
-    return ((packed >> 16) & 0xffff) >= 16299 &&
-        Windows::Foundation::Metadata::ApiInformation::IsTypePresent(L"Windows.UI.Xaml.Media.AcrylicBrush");
+    return Windows::Foundation::Metadata::ApiInformation::IsTypePresent(L"Windows.UI.Xaml.Media.AcrylicBrush") &&
+        Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(L"Windows.UI.Xaml.Media.AcrylicBrush", L"BackgroundSource");
 }
-bool supports_mica() {
-    auto version = Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamilyVersion;
-    return ((_wcstoui64(version->Data(), nullptr, 10) >> 16) & 0xffff) >= 22000;
+bool supports_system_backdrop() {
+    // WinUI 2 exposes no public IsSupported method. Its BackdropMaterial probes
+    // the compositor and assigns an opaque fallback when Mica is unavailable;
+    // ask that implementation rather than guessing from the Windows build.
+    if (!Window::Current) return false;
+    static int cached = -1;
+    if (cached >= 0) return cached != 0;
+    try {
+        auto probe = ref new Page();
+        muxc::BackdropMaterial::SetApplyToRootOrPageBackground(probe, true);
+        auto brush = dynamic_cast<SolidColorBrush^>(probe->Background);
+        const bool supported = brush && brush->Color.A == 0;
+        muxc::BackdropMaterial::SetApplyToRootOrPageBackground(probe, false);
+        cached = supported ? 1 : 0;
+        return supported;
+    } catch (Platform::Exception^) { cached = 0; return false; }
 }
 AppAppearance resolved_appearance(AppAppearance requested) {
     if (requested == AppAppearance::Windows10) return requested;
     if (requested == AppAppearance::Windows10Fluent && supports_acrylic()) return requested;
     if (requested == AppAppearance::Windows11SunValley) {
-        if (supports_mica()) return requested;
+        if (supports_system_backdrop()) return requested;
         return supports_acrylic() ? AppAppearance::Windows10Fluent : AppAppearance::Windows10;
     }
-    if (supports_mica()) return AppAppearance::Windows11SunValley;
+    if (supports_system_backdrop()) return AppAppearance::Windows11SunValley;
     if (supports_acrylic()) return AppAppearance::Windows10Fluent;
     return AppAppearance::Windows10;
 }
@@ -680,6 +712,71 @@ bool valid_server_address(const std::wstring& address) {
     return valid_port(colon + 1);
 }
 
+std::wstring save_server_icon(const std::wstring& address, const uint8_t* data, size_t length, Platform::String^ local) {
+    if (!data || !length || length > 48 * 1024 || !local) return {};
+    uint64_t hash = 14695981039346656037ull;
+    for (wchar_t ch : address) { hash ^= static_cast<uint16_t>(ch); hash *= 1099511628211ull; }
+    wchar_t name[64] = {};
+    swprintf_s(name, L"horizon-server-%016llx.png", static_cast<unsigned long long>(hash));
+    const std::wstring path = std::wstring(local->Data(), local->Length()) + L"\\" + name;
+    HANDLE file = CreateFile2(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return {};
+    DWORD written = 0;
+    const bool ok = WriteFile(file, data, static_cast<DWORD>(length), &written, nullptr) && written == length;
+    CloseHandle(file);
+    return ok ? std::wstring(L"ms-appdata:///local/") + name : std::wstring();
+}
+
+void apply_server_details(const ServerView& view, const ServerDetails& details) {
+    view.motd->Text = ref new Platform::String(details.motd.c_str());
+    view.players->Text = ref new Platform::String(details.players.c_str());
+    if (!details.image.empty()) {
+        try {
+            auto bitmap = ref new BitmapImage();
+            bitmap->UriSource = ref new Uri(ref new Platform::String(details.image.c_str()));
+            view.image->Source = bitmap;
+            view.placeholder->Visibility = Visibility::Collapsed;
+        } catch (Platform::Exception^) {}
+    }
+}
+
+void request_server_status(const std::wstring& address) {
+    auto& current = server_details[address];
+    if (current.pending || (current.checked && GetTickCount64() - current.checked < 60000)) return;
+    current.pending = true;
+    auto local = ApplicationData::Current->LocalFolder->Path;
+    ThreadPool::RunAsync(ref new WorkItemHandler([address, local](IAsyncAction^) {
+        ServerDetails result;
+        const auto utf8 = encode_utf8(address);
+        std::vector<uint8_t> data(64 * 1024);
+        const auto length = horizon_uwp_server_status(reinterpret_cast<const uint8_t*>(utf8.data()), utf8.size(), data.data(), data.size());
+        if (length >= 8) {
+            const size_t motd = data[0] | (static_cast<size_t>(data[1]) << 8);
+            const size_t players = data[2] | (static_cast<size_t>(data[3]) << 8);
+            const size_t icon = data[4] | (static_cast<size_t>(data[5]) << 8) |
+                (static_cast<size_t>(data[6]) << 16) | (static_cast<size_t>(data[7]) << 24);
+            if (motd + players + icon <= static_cast<size_t>(length) - 8) {
+                result.motd = decode_utf8(data.data() + 8, motd);
+                result.players = decode_utf8(data.data() + 8 + motd, players);
+                result.image = save_server_icon(address, data.data() + 8 + motd + players, icon, local);
+                result.online = true;
+            }
+        }
+        if (!result.online) { result.motd = L"Server unavailable"; result.players = L""; }
+        result.checked = GetTickCount64();
+        try { dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([address, result]() {
+            const auto exists = std::find_if(server_entries.begin(), server_entries.end(),
+                [&address](const SavedServer& server) { return server.address == address; });
+            if (exists == server_entries.end()) { server_details.erase(address); return; }
+            server_details[address] = result;
+            const auto view = server_views.find(address);
+            if (view != server_views.end()) apply_server_details(view->second, result);
+            update_server_secondary_tile(*exists, result);
+            if (live_tile_options & 4) update_live_tile();
+        })); } catch (...) {}
+    }));
+}
+
 void load_server_entries() {
     server_entries.clear();
     try {
@@ -740,6 +837,7 @@ void load_server_entries() {
             if (!server.name.empty() && server.name.size() <= 64 &&
                 valid_server_address(server.address)) server_entries.push_back(std::move(server));
         }
+        for (const auto& server : server_entries) request_server_status(server.address);
     } catch (Platform::Exception^) {}
 }
 
@@ -759,6 +857,7 @@ std::wstring xml_escape(const std::wstring& value) {
     std::wstring escaped;
     escaped.reserve(value.size());
     for (const auto ch : value) {
+        if (ch < 0x20 && ch != L'\t' && ch != L'\n' && ch != L'\r') continue;
         switch (ch) {
         case L'&': escaped.append(L"&amp;"); break;
         case L'<': escaped.append(L"&lt;"); break;
@@ -771,10 +870,11 @@ std::wstring xml_escape(const std::wstring& value) {
     return escaped;
 }
 
-std::wstring tile_markup(const std::wstring& title, const std::wstring& detail, bool use_skin) {
+std::wstring tile_markup(const std::wstring& title, const std::wstring& detail, const std::wstring& image = {}, bool circular = false) {
     std::wstring content = L"<text hint-style=\"subtitle\">" + xml_escape(title) + L"</text>";
     if (!detail.empty()) content += L"<text hint-style=\"captionSubtle\">" + xml_escape(detail) + L"</text>";
-    if (use_skin) content += L"<image placement=\"inline\" src=\"ms-appdata:///local/horizon-profile-tile.png\" hint-crop=\"circle\"/>";
+    if (!image.empty()) content += L"<image placement=\"inline\" src=\"" + xml_escape(image) +
+        (circular ? L"\" hint-crop=\"circle\"/>" : L"\"/>");
     std::wstring xml = L"<tile><visual version=\"3\">";
     for (const auto* size : { L"TileMedium", L"TileWide", L"TileLarge" })
         xml += L"<binding template=\"" + std::wstring(size) + L"\" branding=\"name\">" + content + L"</binding>";
@@ -782,9 +882,9 @@ std::wstring tile_markup(const std::wstring& title, const std::wstring& detail, 
     return xml;
 }
 
-std::vector<std::wstring> recent_world_names(const std::wstring& save_root) {
-    struct World { std::wstring name; FILETIME modified; };
-    std::vector<World> worlds;
+struct RecentWorld { std::wstring name; std::wstring path; FILETIME modified; };
+std::vector<RecentWorld> recent_worlds(const std::wstring& save_root) {
+    std::vector<RecentWorld> worlds;
     const auto pattern = save_root + L"\\*";
     WIN32_FIND_DATAW entry = {};
     HANDLE find = FindFirstFileW(pattern.c_str(), &entry);
@@ -793,24 +893,64 @@ std::vector<std::wstring> recent_world_names(const std::wstring& save_root) {
         if (!(entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
             (entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ||
             !wcscmp(entry.cFileName, L".") || !wcscmp(entry.cFileName, L"..")) continue;
-        worlds.push_back({ entry.cFileName, entry.ftLastWriteTime });
+        worlds.push_back({ entry.cFileName, save_root + L"\\" + entry.cFileName, entry.ftLastWriteTime });
     } while (FindNextFileW(find, &entry));
     FindClose(find);
-    std::sort(worlds.begin(), worlds.end(), [](const World& left, const World& right) {
+    std::sort(worlds.begin(), worlds.end(), [](const RecentWorld& left, const RecentWorld& right) {
         return CompareFileTime(&left.modified, &right.modified) > 0;
     });
-    std::vector<std::wstring> names;
-    for (size_t i = 0; i < worlds.size() && i < 4; ++i) names.push_back(worlds[i].name);
-    return names;
+    return worlds;
+}
+
+std::wstring world_tile_icon(const RecentWorld& world, Platform::String^ local) {
+    const auto input = world.path + L"\\icon.png";
+    HANDLE file = CreateFile2(input.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return {};
+    LARGE_INTEGER size = {};
+    if (!GetFileSizeEx(file, &size) || size.QuadPart < 8 || size.QuadPart > 512 * 1024) { CloseHandle(file); return {}; }
+    std::vector<uint8_t> bytes(static_cast<size_t>(size.QuadPart)); DWORD read = 0;
+    const bool loaded = ReadFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &read, nullptr) && read == bytes.size();
+    CloseHandle(file);
+    const uint8_t png[] = {137, 80, 78, 71, 13, 10, 26, 10};
+    if (!loaded || memcmp(bytes.data(), png, sizeof(png))) return {};
+    uint64_t hash = 14695981039346656037ull;
+    for (wchar_t ch : world.name) { hash ^= static_cast<uint16_t>(ch); hash *= 1099511628211ull; }
+    wchar_t name[64] = {}; swprintf_s(name, L"horizon-world-%016llx.png", static_cast<unsigned long long>(hash));
+    const std::wstring path = std::wstring(local->Data(), local->Length()) + L"\\" + name;
+    file = CreateFile2(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return {};
+    DWORD written = 0; const bool saved = WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) && written == bytes.size();
+    CloseHandle(file);
+    return saved ? std::wstring(L"ms-appdata:///local/") + name : std::wstring();
+}
+
+void update_pinned_world_tiles(Platform::String^ local) {
+    const auto root = std::wstring(local->Data(), local->Length()) + L"\\game\\saves";
+    for (const auto& world : recent_worlds(root)) {
+        try {
+            const auto id = secondary_tile_id(L"world", world.name);
+            auto tile_id = ref new Platform::String(id.c_str());
+            if (!SecondaryTile::Exists(tile_id)) continue;
+            uint8_t buffer[512] = {};
+            const auto length = horizon_uwp_world_summary(reinterpret_cast<const uint16_t*>(world.path.data()), world.path.size(), buffer, sizeof(buffer));
+            const auto detail = length > 0 ? decode_utf8(buffer, static_cast<size_t>(length)) : L"Saved world";
+            auto xml = ref new XmlDocument();
+            xml->LoadXml(ref new Platform::String(tile_markup(world.name, detail, world_tile_icon(world, local)).c_str()));
+            TileUpdateManager::CreateTileUpdaterForSecondaryTile(tile_id)->Update(ref new TileNotification(xml));
+        } catch (Platform::Exception^) {}
+    }
 }
 
 void update_live_tile() {
+    const unsigned generation = tile_generation.fetch_add(1) + 1;
     const unsigned options = live_tile_options;
     const unsigned kind = profile_kind;
     const bool has_skin = tile_skin_available;
     const std::wstring account_name = profile ? std::wstring(profile->Data(), profile->Length()) : L"Profile";
     const auto servers = server_entries;
+    const auto statuses = server_details;
     const auto local = ApplicationData::Current->LocalFolder->Path;
+    ThreadPool::RunAsync(ref new WorkItemHandler([local](IAsyncAction^) { update_pinned_world_tiles(local); }));
     if (options == 0) {
         try {
             auto updater = TileUpdateManager::CreateTileUpdaterForApplication();
@@ -819,7 +959,7 @@ void update_live_tile() {
         } catch (...) {}
         return;
     }
-    ThreadPool::RunAsync(ref new WorkItemHandler([options, kind, has_skin, account_name, servers, local](IAsyncAction^) {
+    ThreadPool::RunAsync(ref new WorkItemHandler([options, kind, has_skin, account_name, servers, statuses, local, generation](IAsyncAction^) {
         try {
             std::vector<std::wstring> updates;
             const bool include_worlds = (options & 1) != 0;
@@ -830,22 +970,30 @@ void update_live_tile() {
                 const auto detail = kind == 1 || kind == 3 ? L"Minecraft account" :
                     kind == 2 ? L"Offline account" : L"Minecraft: Java Edition";
                 const bool use_skin = has_skin && (kind == 1 || kind == 3);
-                updates.push_back(tile_markup(title, detail, use_skin));
+                updates.push_back(tile_markup(title, detail, use_skin ? L"ms-appdata:///local/horizon-profile-tile.png" : L"", use_skin));
             }
             if (include_worlds) {
                 const auto save_root = std::wstring(local->Data(), local->Length()) + L"\\game\\saves";
-                const auto worlds = recent_world_names(save_root);
-                if (worlds.empty()) updates.push_back(tile_markup(L"No worlds yet", L"Start a world in Horizon", false));
-                else for (const auto& world : worlds)
-                    updates.push_back(tile_markup(world, L"Recent world", false));
+                const auto worlds = recent_worlds(save_root);
+                if (worlds.empty()) updates.push_back(tile_markup(L"No worlds yet", L"Start a world in Horizon"));
+                else for (size_t i = 0; i < worlds.size() && i < (include_servers ? 2u : 4u) && updates.size() < 5; ++i) {
+                    const auto& world = worlds[i]; uint8_t buffer[512] = {};
+                    const auto length = horizon_uwp_world_summary(reinterpret_cast<const uint16_t*>(world.path.data()), world.path.size(), buffer, sizeof(buffer));
+                    const auto detail = length > 0 ? decode_utf8(buffer, static_cast<size_t>(length)) : L"Recent world";
+                    updates.push_back(tile_markup(world.name, detail, world_tile_icon(world, local)));
+                }
             }
             if (include_servers) {
                 const size_t limit = (std::min)(servers.size(), size_t(4));
-                if (limit == 0) updates.push_back(tile_markup(L"No servers saved", L"Add a server in Horizon", false));
-                else for (size_t i = 0; i < limit; ++i)
-                    updates.push_back(tile_markup(servers[i].name, servers[i].address, false));
+                if (limit == 0 && updates.size() < 5) updates.push_back(tile_markup(L"No servers saved", L"Add a server in Horizon"));
+                else for (size_t i = 0; i < limit && updates.size() < 5; ++i) {
+                    const auto found = statuses.find(servers[i].address);
+                    const bool online = found != statuses.end() && found->second.online;
+                    const auto detail = online ? found->second.players + L"\n" + found->second.motd : servers[i].address;
+                    updates.push_back(tile_markup(servers[i].name, detail, online ? found->second.image : L""));
+                }
             }
-            if (updates.empty()) return;
+            if (updates.empty() || tile_generation.load() != generation) return;
             auto updater = TileUpdateManager::CreateTileUpdaterForApplication();
             updater->EnableNotificationQueue(updates.size() > 1);
             updater->Clear();
@@ -856,6 +1004,73 @@ void update_live_tile() {
             }
         } catch (...) { /* Live tiles are optional and must not block the launcher. */ }
     }));
+}
+
+std::wstring secondary_tile_id(const std::wstring& kind, const std::wstring& target) {
+    uint64_t hash = 14695981039346656037ull;
+    for (wchar_t ch : target) { hash ^= static_cast<uint16_t>(ch); hash *= 1099511628211ull; }
+    wchar_t suffix[32] = {}; swprintf_s(suffix, L"%016llx", static_cast<unsigned long long>(hash));
+    return L"horizon-" + kind + L"-" + suffix;
+}
+
+void update_server_secondary_tile(const SavedServer& server, const ServerDetails& details) {
+    try {
+        const auto id = secondary_tile_id(L"server", server.address);
+        auto tile_id = ref new Platform::String(id.c_str());
+        if (!SecondaryTile::Exists(tile_id)) return;
+        const auto detail = details.online ? details.players + L"\n" + details.motd : L"Server unavailable";
+        auto xml = ref new XmlDocument();
+        xml->LoadXml(ref new Platform::String(tile_markup(server.name, detail, details.image).c_str()));
+        TileUpdateManager::CreateTileUpdaterForSecondaryTile(tile_id)->Update(ref new TileNotification(xml));
+    } catch (Platform::Exception^) {}
+}
+
+bool secondary_tile_exists(const std::wstring& kind, const std::wstring& target) {
+    try { return SecondaryTile::Exists(ref new Platform::String(secondary_tile_id(kind, target).c_str())); }
+    catch (Platform::Exception^) { return false; }
+}
+
+void toggle_secondary_tile(const std::wstring& kind, const std::wstring& target, const std::wstring& title) {
+    try {
+        const auto id = secondary_tile_id(kind, target);
+        auto tile_id = ref new Platform::String(id.c_str());
+        if (SecondaryTile::Exists(tile_id)) {
+            auto tile = ref new SecondaryTile(tile_id);
+            create_task(tile->RequestDeleteAsync()).then([](task<bool> done) {
+                try { if (done.get()) refresh(); } catch (...) {}
+            }, task_continuation_context::use_current());
+            return;
+        }
+        auto logo = ref new Uri(L"ms-appx:///Assets/Square150x150Logo.png");
+        const auto args = kind + L":" + target;
+        auto tile = ref new SecondaryTile(tile_id, ref new Platform::String(title.c_str()),
+            ref new Platform::String(args.c_str()), logo, TileSize::Square150x150);
+        tile->VisualElements->ShowNameOnSquare150x150Logo = true;
+        create_task(tile->RequestCreateAsync()).then([id, title, kind, target](task<bool> done) {
+            try {
+                if (!done.get()) return;
+                std::wstring detail = target, image;
+                if (kind == L"server") {
+                    const auto found = server_details.find(target);
+                    if (found != server_details.end() && found->second.online) {
+                        detail = found->second.players + L"\n" + found->second.motd;
+                        image = found->second.image;
+                    }
+                } else if (kind == L"world") {
+                    auto local = ApplicationData::Current->LocalFolder->Path;
+                    RecentWorld world{target, std::wstring(local->Data(), local->Length()) + L"\\game\\saves\\" + target, {}};
+                    uint8_t data[512] = {};
+                    const auto length = horizon_uwp_world_summary(reinterpret_cast<const uint16_t*>(world.path.data()), world.path.size(), data, sizeof(data));
+                    if (length > 0) detail = decode_utf8(data, static_cast<size_t>(length));
+                    image = world_tile_icon(world, local);
+                }
+                auto xml = ref new XmlDocument();
+                xml->LoadXml(ref new Platform::String(tile_markup(title, detail, image).c_str()));
+                TileUpdateManager::CreateTileUpdaterForSecondaryTile(ref new Platform::String(id.c_str()))->Update(ref new TileNotification(xml));
+                refresh();
+            } catch (...) {}
+        }, task_continuation_context::use_current());
+    } catch (Platform::Exception^) { show_message(L"Pin to Start", L"Windows could not create or remove this tile."); }
 }
 
 void persist_tile_skin(WriteableBitmap^ image, unsigned generation) {
@@ -1027,6 +1242,33 @@ void show_message(Platform::String^ title, Platform::String^ message) {
     dialog->ShowAsync();
 }
 
+void try_pending_tile_launch(unsigned generation) {
+    if (pending_tile_launch.empty() || prompt_kind != 0 || !renderer_known || !renderer_available || choice.load() != 0) return;
+    const auto argument = pending_tile_launch;
+    pending_tile_launch.clear();
+    if (argument.compare(0, 7, L"server:") == 0) {
+        const auto address = argument.substr(7);
+        const auto found = std::find_if(server_entries.begin(), server_entries.end(),
+            [&address](const SavedServer& server) { return server.address == address; });
+        if (found != server_entries.end() && valid_server_address(address)) {
+            quick_connect_address = address; quick_play_world.clear(); quick_benchmark = false; choose(1, generation); return;
+        }
+    } else if (argument.compare(0, 6, L"world:") == 0) {
+        const auto name = argument.substr(6);
+        if (!name.empty() && name.size() <= 255 && name != L"." && name != L".." &&
+            name.find_first_of(L"\\/:") == std::wstring::npos && name.find(L'\0') == std::wstring::npos) {
+            auto local = ApplicationData::Current->LocalFolder->Path;
+            const auto path = std::wstring(local->Data(), local->Length()) + L"\\game\\saves\\" + name;
+            WIN32_FIND_DATAW info = {}; HANDLE found = FindFirstFileW(path.c_str(), &info);
+            if (found != INVALID_HANDLE_VALUE) FindClose(found);
+            if (found != INVALID_HANDLE_VALUE && (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !(info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+                quick_play_world = name; quick_connect_address.clear(); quick_benchmark = false; choose(1, generation); return;
+            }
+        }
+    }
+    show_message(L"Pinned item unavailable", L"The saved server or world for this tile is no longer available.");
+}
+
 using BuildLabelReader = size_t(__cdecl*)(unsigned char*, size_t);
 Platform::String^ build_label(BuildLabelReader reader) {
     unsigned char buffer[256];
@@ -1173,6 +1415,7 @@ void show_server_dialog(bool direct_connect) {
         }
         if (direct_connect) {
             quick_connect_address = std::move(server_address);
+            quick_play_world.clear(); quick_benchmark = false;
             choose(1, displayed_generation);
             return;
         }
@@ -1312,15 +1555,29 @@ void refresh_save_list(StackPanel^ output) {
                 })));
                 if (saves.empty()) output->Children->Append(text(L"No worlds yet.", 14));
                 for (const auto& save : saves) {
-                    auto row = ref new StackPanel(); row->Orientation = Orientation::Horizontal;
+                    auto row = ref new StackPanel();
                     auto label = text(ref new Platform::String((save.name + L" · " + format_bytes(save.bytes)).c_str()), 14);
                     label->VerticalAlignment = VerticalAlignment::Center;
                     row->Children->Append(label);
+                    auto commands = ref new CommandBar();
+                    auto play = ref new AppBarButton(); play->Label = L"Play"; play->Icon = ref new SymbolIcon(Symbol::Play);
+                    const auto name = save.name; const auto generation = displayed_generation;
+                    play->IsEnabled = !renderer_known || renderer_available;
+                    play->Click += ref new RoutedEventHandler([name, generation](Platform::Object^, RoutedEventArgs^) {
+                        quick_play_world = name; quick_connect_address.clear(); quick_benchmark = false; choose(1, generation);
+                    });
+                    commands->PrimaryCommands->Append(play);
+                    auto pin = ref new AppBarButton(); pin->Label = secondary_tile_exists(L"world", name) ? L"Unpin" : L"Pin to Start";
+                    pin->Icon = ref new SymbolIcon(Symbol::Pin);
+                    pin->Click += ref new RoutedEventHandler([name](Platform::Object^, RoutedEventArgs^) { toggle_secondary_tile(L"world", name, name); });
+                    commands->PrimaryCommands->Append(pin);
                     auto path = save.path;
-                    row->Children->Append(action_button(L"Export", ref new RoutedEventHandler([path](Platform::Object^, RoutedEventArgs^) {
+                    auto export_button = ref new AppBarButton(); export_button->Label = L"Export"; export_button->Icon = ref new SymbolIcon(Symbol::Save);
+                    export_button->Click += ref new RoutedEventHandler([path](Platform::Object^, RoutedEventArgs^) {
                         if (horizon_uwp_pick_save_folder(path.c_str(), path.size(), 2) != 0)
                             show_message(L"Export save", L"The save folder picker could not be opened.");
-                    })));
+                    });
+                    commands->PrimaryCommands->Append(export_button); row->Children->Append(commands);
                     output->Children->Append(row);
                 }
                 output->Children->Append(text(ref new Platform::String((L"Total saves: " + format_bytes(total)).c_str()), 14));
@@ -1458,7 +1715,7 @@ void apply_theme() {
             return;
         }
         const auto appearance = resolved_appearance(selected_appearance);
-        if (appearance == AppAppearance::Windows11SunValley && has_winui && supports_mica()) {
+        if (appearance == AppAppearance::Windows11SunValley && has_winui && supports_system_backdrop()) {
             muxc::BackdropMaterial::SetApplyToRootOrPageBackground(page, true);
         } else page->Background = surface(false);
         if (navigation) update_navigation_surface(navigation);
@@ -1493,6 +1750,7 @@ void update_navigation_surface(DependencyObject^ node) {
 
 void refresh() {
     if (!content) return;
+    server_views.clear();
     auto panel = ref new StackPanel();
     panel->Margin = Thickness(24);
     panel->MaxWidth = 780;
@@ -1524,9 +1782,9 @@ void refresh() {
         if ((resolved_appearance(selected_appearance) == AppAppearance::Windows11SunValley) !=
             (resolved_appearance(startup_appearance) == AppAppearance::Windows11SunValley))
             appearance_card->Children->Append(text(L"Colours and materials have updated. Restart the app to finish applying the control styles.", 14));
-        if (selected_appearance == AppAppearance::Windows11SunValley && !supports_mica())
-            appearance_card->Children->Append(text(L"Mica is available on Windows 11. On this Windows version, this choice uses the closest available system material.", 14));
-        appearance_card->Children->Append(text(L"Automatic matches your Windows version. The app follows your light, dark and high contrast settings.", 14));
+        if (selected_appearance == AppAppearance::Windows11SunValley && !supports_system_backdrop())
+            appearance_card->Children->Append(text(L"This device uses the closest available system material.", 14));
+        appearance_card->Children->Append(text(L"Automatic uses the available system materials. The app follows your light, dark and high contrast settings.", 14));
         panel->Children->Append(card(appearance_card));
         auto launch_card = ref new StackPanel();
         launch_card->Children->Append(text(L"Launch settings", 18));
@@ -1565,6 +1823,39 @@ void refresh() {
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
+        auto benchmark_card = ref new StackPanel();
+        benchmark_card->Children->Append(text(L"Rendering benchmark", 18));
+        benchmark_card->Children->Append(text(L"Run Horizon's standard game benchmark. It creates or replaces its own benchmark world and saves the report in the game's benchmarks folder.", 14));
+        auto contribute = ref new CheckBox();
+        contribute->Content = L"Contribute this benchmark to Horizon";
+        contribute->IsChecked = false;
+        benchmark_card->Children->Append(contribute);
+        benchmark_card->Children->Append(text(L"If selected, the results and hardware details are sent to Horizon. The upload excludes local paths and your report label.", 14));
+        const auto benchmark_generation = displayed_generation;
+        auto benchmark_button = action_button(L"Start benchmark", ref new RoutedEventHandler([benchmark_generation, contribute](Platform::Object^, RoutedEventArgs^) {
+            quick_connect_address.clear(); quick_play_world.clear(); quick_benchmark = true;
+            quick_benchmark_contribute = contribute->IsChecked && contribute->IsChecked->Value;
+            choose(1, benchmark_generation);
+        }));
+        benchmark_button->IsEnabled = !renderer_known || renderer_available;
+        benchmark_card->Children->Append(benchmark_button);
+        auto reports_button = action_button(L"Open benchmark reports", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
+            try {
+                if (!Windows::Foundation::Metadata::ApiInformation::IsMethodPresent(L"Windows.System.Launcher", L"LaunchFolderAsync")) {
+                    show_message(L"Benchmark reports", L"Reports are saved in the app's game\\benchmarks folder.");
+                    return;
+                }
+                auto context = task_continuation_context::use_current();
+                create_task(ApplicationData::Current->LocalFolder->CreateFolderAsync(L"game", CreationCollisionOption::OpenIfExists))
+                    .then([](StorageFolder^ game) { return game->CreateFolderAsync(L"benchmarks", CreationCollisionOption::OpenIfExists); }, context)
+                    .then([](task<StorageFolder^> result) {
+                        try { Windows::System::Launcher::LaunchFolderAsync(result.get()); }
+                        catch (Platform::Exception^) { show_message(L"Benchmark reports", L"Could not open the benchmark reports folder."); }
+                    }, context);
+            } catch (Platform::Exception^) { show_message(L"Benchmark reports", L"Could not open the benchmark reports folder."); }
+        }));
+        benchmark_card->Children->Append(reports_button);
+        panel->Children->Append(card(benchmark_card));
         auto exit_card = ref new StackPanel();
         exit_card->Children->Append(text(L"When Minecraft quits", 18));
         auto exit_behavior = ref new ComboBox();
@@ -1686,7 +1977,7 @@ void refresh() {
             toggle->Unchecked += changed;
             tile_card->Children->Append(toggle);
         }
-        tile_card->Children->Append(text(L"Worlds show the most recently changed saves. Account tiles include your Minecraft face when available. Server tiles show saved server names and addresses.", 14));
+        tile_card->Children->Append(text(L"World tiles show recent saves, their icons and game settings. Account tiles include your Minecraft face when available. Server tiles show their status, player count and icon when available.", 14));
         tile_card->Children->Append(action_button(L"Update tile now", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { update_live_tile(); })));
         panel->Children->Append(card(tile_card));
         panel->Children->Append(text(L"Storage", 18));
@@ -1743,16 +2034,44 @@ void refresh() {
         if (server_entries.empty()) panel->Children->Append(text(L"No servers saved yet.", 14));
         for (const auto& server : server_entries) {
             auto server_card = ref new StackPanel();
-            server_card->Children->Append(text(ref new Platform::String(server.name.c_str()), 16));
-            server_card->Children->Append(text(ref new Platform::String(server.address.c_str()), 14));
+            auto row = ref new Grid();
+            auto icon_col = ref new ColumnDefinition(); icon_col->Width = GridLength(1, GridUnitType::Auto);
+            auto info_col = ref new ColumnDefinition(); info_col->Width = GridLength(1, GridUnitType::Star);
+            row->ColumnDefinitions->Append(icon_col); row->ColumnDefinitions->Append(info_col);
+            auto icon_box = ref new Grid(); icon_box->Width = 56; icon_box->Height = 56; icon_box->Margin = Thickness(0, 0, 12, 0);
+            auto placeholder = ref new SymbolIcon(Symbol::Globe);
+            auto image = ref new Image(); image->Stretch = Stretch::Uniform;
+            image->ImageFailed += ref new ExceptionRoutedEventHandler([placeholder](Platform::Object^, ExceptionRoutedEventArgs^) {
+                placeholder->Visibility = Visibility::Visible;
+            });
+            icon_box->Children->Append(placeholder); icon_box->Children->Append(image);
+            row->Children->Append(icon_box);
+            auto info = ref new StackPanel(); Grid::SetColumn(info, 1);
+            info->Children->Append(text(ref new Platform::String(server.name.c_str()), 16));
+            info->Children->Append(text(ref new Platform::String(server.address.c_str()), 14));
+            auto motd = text(L"Checking server…", 14);
+            auto players = text(L"", 14);
+            info->Children->Append(motd); info->Children->Append(players);
+            row->Children->Append(info); server_card->Children->Append(row);
+            ServerView view{motd, players, image, placeholder};
+            server_views[server.address] = view;
+            const auto details = server_details.find(server.address);
+            if (details != server_details.end() && !details->second.pending) apply_server_details(view, details->second);
             const auto address = server.address;
-            server_card->Children->Append(action_button(L"Connect", ref new RoutedEventHandler(
-                [address](Platform::Object^, RoutedEventArgs^) {
+            auto server_commands = ref new CommandBar();
+            auto connect = ref new AppBarButton();
+            connect->Label = L"Connect";
+            connect->Icon = ref new SymbolIcon(Symbol::AddFriend);
+            connect->Click += ref new RoutedEventHandler([address](Platform::Object^, RoutedEventArgs^) {
                     quick_connect_address = address;
+                    quick_play_world.clear(); quick_benchmark = false;
                     choose(1, displayed_generation);
-                })));
-            server_card->Children->Append(action_button(L"Remove", ref new RoutedEventHandler(
-                [address](Platform::Object^, RoutedEventArgs^) {
+                });
+            server_commands->PrimaryCommands->Append(connect);
+            auto remove = ref new AppBarButton();
+            remove->Label = L"Remove";
+            remove->Icon = ref new SymbolIcon(Symbol::Delete);
+            remove->Click += ref new RoutedEventHandler([address](Platform::Object^, RoutedEventArgs^) {
                     auto address_utf8 = encode_utf8(address);
                     auto local = ApplicationData::Current->LocalFolder->Path;
                     auto game_path = Platform::String::Concat(local, L"\\game");
@@ -1766,9 +2085,23 @@ void refresh() {
                     load_server_entries();
                     update_live_tile();
                     refresh();
-                })));
+                });
+            server_commands->PrimaryCommands->Append(remove);
+            auto pin = ref new AppBarButton();
+            pin->Label = secondary_tile_exists(L"server", address) ? L"Unpin" : L"Pin to Start";
+            pin->Icon = ref new SymbolIcon(Symbol::Pin);
+            const auto server_name = server.name;
+            pin->Click += ref new RoutedEventHandler([address, server_name](Platform::Object^, RoutedEventArgs^) {
+                toggle_secondary_tile(L"server", address, server_name);
+            });
+            server_commands->PrimaryCommands->Append(pin);
+            server_card->Children->Append(server_commands);
             panel->Children->Append(card(server_card));
         }
+    } else if (show_saves && prompt_kind == 0) {
+        panel->Children->Append(text(L"Worlds and saves", 28));
+        panel->Children->Append(text(L"Play or pin a world, or import and export a copy.", 14));
+        auto save_rows = ref new StackPanel(); panel->Children->Append(save_rows); refresh_save_list(save_rows);
     } else if (show_logs && prompt_kind == 0) {
         panel->Children->Append(text(L"Logs", 28));
         panel->Children->Append(text(L"Latest game log", 18));
@@ -1807,7 +2140,6 @@ void refresh() {
                 : (renderer_failure ? renderer_failure : L"No compatible renderer was detected."))
             : L"Checking graphics support…", 14));
         panel->Children->Append(profile_card());
-        panel->Children->Append(button(L"Start game", 1));
     }
     auto scroll = ref new ScrollViewer();
     scroll->HorizontalScrollMode = ScrollMode::Disabled;
@@ -1815,7 +2147,22 @@ void refresh() {
     auto layout = ref new Grid();
     layout->Children->Append(panel);
     scroll->Content = layout;
-    content->Content = scroll;
+    if (!show_settings && !show_servers && !show_saves && !show_logs && !show_news && prompt_kind == 0) {
+        auto root = ref new Grid();
+        auto body_row = ref new RowDefinition(); body_row->Height = GridLength(1, GridUnitType::Star);
+        auto commands_row = ref new RowDefinition(); commands_row->Height = GridLength(1, GridUnitType::Auto);
+        root->RowDefinitions->Append(body_row); root->RowDefinitions->Append(commands_row);
+        root->Children->Append(scroll);
+        auto commands = ref new CommandBar();
+        auto start = ref new AppBarButton();
+        start->Label = L"Start game"; start->Icon = ref new SymbolIcon(Symbol::Play);
+        start->IsEnabled = !renderer_known || renderer_available;
+        const auto generation = displayed_generation;
+        start->Click += ref new RoutedEventHandler([generation](Platform::Object^, RoutedEventArgs^) { choose(1, generation); });
+        commands->PrimaryCommands->Append(start);
+        Grid::SetRow(commands, 1); root->Children->Append(commands);
+        content->Content = root;
+    } else content->Content = scroll;
 }
 
 ref class ShellApp sealed : Application, Windows::UI::Xaml::Markup::IXamlMetadataProvider {
@@ -1836,10 +2183,20 @@ public:
         return metadata_ ? metadata_->GetXmlnsDefinitions() : ref new Platform::Array<Windows::UI::Xaml::Markup::XmlnsDefinition>(0);
     }
 protected:
-    virtual void OnLaunched(LaunchActivatedEventArgs^) override {
+    virtual void OnLaunched(LaunchActivatedEventArgs^ args) override {
         try {
         PROBE_STAGE(L"OnLaunched");
         auto window = Window::Current;
+        if (args && args->Arguments && args->Arguments->Length() <= 1024) {
+            const std::wstring argument(args->Arguments->Data(), args->Arguments->Length());
+            if (argument.compare(0, 7, L"server:") == 0 || argument.compare(0, 6, L"world:") == 0)
+                pending_tile_launch = argument;
+        }
+        if (page) {
+            window->Activate();
+            try_pending_tile_launch(displayed_generation);
+            return;
+        }
         dispatcher = window->Dispatcher;
         horizon_uwp_attach_shell(CoreWindow::GetForCurrentThread());
         page = ref new Page();
@@ -1952,11 +2309,17 @@ protected:
             servers_navigation->Content = L"Servers"; servers_navigation->Tag = L"servers";
             servers_navigation->Icon = ref new SymbolIcon(Symbol::Globe);
             navigation->MenuItems->Append(servers_navigation);
+            saves_navigation = ref new muxc::NavigationViewItem();
+            saves_navigation->Content = L"Worlds"; saves_navigation->Tag = L"saves";
+            saves_navigation->Icon = ref new SymbolIcon(Symbol::Folder);
+            navigation->MenuItems->Append(saves_navigation);
             auto logs = ref new muxc::NavigationViewItem();
             logs->Content = L"Logs"; logs->Tag = L"logs"; logs->Icon = ref new SymbolIcon(Symbol::Document);
             navigation->MenuItems->Append(logs);
             auto news = ref new muxc::NavigationViewItem();
-            news->Content = L"What's new"; news->Tag = L"news"; news->Icon = ref new SymbolIcon(Symbol::Globe);
+            news->Content = L"What's new"; news->Tag = L"news";
+            auto news_icon = ref new FontIcon(); news_icon->FontFamily = ref new FontFamily(L"Segoe MDL2 Assets"); news_icon->Glyph = L"\uE789";
+            news->Icon = news_icon;
             navigation->MenuItems->Append(news);
             profile_navigation = ref new muxc::NavigationViewItem();
             profile_navigation->Tag = L"profile";
@@ -1981,13 +2344,14 @@ protected:
                 [](muxc::NavigationView^, muxc::NavigationViewSelectionChangedEventArgs^ args) {
                     if (prompt_kind != 0) return;
                     show_settings = args->IsSettingsSelected;
-                    show_logs = false; show_news = false; show_servers = false;
+                    show_logs = false; show_news = false; show_servers = false; show_saves = false;
                     if (!show_settings) {
                         auto item = dynamic_cast<muxc::NavigationViewItem^>(args->SelectedItem);
                         auto tag = item ? dynamic_cast<Platform::String^>(item->Tag) : nullptr;
                         show_logs = tag && tag == L"logs";
                         show_news = tag && tag == L"news";
                         show_servers = tag && tag == L"servers";
+                        show_saves = tag && tag == L"saves";
                     }
                     refresh();
                 });
@@ -2287,7 +2651,8 @@ extern "C" int __cdecl horizon_uwp_dialog_show(const unsigned char* bytes, size_
             if (generation != prompt_generation.load()) return;
             try {
                 displayed_generation = generation; prompt_text = value; prompt_kind = kind;
-                if (kind == 0) refresh(); else show_prompt_dialog(value, accounts, kind, generation);
+                if (kind == 0) { refresh(); try_pending_tile_launch(generation); }
+                else show_prompt_dialog(value, accounts, kind, generation);
                 PROBE_STAGE(L"Prompt ready");
             }
             catch (...) { choice.store(-2); }
@@ -2375,6 +2740,18 @@ extern "C" size_t __cdecl horizon_uwp_page_selected_server(unsigned char* buffer
     }
     quick_connect_address.clear();
     return length;
+}
+extern "C" size_t __cdecl horizon_uwp_page_selected_world(unsigned char* buffer, size_t capacity) {
+    const auto name = encode_utf8(quick_play_world); quick_play_world.clear();
+    if (!buffer || name.empty() || name.size() > capacity) return 0;
+    memcpy(buffer, name.data(), name.size());
+    return name.size();
+}
+extern "C" int __cdecl horizon_uwp_page_selected_benchmark() {
+    const bool run = quick_benchmark; quick_benchmark = false; return run ? 1 : 0;
+}
+extern "C" int __cdecl horizon_uwp_page_selected_benchmark_contribution() {
+    const bool contribute = quick_benchmark_contribute; quick_benchmark_contribute = false; return contribute ? 1 : 0;
 }
 #ifdef HORIZON_UWP_NATIVE_D3D11
 extern "C" void* __cdecl horizon_uwp_acquire_game_swapchain_panel() {
@@ -2519,7 +2896,7 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
                 if (navigation && home_navigation && navigation->SelectedItem != home_navigation)
                     navigation->SelectedItem = home_navigation;
                 else {
-                    show_settings = show_logs = show_news = show_servers = false;
+                    show_settings = show_logs = show_news = show_servers = show_saves = false;
                     refresh();
                 }
             }

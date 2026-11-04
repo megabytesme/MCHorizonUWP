@@ -6,6 +6,8 @@ static ALLOCATOR: horizon_threads::Allocator = horizon_threads::ALLOCATOR;
 
 #[cfg(all(target_vendor = "uwp", feature = "uwp-account"))]
 mod pregame;
+#[cfg(any(test, all(target_vendor = "uwp", feature = "xaml-shell")))]
+mod server_status;
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 mod xaml_pregame;
 
@@ -77,6 +79,12 @@ unsafe extern "C" {
     fn horizon_uwp_discard_pregame_input();
     #[cfg(feature = "xaml-shell")]
     fn horizon_uwp_page_selected_server(buffer: *mut u8, capacity: usize) -> usize;
+    #[cfg(feature = "xaml-shell")]
+    fn horizon_uwp_page_selected_world(buffer: *mut u8, capacity: usize) -> usize;
+    #[cfg(feature = "xaml-shell")]
+    fn horizon_uwp_page_selected_benchmark() -> i32;
+    #[cfg(feature = "xaml-shell")]
+    fn horizon_uwp_page_selected_benchmark_contribution() -> i32;
 }
 
 #[cfg(all(
@@ -515,6 +523,23 @@ pub unsafe extern "C" fn horizon_uwp_run_prepared(
             .and_then(|bytes| std::str::from_utf8(bytes).ok())
             .filter(|address| !address.is_empty());
         std::env::set_var("HORIZON_UWP_SERVER_ADDRESS", address.unwrap_or(""));
+        let mut world = [0u8; 1024];
+        let length = horizon_uwp_page_selected_world(world.as_mut_ptr(), world.len());
+        let name = world
+            .get(..length)
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
+            .unwrap_or("");
+        std::env::set_var("HORIZON_UWP_QUICK_WORLD", name);
+        let benchmark = horizon_uwp_page_selected_benchmark() != 0;
+        let contribute = horizon_uwp_page_selected_benchmark_contribution() != 0;
+        std::env::set_var(
+            "HORIZON_UWP_BENCHMARK",
+            if benchmark { "standard" } else { "" },
+        );
+        std::env::set_var(
+            "HORIZON_UWP_BENCHMARK_CONTRIBUTE",
+            if benchmark && contribute { "1" } else { "0" },
+        );
     }
     unsafe { run(resources, resources_len, game_dir, game_dir_len, true) }
 }

@@ -89,6 +89,7 @@ pub struct NativeRenderer {
     panorama: horizon_native_panorama::Panorama,
     entities: horizon_native_entities::d3d11::EntityRenderer,
     viewport: [u32; 2],
+    benchmark: bool,
     scene: Option<horizon_native_scene::TerrainScene>,
     layout: ColumnLayout,
     #[cfg(feature = "native-d3d11-readback")]
@@ -134,6 +135,7 @@ impl NativeRenderer {
             panorama,
             entities,
             viewport,
+            benchmark: std::env::var("HORIZON_UWP_BENCHMARK").as_deref() == Ok("standard"),
             scene: None,
             layout: ColumnLayout::VANILLA,
             #[cfg(feature = "native-d3d11-readback")]
@@ -336,7 +338,7 @@ impl NativeRenderer {
         if let Some(sample) = &mut sample {
             sample.restart();
         }
-        self.window.renderer().present()?;
+        self.window.renderer().present_with_vsync(!self.benchmark)?;
         #[cfg(feature = "native-d3d11-readback")]
         if let (Some(mut sample), Some(timings)) = (sample, &mut self.timings) {
             sample.mark(6);

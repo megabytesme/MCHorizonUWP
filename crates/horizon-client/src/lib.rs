@@ -34,6 +34,15 @@ pub fn run_uwp_with_session(
     {
         args.extend(["--server".to_owned(), server]);
     }
+    if let Ok(world) = std::env::var("HORIZON_UWP_QUICK_WORLD")
+        && !world.is_empty()
+        && world.len() <= 1024
+    {
+        args.extend(["--quickPlaySingleplayer".to_owned(), world]);
+    }
+    if std::env::var("HORIZON_UWP_BENCHMARK").as_deref() == Ok("standard") {
+        args.extend(["--benchmark".to_owned(), "standard".to_owned()]);
+    }
     // The diagnostic marker is honored only by the opt-in readback build.
     // Its game directory is separate, so ordinary worlds remain untouched.
     #[cfg(feature = "native-d3d11-readback")]

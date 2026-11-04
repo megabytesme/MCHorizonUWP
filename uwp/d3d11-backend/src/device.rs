@@ -611,7 +611,16 @@ impl Renderer {
 
     /// Presents the current frame.
     pub fn present(&self) -> Result<()> {
-        unsafe { self.swap_chain.Present(1, DXGI_PRESENT(0)).ok() }
+        self.present_with_vsync(true)
+    }
+
+    /// Presents without a sync interval when running an uncapped benchmark.
+    pub fn present_with_vsync(&self, vsync: bool) -> Result<()> {
+        unsafe {
+            self.swap_chain
+                .Present(u32::from(vsync), DXGI_PRESENT(0))
+                .ok()
+        }
     }
 
     /// Count pixels differing from a black RGB clear before presentation.

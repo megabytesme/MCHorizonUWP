@@ -134,7 +134,7 @@ uwp-controller = ["dep:horizon-uwp-gamepad"]
 # Linux: the server build (`--no-default-features`, released as horizon-engine; docs/server.md).
 audio = ["horizon-client-render/audio", "horizon-client-lib/audio"]
 uwp-audio = ["horizon-client-render/uwp-audio"]
-uwp-https = ["horizon-client-render/uwp-https"]
+uwp-https = ["horizon-client-render/uwp-https", "horizon-client-lib/uwp-https"]
 # Controllers: gilrs, and the DualSense's own output. Without it only `horizon-ctl pad`'s virtual pad.
 controllers = ["horizon-client-lib/controllers", "dep:gilrs", "dep:horizon-dualsense", "horizon-client-input/controllers"]
 # Records the call sites of mob random draws (`mob_ai_probe` traces).

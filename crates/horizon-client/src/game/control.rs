@@ -1245,6 +1245,23 @@ impl Game<'_> {
                 "gpu_reserved_bytes": memory.as_ref().map(|m| m.total_reserved_bytes),
             })
         });
+        // The native UWP D3D11 renderer does not have a wgpu Renderer. Expose
+        // its adapter and viewport too, so the benchmark can begin and label
+        // the backend without inventing a driver version.
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let renderer = renderer.or_else(|| {
+            self.native_renderer.as_ref().map(|r| {
+                let (gpu, vendor) = r.adapter_info().unwrap_or_default();
+                json!({
+                    "gpu": gpu,
+                    "vendor": vendor_name(vendor),
+                    "driver": "",
+                    "device_type": "other",
+                    "backend": "dx11",
+                    "size": r.viewport_size(),
+                })
+            })
+        });
         // The keyboard as the OS reports it (screens read Shift and Ctrl here).
         let mut physical_keys: Vec<_> = self
             .physical_keys
