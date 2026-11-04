@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
         MicrosoftClientId.Text = BuildSelection.FluentLauncherClientId;
         PackageVersion.Text = LocalRecipe.DefaultPackageVersion;
         UpdateRendererChoices();
+        UpdateResourceChoices();
         UpstreamNightly.Text = $"Horizon nightly {LocalRecipe.UpstreamNightlyDate} · {LocalRecipe.UpstreamNightlyShortCommit} (UWP port)";
         _ = CheckNightlyAsync();
     }
@@ -53,11 +54,24 @@ public sealed partial class MainWindow : Window
 
     private void Profile_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateRendererChoices();
     private void Renderer_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateRendererChoices();
+    private void ResourceMode_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateResourceChoices();
+
+    private void UpdateResourceChoices()
+    {
+        if (ResourceMode is null || ExistingFrameworkName is null || ChooseResources is null || ChooseMinecraft is null || PrepareSounds is null) return;
+        var reuse = ResourceMode.SelectedIndex == 1;
+        ExistingFrameworkName.IsEnabled = reuse;
+        ChooseResources.IsEnabled = !reuse;
+        ChooseMinecraft.IsEnabled = !reuse;
+        PrepareSounds.IsEnabled = !reuse;
+        if (reuse) PrepareSounds.IsChecked = false;
+    }
 
     private BuildSelection CurrentSelection() => new((TargetProfile)Profile.SelectedIndex,
         NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true,
-        PackageFramework.IsChecked == true, NativeDeviceVibration.IsChecked == true,
-        MicrosoftClientId.Text, SelectedRenderer);
+        ResourceMode.SelectedIndex == 0, NativeDeviceVibration.IsChecked == true,
+        MicrosoftClientId.Text, SelectedRenderer, ResourceMode.SelectedIndex == 1,
+        ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "");
 
     private async Task<string?> PickFolderAsync()
     {
@@ -94,12 +108,10 @@ public sealed partial class MainWindow : Window
             var source = sourceDirectory;
             var resources = resourceDirectory;
             var minecraft = minecraftDirectory;
-            if (source is null || resources is null)
-                throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
             var selection = CurrentSelection();
             var plan = LocalRecipe.Plan(selection);
-            LocalRecipe.ValidateResources(resources);
-            if (selection.PrepareSounds) LocalRecipe.ValidateSoundPreparation(resources, minecraft);
+            if (source is null) throw new InvalidOperationException("Choose a local source tree.");
+            LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var probe = new SystemProbe();
             await LocalRecipe.ValidateSourceAsync(source, probe);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
@@ -107,7 +119,7 @@ public sealed partial class MainWindow : Window
                 ? "Pinned source revision and required tool locations were found. Cargo will fetch missing dependencies when the build starts; signing is not yet available."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
-            if (!selection.PrepareSounds && LocalRecipe.SoundWarning(resources) is { } warning)
+            if (selection.ValidatedExistingResourceFramework is null && !selection.PrepareSounds && LocalRecipe.SoundWarning(resources!) is { } warning)
                 RecipeSteps.Children.Add(new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap });
             foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name, TextWrapping = TextWrapping.Wrap });
             foreach (var note in plan.Notes) RecipeSteps.Children.Add(new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap });
@@ -124,14 +136,16 @@ public sealed partial class MainWindow : Window
             var source = sourceDirectory;
             var resources = resourceDirectory;
             var minecraft = minecraftDirectory;
-            if (source is null || resources is null)
-                throw new InvalidOperationException("Choose both a local source tree and prepared resources.");
             var selection = CurrentSelection();
+            if (source is null) throw new InvalidOperationException("Choose a local source tree.");
+            LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var result = await LocalBuildRunner.RunAsync(source, resources, selection, new SystemProbe(), progress, minecraft);
             RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
             if (result.ResourceFrameworkPackage is { } framework)
                 RecipeStatus.Text += $" Unsigned resource framework: {framework}. Sign it with the same publisher and install it as a dependency. It contains private Minecraft resources.";
+            if (selection.ValidatedExistingResourceFramework is { } existing)
+                RecipeStatus.Text += $" Requires existing resource framework {existing} on the target.";
             if (result.SoundWarning is { } warning)
                 RecipeStatus.Text += " " + warning;
         }

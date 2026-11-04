@@ -23,6 +23,23 @@ public static class LocalRecipe
     public const string MinecraftVersion = "26.3";
     public const string SourceManifestVersion = "1.0.1.0";
 
+    /// <summary>Client packaging arguments for the selected resource mode.</summary>
+    public static IReadOnlyList<string> ResourceArguments(BuildSelection selection, string? resources = null, string? builtFramework = null)
+    {
+        var existing = selection.ValidatedExistingResourceFramework;
+        if (existing is not null) return ["-ResourceFrameworkName", existing];
+        if (selection.UseResourceFramework) return ["-ResourceFrameworkName", builtFramework ?? "<framework-name>"];
+        return ["-Resources", resources ?? "<selected-resources>"];
+    }
+
+    public static void ValidateResourceSelection(BuildSelection selection, string? resources, string? minecraftDirectory)
+    {
+        if (selection.ValidatedExistingResourceFramework is not null) return;
+        if (string.IsNullOrWhiteSpace(resources)) throw new InvalidOperationException("Choose prepared resources.");
+        ValidateResources(resources);
+        if (selection.PrepareSounds) ValidateSoundPreparation(resources, minecraftDirectory);
+    }
+
     /// <summary>Encode a release's UTC publication time in four APPX version fields.</summary>
     public static string PackageVersionFor(DateTimeOffset published)
     {
@@ -45,6 +62,7 @@ public static class LocalRecipe
     {
         var packageVersion = selection.ValidatedPackageVersion;
         var clientId = selection.ValidatedMicrosoftClientId;
+        var existingFramework = selection.ValidatedExistingResourceFramework;
         var arm32 = selection.Target == TargetProfile.WindowsMobile;
         var arch = selection.Target switch
         {
@@ -78,19 +96,21 @@ public static class LocalRecipe
         steps.Add(new("Strict-link host", "cmd", ["/d", "/c", "uwp/host/build-game.cmd", arch]));
         if (selection.UseResourceFramework)
             steps.Add(new("Package reusable resources", "MakeAppx", ["<prepared-resources>", "<framework-output>"]));
-        steps.Add(new("Create unsigned client package", "powershell", ["-NoProfile", "-File", "uwp/host/package.ps1", "-Architecture", arch,
+        var package = new List<string> { "-NoProfile", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", $"uwp/host/build/game-{arch}/HorizonUWP.exe", "-OutputDirectory", ".local/builder-output",
-            selection.UseResourceFramework ? "-ResourceFrameworkName" : "-Resources",
-            selection.UseResourceFramework ? "<framework-name>" : "<selected-resources>"]));
+        };
+        package.AddRange(ResourceArguments(selection));
+        steps.Add(new("Create unsigned client package", "powershell", package.AsReadOnly()));
         var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
             $"Based on Horizon nightly {UpstreamNightlyDate}, source {UpstreamNightlyShortCommit}; this is a UWP port, not an official Horizon binary.",
             "The renderer is checked on the device before launch; unavailable graphics devices are not offered.",
             "The resulting APPX requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
-            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and uses all available processor cores.",
-            "The resource manifest version is checked; resource ownership and complete content integrity are not established by this check." };
+            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and uses all available processor cores." };
+        if (existingFramework is null) notes.Add("The resource manifest version is checked; resource ownership and complete content integrity are not established by this check.");
         if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
         if (selection.UseResourceFramework) notes.Add("The separate unsigned resource framework contains your private prepared resources; retain it for clients using the same content and install it as a dependency.");
+        if (existingFramework is not null) notes.Add($"The client requires the existing {existingFramework} framework, published by {ResourceFrameworkPacker.Publisher}, on the target. Its installation is not checked by this builder.");
         if (selection.NativeDeviceVibration) notes.Add("Device vibration is an optional native mod with its own setting, separate from controller vibration; unsupported devices are ignored.");
         if (clientId is null) notes.Add("No Microsoft application ID was supplied; sign-in needs a build configured with an approved public client ID.");
         else notes.Add("Microsoft sign-in uses the configured public application ID and device-code flow; Xbox/Minecraft access depends on that registration.");

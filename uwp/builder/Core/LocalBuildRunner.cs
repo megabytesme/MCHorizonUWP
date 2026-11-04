@@ -15,17 +15,20 @@ public static class LocalBuildRunner
         return Math.Max(1, processors);
     }
 
-    public static async Task<LocalBuildResult> RunAsync(string source, string resources, BuildSelection selection,
+    public static async Task<LocalBuildResult> RunAsync(string source, string? resources, BuildSelection selection,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
     {
         var plan = LocalRecipe.Plan(selection);
         await LocalRecipe.ValidateSourceAsync(source, probe);
-        LocalRecipe.ValidateResources(resources);
-        if (selection.PrepareSounds) LocalRecipe.ValidateSoundPreparation(resources, minecraftDirectory);
+        var existingFramework = selection.ValidatedExistingResourceFramework;
+        LocalRecipe.ValidateResourceSelection(selection, resources, minecraftDirectory);
         var workspaceBase = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
-        if (ResourcesContainWorkspace(resources, workspaceBase))
-            throw new InvalidOperationException("Choose a resource directory that does not contain the builder workspace.");
-        ValidateResourceTree(resources);
+        if (existingFramework is null)
+        {
+            if (ResourcesContainWorkspace(resources!, workspaceBase))
+                throw new InvalidOperationException("Choose a resource directory that does not contain the builder workspace.");
+            ValidateResourceTree(resources!);
+        }
         string? angleBin = null;
         if (selection.Target != TargetProfile.WindowsMobile)
         {
@@ -98,9 +101,9 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("Cargo could not fetch dependencies. Check the internet connection and configured Cargo registries. " + error.Message, error);
         }
 
-        var packageResources = selection.PrepareSounds
-            ? await PrepareSoundResourcesAsync(snapshot, resources, minecraftDirectory!, probe, progress)
-            : Path.GetFullPath(resources);
+        var packageResources = existingFramework is not null ? null : selection.PrepareSounds
+            ? await PrepareSoundResourcesAsync(snapshot, resources!, minecraftDirectory!, probe, progress)
+            : Path.GetFullPath(resources!);
 
         progress?.Report("Building the game bridge. This may take several minutes.");
         try
@@ -148,7 +151,7 @@ public static class LocalBuildRunner
         if (selection.UseResourceFramework)
         {
             progress?.Report("Packaging a reusable resource framework from a private snapshot.");
-            framework = await ResourceFrameworkPacker.PackAsync(packageResources, Path.Combine(root, "resource-framework"), progress);
+            framework = await ResourceFrameworkPacker.PackAsync(packageResources!, Path.Combine(root, "resource-framework"), progress);
         }
         string? releaseNotes = null;
         try { releaseNotes = await NightlyRelease.FetchPinnedNotesAsync(LocalRecipe.UpstreamNightlyDate, LocalRecipe.UpstreamNightlyCommit); }
@@ -169,14 +172,14 @@ public static class LocalBuildRunner
         progress?.Report("Packaging the unsigned client.");
         var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
-            "-IdentityName", "HorizonUWPPrototype", "-WinUIFramework", "2.7",
-            framework is null ? "-Resources" : "-ResourceFrameworkName", framework?.Name ?? packageResources };
+            "-IdentityName", "HorizonUWPPrototype", "-WinUIFramework", "2.7" };
+        packageArguments.AddRange(LocalRecipe.ResourceArguments(selection, packageResources, framework?.Name));
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
         packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath);
         await RunProcess(powershell, snapshot, packageArguments);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
-        return new(root, package, LocalRecipe.SoundWarning(packageResources), framework?.Package);
+        return new(root, package, packageResources is null ? null : LocalRecipe.SoundWarning(packageResources), framework?.Package);
     }
 
     public static async Task<string> CreateSnapshotAsync(string source, IProbe probe)

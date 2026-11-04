@@ -274,6 +274,26 @@ Require(LocalBuildRunner.CargoJobCount(32, 1) == 32, "parallelism does not impos
 var frameworkRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, UseResourceFramework: true));
 Require(frameworkRecipe.Steps.Any(step => step.Name == "Package reusable resources")
     && frameworkRecipe.Steps.Single(step => step.Name == "Create unsigned client package").Arguments.Contains("-ResourceFrameworkName"), "framework recipe includes dependency");
+const string installedFramework = "Horizon.Asset.26-3.321aa1f73c8a1a627df3642f1dcee0";
+var reuse = new BuildSelection(TargetProfile.WindowsMobile, false, ReuseResourceFramework: true, ExistingResourceFramework: installedFramework);
+var reuseRecipe = LocalRecipe.Plan(reuse);
+LocalRecipe.ValidateResourceSelection(reuse, null, null);
+try { LocalRecipe.ValidateResourceSelection(new BuildSelection(TargetProfile.WindowsMobile, false), null, null); throw new Exception("missing embedded resources accepted"); }
+catch (InvalidOperationException) { }
+Require(reuseRecipe.Steps.All(step => step.Name != "Package reusable resources"), "reuse does not build another framework");
+Require(LocalRecipe.ResourceArguments(reuse).SequenceEqual(["-ResourceFrameworkName", installedFramework]), "reuse packages the exact installed framework dependency");
+Require(reuseRecipe.Steps.Single(step => step.Name == "Create unsigned client package").Arguments.Contains(installedFramework), "reuse recipe records the selected framework");
+Require(LocalRecipe.ResourceArguments(new BuildSelection(TargetProfile.WindowsMobile, false), "prepared").SequenceEqual(["-Resources", "prepared"]), "embedded resources remain available");
+Require(LocalRecipe.ResourceArguments(new BuildSelection(TargetProfile.WindowsMobile, false, UseResourceFramework: true), builtFramework: installedFramework).SequenceEqual(["-ResourceFrameworkName", installedFramework]), "new framework mode remains available");
+foreach (var invalid in new[] { "", "Horizon.Asset.26-2.321aa1f73c8a1a627df3642f1dcee0", installedFramework + ";bad", installedFramework.ToUpperInvariant() })
+{
+    try { _ = LocalRecipe.Plan(reuse with { ExistingResourceFramework = invalid }); throw new Exception("invalid framework name accepted"); }
+    catch (ArgumentException) { }
+}
+try { _ = LocalRecipe.Plan(reuse with { PrepareSounds = true }); throw new Exception("sound preparation accepted with existing framework"); }
+catch (ArgumentException) { }
+try { _ = LocalRecipe.Plan(reuse with { UseResourceFramework = true }); throw new Exception("conflicting framework modes accepted"); }
+catch (ArgumentException) { }
 var arm64Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false));
 Require(arm64Recipe.Target == "aarch64-uwp-windows-msvc"
     && arm64Recipe.Features.Contains("uwp-dx12-renderer"), "ARM64 recipe includes the tablet target and DX12 renderer");
@@ -316,6 +336,9 @@ var withSounds = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobi
 Require(inputs.Sha256() != withSounds.Sha256(), "sound preparation changes input hash");
 var withFramework = BuildInputs.Create(new BuildSelection(TargetProfile.WindowsMobile, true, UseResourceFramework: true), commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
 Require(inputs.Sha256() != withFramework.Sha256(), "framework selection changes input hash");
+var reusedInputs = BuildInputs.Create(reuse, commit, hash, hash, hash, null, null, "stable-1.91.0", "14.44.35207", "10.0.15063.0");
+Require(reusedInputs.ExistingResourceFramework == installedFramework && reusedInputs.ResourceInventorySha256 is null, "reuse records the framework identity without inventing a resource inventory");
+Require(reusedInputs.Sha256() != withoutTouch.Sha256(), "reused framework changes input hash");
 var withVibration = BuildInputs.Create(withDevice, commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0", hash);
 Require(inputs.Sha256() != withVibration.Sha256(), "device vibration changes input hash");
 try { _ = BuildInputs.Create(withDevice, commit, hash, hash, hash, hash, hash, "stable-1.91.0", "14.44.35207", "10.0.15063.0"); throw new Exception("missing vibration digest accepted"); }

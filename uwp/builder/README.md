@@ -12,8 +12,10 @@ tested on a Lumia in its separate branch. The local recipe builds from a pinned 
 snapshot and links to official setup instructions for
 missing tools. On request it can invoke the system Windows Package Manager for
 fixed Rustup, Git and Python packages, with interactive license/elevation prompts and normal
-package verification. The local recipe copies user-selected prepared resources
-into private package output, but does not sign or install packages. Tool presence does not establish version or recipe
+package verification. The local recipe can embed prepared resources, build a
+separate resource framework, or use a framework already installed on the target.
+The existing-framework option requires its exact name and no local resource
+directory. The builder does not sign or install packages. Tool presence does not establish version or recipe
 compatibility with every machine; the x64, ARM64 and ARM32 recipes have been
 built locally. ARM64 and ARM32 Rust builds use the installed LLVM Clang
 compiler for their cross-target C dependencies. Visual Studio detection checks
@@ -118,6 +120,12 @@ The builder copies the chosen resources into its private workspace, builds
 objects. It does not modify the selected resource tree or Minecraft install.
 If the selected resources already contain any sound data, disable sound
 preparation or choose a sound-free copy; existing data is not overwritten.
+For the existing-framework option, enter the exact `Horizon.Asset.26-3.…` name
+on the target. The client declares that package as a dependency with publisher
+`CN=HorizonUWPPrototype` and minimum version `1.0.0.0`; the builder cannot check
+the target's installation or resource contents. This mode does not build or
+bundle resources, and sound preparation is unavailable.
+
 The package-version field changes only the isolated manifest and cannot be
 lower than the pinned source version. Choose a version newer than the package
 with the same identity already installed on the target; the builder cannot

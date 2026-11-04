@@ -1,13 +1,28 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", string Renderer = "native-d3d11")
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", string Renderer = "native-d3d11", bool ReuseResourceFramework = false, string ExistingResourceFramework = "")
 {
     // Public Fluent Launcher application ID, selected at the user's request while their own is reviewed.
     public const string FluentLauncherClientId = "0844e754-1d2e-4861-8e2b-18059609badb";
     public const string TouchModId = "horizon_touch";
     public const string DeviceVibrationModId = "horizon_device_vibration";
     public bool IncludesNativeTouchMod => NativeTouchMod;
+    public string? ValidatedExistingResourceFramework
+    {
+        get
+        {
+            if (!ReuseResourceFramework) return null;
+            if (UseResourceFramework || PrepareSounds)
+                throw new ArgumentException("Reusing an installed resource framework cannot also build resources or prepare sounds.");
+            var name = ExistingResourceFramework.Trim();
+            var prefix = "Horizon.Asset." + LocalRecipe.MinecraftVersion.Replace('.', '-') + ".";
+            var digest = name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : "";
+            if (name.Length > 50 || digest.Length is < 20 or > 30 || digest.Any(c => !char.IsAsciiHexDigit(c) || char.IsUpper(c)))
+                throw new ArgumentException($"Enter the exact installed {LocalRecipe.MinecraftVersion} resource framework name (Horizon.Asset.{LocalRecipe.MinecraftVersion.Replace('.', '-')}. followed by its lowercase digest).");
+            return name;
+        }
+    }
     public IReadOnlyList<string> ModIds => new[]
         { IncludesNativeTouchMod ? TouchModId : null, NativeDeviceVibration ? DeviceVibrationModId : null }
         .Where(id => id is not null).Select(id => id!).ToArray();
