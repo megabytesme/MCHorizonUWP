@@ -1553,6 +1553,8 @@ impl crate::Surface for Surface {
                 match raw_result {
                     Ok(raw) => (raw, wl_window),
                     Err(e) => {
+                        #[cfg(target_vendor = "uwp")]
+                        {
                         log::error!(
                             "UWP ANGLE eglCreateWindowSurface failed: {e:?}; raw window handle={:?}; native handle={native_window_ptr:p}; presentable={}",
                             self.raw_window_handle,
@@ -1561,6 +1563,12 @@ impl crate::Surface for Surface {
                         return Err(crate::SurfaceError::Other(
                             "UWP ANGLE could not create a SwapChainPanel surface; see the preceding EGL error",
                         ));
+                        }
+                        #[cfg(not(target_vendor = "uwp"))]
+                        {
+                            log::warn!("Error in create_window_surface: {e:?}");
+                            return Err(crate::SurfaceError::Lost);
+                        }
                     }
                 }
             }

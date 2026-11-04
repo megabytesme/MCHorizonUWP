@@ -56,6 +56,7 @@ extern "C" void __cdecl horizon_uwp_page_event(const HorizonUwpEvent* event);
 extern "C" void __cdecl horizon_uwp_page_shutdown();
 #ifdef HORIZON_UWP_XAML_SHELL
 extern "C" void __cdecl horizon_uwp_resume_pregame_input();
+extern "C" int __cdecl horizon_uwp_page_selected_renderer();
 #endif
 extern "C" int __cdecl horizon_uwp_window_closed() { return account_window_closed.load() ? 1 : 0; }
 extern "C" int __cdecl horizon_uwp_window_visible() { return account_window_visible.load() ? 1 : 0; }
@@ -298,8 +299,9 @@ static Platform::String^ resolve_resources(Platform::String^ local_path) {
 
 extern "C" void* __cdecl horizon_uwp_window_handle() {
 #ifdef HORIZON_UWP_XAML_SHELL
-    const char* renderer = getenv("HORIZON_UWP_RENDERER");
-    if (renderer && strcmp(renderer, "angle") == 0 && game_surface_native)
+    // Rust's patched UWP environment is process-local and is not the CRT
+    // environment read by getenv. The shell owns the authoritative selection.
+    if (horizon_uwp_page_selected_renderer() == 1 && game_surface_native)
         return game_surface_native.Get();
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
     if (!owner || !current_window) return nullptr;
