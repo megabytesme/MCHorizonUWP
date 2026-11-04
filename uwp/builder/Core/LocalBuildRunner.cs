@@ -78,6 +78,11 @@ public static class LocalBuildRunner
         var jobs = Math.Max(1, Environment.ProcessorCount);
         vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
         progress?.Report($"Using all {jobs} available processor cores for Cargo.");
+        if (selection.Target == TargetProfile.SurfaceProX)
+        {
+            vcEnvironment["CC_aarch64_uwp_windows_msvc"] = Path.Combine(
+                probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
+        }
         if (arm)
         {
             vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");

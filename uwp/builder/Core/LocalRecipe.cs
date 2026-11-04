@@ -168,8 +168,8 @@ public static class LocalRecipe
         if (!probe.FileExists(vc)) blockers.Add($"The checked-in {arch} host script's Visual Studio installation was not found.");
         if (arch == "arm" && selection.PrepareSounds && !probe.FileExists(Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")))
             blockers.Add("Sound preparation requires the x64 Visual Studio installation used by the checked-in desktop host script.");
-        if (arch == "arm" && !probe.FileExists(Path.Combine(pf, "LLVM", "bin", "clang.exe")))
-            blockers.Add("The ARM32 recipe requires clang.exe in the standard LLVM installation.");
+        if ((arch is "arm" or "arm64") && !probe.FileExists(Path.Combine(pf, "LLVM", "bin", "clang.exe")))
+            blockers.Add($"The {arch.ToUpperInvariant()} recipe requires clang.exe in the standard LLVM installation.");
         var sdk = Path.Combine(pfx86, "Windows Kits", "10", "bin");
         if (!probe.FileExists(Path.Combine(sdk, "10.0.15063.0", "x64", "fxc.exe")))
             blockers.Add("The host script requires Windows SDK 10.0.15063.0 fxc.exe.");

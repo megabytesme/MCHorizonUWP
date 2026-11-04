@@ -268,14 +268,15 @@ Require(prepareRecipe.Steps.Single(step => step.Name == "Build resource preparer
     && prepareRecipe.Steps.Any(step => step.Name == "Prepare sound assets"), "optional sound preparation uses the desktop host target");
 var desktopRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false));
 Require(desktopRecipe.Steps.All(step => !step.Arguments.Contains("--offline-arm32")), "desktop excludes ARM override");
-Require(LocalBuildRunner.CargoJobCount(32, 32L * 1024 * 1024 * 1024) == 8, "parallelism fits memory");
+Require(LocalBuildRunner.CargoJobCount(32, 32L * 1024 * 1024 * 1024) == 32, "parallelism uses every available processor");
 Require(LocalBuildRunner.CargoJobCount(4, 64L * 1024 * 1024 * 1024) == 4, "parallelism uses available CPUs");
-Require(LocalBuildRunner.CargoJobCount(32, 1) == 1, "parallelism has a minimum of one");
+Require(LocalBuildRunner.CargoJobCount(32, 1) == 32, "parallelism does not impose a memory-based CPU cap");
 var frameworkRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, UseResourceFramework: true));
 Require(frameworkRecipe.Steps.Any(step => step.Name == "Package reusable resources")
     && frameworkRecipe.Steps.Single(step => step.Name == "Create unsigned client package").Arguments.Contains("-ResourceFrameworkName"), "framework recipe includes dependency");
-try { _ = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false)); throw new Exception("unverified ARM64 recipe accepted"); }
-catch (NotSupportedException) { }
+var arm64Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false));
+Require(arm64Recipe.Target == "aarch64-uwp-windows-msvc"
+    && arm64Recipe.Features.Contains("uwp-dx12-renderer"), "ARM64 recipe includes the tablet target and DX12 renderer");
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
 Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");
 Require(missingToolchain.Any(blocker => blocker.Contains("rust-src")), "rust-src checked");
@@ -333,7 +334,7 @@ Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Instruc
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("15063"), "mobile SDK required");
 Require(missing.Any(c => c.Status == CheckStatus.Review && c.Name == "Rust UWP standard library"), "unverified UWP std");
 Require(missing.Single(c => c.Name == "Build recipe and signing").Detail.Contains("pinned local build recipe"), "available mobile recipe reported");
-Require(new SetupChecker(new FakeProbe()).Scan(TargetProfile.SurfaceProX).Single(c => c.Name == "Build recipe and signing").Detail.Contains("not yet available"), "unavailable ARM64 recipe reported");
+Require(new SetupChecker(new FakeProbe()).Scan(TargetProfile.SurfaceProX).Single(c => c.Name == "Build recipe and signing").Detail.Contains("ARM64 build recipe is available"), "available ARM64 recipe reported");
 
 var modernOnly = new FakeProbe();
 var modernKits = Path.Combine(modernOnly.Root, "Windows Kits", "10");
