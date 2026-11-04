@@ -144,6 +144,9 @@ CoreDispatcher^ dispatcher;
 Page^ page;
 Grid^ shell_root;
 Grid^ app_title_bar;
+FrameworkElement^ launcher_content;
+Grid^ game_loading_overlay;
+ProgressRing^ game_loading_spinner;
 ColumnDefinition^ title_bar_left_padding;
 ColumnDefinition^ title_bar_right_padding;
 ContentControl^ content;
@@ -1097,7 +1100,7 @@ void show_about() {
     };
     auto release = installed_release();
     auto architecture = package_architecture();
-    add_run(L"Horizon UWP", true, 18);
+    add_run(L"MCHorizonUWP", true, 18);
     add_break();
     add_run(std::wstring(L"Version ") + version + L" (" + windows_version_label() + L") " +
         std::wstring(architecture->Data(), architecture->Length()));
@@ -1715,7 +1718,7 @@ void refresh() {
         panel->Children->Append(card(storage_card)); refresh_app_storage(storage_total);
         auto about_card = ref new StackPanel();
         about_card->Children->Append(text(L"About", 18));
-        about_card->Children->Append(action_button(L"About Horizon UWP", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_about(); })));
+        about_card->Children->Append(action_button(L"About MCHorizonUWP", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_about(); })));
         panel->Children->Append(card(about_card));
     } else if (show_servers && prompt_kind == 0) {
         load_server_entries();
@@ -1997,6 +2000,7 @@ protected:
             throw;
         }
         auto page_content = safe_cast<FrameworkElement^>(page->Content);
+        launcher_content = page_content;
         // A XAML element can only have one visual-tree parent. Move the
         // NavigationView from the page into the shared titlebar/page layout.
         page->Content = nullptr;
@@ -2027,7 +2031,7 @@ protected:
             app_icon->Height = 18;
             app_icon->Margin = Thickness(0, 0, 8, 0);
             title->Children->Append(app_icon);
-            auto app_name = text(L"Horizon", 14);
+            auto app_name = text(L"MCHorizonUWP", 14);
             app_name->Margin = Thickness(0);
             app_name->VerticalAlignment = VerticalAlignment::Center;
             title->Children->Append(app_name);
@@ -2078,6 +2082,18 @@ protected:
             [](Platform::Object^, RoutedEventArgs^) { update_game_surface_metrics(); });
         horizon_uwp_register_game_surface(reinterpret_cast<void*>(reinterpret_cast<IUnknown*>(game_surface)));
         shell_root->Children->Append(game_surface);
+        game_loading_overlay = ref new Grid();
+        game_loading_overlay->Margin = game_surface->Margin;
+        game_loading_overlay->Background = ref new SolidColorBrush(Colors::Black);
+        game_loading_overlay->Visibility = Visibility::Collapsed;
+        game_loading_overlay->IsHitTestVisible = false;
+        game_loading_spinner = ref new ProgressRing();
+        game_loading_spinner->Width = 48;
+        game_loading_spinner->Height = 48;
+        game_loading_spinner->HorizontalAlignment = HorizontalAlignment::Center;
+        game_loading_spinner->VerticalAlignment = VerticalAlignment::Center;
+        game_loading_overlay->Children->Append(game_loading_spinner);
+        shell_root->Children->Append(game_loading_overlay);
         window->Content = shell_root;
 #else
         shell_root = ref new Grid();
@@ -2431,6 +2447,15 @@ extern "C" int32_t __cdecl horizon_uwp_attach_game_swapchain(void* swap_chain) {
 }
 
 #endif
+static void __cdecl game_menu_shown_on_ui(void*) {
+    if (game_loading_spinner) game_loading_spinner->IsActive = false;
+    if (game_loading_overlay) game_loading_overlay->Visibility = Visibility::Collapsed;
+}
+
+extern "C" void __cdecl horizon_uwp_page_game_menu_shown() {
+    horizon_uwp_dispatch_ui_sync(game_menu_shown_on_ui, nullptr);
+}
+
 extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
     page_switch_error[0] = 0;
     if (!dispatcher) {
@@ -2470,7 +2495,10 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
             game_surface->Opacity = panel_renderer ? 1.0 : 0.0;
             game_surface->IsHitTestVisible = panel_renderer;
             update_game_surface_metrics();
-            page->Visibility = Visibility::Collapsed;
+            if (launcher_content) launcher_content->Visibility = Visibility::Collapsed;
+            page->Visibility = Visibility::Visible;
+            if (game_loading_overlay) game_loading_overlay->Visibility = Visibility::Visible;
+            if (game_loading_spinner) game_loading_spinner->IsActive = true;
         } else {
             if (renderer <= 2) {
                 const HRESULT detach = detach_game_swapchain();
@@ -2483,6 +2511,9 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
             game_surface->Opacity = 0.0;
             game_surface->IsHitTestVisible = false;
             horizon_uwp_set_game_surface_active(0);
+            if (game_loading_spinner) game_loading_spinner->IsActive = false;
+            if (game_loading_overlay) game_loading_overlay->Visibility = Visibility::Collapsed;
+            if (launcher_content) launcher_content->Visibility = Visibility::Visible;
             page->Visibility = show == 0 ? Visibility::Visible : Visibility::Collapsed;
             if (show == 0 && prompt_kind == 0) {
                 if (navigation && home_navigation && navigation->SelectedItem != home_navigation)

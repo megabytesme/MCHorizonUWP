@@ -21,6 +21,12 @@ unsafe extern "C" {
         scale_y: *mut f64,
     );
     fn horizon_uwp_attach_game_swapchain(swap_chain: *mut c_void) -> i32;
+    fn horizon_uwp_game_menu_shown();
+}
+
+/// Tell the shell that the first menu (or quick-play world) frame is visible.
+pub fn game_menu_shown() {
+    unsafe { horizon_uwp_game_menu_shown() }
 }
 
 static PREPARED_RENDERER: Mutex<Option<usize>> = Mutex::new(None);

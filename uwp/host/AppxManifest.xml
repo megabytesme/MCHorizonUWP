@@ -2,7 +2,7 @@
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap">
   <Identity Name="HorizonUWPPrototype" Publisher="CN=HorizonUWPPrototype" Version="1.0.1.0" ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>Horizon</DisplayName>
+    <DisplayName>MCHorizonUWP</DisplayName>
     <PublisherDisplayName>Horizon</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -15,7 +15,7 @@
   </Resources>
   <Applications>
     <Application Id="App" Executable="HorizonUWP.exe" EntryPoint="HorizonUWP.App">
-      <uap:VisualElements DisplayName="Horizon" Description="Unofficial Horizon client for Minecraft: Java Edition" BackgroundColor="#14243A" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
+      <uap:VisualElements DisplayName="MCHorizonUWP" Description="Unofficial Horizon client for Minecraft: Java Edition" BackgroundColor="#14243A" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square310x310Logo="Assets\Square310x310Logo.png" />
       </uap:VisualElements>
     </Application>

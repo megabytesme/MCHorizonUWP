@@ -352,6 +352,14 @@ extern "C" void __cdecl horizon_uwp_release_angle_window_properties(void* proper
     if (properties) reinterpret_cast<IUnknown*>(properties)->Release();
 }
 
+#if defined(HORIZON_UWP_ACCOUNT) && defined(HORIZON_UWP_XAML_SHELL)
+extern "C" void __cdecl horizon_uwp_page_game_menu_shown();
+#endif
+extern "C" void __cdecl horizon_uwp_game_menu_shown() {
+#if defined(HORIZON_UWP_ACCOUNT) && defined(HORIZON_UWP_XAML_SHELL)
+    horizon_uwp_page_game_menu_shown();
+#endif
+}
 extern "C" void __cdecl horizon_uwp_pump_events() {
     // The XAML account state machine runs on a worker. Only the owning UI
     // thread may pump a CoreWindow dispatcher.

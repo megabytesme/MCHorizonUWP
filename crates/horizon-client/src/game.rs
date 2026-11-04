@@ -18555,6 +18555,11 @@ impl Game<'_> {
                         self.frame_stats.record(elapsed.as_secs_f32() * 1000.0);
                         self.debug_charts.frame_times.log(elapsed.as_nanos() as i64);
                         if self.frames == 0 {
+                            #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+                            {
+                                // Quick play can open a world without drawing the title.
+                                horizon_native_window::game_menu_shown();
+                            }
                             // The launcher times Play to this line (launcher/src/perf.rs).
                             log::info!(
                                 "Horizon: first frame after {} ms",
@@ -21173,6 +21178,8 @@ impl Loading {
     }
     fn draw(&mut self) {
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let title_was_drawn = self.title_drawn;
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         let native_size = self.native_renderer.as_ref().map(|r| r.viewport_size());
         #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
         let native_size: Option<[u32; 2]> = None;
@@ -21223,6 +21230,12 @@ impl Loading {
                 Ok(_) => {}
                 Err(e) => log::warn!("Horizon: loading screen frame failed: {e}"),
             }
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if self.title_drawn && !title_was_drawn {
+            // The UWP shell can remove its startup indicator once a real menu
+            // frame has been presented, rather than when resources start loading.
+            horizon_native_window::game_menu_shown();
         }
         if !self.shown {
             self.shown = true;
