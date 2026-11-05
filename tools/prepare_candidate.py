@@ -26,7 +26,7 @@ def digest(data):
 
 
 def verify_upstream(archive_path, repository):
-    tar_bytes = subprocess.check_output(["git", "-C", str(repository), "archive", "--format=tar", UPSTREAM])
+    tar_bytes = subprocess.check_output(["git", "-C", str(repository), "-c", "core.autocrlf=false", "archive", "--format=tar", UPSTREAM])
     expected = {}
     with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as source:
         for item in source:
