@@ -13,11 +13,15 @@ use crate::sound_events::{Sound, SoundRegistry};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use horizon_core::random::{LegacyRandom, RandomSource};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+
+#[path = "audio_stream.rs"]
+mod streaming;
+use streaming::{StreamChunk, StreamingSamples};
 
 /// An OpenAL source's state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,6 +34,7 @@ enum State {
 /// An OpenAL source.
 struct Channel {
     samples: Option<(Arc<Vec<f32>>, u32)>,
+    stream: Option<StreamingSamples>,
     position: f64,
     state: State,
     gain: f32,
@@ -115,6 +120,11 @@ pub struct MixerBackend {
 impl Drop for MixerBackend {
     fn drop(&mut self) {
         if self.owner == 0 {
+            // Dropping each receiver also wakes a streamed decoder blocked on
+            // its bounded queue; it must not outlive the game session.
+            if let Ok(mut mixer) = self.mixer.lock() {
+                mixer.channels.retain(|_, channel| channel.owner != 0);
+            }
             return;
         }
         self.shares
@@ -135,6 +145,7 @@ static SHARED_CHANNELS: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomic
 const SAME_SOUND: std::time::Duration = std::time::Duration::from_millis(150);
 /// Decoded samples and their rate (`None`: the file did not load).
 type Samples = Option<(Arc<Vec<f32>>, u32)>;
+
 /// Decoded static sounds (`SoundBufferLibrary`'s buffers), dropped least
 /// recently used first past `CACHE_BYTES`: kept forever, every sound heard in
 /// a session stayed (up to 1.4 GiB of samples, villages playing hundreds).
@@ -248,7 +259,12 @@ pub struct Audio {
     #[cfg(feature = "audio")]
     device_ticks: u32,
 }
-fn decode(path: &Path) -> Option<(Vec<f32>, u32)> {
+/// Decode one file packet by packet. Returning false stops promptly when the
+/// receiving channel has gone away or a static buffer cannot be allocated.
+fn decode_packets(
+    path: &Path,
+    mut consume: impl FnMut(&[f32], usize, u32) -> bool,
+) -> Option<bool> {
     use symphonia::core::{
         audio::SampleBuffer, codecs::DecoderOptions, formats::FormatOptions, io::MediaSourceStream,
         meta::MetadataOptions, probe::Hint,
@@ -272,7 +288,6 @@ fn decode(path: &Path) -> Option<(Vec<f32>, u32)> {
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .ok()?;
-    let mut mono = Vec::new();
     while let Ok(packet) = format.next_packet() {
         if packet.track_id() != id {
             continue;
@@ -284,11 +299,94 @@ fn decode(path: &Path) -> Option<(Vec<f32>, u32)> {
         let channels = spec.channels.count().max(1);
         let mut samples = SampleBuffer::<f32>::new(buffer.capacity() as u64, spec);
         samples.copy_interleaved_ref(buffer);
-        for frame in samples.samples().chunks(channels) {
-            mono.push(frame.iter().sum::<f32>() / channels as f32);
+        if !consume(samples.samples(), channels, rate) {
+            return Some(false);
         }
     }
-    Some((mono, rate))
+    Some(true)
+}
+
+fn decode(path: &Path, mut still_needed: impl FnMut() -> bool) -> Option<(Vec<f32>, u32)> {
+    let mut mono = Vec::new();
+    let mut sample_rate = 0;
+    let complete = decode_packets(path, |samples, channels, rate| {
+        if !still_needed() {
+            return false;
+        }
+        sample_rate = rate;
+        let frames = samples.len().div_ceil(channels);
+        if mono.len().saturating_add(frames) > CACHE_BYTES / std::mem::size_of::<f32>()
+            || mono.try_reserve(frames).is_err()
+        {
+            log::warn!("Horizon: static sound exceeds the decoded sound budget");
+            return false;
+        }
+        mono.extend(
+            samples
+                .chunks(channels)
+                .map(|frame| frame.iter().sum::<f32>() / channels as f32),
+        );
+        true
+    })?;
+    (complete && sample_rate != 0).then_some((mono, sample_rate))
+}
+
+const STREAM_CHUNK_SAMPLES: usize = 4096;
+const STREAM_QUEUE_CHUNKS: usize = 4;
+
+fn stream_audio(
+    path: &Path,
+    sender: std::sync::mpsc::SyncSender<StreamChunk>,
+    looping: &std::sync::atomic::AtomicBool,
+) {
+    loop {
+        let mut sent_samples = false;
+        let mut chunk = Vec::with_capacity(STREAM_CHUNK_SAMPLES);
+        let mut sample_rate = 0;
+        let complete = decode_packets(path, |samples, channels, rate| {
+            sample_rate = rate;
+            for frame in samples.chunks(channels) {
+                chunk.push(frame.iter().sum::<f32>() / channels as f32);
+                if chunk.len() == STREAM_CHUNK_SAMPLES {
+                    sent_samples = true;
+                    if sender
+                        .send(StreamChunk {
+                            rate,
+                            samples: std::mem::replace(
+                                &mut chunk,
+                                Vec::with_capacity(STREAM_CHUNK_SAMPLES),
+                            ),
+                        })
+                        .is_err()
+                    {
+                        return false;
+                    }
+                }
+            }
+            true
+        });
+        if complete != Some(true) {
+            break;
+        }
+        if !chunk.is_empty() {
+            sent_samples = true;
+            if sender
+                .send(StreamChunk {
+                    rate: sample_rate,
+                    samples: chunk,
+                })
+                .is_err()
+            {
+                break;
+            }
+        }
+        if complete != Some(true)
+            || !sent_samples
+            || !looping.load(std::sync::atomic::Ordering::Relaxed)
+        {
+            break;
+        }
+    }
 }
 /// A sound file without its variant number (`mob/creeper/say2.ogg` is `mob/creeper/say`): each
 /// player's game picks its own variant of the same event.
@@ -359,6 +457,7 @@ impl Backend for MixerBackend {
             id,
             Channel {
                 samples: None,
+                stream: None,
                 position: 0.0,
                 state: State::Initial,
                 gain: 1.0,
@@ -389,7 +488,14 @@ impl Backend for MixerBackend {
         self.with(channel, |c| c.linear = linear);
     }
     fn set_looping(&mut self, channel: ChannelId, looping: bool) {
-        self.with(channel, |c| c.looping = looping);
+        self.with(channel, |c| {
+            c.looping = looping;
+            if let Some(stream) = &c.stream {
+                stream
+                    .looping
+                    .store(looping, std::sync::atomic::Ordering::Relaxed);
+            }
+        });
     }
     fn set_position(&mut self, channel: ChannelId, p: [f64; 3]) {
         self.with(channel, |c| c.at = [p[0] as f32, p[1] as f32, p[2] as f32]);
@@ -412,11 +518,22 @@ impl Backend for MixerBackend {
             return;
         }
         if sound.stream {
-            // A streamed sound loops by restarting its stream.
-            let mixer = self.mixer.clone();
+            let (sender, receiver) = std::sync::mpsc::sync_channel(STREAM_QUEUE_CHUNKS);
+            let repeat = Arc::new(std::sync::atomic::AtomicBool::new(looping));
+            let player_repeat = repeat.clone();
+            self.with(channel, |c| {
+                c.looping |= looping;
+                repeat.store(c.looping, std::sync::atomic::Ordering::Relaxed);
+                c.stream = Some(StreamingSamples {
+                    receiver,
+                    looping: player_repeat,
+                    queued: VecDeque::new(),
+                    rate: 0,
+                    ended: false,
+                });
+            });
             std::thread::spawn(move || {
-                let samples = decode(&file).map(|(s, r)| (Arc::new(s), r));
-                attach(&mixer, channel, samples, looping);
+                stream_audio(&file, sender, &repeat);
             });
             return;
         }
@@ -433,11 +550,24 @@ impl Backend for MixerBackend {
                 .name("sound decoder".into())
                 .spawn(move || {
                     for job in receive {
+                        let still_needed = || {
+                            mixer.lock().ok().is_some_and(|m| {
+                                m.channels
+                                    .get(&job.channel)
+                                    .is_some_and(|c| c.state == State::Initial)
+                            })
+                        };
+                        if !still_needed() {
+                            continue;
+                        }
                         // Queued twice before the first decode finished.
                         let cached = cache.lock().ok().and_then(|mut c| c.get(&job.key));
                         let samples = cached.unwrap_or_else(|| {
-                            let samples = decode(&job.file).map(|(s, r)| (Arc::new(s), r));
-                            if let Ok(mut c) = cache.lock() {
+                            let samples =
+                                decode(&job.file, &still_needed).map(|(s, r)| (Arc::new(s), r));
+                            if still_needed()
+                                && let Ok(mut c) = cache.lock()
+                            {
                                 c.insert(job.key, samples.clone());
                             }
                             samples
@@ -458,7 +588,11 @@ impl Backend for MixerBackend {
     /// `alSourceStop`: any state becomes stopped, an initial source too (a
     /// sound still decoding then never starts).
     fn stop(&mut self, channel: ChannelId) {
-        self.with(channel, |c| c.state = State::Stopped);
+        self.with(channel, |c| {
+            c.state = State::Stopped;
+            c.stream = None;
+            c.samples = None;
+        });
     }
     fn pause(&mut self, channel: ChannelId) {
         self.with(channel, |c| {
@@ -571,13 +705,27 @@ fn mix(mixer: &mut Mixer, data: &mut [f32], channels: usize, rate: u32) {
     let dot = |a: [f64; 3], b: [f64; 3]| (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) as f32;
     // Gains and pans per source for this buffer.
     let mut voices: Vec<(ChannelId, [f32; 3], f64)> = Vec::new();
-    for (id, c) in &mixer.channels {
-        let Some((_, source_rate)) = &c.samples else {
-            continue;
-        };
+    for (id, c) in &mut mixer.channels {
+        if c.state == State::Initial
+            && let Some(stream) = &mut c.stream
+        {
+            stream.fill(2);
+            if stream.queued.len() >= 2 {
+                c.state = State::Playing;
+            } else if stream.ended {
+                c.state = State::Stopped;
+            }
+        }
         if c.state != State::Playing {
             continue;
         }
+        let source_rate = if let Some((_, rate)) = &c.samples {
+            *rate
+        } else if let Some(stream) = &c.stream {
+            stream.rate
+        } else {
+            continue;
+        };
         let at = [f64::from(c.at[0]), f64::from(c.at[1]), f64::from(c.at[2])];
         let away = |listener: [f64; 3]| {
             [
@@ -616,7 +764,7 @@ fn mix(mixer: &mut Mixer, data: &mut [f32], channels: usize, rate: u32) {
             right = middle + (right - middle) / 2.0;
         }
         let [left, right] = [left, right].map(|pan| gain * pan);
-        let step = f64::from(*source_rate) / f64::from(rate) * f64::from(c.pitch.max(0.0));
+        let step = f64::from(source_rate) / f64::from(rate) * f64::from(c.pitch.max(0.0));
         voices.push((*id, [left, right, gain], step));
     }
     mixer.cameras = cameras;
@@ -624,22 +772,35 @@ fn mix(mixer: &mut Mixer, data: &mut [f32], channels: usize, rate: u32) {
         let Some(c) = mixer.channels.get_mut(&id) else {
             continue;
         };
-        let Some((samples, _)) = c.samples.clone() else {
-            continue;
-        };
+        let samples = c.samples.as_ref().map(|(samples, _)| samples.clone());
         for frame in data.chunks_mut(channels) {
-            let mut i = c.position as usize;
-            if i + 1 >= samples.len() {
-                if c.looping && samples.len() > 1 {
-                    c.position = 0.0;
-                    i = 0;
+            let s = if let Some(stream) = &mut c.stream {
+                if let Some(sample) = stream.sample(&mut c.position, step) {
+                    sample
                 } else {
-                    c.state = State::Stopped;
+                    if stream.ended {
+                        c.state = State::Stopped;
+                    }
                     break;
                 }
-            }
-            let t = (c.position - i as f64) as f32;
-            let s = samples[i] * (1.0 - t) + samples[i + 1] * t;
+            } else if let Some(samples) = &samples {
+                let mut i = c.position as usize;
+                if i + 1 >= samples.len() {
+                    if c.looping && samples.len() > 1 {
+                        c.position = 0.0;
+                        i = 0;
+                    } else {
+                        c.state = State::Stopped;
+                        break;
+                    }
+                }
+                let t = (c.position - i as f64) as f32;
+                let sample = samples[i] * (1.0 - t) + samples[i + 1] * t;
+                c.position += step;
+                sample
+            } else {
+                break;
+            };
             if channels >= 2 {
                 frame[0] += s * left;
                 frame[1] += s * right;
@@ -647,7 +808,6 @@ fn mix(mixer: &mut Mixer, data: &mut [f32], channels: usize, rate: u32) {
                 // A mono output has no panning: the source's own gain.
                 frame[0] += s * gain;
             }
-            c.position += step;
         }
     }
     // Limit the whole buffer together, preserving waveform and stereo balance
@@ -669,7 +829,11 @@ fn mix(mixer: &mut Mixer, data: &mut [f32], channels: usize, rate: u32) {
 /// `HORIZON_NO_AUDIO`, or a virtual screen (`vscreen`), where agents and
 /// harnesses run the game and must stay off the user's speakers.
 /// `HORIZON_AUDIO=1` opens the output anyway (testing into a null sink).
-#[cfg(any(feature = "audio", all(feature = "uwp-audio", target_vendor = "uwp"), test))]
+#[cfg(any(
+    feature = "audio",
+    all(feature = "uwp-audio", target_vendor = "uwp"),
+    test
+))]
 fn output_disabled(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<String> {
     if var("HORIZON_NO_AUDIO").is_some() {
         return Some("audio off: HORIZON_NO_AUDIO is set".into());
@@ -944,8 +1108,11 @@ impl Audio {
         }
         let mut reported_samples = false;
         let stream = horizon_uwp_xaudio_stream::Stream::open(move |output| {
-            if let Ok(mut m) = mixer.lock() { mix(&mut m, output, 2, 48_000); }
-            else { output.fill(0.0); }
+            if let Ok(mut m) = mixer.lock() {
+                mix(&mut m, output, 2, 48_000);
+            } else {
+                output.fill(0.0);
+            }
             if !reported_samples && output.iter().any(|sample| sample.abs() > 0.0001) {
                 log::info!("Horizon: XAudio2 is playing non-silent game audio");
                 reported_samples = true;
@@ -1502,6 +1669,7 @@ mod tests {
     fn channel(samples: Vec<f32>, linear: Option<f32>, at: [f32; 3], looping: bool) -> Channel {
         Channel {
             samples: Some((Arc::new(samples), 48_000)),
+            stream: None,
             position: 0.0,
             state: State::Playing,
             gain: 1.0,
@@ -1514,6 +1682,67 @@ mod tests {
             world: 0,
             started: None,
         }
+    }
+
+    #[test]
+    fn streamed_audio_crosses_chunks_and_resamples_without_waiting() {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(STREAM_QUEUE_CHUNKS);
+        let mut source = channel(Vec::new(), None, [0.0; 3], false);
+        source.samples = None;
+        source.state = State::Initial;
+        source.stream = Some(StreamingSamples {
+            receiver,
+            looping: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            queued: VecDeque::new(),
+            rate: 0,
+            ended: false,
+        });
+        let mut mixer = Mixer::default();
+        mixer.channels.insert(1, source);
+        let mut silence = [1.0; 2];
+        mix(&mut mixer, &mut silence, 1, 48_000);
+        assert_eq!(silence, [0.0; 2]);
+        assert_eq!(mixer.channels[&1].state, State::Initial);
+        sender
+            .send(StreamChunk {
+                rate: 24_000,
+                samples: vec![0.0, 0.25],
+            })
+            .unwrap();
+        sender
+            .send(StreamChunk {
+                rate: 24_000,
+                samples: vec![0.5, 0.75, 1.0],
+            })
+            .unwrap();
+        drop(sender);
+        let mut output = [0.0; 8];
+        mix(&mut mixer, &mut output, 1, 48_000);
+        assert_eq!(output, [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]);
+        let mut tail = [1.0; 2];
+        mix(&mut mixer, &mut tail, 1, 48_000);
+        assert_eq!(mixer.channels[&1].state, State::Stopped);
+    }
+
+    #[test]
+    fn stopping_a_stream_disconnects_a_blocked_decoder() {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        sender
+            .send(StreamChunk {
+                rate: 48_000,
+                samples: vec![0.0, 1.0],
+            })
+            .unwrap();
+        let worker = std::thread::spawn(move || {
+            sender
+                .send(StreamChunk {
+                    rate: 48_000,
+                    samples: vec![1.0, 0.0],
+                })
+                .is_err()
+        });
+        drop(receiver);
+        assert!(worker.join().unwrap());
     }
 
     #[test]
