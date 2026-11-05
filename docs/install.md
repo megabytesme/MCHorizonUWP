@@ -1,14 +1,14 @@
 # Installing a Horizon UWP package
 
-This guide describes the intended signed output. The preview builder does not
-yet produce or install a complete signed package set automatically, and these
-steps have not yet been verified on a Windows 10 Mobile device.
+This guide describes the signed output. Installation is not yet automatic, and
+these steps have not yet been verified on a Windows 10 Mobile device.
 
 Keep the client APPX, its public `.cer` file, and any separately built resource
 framework together. The resource framework contains your Minecraft resources;
 keep it private. The public certificate does not contain your private signing
 key. The client also depends on Microsoft.UI.Xaml 2.7 and Microsoft.VCLibs
-140.00; the preview does not yet collect those dependencies automatically.
+140.00; their Microsoft-signed packages are included in the `Dependencies`
+folder when they are available in the builder's SDK and NuGet cache.
 
 ## Windows 10 or Windows 11 PC
 
@@ -22,7 +22,8 @@ administrator approval. Trust a certificate only if you recognize its owner:
 Windows will trust other packages signed with the same certificate too. See
 [Microsoft's certificate instructions](https://learn.microsoft.com/en-us/windows/msix/app-installer/troubleshoot-appinstaller-issues#trusted-certificates).
 
-Install Microsoft.VCLibs 140.00, Microsoft.UI.Xaml 2.7 and, if present, the resource framework first;
+Install the Microsoft.VCLibs 140.00 and Microsoft.UI.Xaml 2.7 packages from
+`Dependencies` and, if present, the resource framework first;
 then open the client APPX in App Installer. Alternatively, use PowerShell's
 `Add-AppxPackage` with the matching framework packages. A resource framework
 already installed on the target must have the exact name and publisher expected

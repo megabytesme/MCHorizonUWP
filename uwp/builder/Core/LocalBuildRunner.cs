@@ -85,6 +85,17 @@ public static class LocalBuildRunner
         var cmd = Path.Combine(system, "cmd.exe");
         var powershell = Path.Combine(system, "WindowsPowerShell", "v1.0", "powershell.exe");
 
+        var targetArchitecture = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
+            TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => throw new ArgumentOutOfRangeException(nameof(selection)) };
+        IReadOnlyList<string>? dependencies = null;
+        if (release is not null)
+        {
+            progress?.Report("Checking the Microsoft frameworks needed to install on the target.");
+            dependencies = await FrameworkDependencies.FindAsync(targetArchitecture,
+                probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)",
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), signTool, root);
+        }
+
         if (selection.RegistryNativeMods is { Count: > 0 } selectedMods)
         {
             if (release is null) throw new InvalidOperationException("Native registry mods require an authenticated source release.");
@@ -221,7 +232,7 @@ public static class LocalBuildRunner
         if (identity is not null)
         {
             progress?.Report("Signing the package and exporting its public certificate.");
-            signed = await PackageOutput.CreateAsync(package, framework?.Package, identity, signTool, Path.Combine(root, "signed-output"));
+            signed = await PackageOutput.CreateAsync(package, framework?.Package, identity, signTool, Path.Combine(root, "signed-output"), dependencies);
         }
         return new(root, package, packageResources is null ? null : LocalRecipe.SoundWarning(packageResources), framework?.Package, signed);
     }

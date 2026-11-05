@@ -1,5 +1,16 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 2 && args[0] == "--check-frameworks")
+{
+    var programFiles = Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? throw new Exception("Windows SDK directory not found.");
+    var signtool = Path.Combine(programFiles, "Windows Kits", "10", "bin", "10.0.26100.0", "x64", "signtool.exe");
+    var packages = await FrameworkDependencies.FindAsync(args[1], programFiles,
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), signtool, Path.GetTempPath());
+    Require(packages.Count == 2 && packages.All(File.Exists), "Microsoft framework packages verified");
+    Console.WriteLine($"Verified Microsoft UI and VC runtime packages for {args[1]}.");
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--apply-native-mod")
 {
     var workspace = Path.GetFullPath(args[2]);
@@ -130,8 +141,11 @@ if (args.Length == 4 && args[0] == "--signing-proof")
     using (var zip = System.IO.Compression.ZipFile.OpenRead(signed)) Require(zip.GetEntry("AppxSignature.p7x") is not null, "signed package contains signature");
     using (var publicCert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate))
         Require(publicCert.Thumbprint == identity.Thumbprint && !publicCert.HasPrivateKey, "export contains only the public certificate");
-    var set = await PackageOutput.CreateAsync(unsigned, unsigned, identity, args[2], Path.Combine(output, "signed-set"));
+    var microsoftFrameworks = await FrameworkDependencies.FindAsync("x86", Environment.GetEnvironmentVariable("ProgramFiles(x86)")!,
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), args[2], output);
+    var set = await PackageOutput.CreateAsync(unsigned, unsigned, identity, args[2], Path.Combine(output, "signed-set"), microsoftFrameworks);
     Require(File.Exists(set.Client) && File.Exists(set.Certificate) && File.Exists(set.ResourceFramework) && File.Exists(set.InstallationGuide), "signed package set, public certificate and installation guide created");
+    Require(set.Dependencies is { Count: 2 } && set.Dependencies.All(File.Exists), "Microsoft framework packages included");
     Require((await File.ReadAllTextAsync(set.InstallationGuide)).Contains("Windows 10 Mobile"), "installation guide covers phones");
     using (var frameworkZip = System.IO.Compression.ZipFile.OpenRead(set.ResourceFramework!))
         Require(frameworkZip.GetEntry("AppxSignature.p7x") is not null, "resource framework in set is signed");

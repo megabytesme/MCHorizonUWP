@@ -252,6 +252,8 @@ public sealed partial class MainWindow : Window
             var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft);
             var signed = result.SignedOutput ?? throw new InvalidOperationException("The build did not produce signed output.");
             RecipeStatus.Text = $"Signed client: {signed.Client}. Public certificate: {signed.Certificate}. Installation guide: {signed.InstallationGuide}.";
+            if (signed.Dependencies is { Count: > 0 })
+                RecipeStatus.Text += $" Microsoft framework dependencies: {Path.GetDirectoryName(signed.Dependencies[0])}.";
             if (result.SignedOutput?.ResourceFramework is { } signedFramework)
                 RecipeStatus.Text += $" Signed resource framework: {signedFramework}. It contains private Minecraft resources.";
             if (selection.ValidatedExistingResourceFramework is { } existing)
