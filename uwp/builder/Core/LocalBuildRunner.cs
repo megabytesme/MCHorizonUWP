@@ -95,9 +95,9 @@ public static class LocalBuildRunner
             splitRelease: release is not null, unifiedToolchain: unifiedToolchain);
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
         if (unifiedToolchain && toolchainRoot is null) throw new InvalidOperationException("The selected Visual Studio toolchain is no longer available. Check setup again.");
-        var profileRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+        var workspaceDrive = Path.GetPathRoot(release is null ? workspaceBase : Path.GetFullPath(source))
             ?? throw new InvalidOperationException("Could not determine the builder workspace drive.");
-        if (new DriveInfo(profileRoot).AvailableFreeSpace < MinimumFreeBytes)
+        if (new DriveInfo(workspaceDrive).AvailableFreeSpace < MinimumFreeBytes)
             throw new IOException("At least 10 GiB of free space is required on the builder workspace drive before starting a build.");
 
         progress?.Report(release is null ? "Creating an isolated snapshot of the pinned source revision." : "Using the authenticated release source workspace.");
