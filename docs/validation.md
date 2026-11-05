@@ -164,3 +164,18 @@ without ownership. In a separate live Sandbox UI test, Microsoft returned a
 device code and the cancellation action worked. No real account or live
 ownership check has been used, and the component is not yet connected to
 resource downloads.
+
+## 2026-11-05: alternative ARM32 toolchain compile
+
+Microsoft [warns](https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads-archive)
+that unserviced archived SDK installers, including the 15063 installer used by
+the current ARM32 recipe, may be vulnerable. The supported downloads page
+offers a [serviced 17763 SDK](https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads).
+On Ben-Desktop, the already installed Visual Studio 2022 Build Tools v143 ARM
+compiler and SDK 10.0.17763.0 compiled the actual UWP host, renderer, window
+bridge and XAML shell in `%TEMP%\horizon-arm-serviced-sdk-probe-20261105`
+using `cmd /d /c probe.cmd`. The shader compiler also produced the two feature
+level 9_1 shaders. `llvm-readobj --file-headers App.obj XamlShell.obj` reported
+ARMNT objects. The installed SDK on this machine was an older 17763 build;
+the serviced installer was not installed in this test. No full ARM32 link,
+APPX, unsupported-import check or Lumia run was performed with this toolchain.

@@ -40,5 +40,8 @@ automation must only publish evidence backed by actual tests.
 The first candidate patch applies to the pinned upstream commit. The source
 assembler verifies input hashes, applies the patch and overlays a separate UWP
 client archive in a new workspace. Synthetic tests and a local assembly of the
-first candidate passed. The build runner still uses the old local checkout and
-does not yet use this assembly path to build split inputs.
+first candidate passed. A development runner can now build and sign that exact
+split-source candidate; an x64 output and its separate resource framework were
+verified and installed in Sandbox. The wizard still uses the old local
+checkout, and authenticated public releases and the other target builds remain
+unverified.
