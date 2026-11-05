@@ -230,6 +230,15 @@ ScrollViewer^ controller_page_scroll;
 DispatcherTimer^ controller_navigation_timer;
 bool controller_navigation_sounds = true;
 bool controller_is_last_input = false;
+bool controller_face_buttons_swapped = false;
+
+int read_controller_face_swap() {
+    auto game_path = Platform::String::Concat(ApplicationData::Current->LocalFolder->Path, L"\\game");
+    const auto value = horizon_uwp_controller_face_swap(
+        reinterpret_cast<const uint16_t*>(game_path->Data()), game_path->Length(), -1);
+    if (value >= 0) controller_face_buttons_swapped = value != 0;
+    return value;
+}
 
 // These are XAML control sounds, separate from Minecraft's in-game audio.
 void update_controller_sounds() {
@@ -1381,6 +1390,20 @@ void controller_cancel_focused() {
     if (navigation && home_navigation) navigation->SelectedItem = home_navigation;
 }
 
+bool handle_swapped_gamepad_key(Windows::System::VirtualKey key, bool down) {
+    using Windows::System::VirtualKey;
+    if (!controller_face_buttons_swapped ||
+        (launcher_content && launcher_content->Visibility != Visibility::Visible) ||
+        (key != VirtualKey::GamepadA && key != VirtualKey::GamepadB)) return false;
+    // The test dialog must receive button readings without activating controls.
+    if (down && !controller_test_dialog) {
+        set_controller_last_input(true);
+        if (key == VirtualKey::GamepadA) controller_cancel_focused();
+        else controller_activate_focused();
+    }
+    return true;
+}
+
 // NavigationView changes replace the entire page body. Restore controller focus
 // into the new body after XAML has laid it out, so narrow/mobile panes do not
 // strand focus in the navigation rail.
@@ -1398,6 +1421,8 @@ void start_controller_navigation() {
     TimeSpan interval; interval.Duration = 500000; controller_navigation_timer->Interval = interval;
     controller_navigation_timer->Tick += ref new EventHandler<Platform::Object^>([](Platform::Object^, Platform::Object^) {
         static unsigned previous = 0;
+        static bool previous_swap = false;
+        static bool wait_for_face_release = false;
         static ULONGLONG next_repeat = 0;
         static ULONGLONG test_cancel_at = 0;
         try {
@@ -1419,8 +1444,17 @@ void start_controller_navigation() {
                 CloseHandle(input);
             }
 #else
-            const unsigned keys = horizon_uwp_controller_navigation_read();
+            unsigned keys = horizon_uwp_controller_navigation_read();
 #endif
+            const unsigned face = keys & 48;
+            if (previous_swap != controller_face_buttons_swapped && face) wait_for_face_release = true;
+            previous_swap = controller_face_buttons_swapped;
+            if (wait_for_face_release) {
+                if (!face) wait_for_face_release = false;
+                else keys &= ~48u;
+            } else if (controller_face_buttons_swapped) {
+                keys = (keys & ~48u) | ((face & 16u) << 1) | ((face & 32u) >> 1);
+            }
             if (keys) set_controller_last_input(true);
             const unsigned pressed = keys & ~previous;
             const auto now = GetTickCount64();
@@ -2128,6 +2162,9 @@ void update_navigation_surface(DependencyObject^ node) {
 
 void refresh() {
     if (!content) return;
+#ifndef HORIZON_UWP_SHELL_PROBE
+    read_controller_face_swap();
+#endif
     server_views.clear();
     auto panel = ref new StackPanel();
     panel->Margin = Thickness(24);
@@ -2208,7 +2245,7 @@ void refresh() {
         controller_card->Children->Append(text(L"Use the right stick to scroll. Press Back to return to page navigation.", 14));
         controller_card->Children->Append(action_button(L"Test controller", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_controller_test(); })));
         auto face_swap = ref new ToggleSwitch();
-        face_swap->Header = L"Swap A/B and X/Y in game";
+        face_swap->Header = L"Swap A/B and X/Y";
         auto game_path = Platform::String::Concat(ApplicationData::Current->LocalFolder->Path, L"\\game");
         const auto face_swap_value = horizon_uwp_controller_face_swap(
             reinterpret_cast<const uint16_t*>(game_path->Data()), game_path->Length(), -1);
@@ -2224,7 +2261,7 @@ void refresh() {
                 face_swap->IsOn = !enabled;
                 *restoring_face_swap = false;
                 show_message(L"Controller settings", L"Horizon could not save the button layout.");
-            }
+            } else controller_face_buttons_swapped = enabled;
         });
         controller_card->Children->Append(face_swap);
         auto controller_sounds = ref new ToggleSwitch();
@@ -2641,6 +2678,25 @@ protected:
             catch (Platform::Exception^) {}
         }
         update_controller_sounds();
+        // AcceleratorKeyActivated is available on the 15063 minimum; newer
+        // XAML builds also expose tunnelling key events. Handle both key-down
+        // and key-up so native XAML does not invoke the original button.
+        window->Dispatcher->AcceleratorKeyActivated += ref new TypedEventHandler<CoreDispatcher^, AcceleratorKeyEventArgs^>(
+            [](CoreDispatcher^, AcceleratorKeyEventArgs^ event) {
+                const auto kind = event->EventType;
+                const bool down = kind == CoreAcceleratorKeyEventType::KeyDown || kind == CoreAcceleratorKeyEventType::SystemKeyDown;
+                const bool up = kind == CoreAcceleratorKeyEventType::KeyUp || kind == CoreAcceleratorKeyEventType::SystemKeyUp;
+                if ((down || up) && handle_swapped_gamepad_key(event->VirtualKey, down && !event->KeyStatus.WasKeyDown))
+                    event->Handled = true;
+            });
+        if (Windows::Foundation::Metadata::ApiInformation::IsEventPresent(L"Windows.UI.Xaml.UIElement", L"PreviewKeyDown")) {
+            page->PreviewKeyDown += ref new KeyEventHandler([](Platform::Object^, KeyRoutedEventArgs^ event) {
+                if (handle_swapped_gamepad_key(event->Key, !event->KeyStatus.WasKeyDown)) event->Handled = true;
+            });
+            page->PreviewKeyUp += ref new KeyEventHandler([](Platform::Object^, KeyRoutedEventArgs^ event) {
+                if (handle_swapped_gamepad_key(event->Key, false)) event->Handled = true;
+            });
+        }
         page->AddHandler(UIElement::KeyDownEvent, ref new KeyEventHandler([](Platform::Object^, KeyRoutedEventArgs^ event) {
             const auto key = static_cast<int>(event->Key);
             set_controller_last_input(key >= static_cast<int>(Windows::System::VirtualKey::GamepadA)
