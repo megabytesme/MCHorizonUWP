@@ -11,8 +11,9 @@ off by default and is separate from controller input. The touch mod has been
 tested on a Lumia in its separate branch. The local recipe builds from a pinned source
 snapshot and links to official setup instructions for
 missing tools. On request it can invoke the system Windows Package Manager for
-fixed Rustup, Git and Python packages, with interactive license/elevation prompts and normal
-package verification. The local recipe can embed prepared resources, build a
+fixed Rustup, Git and Python packages. Git and Python are requested silently;
+Rustup remains interactive, and Windows can request elevation. Only Git's
+silent installation has been exercised in Sandbox. The local recipe can embed prepared resources, build a
 separate resource framework, or use a framework already installed on the target.
 The existing-framework option requires its exact name and no local resource
 directory. The builder does not sign or install packages. Tool presence does not establish version or recipe

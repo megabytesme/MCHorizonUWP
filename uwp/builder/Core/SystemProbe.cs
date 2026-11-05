@@ -2,6 +2,25 @@ namespace Horizon.Builder.Core;
 
 public sealed class SystemProbe : IProbe
 {
+    /// <summary>Include paths installed since the builder process started, without removing existing paths.</summary>
+    public static void RefreshProcessPath()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var current = Environment.GetEnvironmentVariable("PATH") ?? "";
+        var parts = current.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries).ToList();
+        var known = new HashSet<string>(parts.Select(p => p.Trim().Trim('"')), StringComparer.OrdinalIgnoreCase);
+        foreach (var scope in new[] { EnvironmentVariableTarget.Machine, EnvironmentVariableTarget.User })
+        {
+            var value = Environment.GetEnvironmentVariable("Path", scope) ?? "";
+            foreach (var part in value.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var expanded = Environment.ExpandEnvironmentVariables(part.Trim().Trim('"'));
+                if (expanded.Length > 0 && known.Add(expanded)) parts.Add(expanded);
+            }
+        }
+        Environment.SetEnvironmentVariable("PATH", string.Join(Path.PathSeparator, parts));
+    }
+
     public string? EnvironmentValue(string name) => Environment.GetEnvironmentVariable(name);
     public bool FileExists(string path) => File.Exists(path);
     public IEnumerable<string> Directories(string path)

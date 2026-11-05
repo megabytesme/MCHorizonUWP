@@ -180,15 +180,19 @@ public sealed partial class MainWindow : Window
         InstallRustup.IsEnabled = false;
         InstallGit.IsEnabled = false;
         InstallPython.IsEnabled = false;
-        InstallStatus.Text = "Windows Package Manager is running. Follow its prompts.";
+        InstallStatus.Text = "Starting Windows Package Manager…";
         try
         {
             var tool = ReferenceEquals(sender, InstallRustup) ? InstallableTool.Rustup
                 : ReferenceEquals(sender, InstallGit) ? InstallableTool.Git
                 : ReferenceEquals(sender, InstallPython) ? InstallableTool.Python
                 : throw new InvalidOperationException("Unknown tool selection.");
+            InstallStatus.Text = tool == InstallableTool.Rustup
+                ? "Windows Package Manager is running. Follow its prompts."
+                : $"Installing {tool} with Windows Package Manager…";
             await WindowsPackageManager.InstallAsync(new SystemProbe(), tool);
-            InstallStatus.Text = "WinGet completed. Restart the builder, then check setup again.";
+            SystemProbe.RefreshProcessPath();
+            InstallStatus.Text = "WinGet completed. Check setup again.";
         }
         catch (Exception error)
         {

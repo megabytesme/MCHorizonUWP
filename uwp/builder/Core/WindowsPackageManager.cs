@@ -4,7 +4,7 @@ namespace Horizon.Builder.Core;
 
 public enum InstallableTool { Rustup, Git, Python }
 
-/// <summary>Fixed, interactive package-manager operations initiated by the user.</summary>
+/// <summary>Fixed package-manager operations initiated by the user.</summary>
 public static class WindowsPackageManager
 {
     public static IReadOnlyList<string> Arguments(InstallableTool tool)
@@ -16,7 +16,11 @@ public static class WindowsPackageManager
             InstallableTool.Python => "Python.Python.3.13",
             _ => throw new ArgumentOutOfRangeException(nameof(tool)),
         };
-        return Array.AsReadOnly(new[] { "install", "--id", package, "--exact", "--source", "winget", "--interactive", "--no-upgrade" });
+        var args = new List<string> { "install", "--id", package, "--exact", "--source", "winget" };
+        if (tool == InstallableTool.Rustup) args.Add("--interactive");
+        else args.AddRange(["--silent", "--disable-interactivity", "--accept-package-agreements", "--accept-source-agreements"]);
+        args.Add("--no-upgrade");
+        return args.AsReadOnly();
     }
 
     public static async Task InstallAsync(IProbe probe, InstallableTool tool)

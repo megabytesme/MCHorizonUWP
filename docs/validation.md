@@ -8,6 +8,12 @@ and the separately packaged UWP source candidate. All 374 changed upstream
 paths matched the port commit after normalizing Windows text line endings.
 The local archive is a test fixture, not a downloaded release asset.
 
+Separately, the GitHub source ZIP for the same upstream commit was downloaded,
+its contents checked against that commit, and assembled with the candidate
+patch and client archives. Its 374 changed paths also matched the port after
+normalizing Windows text line endings. The build below used the local ZIP,
+not this downloaded ZIP.
+
 On Ben-Desktop, the build directory was
 `%TEMP%\horizon-uwp-assembled-lf-20261105`. The patched Rust 1.99.1 source
 was prepared with `powershell.exe -NoProfile -ExecutionPolicy Bypass -File
@@ -41,3 +47,13 @@ dependency. The installed app was not launched. No real account sign-in,
 builder-driven signing, automated dependency setup, or fresh-PC build was
 tested. ARM32, ARM64 and x86 were not built in this run. These results must
 not be represented as end-to-end release compatibility evidence.
+
+## 2026-11-05: WinGet and Git setup
+
+With WinGet installed separately in Windows Sandbox, the original builder
+started the Git installer in interactive mode and it stopped at a Next button.
+The updated builder requested silent Git installation and refreshed its
+process PATH. Git installed without interacting with the installer, and the
+same running builder subsequently reported Git as found. The Git installer
+had been downloaded during the earlier interactive attempt, so this is not a
+fresh-download test. Python's silent installer and Rustup remain unverified.
