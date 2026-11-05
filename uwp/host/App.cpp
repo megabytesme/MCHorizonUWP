@@ -280,12 +280,13 @@ static Platform::String^ resolve_resources(Platform::String^ local_path) {
         resources = Platform::String::Concat(installed, ref new Platform::String(L"\\resources"));
         Platform::String^ framework_resources = nullptr;
         auto dependencies = Windows::ApplicationModel::Package::Current->Dependencies;
+        auto publisher = Windows::ApplicationModel::Package::Current->Id->Publisher;
         for (unsigned int index = 0; index < dependencies->Size; ++index) {
             auto dependency = dependencies->GetAt(index);
             auto name = dependency->Id->Name;
             constexpr wchar_t prefix[] = L"Horizon.Asset.";
             if (wcsncmp(name->Data(), prefix, _countof(prefix) - 1) != 0) continue;
-            if (wcscmp(dependency->Id->Publisher->Data(), L"CN=HorizonUWPPrototype") != 0) continue;
+            if (wcscmp(dependency->Id->Publisher->Data(), publisher->Data()) != 0) continue;
             if (framework_resources != nullptr) throw ref new Platform::FailureException();
             framework_resources = Platform::String::Concat(
                 dependency->InstalledLocation->Path, ref new Platform::String(L"\\resources"));

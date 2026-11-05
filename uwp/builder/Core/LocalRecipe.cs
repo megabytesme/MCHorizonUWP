@@ -47,7 +47,7 @@ public static class LocalRecipe
         return FormattableString.Invariant($"{utc.Year}.{utc.Month * 100 + utc.Day}.{utc.Hour * 100 + utc.Minute}.{utc.Second}");
     }
 
-    public static void ConfigureManifest(XDocument manifest, BuildSelection selection)
+    public static void ConfigureManifest(XDocument manifest, BuildSelection selection, PackageSigningIdentity? signingIdentity = null)
     {
         var identity = manifest.Root?.Element(manifest.Root.Name.Namespace + "Identity")
             ?? throw new InvalidDataException("The pinned package manifest has no identity.");
@@ -56,6 +56,11 @@ public static class LocalRecipe
             || (string?)identity.Attribute("Version") != SourceManifestVersion)
             throw new InvalidDataException("The pinned package identity or version did not match the recipe.");
         identity.SetAttributeValue("Version", selection.ValidatedPackageVersion);
+        if (signingIdentity is not null)
+        {
+            identity.SetAttributeValue("Name", "MCHorizonUWP");
+            identity.SetAttributeValue("Publisher", signingIdentity.Publisher);
+        }
     }
 
     public static LocalBuildPlan Plan(BuildSelection selection)

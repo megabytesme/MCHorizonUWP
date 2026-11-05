@@ -74,3 +74,12 @@ the Sandbox user's certificate store. The maintainer tool exported its public
 key, signed the candidate catalog and verified the signature. The private key
 was not exported. This does not establish a production trust key or publish a
 signed catalog.
+
+## 2026-11-05: user-owned publisher support
+
+The x64 UWP host was rebuilt from the assembled test source with the resource
+publisher taken from the installed package identity. Its strict link and
+unsupported-import checks passed. A packaging probe then created a synthetic
+resource framework and a dependent client with a non-prototype publisher; both
+package manifests and the framework dependency used that publisher. This is a
+component test and does not yet exercise the builder's signing pipeline.

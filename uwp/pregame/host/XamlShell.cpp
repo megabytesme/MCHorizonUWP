@@ -2113,11 +2113,12 @@ void refresh_app_storage(TextBlock^ output) {
         std::uint64_t framework = 0;
         try {
             auto dependencies = Windows::ApplicationModel::Package::Current->Dependencies;
+            auto publisher = Windows::ApplicationModel::Package::Current->Id->Publisher;
             for (unsigned i = 0; i < dependencies->Size; ++i) {
                 auto dependency = dependencies->GetAt(i);
                 auto name = dependency->Id->Name;
                 if (name->Length() >= 14 && wcsncmp(name->Data(), L"Horizon.Asset.", 14) == 0 &&
-                    wcscmp(dependency->Id->Publisher->Data(), L"CN=HorizonUWPPrototype") == 0)
+                    wcscmp(dependency->Id->Publisher->Data(), publisher->Data()) == 0)
                     framework += directory_bytes(std::wstring(dependency->InstalledLocation->Path->Data()));
             }
         } catch (...) {}

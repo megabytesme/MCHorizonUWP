@@ -10,6 +10,7 @@ param(
     [string]$Resources,
     [ValidatePattern('^Horizon\.Asset\.[0-9-]+\.[0-9a-f]{20,30}$')][string]$ResourceFrameworkName,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$')][string]$IdentityName,
+    [string]$Publisher,
     [ValidateSet('2.7', '2.8')][string]$WinUIFramework,
     [string]$PackageVersion,
     [string]$ReleaseNotes
@@ -136,6 +137,12 @@ $manifest = (Get-Content (Join-Path $hostDir 'AppxManifest.xml') -Raw).Replace('
 if ($IdentityName) {
     $manifest = $manifest.Replace('Name="HorizonUWPPrototype"', "Name=`"$IdentityName`"")
 }
+if ($Publisher) {
+    $null = [System.Security.Cryptography.X509Certificates.X500DistinguishedName]::new($Publisher)
+    $manifestXml = [xml]$manifest
+    $manifestXml.Package.Identity.Publisher = $Publisher
+    $manifest = $manifestXml.OuterXml
+}
 if ($PackageVersion) {
     $parts = $PackageVersion.Split('.')
     if ($parts.Count -ne 4) { throw 'Package version must contain four numeric fields.' }
@@ -164,7 +171,7 @@ if ($ResourceFrameworkName) {
     $namespace = $manifestXml.DocumentElement.NamespaceURI
     $dependency = $manifestXml.CreateElement('PackageDependency', $namespace)
     $dependency.SetAttribute('Name', $ResourceFrameworkName)
-    $dependency.SetAttribute('Publisher', 'CN=HorizonUWPPrototype')
+    $dependency.SetAttribute('Publisher', $manifestXml.Package.Identity.Publisher)
     $dependency.SetAttribute('MinVersion', '1.0.0.0')
     $manifestXml.Package.Dependencies.AppendChild($dependency) | Out-Null
     $manifest = $manifestXml.OuterXml

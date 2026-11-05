@@ -93,11 +93,12 @@ if (args.Length == 2 && args[0] == "--framework-client-probe")
     Directory.CreateDirectory(resources);
     File.WriteAllText(Path.Combine(resources, "horizon-resources.json"), "{\"minecraft\":\"26.3\"}");
     File.WriteAllText(Path.Combine(resources, "fixture.txt"), "synthetic fixture");
-    var framework = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "framework-output"));
+    const string publisher = "CN=MCHorizonUWP-proof";
+    var framework = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "framework-output"), publisher: publisher);
     var output = Path.Combine(root, "client-output");
     var start = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true };
     foreach (var arg in new[] { "-NoProfile", "-File", Path.GetFullPath("uwp/host/package.ps1"), "-Architecture", "x64",
-        "-Executable", Path.GetFullPath(args[1]), "-OutputDirectory", output, "-ResourceFrameworkName", framework.Name })
+        "-Executable", Path.GetFullPath(args[1]), "-OutputDirectory", output, "-ResourceFrameworkName", framework.Name, "-Publisher", publisher })
         start.ArgumentList.Add(arg);
     using (var process = System.Diagnostics.Process.Start(start) ?? throw new Exception("package script did not start"))
     {
@@ -110,7 +111,11 @@ if (args.Length == 2 && args[0] == "--framework-client-probe")
     var ns = manifest.Root!.Name.Namespace;
     var dependency = manifest.Root.Element(ns + "Dependencies")!.Elements(ns + "PackageDependency")
         .Single(element => (string?)element.Attribute("Name") == framework.Name);
-    Require((string?)dependency.Attribute("Publisher") == ResourceFrameworkPacker.Publisher, "framework dependency publisher");
+    Require((string?)dependency.Attribute("Publisher") == publisher, "framework dependency publisher");
+    Require((string?)manifest.Root.Element(ns + "Identity")!.Attribute("Publisher") == publisher, "client publisher");
+    using var frameworkZip = System.IO.Compression.ZipFile.OpenRead(framework.Package);
+    using var frameworkManifest = frameworkZip.GetEntry("AppxManifest.xml")!.Open();
+    Require((string?)System.Xml.Linq.XDocument.Load(frameworkManifest).Root!.Element(ns + "Identity")!.Attribute("Publisher") == publisher, "framework publisher");
     Require(zip.GetEntry("resources/fixture.txt") is null, "resources are separate from the client");
     Console.WriteLine("Verified framework and dependent client packaging using synthetic resources.");
     return;
@@ -386,6 +391,10 @@ Require(new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.9.0").Validat
 var manifestTest = System.Xml.Linq.XDocument.Parse("<Package xmlns='http://schemas.microsoft.com/appx/manifest/foundation/windows10'><Identity Name='HorizonUWPPrototype' Publisher='CN=HorizonUWPPrototype' Version='1.0.1.0'/></Package>");
 LocalRecipe.ConfigureManifest(manifestTest, new BuildSelection(TargetProfile.WindowsMobile, true, "1.0.9.0"));
 Require(manifestTest.Root!.Elements().Single().Attribute("Version")!.Value == "1.0.9.0", "manifest receives selected version");
+var signedManifest = System.Xml.Linq.XDocument.Parse("<Package xmlns='http://schemas.microsoft.com/appx/manifest/foundation/windows10'><Identity Name='HorizonUWPPrototype' Publisher='CN=HorizonUWPPrototype' Version='1.0.1.0'/></Package>");
+LocalRecipe.ConfigureManifest(signedManifest, selection, new PackageSigningIdentity(new string('a', 40), "CN=MCHorizonUWP-user"));
+Require((string?)signedManifest.Root!.Elements().Single().Attribute("Name") == "MCHorizonUWP", "production-style package identity selected");
+Require((string?)signedManifest.Root.Elements().Single().Attribute("Publisher") == "CN=MCHorizonUWP-user", "package publisher follows the selected certificate");
 var wrongManifest = System.Xml.Linq.XDocument.Parse("<Package><Identity Name='other' Publisher='CN=HorizonUWPPrototype' Version='1.0.1.0'/></Package>");
 try { LocalRecipe.ConfigureManifest(wrongManifest, selection); throw new Exception("wrong package identity accepted"); }
 catch (InvalidDataException) { }

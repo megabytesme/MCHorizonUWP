@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -14,8 +15,10 @@ public static class ResourceFrameworkPacker
 {
     public const string Publisher = "CN=HorizonUWPPrototype";
 
-    public static async Task<ResourceFramework> PackAsync(string resources, string newOutputDirectory, IProgress<string>? progress = null)
+    public static async Task<ResourceFramework> PackAsync(string resources, string newOutputDirectory, IProgress<string>? progress = null, string? publisher = null)
     {
+        publisher ??= Publisher;
+        _ = new X500DistinguishedName(publisher);
         var gameVersion = ReadGameVersion(resources);
         var output = Path.GetFullPath(newOutputDirectory);
         if (Directory.Exists(output) || File.Exists(output)) throw new IOException("Choose a new framework output directory.");
@@ -45,7 +48,7 @@ public static class ResourceFrameworkPacker
         XNamespace ns = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
         var manifest = new XDocument(new XDeclaration("1.0", "utf-8", null),
             new XElement(ns + "Package",
-                new XElement(ns + "Identity", new XAttribute("Name", name), new XAttribute("Publisher", Publisher),
+                new XElement(ns + "Identity", new XAttribute("Name", name), new XAttribute("Publisher", publisher),
                     new XAttribute("Version", "1.0.0.0"), new XAttribute("ProcessorArchitecture", "neutral")),
                 new XElement(ns + "Properties", new XElement(ns + "Framework", "true"),
                     new XElement(ns + "DisplayName", "Horizon Minecraft resources"),
