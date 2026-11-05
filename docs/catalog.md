@@ -26,6 +26,10 @@ catalog bytes, using SHA-256 and a 64-byte IEEE P1363 signature. The trusted
 public key is supplied as SubjectPublicKeyInfo; there is currently no pinned
 production key, key-management workflow, or release signing process. Catalog
 URLs and digests are unusable as a trust anchor until those pieces exist.
+The development-only `tools/catalog-signer` can sign using an existing P-256
+private key in the current user's certificate store, export its public key,
+and verify a signed catalog. It does not create, export or back up private
+keys. Its `self-test <catalog>` command uses an ephemeral key only.
 
 Evidence is separate from compatibility. It identifies exact patch, client,
 builder and architecture versions, with independent build and device results.
