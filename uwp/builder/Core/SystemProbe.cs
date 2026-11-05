@@ -37,11 +37,23 @@ public sealed class SystemProbe : IProbe
             try
             {
                 var candidate = Path.Combine(directory.Trim().Trim('"'), executable);
-                if (File.Exists(candidate)) return candidate;
+                if (File.Exists(candidate))
+                {
+                    if (IsPythonExecutionAlias(executable, candidate, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), File.GetAttributes(candidate)))
+                        continue;
+                    return candidate;
+                }
             }
             catch (ArgumentException) { }
             catch (NotSupportedException) { }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
         return null;
     }
+
+    internal static bool IsPythonExecutionAlias(string executable, string candidate, string localAppData, FileAttributes attributes)
+        => executable.Equals("python.exe", StringComparison.OrdinalIgnoreCase)
+            && (attributes & FileAttributes.ReparsePoint) != 0
+            && Path.GetFullPath(candidate).Equals(Path.GetFullPath(Path.Combine(localAppData, "Microsoft", "WindowsApps", "python.exe")), StringComparison.OrdinalIgnoreCase);
 }

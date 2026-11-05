@@ -15,8 +15,9 @@ tested on a Lumia in its separate branch. The local recipe builds from a pinned 
 snapshot and links to official setup instructions for
 missing tools. On request it can invoke the system Windows Package Manager for
 fixed Rustup, Git and Python packages. Git and Python are requested silently;
-Rustup remains interactive, and Windows can request elevation. Only Git's
-silent installation has been exercised in Sandbox. The local recipe can embed prepared resources, build a
+Rustup remains interactive, and Windows can request elevation. Git's silent
+installation and Python's equivalent WinGet command have been exercised in
+Sandbox. The local recipe can embed prepared resources, build a
 separate resource framework, or use a framework already installed on the target.
 The existing-framework option requires its exact name and no local resource
 directory. The builder does not sign or install packages. Tool presence does not establish version or recipe

@@ -56,7 +56,11 @@ The updated builder requested silent Git installation and refreshed its
 process PATH. Git installed without interacting with the installer, and the
 same running builder subsequently reported Git as found. The Git installer
 had been downloaded during the earlier interactive attempt, so this is not a
-fresh-download test. Python's silent installer and Rustup remain unverified.
+fresh-download test. A later WinGet command installed Python 3.13 silently in
+Sandbox without interaction, and a fresh process refreshed PATH, skipped the
+zero-byte Store execution alias and successfully ran that Python. The Python
+test used the same fixed WinGet arguments as the builder but did not click its
+install button. Rustup remains unverified and interactive.
 
 ## 2026-11-05: package signing component
 

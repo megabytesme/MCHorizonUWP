@@ -12,6 +12,20 @@ if (args.Length == 3 && args[0] == "--stage-native-mod")
     return;
 }
 
+if (args.Length == 1 && args[0] == "--check-python-path")
+{
+    SystemProbe.RefreshProcessPath();
+    var python = new SystemProbe().FindOnPath("python.exe") ?? throw new Exception("Python was not found.");
+    var start = new System.Diagnostics.ProcessStartInfo(python) { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+    start.ArgumentList.Add("--version");
+    using var process = System.Diagnostics.Process.Start(start) ?? throw new Exception("Python did not start.");
+    var version = await process.StandardOutput.ReadToEndAsync();
+    await process.WaitForExitAsync();
+    Require(process.ExitCode == 0 && version.StartsWith("Python 3.", StringComparison.Ordinal), "detected Python runs successfully");
+    Console.WriteLine("Detected WinGet-installed Python successfully.");
+    return;
+}
+
 if (args.Length == 1 && args[0] == "--native-index-probe")
 {
     var nativeResults = await NativeModIndex.FetchAsync();
@@ -100,6 +114,9 @@ Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm64) == TargetProfile.SurfaceProX, "ARM64 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm) == TargetProfile.WindowsMobile, "ARM32 default target");
 Require(Guid.TryParse(HorizonIdentity.ClientId, out _), "Horizon public client ID has the expected format");
+var fakeLocal = Path.Combine(Path.GetTempPath(), "fake-user");
+Require(SystemProbe.IsPythonExecutionAlias("python.exe", Path.Combine(fakeLocal, "Microsoft", "WindowsApps", "python.exe"), fakeLocal, FileAttributes.ReparsePoint), "Python Store execution alias skipped");
+Require(!SystemProbe.IsPythonExecutionAlias("python.exe", Path.Combine(fakeLocal, "Programs", "Python", "python.exe"), fakeLocal, FileAttributes.Normal), "real Python executable retained");
 
 if (args.Length == 1 && args[0] == "--nightly-probe")
 {
