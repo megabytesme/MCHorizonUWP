@@ -44,6 +44,12 @@ if (args.Length == 4 && args[0] == "--signing-proof")
     using (var zip = System.IO.Compression.ZipFile.OpenRead(signed)) Require(zip.GetEntry("AppxSignature.p7x") is not null, "signed package contains signature");
     using (var publicCert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate))
         Require(publicCert.Thumbprint == identity.Thumbprint && !publicCert.HasPrivateKey, "export contains only the public certificate");
+    var set = await PackageOutput.CreateAsync(unsigned, unsigned, identity, args[2], Path.Combine(output, "signed-set"));
+    Require(File.Exists(set.Client) && File.Exists(set.Certificate) && File.Exists(set.ResourceFramework), "signed package set and public certificate created");
+    using (var frameworkZip = System.IO.Compression.ZipFile.OpenRead(set.ResourceFramework!))
+        Require(frameworkZip.GetEntry("AppxSignature.p7x") is not null, "resource framework in set is signed");
+    try { await PackageOutput.CreateAsync(unsigned, null, identity, args[2], Path.Combine(output, "signed-set")); throw new Exception("existing output accepted"); }
+    catch (IOException) { }
     Console.WriteLine($"Synthetic package signed with {identity.Publisher}; public certificate exported.");
     return;
 }
