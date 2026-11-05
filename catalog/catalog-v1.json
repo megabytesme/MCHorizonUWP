@@ -40,7 +40,10 @@
         "max_exclusive": "0.1.1"
       },
       "architectures": [
-        "x64"
+        "x86",
+        "x64",
+        "arm",
+        "arm64"
       ]
     }
   ],
