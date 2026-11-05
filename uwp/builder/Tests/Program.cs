@@ -1,5 +1,21 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 3 && args[0] == "--framework-fallback-proof")
+{
+    var root = Path.GetFullPath(args[2]);
+    if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new framework proof workspace.");
+    Directory.CreateDirectory(root);
+    var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    await WinUiBootstrap.EnsureAsync(profile, root, args[1], new ConsoleProgress());
+    var systemSdkRoot = Environment.GetEnvironmentVariable("ProgramFiles(x86)")!;
+    var signTool = Path.Combine(systemSdkRoot, "Windows Kits", "10", "bin", "10.0.26100.0", "x64", "signtool.exe");
+    var packages = await FrameworkDependencies.FindAsync(args[1], Path.Combine(root, "empty-sdk"), profile, signTool, root);
+    Require(packages.Count == 2 && packages.All(File.Exists) && packages[0].StartsWith(root, StringComparison.OrdinalIgnoreCase),
+        "Microsoft runtime downloaded, extracted and verified without an SDK runtime package");
+    Console.WriteLine($"Verified Microsoft VC runtime fallback for {args[1]}: {packages[0]}");
+    return;
+}
+
 if (args.Length == 5 && args[0] == "--prepare-assets-candidate")
 {
     static string InputHash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
