@@ -66,12 +66,22 @@ impl ControllerTest {
         let mut output = String::new();
         for (_, pad) in self.gilrs.gamepads() {
             use std::fmt::Write;
-            let _ = writeln!(
-                output,
-                "{} ({:?} mapping)",
-                pad.name(),
-                pad.mapping_source()
-            );
+            let mapping = if pad.mapping_source() == gilrs::MappingSource::SdlMappings {
+                "database"
+            } else {
+                "automatic"
+            };
+            let _ = writeln!(output, "{} ({} mapping)", pad.name(), mapping);
+            if let (Some(vendor), Some(product)) = (pad.vendor_id(), pad.product_id()) {
+                let (vendor_name, product_name) = crate::usb_ids::lookup(vendor, product);
+                let _ = writeln!(output, "Reported hardware ID: {vendor:04X}:{product:04X}");
+                if let Some(name) = vendor_name {
+                    let _ = writeln!(output, "USB ID vendor entry: {name}");
+                }
+                if let Some(name) = product_name {
+                    let _ = writeln!(output, "USB ID product entry: {name}");
+                }
+            }
             let buttons = [
                 ("South", gilrs::Button::South),
                 ("East", gilrs::Button::East),

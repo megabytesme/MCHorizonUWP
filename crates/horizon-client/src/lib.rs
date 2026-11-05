@@ -79,3 +79,6 @@ mod uwp_mods;
 
 #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
 pub mod uwp_controller;
+
+#[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+mod usb_ids;

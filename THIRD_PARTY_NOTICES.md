@@ -1,5 +1,13 @@
 # Third-party notices
 
+## USB ID Repository
+
+`third_party/usb-ids/usb.ids` is the 2026-06-26 snapshot of the
+[USB ID Repository](https://usb-ids.gowdy.us/), maintained by Stephen J. Gowdy
+and contributors. The database is distributed under the BSD-3-Clause option
+(`third_party/usb-ids/LICENSE`); the upstream repository offers GPL-2.0-or-later
+as an alternative. Names describe reported IDs, not verified product brands.
+
 ## SDL Game Controller Database
 
 The `gilrs` 0.11.2 dependency embeds [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB),
