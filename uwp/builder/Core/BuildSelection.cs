@@ -64,8 +64,7 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     {
         "native-d3d11" => Renderer,
         "angle" => Renderer,
-        "dx12" when Target is TargetProfile.DesktopX64 or TargetProfile.SurfaceProX => Renderer,
-        "dx12" => throw new NotSupportedException("The Direct3D 12 renderer is not included in this architecture's package."),
+        "dx12" => Renderer,
         _ => throw new ArgumentException("Choose a supported renderer."),
     };
 
@@ -73,7 +72,7 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     // fragments or paths are interpolated. Execution requires a verified recipe.
     public IReadOnlyList<string> Features => new[]
         { "native-d3d11",
-          Target is TargetProfile.DesktopX64 or TargetProfile.SurfaceProX ? "uwp-dx12-renderer" : null,
+          "uwp-dx12-renderer",
           IncludesNativeTouchMod ? "native-touch-mod" : null,
           NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell" }
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();

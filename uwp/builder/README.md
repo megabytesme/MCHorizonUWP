@@ -70,9 +70,12 @@ also checked into `uwp/host/Assets`, so the matching What's New page remains
 available if GitHub's moving release metadata changes. Minecraft resource
 framework versions remain tied to the Minecraft resources, not to the Horizon nightly date.
 All four architectures include native D3D11 and can package ANGLE when matching
-UWP DLLs are available in the selected checkout. x64 and ARM64 also include
-WGPU's DX12 backend. Runtime device and surface probes enable only renderers
-that initialize and present on that device. ARM32 ANGLE reached a world on the
+UWP DLLs are available in the selected checkout. All four include WGPU's DX12
+backend. Runtime device and surface probes enable only renderers that initialize
+and present on that device; D3D12 also checks shader-pipeline creation. ARM32
+D3D12 additionally requires a
+hardware adapter: the Lumia 950 XL exposed only Microsoft's software renderer,
+which exhausted the address space during startup. ARM32 ANGLE reached a world on the
 Lumia 950 XL but was slow and later reported a pipeline error; the startup probe
 does not guarantee stable gameplay. See `../angle-arm32/README.md` for the
 32-bit ANGLE build and notices.

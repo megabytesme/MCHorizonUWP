@@ -347,7 +347,16 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
     } else {
         "ANGLE probe: adapter returned"
     });
-    if adapter.get_info().backend != expected_backend {
+    let adapter_info = adapter.get_info();
+    if adapter_info.backend != expected_backend {
+        return 0;
+    }
+    // On ARM32 Mobile, WARP passes device/presentation checks but exhausts
+    // the process address space during game startup. Recheck on each launch
+    // so an actual D3D12 hardware driver can enable the option later.
+    #[cfg(target_arch = "arm")]
+    if renderer == 2 && adapter_info.device_type == wgpu::DeviceType::Cpu {
+        trace_renderer_probe("DX12 probe: ARM32 software adapter is not supported");
         return 0;
     }
     let limits = adapter.limits();
@@ -372,6 +381,10 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
     else {
         return 0;
     };
+    if renderer == 2 && !probe_dx12_pipeline(&device, configuration.format) {
+        trace_renderer_probe("DX12 probe: shader pipeline creation failed");
+        return 0;
+    }
     trace_renderer_probe(if renderer == 2 {
         "DX12 probe: surface configuration starting"
     } else {
@@ -400,6 +413,67 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
         "ANGLE probe: frame presented"
     });
     1
+}
+
+// A device and swap chain alone do not prove that the D3D12 driver can compile
+// and create a graphics pipeline. Treat any error as an unavailable renderer,
+// while leaving the other backends usable.
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    feature = "uwp-dx12-renderer"
+))]
+fn probe_dx12_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> bool {
+    let oom = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+    let internal = device.push_error_scope(wgpu::ErrorFilter::Internal);
+    let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Horizon D3D12 compatibility probe"),
+        source: wgpu::ShaderSource::Wgsl(
+            "@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {\n\
+             let x = f32(i32(i) - 1); return vec4f(x, x, 0.0, 1.0); }\n\
+             @fragment fn fs() -> @location(0) vec4f { return vec4f(0.0, 0.0, 0.0, 1.0); }"
+                .into(),
+        ),
+    });
+    let _pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Horizon D3D12 compatibility probe"),
+        layout: None,
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs"),
+            compilation_options: Default::default(),
+            buffers: &[],
+        },
+        primitive: Default::default(),
+        depth_stencil: None,
+        multisample: Default::default(),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs"),
+            compilation_options: Default::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview_mask: None,
+        cache: None,
+    });
+    let validation_error = pollster::block_on(validation.pop());
+    let internal_error = pollster::block_on(internal.pop());
+    let oom_error = pollster::block_on(oom.pop());
+    validation_error.is_none() && internal_error.is_none() && oom_error.is_none()
+}
+
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    not(feature = "uwp-dx12-renderer")
+))]
+fn probe_dx12_pipeline(_: &wgpu::Device, _: wgpu::TextureFormat) -> bool {
+    false
 }
 
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
@@ -573,6 +647,14 @@ fn report_failure(message: &str) {
 #[cfg(target_vendor = "uwp")]
 fn install_panic_reporter() {
     std::panic::set_hook(Box::new(|info| {
+        // Test packages contain an explicit isolation marker and have no real
+        // player data. Capture the full panic there to diagnose renderer
+        // validation failures; regular packages must not record payloads,
+        // which can contain credentials or server responses.
+        if unsafe { horizon_uwp_is_local_test() != 0 } {
+            let diagnostic = info.to_string();
+            unsafe { horizon_uwp_report_error(diagnostic.as_ptr(), diagnostic.len()) };
+        }
         let location = info.location().map_or_else(
             || "unknown location".to_owned(),
             |location| format!("{}:{}", location.file(), location.line()),

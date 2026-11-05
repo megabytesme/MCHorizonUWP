@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)][string]$Output,
     [ValidateSet('X86', 'X64', 'ARM64', 'ARM')][string]$Machine = 'X64',
     [string[]]$ExtraLibraries = @(),
-    [ValidateRange(0, 1073741824)][long]$StackReserve = 0
+    [ValidateRange(0, 1073741824)][long]$StackReserve = 0,
+    [switch]$LargeAddressAware
 )
 
 # Run in a UWP MSVC developer environment. The sentinel object resolves
@@ -39,6 +40,7 @@ if ($runtimeRelativePath -and $env:VCToolsInstallDir) {
     }
 }
 if ($StackReserve -gt 0) { $linkArgs += "/STACK:$StackReserve" }
+if ($LargeAddressAware) { $linkArgs += '/LARGEADDRESSAWARE' }
 & link @linkArgs
 if ($LASTEXITCODE -ne 0) { throw "Strict UWP link failed: $LASTEXITCODE" }
 if (Select-String -Path $mapPath -Pattern 'dead-import-sentinels\.obj|forbidden_api' -Quiet) {

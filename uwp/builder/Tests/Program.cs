@@ -259,7 +259,7 @@ Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("t
     && fetchStep.Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml"), "fetch uses target, host and overrides");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
-Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,native-touch-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell"), "touch and controller build features");
+Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,uwp-dx12-renderer,native-touch-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell"), "touch and controller build features");
 var withDevice = new BuildSelection(TargetProfile.WindowsMobile, true, NativeDeviceVibration: true);
 Require(withDevice.ModIds.Contains(BuildSelection.DeviceVibrationModId)
     && withDevice.Features.Contains("native-device-vibration-mod"), "device vibration is an optional native mod");
@@ -299,10 +299,13 @@ Require(new BuildSelection(TargetProfile.WindowsMobile, false, Renderer: "angle"
 Require(arm64Recipe.Target == "aarch64-uwp-windows-msvc"
     && arm64Recipe.Features.Contains("uwp-dx12-renderer"), "ARM64 recipe includes the tablet target and DX12 renderer");
 var x86Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX86, false));
-Require(x86Recipe.Target == "i686-uwp-windows-msvc" && !x86Recipe.Features.Contains("uwp-dx12-renderer")
-    && x86Recipe.Steps.Single(step => step.Name == "Strict-link host").Arguments.Contains("x86"), "x86 recipe targets x86 without the unavailable DX12 backend");
-try { _ = new BuildSelection(TargetProfile.DesktopX86, false, Renderer: "dx12").ValidatedRenderer; throw new Exception("x86 DX12 accepted"); }
-catch (NotSupportedException) { }
+Require(x86Recipe.Target == "i686-uwp-windows-msvc" && x86Recipe.Features.Contains("uwp-dx12-renderer")
+    && x86Recipe.Steps.Single(step => step.Name == "Strict-link host").Arguments.Contains("x86"), "x86 recipe includes the DX12 backend");
+foreach (var target in Enum.GetValues<TargetProfile>())
+{
+    var dx12Selection = new BuildSelection(target, false, Renderer: "dx12");
+    Require(dx12Selection.ValidatedRenderer == "dx12" && dx12Selection.Features.Contains("uwp-dx12-renderer"), $"DX12 available in the {target} build");
+}
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
 Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");
 Require(missingToolchain.Any(blocker => blocker.Contains("rust-src")), "rust-src checked");
@@ -319,7 +322,7 @@ Require(new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "
 try { _ = new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "not-an-id").ValidatedMicrosoftClientId; throw new Exception("invalid client ID accepted"); }
 catch (ArgumentException) { }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
-Require(selection.Features.SequenceEqual(["native-d3d11", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "native touch feature selection");
+Require(selection.Features.SequenceEqual(["native-d3d11", "uwp-dx12-renderer", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "native touch feature selection");
 Require(selection.ModIds.SequenceEqual(["horizon_touch"]), "stable native touch mod ID");
 Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");
 Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-dx12-renderer", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "touch can be omitted");

@@ -128,7 +128,7 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = "1";
         vcEnvironment["HORIZON_UWP_TOUCH_MOD"] = selection.IncludesNativeTouchMod ? "1" : "";
-        vcEnvironment["HORIZON_UWP_DX12"] = selection.Target is TargetProfile.DesktopX64 or TargetProfile.SurfaceProX ? "1" : "";
+        vcEnvironment["HORIZON_UWP_DX12"] = "1";
         vcEnvironment["HORIZON_UWP_ANGLE"] = angleBin is null ? "" : "1";
         vcEnvironment["HORIZON_UWP_DEFAULT_RENDERER"] = selection.ValidatedRenderer;
         vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
