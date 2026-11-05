@@ -49,6 +49,7 @@
 #include <cstring>
 #include <mutex>
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -96,6 +97,7 @@ extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsi
 #ifndef HORIZON_UWP_SHELL_PROBE
 extern "C" size_t __cdecl horizon_uwp_controller_test_read(unsigned char*, size_t);
 extern "C" void __cdecl horizon_uwp_controller_test_stop();
+extern "C" int32_t __cdecl horizon_uwp_controller_face_swap(const uint16_t*, size_t, int32_t);
 extern "C" unsigned __cdecl horizon_uwp_controller_navigation_read();
 extern "C" void __cdecl horizon_uwp_controller_navigation_stop();
 #endif
@@ -2205,6 +2207,26 @@ void refresh() {
         controller_card->Children->Append(text(L"Test connected controllers and their game mappings.", 14));
         controller_card->Children->Append(text(L"Use the right stick to scroll. Press Back to return to page navigation.", 14));
         controller_card->Children->Append(action_button(L"Test controller", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_controller_test(); })));
+        auto face_swap = ref new ToggleSwitch();
+        face_swap->Header = L"Swap A/B and X/Y in game";
+        auto game_path = Platform::String::Concat(ApplicationData::Current->LocalFolder->Path, L"\\game");
+        const auto face_swap_value = horizon_uwp_controller_face_swap(
+            reinterpret_cast<const uint16_t*>(game_path->Data()), game_path->Length(), -1);
+        face_swap->IsEnabled = face_swap_value >= 0;
+        face_swap->IsOn = face_swap_value > 0;
+        auto restoring_face_swap = std::make_shared<bool>(false);
+        face_swap->Toggled += ref new RoutedEventHandler([face_swap, game_path, restoring_face_swap](Platform::Object^, RoutedEventArgs^) {
+            if (*restoring_face_swap) return;
+            const bool enabled = face_swap->IsOn;
+            if (horizon_uwp_controller_face_swap(reinterpret_cast<const uint16_t*>(game_path->Data()),
+                game_path->Length(), enabled ? 1 : 0) < 0) {
+                *restoring_face_swap = true;
+                face_swap->IsOn = !enabled;
+                *restoring_face_swap = false;
+                show_message(L"Controller settings", L"Horizon could not save the button layout.");
+            }
+        });
+        controller_card->Children->Append(face_swap);
         auto controller_sounds = ref new ToggleSwitch();
         controller_sounds->Header = L"Controller navigation sounds";
         controller_sounds->IsOn = controller_navigation_sounds;

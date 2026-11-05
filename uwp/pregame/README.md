@@ -36,6 +36,10 @@ runs. The optional contribution checkbox applies to the current run: it sends a
 privacy-filtered report and hardware details to Horizon, without changing any
 other telemetry choices. If uploading fails, the local report is still saved.
 
+The Controllers card also exposes the game's existing A/B and X/Y face-button
+swap. It reads and writes the same controller settings file as the in-game
+menu, so changing the preference in either place is reflected in the other.
+
 The pre-game page and game use the same app view and CoreWindow on every device.
 The host clears the XAML root while the game renders into that window, then
 restores the pre-game page when the game exits. This also keeps Windows 10

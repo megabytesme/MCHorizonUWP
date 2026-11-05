@@ -46,6 +46,39 @@ pub extern "C" fn horizon_uwp_controller_test_stop() {
     CONTROLLER_TEST.with(|slot| *slot.borrow_mut() = None);
 }
 
+/// Read or update the game's existing face-button preference. `value` is -1
+/// to read, or 0/1 to write. The path is the same game directory used at launch.
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_controller_face_swap(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    value: i32,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null() || !(-1..=1).contains(&value) {
+        return -1;
+    }
+    let wide = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
+    let dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(wide));
+    let file = dir.join(horizon_client::gamepad::FILE);
+    let mut settings = match std::fs::read_to_string(&file) {
+        Ok(contents) => horizon_client::gamepad::PadSettings::parse(&contents),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Default::default(),
+        Err(_) => return -1,
+    };
+    if value >= 0 {
+        settings.swap_face_buttons = value != 0;
+        if std::fs::create_dir_all(&dir).is_err()
+            || std::fs::write(file, settings.serialize()).is_err()
+        {
+            return -1;
+        }
+    }
+    i32::from(settings.swap_face_buttons)
+}
+
 #[cfg(all(
     target_vendor = "uwp",
     feature = "xaml-shell",
