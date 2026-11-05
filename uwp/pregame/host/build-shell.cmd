@@ -19,6 +19,7 @@ if /i "%ARCH%"=="arm" (
     set "SDK=10.0.17763.0"
     set "WINUI_VERSION=2.7.3"
 )
+if defined HORIZON_UWP_VSROOT set "VSROOT=%HORIZON_UWP_VSROOT%"
 if defined HORIZON_UWP_WINUI_VERSION set "WINUI_VERSION=%HORIZON_UWP_WINUI_VERSION%"
 if /i not "%ARCH%"=="arm" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="x86" exit /b 1
 set "WINUI=%USERPROFILE%\.nuget\packages\microsoft.ui.xaml\%WINUI_VERSION%\lib\uap10.0"

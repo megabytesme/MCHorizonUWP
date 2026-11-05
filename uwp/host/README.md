@@ -13,7 +13,11 @@ then set `HORIZON_UWP_GAME_LIB` to its static library and run
 `HORIZON_UWP_XAUDIO=1` and `HORIZON_UWP_HTTP=1` when the matching Rust features
 are enabled. See `../xaudio-stream/README.md` and `../https-bridge/README.md`.
 The host uses a strict UWP link and the locally installed Visual Studio and SDK
-paths in the build script. The game host reserves an 8 MiB thread stack, and
+paths in the build script. Set `HORIZON_UWP_VSROOT` to a different Visual Studio
+or Build Tools installation root to use that toolchain for both the game host
+and XAML shell. On the development PC, Visual Studio 2022 Build Tools strict
+linked the host for all four architectures; this does not establish a fresh-PC
+build or device compatibility. The game host reserves an 8 MiB thread stack, and
 the link checks the resulting PE header: Horizon's startup can overflow the
 default 1 MiB UI-thread stack before entering multiplayer. This is reserved
 address space; Windows commits stack pages as they are needed.

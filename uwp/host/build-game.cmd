@@ -32,6 +32,7 @@ if defined HORIZON_UWP_XAML_SHELL if not defined HORIZON_UWP_ACCOUNT (
 if not exist "%HORIZON_UWP_GAME_LIB%" exit /b 1
 set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
 if /i "%ARCH%"=="arm" set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
+if defined HORIZON_UWP_VSROOT set "VSROOT=%HORIZON_UWP_VSROOT%"
 call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
 if errorlevel 1 exit /b %errorlevel%
 set "OUTDIR=%~dp0build\game-%ARCH%"
