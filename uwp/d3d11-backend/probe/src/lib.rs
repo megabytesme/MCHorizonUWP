@@ -352,6 +352,21 @@ fn test_dynamic_mesh(
     {
         return Err(std::io::Error::other("invalid dynamic update accepted").into());
     }
+    let mut combined = renderer.create_dynamic_mesh(12)?;
+    let vertices: Vec<_> = red.into_iter().chain(green).collect();
+    renderer.begin_frame([0., 0., 0., 1.])?;
+    renderer.update_dynamic_mesh(&mut combined, &vertices)?;
+    renderer.draw_pass_range(combined.mesh(), &texture, matrix, DrawPass::Opaque, 0, 6)?;
+    renderer.draw_pass_range(combined.mesh(), &texture, matrix, DrawPass::Opaque, 6, 6)?;
+    let pixels = renderer.probe_pixels()?;
+    if pixels.iter().zip(expected).any(|(p, e)| p.iter().zip(e).any(|(&a, b)| a.abs_diff(b) > 5)) {
+        return Err(std::io::Error::other(format!("dynamic draw ranges changed ordering: {pixels:?}")).into());
+    }
+    if renderer.draw_pass_range(combined.mesh(), &texture, matrix, DrawPass::Opaque, 7, 6).is_ok()
+        || renderer.draw_pass_range(combined.mesh(), &texture, matrix, DrawPass::Opaque, 0, 0).is_ok()
+    {
+        return Err(std::io::Error::other("invalid draw range accepted").into());
+    }
     renderer.begin_frame([0., 0., 0., 1.])?;
     renderer.draw_pass(mesh.mesh(), &texture, matrix, DrawPass::Opaque);
     let pixels = renderer.probe_pixels()?;

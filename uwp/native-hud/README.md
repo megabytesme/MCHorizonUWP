@@ -33,6 +33,7 @@ Enable `d3d11` for `d3d11::HudRenderer`, which creates GPU pages on first use an
 renders HUD batches with the GUI transform. Strict `draw` returns an error
 for unsupported glint, scissored depth, or EndPortal; `draw_supported` skips
 those runs, reports them to the caller, and logs each category once. Changed
-regions are coalesced and uploaded when a page is next used. Unchanged HUD meshes reuse immutable GPU buffers across frames; the CPU
-geometry cache is capped at 4 MiB. Larger batches are rebuilt per frame. ARM32 compilation has passed, and x64 UWP GPU readback verified
+regions are coalesced and uploaded when a page is next used. Ordered HUD draws
+share one reusable dynamic vertex/index buffer, divided into bounded batches
+and ranges to avoid creating a GPU buffer for every individual draw. ARM32 compilation has passed, and x64 UWP GPU readback verified
 paged alpha drawing and retained glyph updates.

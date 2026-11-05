@@ -17,6 +17,7 @@ struct Batch {
     page: usize,
     mesh: Mesh,
     force_opaque: bool,
+    gpu_bytes: usize,
 }
 struct Section {
     origin: [f64; 3],
@@ -29,17 +30,20 @@ struct Section {
 pub struct TerrainScene {
     atlas: Atlas,
     textures: Vec<Texture>,
+    atlas_bytes: usize,
     sections: HashMap<SectionKey, Section>,
 }
 
 impl TerrainScene {
     pub fn new(renderer: &Renderer, mut atlas: Atlas) -> Result<Self> {
         let mut textures = Vec::with_capacity(atlas.pages.len());
+        let mut atlas_bytes = 0usize;
         for page in &mut atlas.pages {
             let levels: Vec<&[u8]> = std::iter::once(page.rgba.as_slice())
                 .chain(page.mips.iter().map(Vec::as_slice))
                 .collect();
             let texture = renderer.create_atlas_mips(page.width, page.height, &levels)?;
+            atlas_bytes += levels.iter().map(|level| level.len()).sum::<usize>();
             // Mesh conversion only needs dimensions and placements. Release each
             // CPU page promptly, reducing the startup peak on smaller devices.
             page.rgba = Vec::new();
@@ -49,6 +53,7 @@ impl TerrainScene {
         Ok(Self {
             atlas,
             textures,
+            atlas_bytes,
             sections: HashMap::new(),
         })
     }
@@ -98,6 +103,18 @@ impl TerrainScene {
     }
     pub fn section_count(&self) -> usize {
         self.sections.len()
+    }
+    /// Requested resource sizes, excluding driver and allocation overhead.
+    pub fn allocation_stats(&self) -> (usize, usize, usize, usize) {
+        let mut batches = 0;
+        let mut bytes = 0;
+        for section in self.sections.values() {
+            for batch in section.solid.iter().chain(&section.translucent) {
+                batches += 1;
+                bytes += batch.gpu_bytes;
+            }
+        }
+        (self.sections.len(), batches, bytes, self.atlas_bytes)
     }
     /// Sections with at least one uploaded draw batch, excluding empty meshes.
     pub fn drawable_section_count(&self) -> usize {
@@ -219,6 +236,8 @@ fn upload_batches(renderer: &Renderer, batches: Vec<MeshBatch>) -> Result<Vec<Ba
                 .collect();
             Ok(Batch {
                 page: batch.atlas_page,
+                gpu_bytes: vertices.len() * std::mem::size_of::<Vertex>()
+                    + batch.indices.len() * std::mem::size_of::<u16>(),
                 mesh: renderer.create_mesh(&vertices, &batch.indices)?,
                 force_opaque: batch.force_opaque,
             })

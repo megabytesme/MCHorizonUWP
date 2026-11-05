@@ -1,6 +1,6 @@
 //! The initial FL9_1 alpha HUD pass. Unsupported states return an error.
 use crate::{Atlas, Blend, Draw, Error, PagePatch, SampleMode, byte_len};
-use horizon_uwp_d3d11::{DrawPass, Mesh, Renderer, Texture, Vertex};
+use horizon_uwp_d3d11::{DrawPass, DynamicMesh, Renderer, Texture, Vertex};
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error as StdError,
@@ -15,11 +15,43 @@ pub struct UnsupportedMode {
     pub sample: SampleMode,
 }
 
-struct CachedMesh {
-    page: usize,
-    pass: DrawPass,
-    vertices: Vec<crate::Vertex>,
-    mesh: Mesh,
+// Each batch fits 16-bit indices and ends on a triangle boundary.
+const MAX_BATCH_VERTICES: usize = 16_383;
+
+#[derive(Debug, PartialEq, Eq)]
+struct DrawSpan {
+    draw: usize,
+    source: usize,
+    first: u32,
+    count: u32,
+}
+
+fn batch_plan(draws: &[&Draw]) -> Vec<Vec<DrawSpan>> {
+    let mut batches = Vec::new();
+    let mut batch = Vec::new();
+    let mut used = 0;
+    for (draw, entry) in draws.iter().enumerate() {
+        let mut source = 0;
+        while source < entry.vertices.len() {
+            let count = (entry.vertices.len() - source).min(MAX_BATCH_VERTICES - used);
+            batch.push(DrawSpan {
+                draw,
+                source,
+                first: used as u32,
+                count: count as u32,
+            });
+            used += count;
+            source += count;
+            if used == MAX_BATCH_VERTICES {
+                batches.push(std::mem::take(&mut batch));
+                used = 0;
+            }
+        }
+    }
+    if !batch.is_empty() {
+        batches.push(batch);
+    }
+    batches
 }
 
 /// GPU atlas pages belonging to the same `Atlas` passed at construction.
@@ -28,7 +60,7 @@ pub struct HudRenderer {
     layout: Vec<([u32; 2], [u32; 2])>,
     dirty: BTreeMap<usize, [u32; 4]>,
     warned: Vec<UnsupportedMode>,
-    meshes: Vec<CachedMesh>,
+    mesh: Option<DynamicMesh>,
 }
 
 impl HudRenderer {
@@ -54,7 +86,7 @@ impl HudRenderer {
             layout,
             dirty: BTreeMap::new(),
             warned: Vec::new(),
-            meshes: Vec::new(),
+            mesh: None,
         })
     }
 
@@ -151,61 +183,15 @@ impl HudRenderer {
                 let page = &atlas.pages[id];
                 replacement.push((
                     id,
-                    renderer.create_atlas(page.size[0], page.size[1], &page.rgba)?,
+                    renderer
+                        .create_atlas(page.size[0], page.size[1], &page.rgba)
+                        .map_err(|e| {
+                            format!(
+                                "HUD atlas page {id} ({}x{}): {e}",
+                                page.size[0], page.size[1]
+                            )
+                        })?,
                 ));
-            }
-        }
-        // Keep at most 4 MiB of CPU vertex snapshots, so static HUD batches
-        // can reuse immutable GPU buffers without growing without bound.
-        let cacheable = supported
-            .iter()
-            .try_fold(0usize, |total, draw| {
-                draw.vertices
-                    .len()
-                    .checked_mul(std::mem::size_of::<crate::Vertex>())
-                    .and_then(|bytes| total.checked_add(bytes))
-            })
-            .is_some_and(|bytes| bytes <= 4 * 1024 * 1024);
-        let mut old = std::mem::take(&mut self.meshes).into_iter();
-        let mut meshes = Vec::new();
-        for draw in supported {
-            // 65,535 is divisible by three and fits 16-bit indices.
-            for part in draw.vertices.chunks(65_535) {
-                if part.is_empty() {
-                    continue;
-                }
-                let pass = draw_pass(draw).expect("partitioned as supported");
-                let prior = old.next();
-                if cacheable
-                    && prior.as_ref().is_some_and(|cached| {
-                        same_geometry(
-                            cached.page,
-                            cached.pass,
-                            &cached.vertices,
-                            draw.page,
-                            pass,
-                            part,
-                        )
-                    })
-                {
-                    meshes.push(prior.expect("checked above"));
-                    continue;
-                }
-                let vertices: Vec<_> = part
-                    .iter()
-                    .map(|v| Vertex {
-                        position: [v.pos[0], v.pos[1], v.depth],
-                        uv: v.uv,
-                        color: v.color,
-                    })
-                    .collect();
-                let indices: Vec<u16> = (0..part.len()).map(|i| i as u16).collect();
-                meshes.push(CachedMesh {
-                    page: draw.page,
-                    pass,
-                    vertices: if cacheable { part.to_vec() } else { Vec::new() },
-                    mesh: renderer.create_mesh(&vertices, &indices)?,
-                });
             }
         }
         for (id, texture) in replacement {
@@ -224,14 +210,18 @@ impl HudRenderer {
                     let dst = row * row_bytes;
                     rgba[dst..dst + row_bytes].copy_from_slice(&page.rgba[src..src + row_bytes]);
                 }
-                renderer.update_atlas(
-                    self.textures[id].as_ref().expect("used page was uploaded"),
-                    rect[0],
-                    rect[1],
-                    size[0],
-                    size[1],
-                    &rgba,
-                )?;
+                renderer
+                    .update_atlas(
+                        self.textures[id].as_ref().expect("used page was uploaded"),
+                        rect[0],
+                        rect[1],
+                        size[0],
+                        size[1],
+                        &rgba,
+                    )
+                    .map_err(|e| {
+                        format!("HUD atlas page {id} update ({}x{}): {e}", size[0], size[1])
+                    })?;
                 self.dirty.remove(&id);
             }
         }
@@ -243,32 +233,54 @@ impl HudRenderer {
             [0.0, 0.0, 1.0, 0.0],
             [-1.0, 1.0, 0.0, 1.0],
         ];
-        for cached in &meshes {
-            renderer.draw_pass(
-                &cached.mesh,
-                self.textures[cached.page]
-                    .as_ref()
-                    .expect("used page was uploaded"),
-                matrix,
-                cached.pass,
-            );
-        }
-        if cacheable {
-            self.meshes = meshes;
+        for batch in batch_plan(&supported) {
+            let count: usize = batch.iter().map(|span| span.count as usize).sum();
+            let mut vertices = Vec::with_capacity(count);
+            for span in &batch {
+                let draw = supported[span.draw];
+                let end = span.source + span.count as usize;
+                vertices.extend(draw.vertices[span.source..end].iter().map(|v| Vertex {
+                    position: [v.pos[0], v.pos[1], v.depth],
+                    uv: v.uv,
+                    color: v.color,
+                }));
+            }
+            if self
+                .mesh
+                .as_ref()
+                .is_none_or(|mesh| mesh.capacity() < count)
+            {
+                // Release the smaller buffers first, keeping peak GPU usage bounded.
+                self.mesh = None;
+                let capacity = count.next_power_of_two().min(MAX_BATCH_VERTICES);
+                self.mesh = Some(
+                    renderer
+                        .create_dynamic_mesh(capacity)
+                        .map_err(|e| format!("HUD batch buffer ({capacity} vertices): {e}"))?,
+                );
+            }
+            let mesh = self.mesh.as_mut().expect("batch mesh was allocated");
+            renderer
+                .update_dynamic_mesh(mesh, &vertices)
+                .map_err(|e| format!("HUD batch update ({count} vertices): {e}"))?;
+            for span in &batch {
+                let draw = supported[span.draw];
+                renderer
+                    .draw_pass_range(
+                        mesh.mesh(),
+                        self.textures[draw.page]
+                            .as_ref()
+                            .expect("used page was uploaded"),
+                        matrix,
+                        draw_pass(draw).expect("partitioned as supported"),
+                        span.first,
+                        span.count,
+                    )
+                    .map_err(|e| format!("HUD batch draw: {e}"))?;
+            }
         }
         Ok(unsupported)
     }
-}
-
-fn same_geometry(
-    old_page: usize,
-    old_pass: DrawPass,
-    old: &[crate::Vertex],
-    page: usize,
-    pass: DrawPass,
-    vertices: &[crate::Vertex],
-) -> bool {
-    old_page == page && old_pass == pass && old == vertices
 }
 
 fn draw_pass(draw: &Draw) -> Option<DrawPass> {
@@ -347,6 +359,70 @@ fn record_dirty(
 mod tests {
     use super::*;
     #[test]
+    fn batches_keep_draw_order_and_split_only_on_triangle_boundaries() {
+        let vertex = crate::Vertex {
+            pos: [0.0; 2],
+            uv: [0.0; 2],
+            color: [1.0; 4],
+            depth: 0.0,
+            glint_uv: [0.0; 2],
+        };
+        let a = Draw {
+            page: 0,
+            blend: Blend::Alpha,
+            sample: SampleMode::Atlas,
+            vertices: vec![vertex; MAX_BATCH_VERTICES - 3],
+        };
+        let b = Draw {
+            page: 1,
+            blend: Blend::Invert,
+            sample: SampleMode::Atlas,
+            vertices: vec![vertex; 9],
+        };
+        let c = Draw {
+            page: 0,
+            blend: Blend::Additive,
+            sample: SampleMode::Atlas,
+            vertices: vec![vertex; 3],
+        };
+        let plan = batch_plan(&[&a, &b, &c]);
+        assert_eq!(plan.len(), 2);
+        assert_eq!(
+            plan[0],
+            [
+                DrawSpan {
+                    draw: 0,
+                    source: 0,
+                    first: 0,
+                    count: (MAX_BATCH_VERTICES - 3) as u32
+                },
+                DrawSpan {
+                    draw: 1,
+                    source: 0,
+                    first: (MAX_BATCH_VERTICES - 3) as u32,
+                    count: 3
+                },
+            ]
+        );
+        assert_eq!(
+            plan[1],
+            [
+                DrawSpan {
+                    draw: 1,
+                    source: 3,
+                    first: 0,
+                    count: 6
+                },
+                DrawSpan {
+                    draw: 2,
+                    source: 0,
+                    first: 6,
+                    count: 3
+                },
+            ]
+        );
+    }
+    #[test]
     fn supported_runs_keep_order_and_unsupported_modes_are_distinct() {
         let draw = |page, blend, sample| Draw {
             page,
@@ -369,62 +445,6 @@ mod tests {
         assert_eq!(unsupported.len(), 2);
         assert!(matches!(unsupported[0].blend, Blend::Depth(_)));
         assert_eq!(unsupported[1].sample, SampleMode::GlintMask);
-    }
-
-    #[test]
-    fn cached_geometry_invalidates_on_state_and_vertex_changes() {
-        let vertex = crate::Vertex {
-            pos: [1.0, 2.0],
-            uv: [0.2, 0.3],
-            color: [1.0; 4],
-            depth: 0.0,
-            glint_uv: [0.0; 2],
-        };
-        let original = [vertex; 3];
-        assert!(same_geometry(
-            0,
-            DrawPass::Overlay,
-            &original,
-            0,
-            DrawPass::Overlay,
-            &original
-        ));
-        assert!(!same_geometry(
-            0,
-            DrawPass::Overlay,
-            &original,
-            1,
-            DrawPass::Overlay,
-            &original
-        ));
-        assert!(!same_geometry(
-            0,
-            DrawPass::Overlay,
-            &original,
-            0,
-            DrawPass::OverlayInvert,
-            &original
-        ));
-        let mut moved = original;
-        moved[1].pos[0] += 1.0;
-        assert!(!same_geometry(
-            0,
-            DrawPass::Overlay,
-            &original,
-            0,
-            DrawPass::Overlay,
-            &moved
-        ));
-        let mut tinted = original;
-        tinted[2].color[3] = 0.5;
-        assert!(!same_geometry(
-            0,
-            DrawPass::Overlay,
-            &original,
-            0,
-            DrawPass::Overlay,
-            &tinted
-        ));
     }
 
     #[test]

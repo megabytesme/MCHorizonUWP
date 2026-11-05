@@ -356,6 +356,7 @@ impl NativeRenderer {
         if let Some(sample) = &mut sample {
             sample.mark(4);
         }
+        let scene = &self.scene;
         self.hud
             .draw_supported(
                 self.window.renderer(),
@@ -365,7 +366,13 @@ impl NativeRenderer {
                 self.viewport,
                 converted.scale,
             )
-            .map_err(|error| format!("native HUD rendering: {error}"))?;
+            .map_err(|error| {
+                if let Some((sections, batches, mesh_bytes, atlas_bytes)) = scene.as_ref().map(|scene| scene.allocation_stats()) {
+                    format!("native HUD rendering: {error}; terrain: {sections} sections, {batches} batches, {} MiB of mesh buffers, {} MiB of atlas pixels (excluding driver overhead)", mesh_bytes / 1_048_576, atlas_bytes / 1_048_576)
+                } else {
+                    format!("native HUD rendering: {error}")
+                }
+            })?;
         #[cfg(feature = "native-d3d11-readback")]
         if let Some(sample) = &mut sample {
             sample.mark(5);

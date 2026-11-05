@@ -532,6 +532,39 @@ impl Renderer {
         view_projection: [[f32; 4]; 4],
         pass: DrawPass,
     ) {
+        self.draw_indexed(mesh, atlas, view_projection, pass, 0, mesh.index_count);
+    }
+
+    /// Draw a range of an uploaded mesh while preserving its original indices.
+    pub fn draw_pass_range(
+        &self,
+        mesh: &Mesh,
+        atlas: &Texture,
+        view_projection: [[f32; 4]; 4],
+        pass: DrawPass,
+        first: u32,
+        count: u32,
+    ) -> Result<()> {
+        if count == 0
+            || first
+                .checked_add(count)
+                .is_none_or(|end| end > mesh.index_count)
+        {
+            return Err(Error::from_hresult(E_INVALIDARG));
+        }
+        self.draw_indexed(mesh, atlas, view_projection, pass, first, count);
+        Ok(())
+    }
+
+    fn draw_indexed(
+        &self,
+        mesh: &Mesh,
+        atlas: &Texture,
+        view_projection: [[f32; 4]; 4],
+        pass: DrawPass,
+        first: u32,
+        count: u32,
+    ) {
         let p = &self.pipeline;
         unsafe {
             self.context.UpdateSubresource(
@@ -605,7 +638,7 @@ impl Renderer {
             );
             self.context
                 .PSSetShaderResources(0, Some(&[Some(atlas.view.clone())]));
-            self.context.DrawIndexed(mesh.index_count, 0, 0);
+            self.context.DrawIndexed(count, first, 0);
         }
     }
 
@@ -638,11 +671,13 @@ impl Renderer {
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
             desc.MiscFlags = 0;
             let mut staging = None;
-            self.device.CreateTexture2D(&desc, None, Some(&mut staging))?;
+            self.device
+                .CreateTexture2D(&desc, None, Some(&mut staging))?;
             let staging = staging.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
             self.context.CopyResource(&staging, &back);
             let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
-            self.context.Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
+            self.context
+                .Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
             let result = if mapped.pData.is_null() {
                 None
             } else {
