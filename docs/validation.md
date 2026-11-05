@@ -88,6 +88,10 @@ game and desktop paths. It searched for Zoom and downloaded the `zoom.hnmod`
 bundle into that scratch home using the launcher's own registry checks. The
 launcher reported the bundle as unsigned and checked its SHA-256. It was not
 compiled into a UWP app or installed by the builder.
+The new staging component repeated that download in Windows Sandbox with a
+pinned launcher archive and independently rechecked the resulting bundle's
+digest. It remains a standalone component; the wizard and UWP build do not
+yet use it.
 
 ## 2026-11-05: catalog signing component
 

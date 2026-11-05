@@ -1,5 +1,17 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 3 && args[0] == "--stage-native-mod")
+{
+    if (Directory.Exists(args[2]) || File.Exists(args[2])) throw new IOException("Choose a new test workspace.");
+    Directory.CreateDirectory(args[2]);
+    var artifact = NativeBundleStager.LauncherFor(System.Runtime.InteropServices.Architecture.X64);
+    var stager = NativeBundleStager.OpenVerifiedArchive(args[1], args[2], artifact.Sha256);
+    var bundles = await stager.InstallAsync("zoom");
+    Require(bundles.Any(bundle => bundle.Id == "zoom" && File.Exists(bundle.Path)), "requested native bundle staged");
+    Console.WriteLine($"Staged {bundles.Count} native bundle(s) using Horizon's registry checks; not applied to a UWP build.");
+    return;
+}
+
 if (args.Length == 1 && args[0] == "--native-index-probe")
 {
     var nativeResults = await NativeModIndex.FetchAsync();
@@ -316,6 +328,7 @@ catch (InvalidDataException) { }
 
 await TestSourceAssembler();
 await TestReleaseSource();
+await TestNativeBundleStager();
 var nativeFixture = $$$"""
 {"schema":1,"projects":[
  {"id":"example","kind":"native-mod","name":"Example","summary":"A native mod","authors":["A"],"versions":[
@@ -588,6 +601,28 @@ Require(new SetupChecker(fake).Scan(TargetProfile.WindowsMobile).Single(c => c.N
 Console.WriteLine("Setup checker tests passed.");
 
 static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }
+static async Task TestNativeBundleStager()
+{
+    var root = Path.Combine(Path.GetTempPath(), "horizon-native-stager-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var archive = Path.Combine(root, "launcher.zip");
+        using (var zip = System.IO.Compression.ZipFile.Open(archive, System.IO.Compression.ZipArchiveMode.Create))
+        using (var writer = new StreamWriter(zip.CreateEntry("horizon-launcher.exe").Open())) writer.Write("synthetic executable");
+        var output = Path.Combine(root, "out");
+        Directory.CreateDirectory(output);
+        try { NativeBundleStager.OpenVerifiedArchive(archive, output, new string('0', 64)); throw new Exception("unverified launcher accepted"); }
+        catch (InvalidDataException) { Require(!File.Exists(Path.Combine(output, "horizon-launcher.exe")), "invalid launcher was not extracted"); }
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(archive)));
+        var stager = NativeBundleStager.OpenVerifiedArchive(archive, output, hash);
+        try { await stager.InstallAsync("../escape"); throw new Exception("invalid mod ID accepted"); }
+        catch (ArgumentException) { }
+        try { NativeBundleStager.LauncherFor(System.Runtime.InteropServices.Architecture.X86); throw new Exception("unsupported launcher architecture accepted"); }
+        catch (PlatformNotSupportedException) { }
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
 static async Task TestReleaseSource()
 {
     var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed for the release test.");
