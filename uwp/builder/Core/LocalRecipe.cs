@@ -20,6 +20,7 @@ public static class LocalRecipe
     public const string UpstreamReleaseVersion = "nightly-" + UpstreamNightlyDate;
     public const string UpstreamNightly = UpstreamNightlyDate + " " + UpstreamNightlyShortCommit;
     public const string RustVersion = "1.99.1";
+    public const string RustToolchain = RustVersion + "-x86_64-pc-windows-msvc";
     public const string MinecraftVersion = "26.3";
     public const string SourceManifestVersion = "1.0.1.0";
 
@@ -80,10 +81,10 @@ public static class LocalRecipe
         var steps = new List<RecipeStep>
         {
             new("Snapshot pinned source", "git", ["archive", "--format=tar", SourceCommit]),
-            new("Prepare Rust source copy", "powershell", ["-NoProfile", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", "stable"]),
+            new("Prepare Rust source copy", "powershell", ["-NoProfile", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", RustToolchain]),
         };
         if (arm32) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
-        var prefix = new List<string> { "+stable" };
+        var prefix = new List<string> { "+" + RustToolchain };
         if (arm32) prefix.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
         var fetch = new List<string>(prefix);
         fetch.AddRange(["fetch", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--target", selection.RustTarget,
@@ -91,7 +92,7 @@ public static class LocalRecipe
         steps.Add(new("Fetch Cargo dependencies", "cargo", fetch.AsReadOnly()));
         if (selection.PrepareSounds)
         {
-            steps.Add(new("Build resource preparer", "cargo", ["+stable", "build", "--manifest-path", "Cargo.toml",
+            steps.Add(new("Build resource preparer", "cargo", ["+" + RustToolchain, "build", "--manifest-path", "Cargo.toml",
                 "-p", "horizon-prepare", "--bin", "horizon-prepare", "--target", "x86_64-pc-windows-msvc", "--target-dir", ".local/builder-prepare-target"]));
             steps.Add(new("Prepare sound assets", "horizon-prepare", ["sounds", "--root", "<snapshot>", "--minecraft-dir", "<selected-installation>"]));
         }
@@ -177,8 +178,8 @@ public static class LocalRecipe
         foreach (var tool in new[] { "git.exe", "rustup.exe", "cargo.exe", "python.exe" })
             if (probe.FindOnPath(tool) is null) blockers.Add($"{tool} was not found on PATH.");
         if (!rust.Version.StartsWith("rustc " + RustVersion + " ", StringComparison.Ordinal))
-            blockers.Add($"The recipe requires stable rustc {RustVersion} and matching rust-src.");
-        if (!rust.SourceAvailable) blockers.Add("The stable toolchain does not contain rust-src.");
+            blockers.Add($"The recipe requires rustc {RustVersion} and matching rust-src.");
+        if (!rust.SourceAvailable) blockers.Add($"The {RustVersion} toolchain does not contain rust-src.");
         var pf = probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files";
         var pfx86 = probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)";
         var arch = selection.Target switch
@@ -229,8 +230,8 @@ public static class LocalRecipe
             await Task.WhenAll(output, error);
             return process.ExitCode == 0 ? (await output).Trim() : "";
         }
-        var version = await Run("run", "stable", "rustc", "--version");
-        var sysroot = await Run("run", "stable", "rustc", "--print", "sysroot");
+        var version = await Run("run", RustToolchain, "rustc", "--version");
+        var sysroot = await Run("run", RustToolchain, "rustc", "--print", "sysroot");
         return new(version, !string.IsNullOrWhiteSpace(sysroot) && probe.FileExists(Path.Combine(sysroot, "lib", "rustlib", "src", "rust", "library", "Cargo.toml")));
     }
 }

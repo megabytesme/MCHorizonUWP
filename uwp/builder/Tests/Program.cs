@@ -774,6 +774,26 @@ foreach (var target in Enum.GetValues<TargetProfile>())
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
 Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");
 Require(missingToolchain.Any(blocker => blocker.Contains("rust-src")), "rust-src checked");
+foreach (var target in Enum.GetValues<TargetProfile>())
+{
+    var pinnedPlan = LocalRecipe.Plan(new BuildSelection(target, false, PrepareSounds: true));
+    Require(pinnedPlan.Steps.Where(step => step.Executable == "cargo").All(step => step.Arguments[0] == "+" + LocalRecipe.RustToolchain),
+        "all Cargo stages use the recipe's exact toolchain");
+    Require(pinnedPlan.Steps.Single(step => step.Name == "Prepare Rust source copy").Arguments.Contains(LocalRecipe.RustToolchain),
+        "Rust source comes from the recipe's exact toolchain");
+}
+var rustReady = false;
+var rustInstalls = 0;
+Task<RustToolchainFacts> InspectRustFake() => Task.FromResult(rustReady
+    ? new RustToolchainFacts("rustc 1.99.1 (test)", true) : new RustToolchainFacts("", false));
+Task InstallRustFake() { rustInstalls++; rustReady = true; return Task.CompletedTask; }
+await WindowsPackageManager.EnsureRustToolchainAsync(InspectRustFake, InstallRustFake);
+await WindowsPackageManager.EnsureRustToolchainAsync(InspectRustFake, InstallRustFake);
+Require(rustInstalls == 1, "the pinned Rust toolchain is installed only when needed");
+var failedRustCheck = false;
+try { await WindowsPackageManager.EnsureRustToolchainAsync(() => Task.FromResult(new RustToolchainFacts("rustc 1.99.1 (test)", false)), () => Task.CompletedTask); }
+catch (InvalidOperationException) { failedRustCheck = true; }
+Require(failedRustCheck, "missing rust-src is rejected after installation");
 var soundBlockers = LocalRecipe.ToolchainBlockers(new BuildSelection(TargetProfile.WindowsMobile, true, PrepareSounds: true), new FakeProbe(), new RustToolchainFacts("rustc 1.99.1 (test)", true));
 Require(soundBlockers.Any(blocker => blocker.Contains("Sound preparation requires the x64")), "ARM sound preparation checks host compiler");
 Require(WindowsPackageManager.Arguments(InstallableTool.Rustup).SequenceEqual(["install", "--id", "Rustlang.Rustup", "--exact", "--source", "winget", "--interactive", "--no-upgrade"]), "fixed interactive Rustup install");

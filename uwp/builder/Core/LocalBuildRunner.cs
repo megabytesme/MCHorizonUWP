@@ -132,13 +132,14 @@ public static class LocalBuildRunner
         }
 
         progress?.Report("Preparing a private copy of the Rust standard library.");
-        await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", "stable"]);
+        await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", LocalRecipe.RustToolchain]);
 
         var arm = selection.Target == TargetProfile.WindowsMobile;
         if (arm)
         {
             progress?.Report("Preparing the ARM32 offline dependency overrides.");
-            await RunProcess(python, snapshot, ["uwp/arm32-deps/prepare.py", "--offline-arm32"]);
+            await RunProcess(python, snapshot, ["uwp/arm32-deps/prepare.py", "--offline-arm32"],
+                new Dictionary<string, string> { ["RUSTUP_TOOLCHAIN"] = LocalRecipe.RustToolchain });
         }
 
         progress?.Report("Preparing the Visual C++ environment.");

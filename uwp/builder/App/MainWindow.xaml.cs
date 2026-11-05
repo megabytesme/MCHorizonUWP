@@ -254,6 +254,8 @@ public sealed partial class MainWindow : Window
             await WindowsPackageManager.EnsureBuildBasicsAsync(probe, tool => WindowsPackageManager.InstallAsync(probe, tool),
                 SystemProbe.RefreshProcessPath, progress);
             await WindowsPackageManager.EnsureClangAsync(probe, selection.Target, tool => WindowsPackageManager.InstallAsync(probe, tool), progress);
+            await WindowsPackageManager.EnsureRustToolchainAsync(() => LocalRecipe.InspectRustAsync(probe),
+                () => WindowsPackageManager.InstallRustToolchainAsync(probe), progress);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
                 splitRelease: true, unifiedToolchain: release.Client == "0.1.1");
             if (blockers.Count > 0) throw new InvalidOperationException(string.Join(" ", blockers));

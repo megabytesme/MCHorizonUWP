@@ -27,7 +27,7 @@ public static class MinecraftAssetPreparation
         var environment = await LocalBuildRunner.VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: true, unifiedRoot: unifiedRoot);
         environment["CARGO_BUILD_JOBS"] = LocalBuildRunner.CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
         progress?.Report("Building Horizon's Minecraft resource preparation helper.");
-        await LocalBuildRunner.RunProcess(cargo, tool, ["+stable", "build", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
+        await LocalBuildRunner.RunProcess(cargo, tool, ["+" + LocalRecipe.RustToolchain, "build", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
             "--manifest-path", Path.Combine(tool, "Cargo.toml"), "--target-dir", Path.Combine(tool, "target")], environment);
         var executable = Path.Combine(tool, "target", "x86_64-pc-windows-msvc", "release", "horizon-uwp-assets.exe");
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true,

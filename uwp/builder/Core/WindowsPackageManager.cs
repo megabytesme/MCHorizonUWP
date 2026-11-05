@@ -7,6 +7,25 @@ public enum InstallableTool { Rustup, Git, Python, Llvm }
 /// <summary>Fixed package-manager operations initiated by the user.</summary>
 public static class WindowsPackageManager
 {
+    public static async Task EnsureRustToolchainAsync(Func<Task<RustToolchainFacts>> inspect, Func<Task> install,
+        IProgress<string>? progress = null)
+    {
+        static bool Ready(RustToolchainFacts facts) => facts.SourceAvailable
+            && facts.Version.StartsWith("rustc " + LocalRecipe.RustVersion + " ", StringComparison.Ordinal);
+        if (Ready(await inspect())) return;
+        progress?.Report($"Installing Rust {LocalRecipe.RustVersion} and rust-src without changing your default toolchain…");
+        await install();
+        if (!Ready(await inspect())) throw new InvalidOperationException("The required Rust compiler and source were not available after setup.");
+    }
+
+    public static async Task InstallRustToolchainAsync(IProbe probe)
+    {
+        var rustup = probe.FindOnPath("rustup.exe")
+            ?? throw new InvalidOperationException("Rustup is not installed. Use Install Rustup in setup, then retry.");
+        await LocalBuildRunner.RunProcess(rustup, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ["toolchain", "install", LocalRecipe.RustToolchain, "--profile", "minimal", "--component", "rust-src", "--no-self-update"]);
+    }
+
     public static async Task EnsureBuildBasicsAsync(IProbe probe, Func<InstallableTool, Task> install,
         Action refreshPath, IProgress<string>? progress = null)
     {
