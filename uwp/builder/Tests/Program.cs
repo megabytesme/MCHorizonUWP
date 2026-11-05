@@ -1,5 +1,16 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 1 && args[0] == "--install-clang-proof")
+{
+    SystemProbe.RefreshProcessPath();
+    var probe = new SystemProbe();
+    await WindowsPackageManager.EnsureClangAsync(probe, TargetProfile.WindowsMobile,
+        tool => WindowsPackageManager.InstallAsync(probe, tool), new ConsoleProgress());
+    Require(probe.FileExists(Path.Combine(probe.EnvironmentValue("ProgramFiles")!, "LLVM", "bin", "clang.exe")), "ARM Clang available after setup");
+    Console.WriteLine("Verified automatic ARM Clang setup.");
+    return;
+}
+
 if (args.Length == 7 && args[0] == "--create-local-install-proof")
 {
     var root = Path.GetFullPath(args[4]);
@@ -696,6 +707,7 @@ Require(WindowsPackageManager.Arguments(InstallableTool.Git)[2] == "Git.Git", "f
 Require(WindowsPackageManager.Arguments(InstallableTool.Python)[2] == "Python.Python.3.13", "fixed Python package");
 Require(WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--silent") && WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--disable-interactivity"), "Git setup is noninteractive");
 Require(WindowsPackageManager.Arguments(InstallableTool.Python).Contains("--silent") && WindowsPackageManager.Arguments(InstallableTool.Python).Contains("--disable-interactivity"), "Python setup is noninteractive");
+Require(WindowsPackageManager.Arguments(InstallableTool.Llvm).Contains("23.1.4"), "ARM Clang installation uses the tested release");
 var autoProbe = new FakeProbe();
 var autoInstalled = new List<InstallableTool>();
 Task InstallFake(InstallableTool tool)
@@ -707,6 +719,16 @@ Task InstallFake(InstallableTool tool)
 await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { });
 await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { });
 Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python]), "missing Git and Python installed once and then reused");
+Task InstallFakeClang(InstallableTool tool)
+{
+    autoInstalled.Add(tool);
+    autoProbe.Files.Add(Path.Combine(autoProbe.Root, "LLVM", "bin", "clang.exe"));
+    return Task.CompletedTask;
+}
+await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.DesktopX64, InstallFakeClang);
+await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.WindowsMobile, InstallFakeClang);
+await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.SurfaceProX, InstallFakeClang);
+Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python, InstallableTool.Llvm]), "Clang installed once only for ARM targets");
 try
 {
     await WindowsPackageManager.EnsureBuildBasicsAsync(new FakeProbe(), _ => Task.CompletedTask, () => { });
