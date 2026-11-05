@@ -82,10 +82,21 @@ def client_archive(revision):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", default="HEAD", help="Committed repository revision")
+    parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
+    parser.add_argument("--builder-version", default="0.1.0", help="Builder version for the candidate compatibility rule")
     parser.add_argument("--output", required=True, type=Path, help="New output directory")
     parser.add_argument("--upstream-archive", required=True, type=Path, help="Verified source ZIP for the pinned upstream commit")
     parser.add_argument("--upstream-repo", required=True, type=Path, help="Git repository containing the pinned upstream commit")
     args = parser.parse_args()
+    def upper_version(value):
+        if not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", value):
+            raise ValueError("Versions must have three numeric components without leading zeroes")
+        major, minor, patch_number = map(int, value.split("."))
+        if max(major, minor) > 2_147_483_647 or patch_number >= 2_147_483_647:
+            raise ValueError("Version exceeds catalog numeric limits")
+        return f"{major}.{minor}.{patch_number + 1}"
+    client_upper = upper_version(args.client_version)
+    builder_upper = upper_version(args.builder_version)
     revision = git("rev-parse", "--verify", args.revision + "^{commit}").decode().strip()
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Invalid Git commit")
@@ -94,18 +105,18 @@ def main():
     verify_upstream(args.upstream_archive, args.upstream_repo)
     args.output.mkdir(parents=True, exist_ok=False)
     (args.output / "horizon-uwp-0.1.0.patch").write_bytes(patch)
-    (args.output / "uwp-client-0.1.0.zip").write_bytes(client)
+    (args.output / f"uwp-client-{args.client_version}.zip").write_bytes(client)
     upstream_hash = digest(args.upstream_archive.read_bytes())
     catalog = {
         "schema_version": 1,
         "patches": [{"version": "0.1.0", "upstream_commit": UPSTREAM, "bridge": 1,
                      "upstream": {"url": f"https://github.com/horizon-rust/horizon/archive/{UPSTREAM}.zip", "sha256": upstream_hash},
                      "artifact": {"url": f"{REPOSITORY}/releases/download/patch-v0.1.0/horizon-uwp-0.1.0.patch", "sha256": digest(patch)}}],
-        "clients": [{"version": "0.1.0", "bridge": 1,
-                     "artifact": {"url": f"{REPOSITORY}/releases/download/client-v0.1.0/uwp-client-0.1.0.zip", "sha256": digest(client)}}],
+        "clients": [{"version": args.client_version, "bridge": 1,
+                     "artifact": {"url": f"{REPOSITORY}/releases/download/client-v{args.client_version}/uwp-client-{args.client_version}.zip", "sha256": digest(client)}}],
         "rules": [{"patch": {"min_inclusive": "0.1.0", "max_exclusive": "0.1.1"},
-                   "client": {"min_inclusive": "0.1.0", "max_exclusive": "0.1.1"},
-                   "builder": {"min_inclusive": "0.1.0", "max_exclusive": "0.1.1"},
+                   "client": {"min_inclusive": args.client_version, "max_exclusive": client_upper},
+                   "builder": {"min_inclusive": args.builder_version, "max_exclusive": builder_upper},
                    "architectures": ["x86", "x64", "arm", "arm64"]}],
         "evidence": [],
     }
