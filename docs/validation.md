@@ -66,3 +66,11 @@ its public certificate. After the certificate was trusted inside that Sandbox,
 SignTool verified the package and Windows installed it. The private key stayed
 in the Sandbox user's certificate store. This component is not yet connected
 to the builder's real package pipeline or installation guide.
+
+## 2026-11-05: catalog signing component
+
+In Sandbox, a separate ephemeral self-signed P-256 certificate was created in
+the Sandbox user's certificate store. The maintainer tool exported its public
+key, signed the candidate catalog and verified the signature. The private key
+was not exported. This does not establish a production trust key or publish a
+signed catalog.

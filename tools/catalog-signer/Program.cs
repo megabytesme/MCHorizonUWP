@@ -60,8 +60,9 @@ static ECDsa OpenSigningKey(string thumbprint)
     if (thumbprint.Length != 40 || !thumbprint.All(char.IsAsciiHexDigit)) throw new ArgumentException("Provide a 40-digit certificate thumbprint.");
     using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
     store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
-    var matches = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, validOnly: true);
-    if (matches.Count != 1 || !matches[0].HasPrivateKey) throw new InvalidOperationException("The valid signing certificate and its private key were not found in the current user's certificate store.");
+    var matches = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, validOnly: false);
+    if (matches.Count != 1 || !matches[0].HasPrivateKey || matches[0].NotBefore > DateTime.Now || matches[0].NotAfter <= DateTime.Now)
+        throw new InvalidOperationException("The valid signing certificate and its private key were not found in the current user's certificate store.");
     return matches[0].GetECDsaPrivateKey() ?? throw new InvalidOperationException("The certificate does not contain an ECDSA private key.");
 }
 
