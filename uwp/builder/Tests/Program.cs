@@ -499,6 +499,12 @@ using (var signingKey = System.Security.Cryptography.ECDsa.Create(System.Securit
             var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(content));
             await transport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", digest), good);
             Require(File.ReadAllBytes(good).SequenceEqual(content), "downloaded artifact digest verified");
+            using (var retryTransport = new CatalogTransport(new InterruptedDownloadHandler(content)))
+            {
+                var retry = Path.Combine(folder, "retry");
+                await retryTransport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", digest), retry);
+                Require(File.ReadAllBytes(retry).SequenceEqual(content), "interrupted artifact download retried and verified");
+            }
             var bad = Path.Combine(folder, "bad");
             try { await transport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", new string('0', 64)), bad); throw new Exception("wrong download digest accepted"); }
             catch (InvalidDataException) { Require(!File.Exists(bad), "invalid download removed"); }
@@ -914,5 +920,27 @@ sealed class CatalogFixtureHandler(byte[] catalog, byte[] signature, byte[] arti
         var bytes = request.RequestUri.AbsolutePath switch { "/catalog" => catalog, "/signature" => signature, "/artifact" => artifact, _ => null };
         return Task.FromResult(bytes is null ? new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
             : new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+    }
+}
+
+sealed class InterruptedDownloadHandler(byte[] artifact) : HttpMessageHandler
+{
+    private int requests;
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (Interlocked.Increment(ref requests) == 1)
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StreamContent(new InterruptedStream(artifact)) });
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(artifact) });
+    }
+}
+
+sealed class InterruptedStream(byte[] bytes) : MemoryStream(bytes)
+{
+    private bool partialRead;
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        if (partialRead) throw new IOException("Simulated connection interruption");
+        partialRead = true;
+        return base.ReadAsync(buffer[..Math.Min(3, buffer.Length)], cancellationToken);
     }
 }

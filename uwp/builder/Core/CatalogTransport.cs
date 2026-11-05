@@ -22,6 +22,19 @@ public sealed class CatalogTransport : IDisposable
 
     public async Task DownloadArtifactAsync(CatalogArtifact artifact, string output, CancellationToken cancellationToken = default)
     {
+        for (var attempt = 0; ; attempt++)
+        {
+            try { await DownloadArtifactOnceAsync(artifact, output, cancellationToken); return; }
+            catch (Exception error) when (attempt < 2 && !cancellationToken.IsCancellationRequested
+                && error is HttpRequestException or IOException or TaskCanceledException)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(attempt + 1), cancellationToken);
+            }
+        }
+    }
+
+    private async Task DownloadArtifactOnceAsync(CatalogArtifact artifact, string output, CancellationToken cancellationToken)
+    {
         if (artifact is null || artifact.Sha256 is null || artifact.Sha256.Length != 64 || !artifact.Sha256.All(char.IsAsciiHexDigit)
             || !Uri.TryCreate(artifact.Url, UriKind.Absolute, out var uri))
             throw new InvalidDataException("Invalid catalog artifact.");
