@@ -360,14 +360,43 @@ pub mod d3d11 {
                 if p.page >= self.textures.len() {
                     return Err("invalid entity atlas patch".into());
                 }
-                self.textures[p.page] = None;
+                // Glyph updates usually touch only a few pixels of a large
+                // atlas page. Recreating the whole GPU texture for each
+                // patch can rapidly exhaust graphics memory on mobile GPUs.
+                // Pages not uploaded yet will use the current atlas pixels
+                // when they are first needed.
+                if let Some(texture) = &self.textures[p.page] {
+                    renderer
+                        .update_atlas(
+                            texture,
+                            p.origin[0],
+                            p.origin[1],
+                            p.size[0],
+                            p.size[1],
+                            &p.rgba,
+                        )
+                        .map_err(|e| {
+                            format!(
+                                "entity atlas page {} update ({}x{}): {e}",
+                                p.page, p.size[0], p.size[1]
+                            )
+                        })?;
+                }
             }
             let mut slot = 0;
             for batch in batches(atlas, vertices, nether) {
                 let page = &atlas.pages[batch.page];
                 if self.textures[batch.page].is_none() {
-                    self.textures[batch.page] =
-                        Some(renderer.create_atlas(page.size[0], page.size[1], &page.rgba)?);
+                    self.textures[batch.page] = Some(
+                        renderer
+                            .create_atlas(page.size[0], page.size[1], &page.rgba)
+                            .map_err(|e| {
+                                format!(
+                                    "entity atlas page {} ({}x{}): {e}",
+                                    batch.page, page.size[0], page.size[1]
+                                )
+                            })?,
+                    );
                 }
                 for part in batch.vertices.chunks(65535) {
                     let v: Vec<_> = part
@@ -386,7 +415,9 @@ pub mod d3d11 {
                     };
                     if let Some(capacity) = capacity {
                         if old < capacity {
-                            let mesh = renderer.create_dynamic_mesh(capacity)?;
+                            let mesh = renderer.create_dynamic_mesh(capacity).map_err(|e| {
+                                format!("entity dynamic buffer ({capacity} vertices): {e}")
+                            })?;
                             if slot == self.dynamic.len() {
                                 self.dynamic.push(mesh);
                             } else {
@@ -395,7 +426,9 @@ pub mod d3d11 {
                             self.dynamic_vertices = self.dynamic_vertices - old + capacity;
                         }
                         let mesh = &mut self.dynamic[slot];
-                        renderer.update_dynamic_mesh(mesh, &v)?;
+                        renderer.update_dynamic_mesh(mesh, &v).map_err(|e| {
+                            format!("entity dynamic buffer update ({} vertices): {e}", v.len())
+                        })?;
                         renderer.draw_pass(
                             mesh.mesh(),
                             self.textures[batch.page].as_ref().unwrap(),
@@ -404,7 +437,9 @@ pub mod d3d11 {
                         );
                     } else {
                         let indices: Vec<_> = (0..part.len()).map(|i| i as u16).collect();
-                        let mesh = renderer.create_mesh(&v, &indices)?;
+                        let mesh = renderer.create_mesh(&v, &indices).map_err(|e| {
+                            format!("entity immutable buffer ({} vertices): {e}", v.len())
+                        })?;
                         renderer.draw_pass(
                             &mesh,
                             self.textures[batch.page].as_ref().unwrap(),

@@ -345,7 +345,8 @@ impl NativeRenderer {
                     .draw_hand(
                         self.window.renderer(),
                         &self.atlas,
-                        &converted.patches,
+                        // draw_entities already applied this frame's atlas updates.
+                        &[],
                         frame,
                         self.viewport,
                     )
