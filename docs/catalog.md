@@ -26,6 +26,8 @@ A successful x64 build does not establish ARM32 success or device behavior.
 An allowed combination without evidence remains unverified. Release
 automation must only publish evidence backed by actual tests.
 
-The first candidate patch applies to the pinned upstream commit. Reusable UWP
-sources under `uwp/` must be packaged separately; the build runner still uses
-the old local checkout and does not yet assemble or build the split inputs.
+The first candidate patch applies to the pinned upstream commit. The source
+assembler verifies input hashes, applies the patch and overlays a separate UWP
+client archive in a new workspace. Synthetic tests and a local assembly of the
+first candidate passed. The build runner still uses the old local checkout and
+does not yet use this assembly path to build split inputs.

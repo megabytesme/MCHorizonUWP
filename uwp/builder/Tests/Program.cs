@@ -1,5 +1,14 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 5 && args[0] == "--assemble-candidate")
+{
+    static string HashInput(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git was not found.");
+    await SourceAssembler.AssembleAsync(args[1], HashInput(args[1]), args[2], HashInput(args[2]), args[3], HashInput(args[3]), args[4], git);
+    Console.WriteLine("Candidate source inputs assembled; this does not authenticate them or build a package.");
+    return;
+}
+
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.X64) == TargetProfile.DesktopX64, "x64 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.X86) == TargetProfile.DesktopX86, "x86 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm64) == TargetProfile.SurfaceProX, "ARM64 default target");

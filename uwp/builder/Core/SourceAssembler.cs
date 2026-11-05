@@ -91,7 +91,7 @@ public static class SourceAssembler
     {
         var start = new ProcessStartInfo(Path.GetFullPath(git)) { WorkingDirectory = output, UseShellExecute = false,
             CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { "-c", "core.fsmonitor=false", "apply", "--binary", "--whitespace=nowarn" }) start.ArgumentList.Add(arg);
+        foreach (var arg in new[] { "-c", "core.fsmonitor=false", "-c", "core.autocrlf=true", "apply", "--binary", "--whitespace=nowarn" }) start.ArgumentList.Add(arg);
         if (check) start.ArgumentList.Add("--check");
         start.ArgumentList.Add("--"); start.ArgumentList.Add(Path.GetFullPath(patch));
         start.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
