@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Formats.Tar;
+using System.Runtime.InteropServices;
 using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
@@ -13,7 +14,26 @@ public static class LocalBuildRunner
     public const long MinimumFreeBytes = 10L * 1024 * 1024 * 1024;
     public static int CargoJobCount(int processors, long memoryBytes)
     {
-        return Math.Max(1, processors);
+        const long gib = 1024L * 1024 * 1024;
+        var memoryJobs = Math.Max(1, (memoryBytes - Math.Min(memoryBytes, 2 * gib)) / (2 * gib));
+        return (int)Math.Min(Math.Max(1, processors), memoryJobs);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MemoryStatus
+    {
+        public uint Length, MemoryLoad;
+        public ulong TotalPhysical, AvailablePhysical, TotalPageFile, AvailablePageFile, TotalVirtual, AvailableVirtual, AvailableExtendedVirtual;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GlobalMemoryStatusEx(ref MemoryStatus status);
+    private static long AvailableBuildMemory()
+    {
+        if (!OperatingSystem.IsWindows()) return GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        var status = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
+        if (!GlobalMemoryStatusEx(ref status)) return GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        return (long)Math.Min(Math.Min(status.TotalPhysical, status.AvailablePageFile), (ulong)long.MaxValue);
     }
 
     public static async Task<LocalBuildResult> RunAsync(string source, string? resources, BuildSelection selection,
@@ -84,6 +104,7 @@ public static class LocalBuildRunner
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
         var cmd = Path.Combine(system, "cmd.exe");
         var powershell = Path.Combine(system, "WindowsPowerShell", "v1.0", "powershell.exe");
+        var jobs = CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory());
 
         var targetArchitecture = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => throw new ArgumentOutOfRangeException(nameof(selection)) };
@@ -101,6 +122,7 @@ public static class LocalBuildRunner
         {
             if (release is null) throw new InvalidOperationException("Native registry mods require an authenticated source release.");
             var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: true);
+            hostEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
             snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, progress);
         }
 
@@ -126,9 +148,8 @@ public static class LocalBuildRunner
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
-        var jobs = Math.Max(1, Environment.ProcessorCount);
         vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        progress?.Report($"Using all {jobs} available processor cores for Cargo.");
+        progress?.Report($"Using {jobs} parallel Cargo jobs based on available processors and memory.");
         if (selection.Target == TargetProfile.SurfaceProX)
         {
             vcEnvironment["CC_aarch64_uwp_windows_msvc"] = Path.Combine(
@@ -333,7 +354,7 @@ public static class LocalBuildRunner
         var cargo = probe.FindOnPath("cargo.exe") ?? throw new InvalidOperationException("Cargo is required to prepare sounds.");
         var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
         var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: false);
-        hostEnvironment["CARGO_BUILD_JOBS"] = Environment.ProcessorCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        hostEnvironment["CARGO_BUILD_JOBS"] = CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory()).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var plan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
         progress?.Report("Building Horizon's resource preparation tool.");
         await RunProcess(cargo, root, plan.Steps.Single(step => step.Name == "Build resource preparer").Arguments, hostEnvironment);

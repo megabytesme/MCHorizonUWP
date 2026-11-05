@@ -62,7 +62,7 @@ dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release
 `-Publish` produces a self-contained x64 builder. Its WinUI application opens
 in Windows Sandbox without a separate .NET runtime. A native ARM64 or x86
 builder distribution has not been established. Builds use private workspaces
-under `%USERPROFILE%\.huwp\b` and all available processor cores. At least
+under `%USERPROFILE%\.huwp\b` and parallel jobs limited by available memory. At least
 10 GiB of free space is required, and actual requirements can be higher.
 See [installation guidance](../../docs/install.md) and
 [builder design](../BUILDER-DESIGN.md) for further details.

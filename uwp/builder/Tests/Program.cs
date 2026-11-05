@@ -660,9 +660,10 @@ Require(prepareRecipe.Steps.Single(step => step.Name == "Build resource preparer
     && prepareRecipe.Steps.Any(step => step.Name == "Prepare sound assets"), "optional sound preparation uses the desktop host target");
 var desktopRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false));
 Require(desktopRecipe.Steps.All(step => !step.Arguments.Contains("--offline-arm32")), "desktop excludes ARM override");
-Require(LocalBuildRunner.CargoJobCount(32, 32L * 1024 * 1024 * 1024) == 32, "parallelism uses every available processor");
+Require(LocalBuildRunner.CargoJobCount(32, 32L * 1024 * 1024 * 1024) == 15, "parallelism leaves memory for the OS");
 Require(LocalBuildRunner.CargoJobCount(4, 64L * 1024 * 1024 * 1024) == 4, "parallelism uses available CPUs");
-Require(LocalBuildRunner.CargoJobCount(32, 1) == 32, "parallelism does not impose a memory-based CPU cap");
+Require(LocalBuildRunner.CargoJobCount(32, 8L * 1024 * 1024 * 1024) == 3, "an 8 GiB Sandbox uses a memory-aware number of jobs");
+Require(LocalBuildRunner.CargoJobCount(32, 1) == 1, "parallelism remains positive when memory is scarce");
 var frameworkRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, UseResourceFramework: true));
 Require(frameworkRecipe.Steps.Any(step => step.Name == "Package reusable resources")
     && frameworkRecipe.Steps.Single(step => step.Name == "Create unsigned client package").Arguments.Contains("-ResourceFrameworkName"), "framework recipe includes dependency");

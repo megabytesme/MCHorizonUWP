@@ -47,7 +47,8 @@ results do not establish device compatibility.
 
 The following folders are on Ben-Desktop under `$env:TEMP`; they are retained
 for inspection and are not release artifacts. The actual builder workspaces on
-a user's PC are separate. All Cargo builds used available processor cores.
+a user's PC are separate. The builder now limits parallel Cargo jobs when
+available memory is low, after an ARM32 rebuild hit Windows' paging-file limit.
 
 | Target | Proof workspace | Result |
 | --- | --- | --- |
