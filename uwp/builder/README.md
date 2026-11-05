@@ -24,7 +24,10 @@ installation and Python's equivalent WinGet command have been exercised in
 Sandbox. The local recipe can embed prepared resources, build a
 separate resource framework, or use a framework already installed on the target.
 The existing-framework option requires its exact name and no local resource
-directory. The builder does not sign or install packages. Tool presence does not establish version or recipe
+directory. The wizard can select a signed catalog release and build signed
+packages, but the first catalog's client and patch releases are still drafts
+and cannot yet be downloaded. A local-checkout build remains unsigned, and the
+builder does not yet install packages. Tool presence does not establish version or recipe
 compatibility with every machine. Earlier port work built x86, x64, ARM64 and
 ARM32 locally; the split-source release pipeline has not been validated for all
 four. ARM64 and ARM32 Rust builds use the installed LLVM Clang

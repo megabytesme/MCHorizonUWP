@@ -23,7 +23,7 @@
             <StackPanel x:Name="WelcomePage" Spacing="14">
               <TextBlock Text="Welcome to Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="Create a Horizon package for a Windows PC or a Windows 10 Mobile device." TextWrapping="Wrap" />
-              <TextBlock Text="This preview still needs a source checkout and prepared Minecraft resources. It creates unsigned packages; automatic setup, sign-in and installation are not ready yet." TextWrapping="Wrap" />
+              <TextBlock Text="This preview still needs prepared Minecraft resources and development tools. Catalog releases are not published yet; automatic setup, resource preparation and installation are not ready." TextWrapping="Wrap" />
               <TextBlock x:Name="UpstreamNightly" TextWrapping="Wrap" />
               <TextBlock x:Name="NightlyStatus" Text="Checking for a newer Horizon nightly…" TextWrapping="Wrap" />
             </StackPanel>
@@ -46,6 +46,11 @@
             </StackPanel>
             <StackPanel x:Name="SourcePage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Choose your source and resources" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="Horizon UWP release" Style="{StaticResource BodyStrongTextBlockStyle}" />
+              <ComboBox x:Name="ReleaseSelection" HorizontalAlignment="Stretch" />
+              <TextBlock x:Name="ReleaseStatus" Text="Checking the signed release catalog…" TextWrapping="Wrap" />
+              <Button x:Name="RefreshReleases" Content="Refresh releases" Click="RefreshReleases_Click" />
+              <TextBlock Text="For local development, select the local source option and choose a checkout." TextWrapping="Wrap" />
               <Button Content="Choose Horizon source" Click="ChooseSource_Click" />
               <TextBlock x:Name="SourcePath" Text="No source selected" TextWrapping="Wrap" />
               <TextBlock Text="Minecraft resources" Style="{StaticResource BodyStrongTextBlockStyle}" />
@@ -97,9 +102,9 @@
             </StackPanel>
             <StackPanel x:Name="BuildPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Build your package" Style="{StaticResource TitleTextBlockStyle}" />
-              <TextBlock Text="Validate the plan, then build. This preview produces unsigned packages that need a matching certificate before installation." TextWrapping="Wrap" />
+              <TextBlock Text="Validate the plan, then build. Catalog builds are signed; local-checkout builds remain unsigned in this preview." TextWrapping="Wrap" />
               <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />
-              <Button x:Name="RunRecipe" Content="Build unsigned client" Click="RunRecipe_Click" />
+              <Button x:Name="RunRecipe" Content="Build client" Click="RunRecipe_Click" />
               <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
               <StackPanel x:Name="RecipeSteps" Spacing="6" />
             </StackPanel>

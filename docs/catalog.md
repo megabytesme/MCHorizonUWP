@@ -4,8 +4,9 @@ The goal is a signed, versioned release catalog for three independent release
 types: `builder-vX.Y.Z`, `client-vX.Y.Z` and `patch-vX.Y.Z`. The catalog
 implementation includes a parser, compatibility checker, P-256 signature
 verifier, HTTPS transport and an embedded public verification key. The wizard
-does not yet use the catalog to download or build releases, and the first
-client and patch releases are still drafts. They are not a supported release.
+can select catalog releases and pass verified inputs to the build runner, but
+the first client and patch releases are still drafts and cannot be downloaded.
+They are not a supported release.
 
 Schema 1 uses three-part numeric stable versions. A rule has inclusive lower
 and exclusive upper bounds for patch, client and builder versions, and an
@@ -52,6 +53,5 @@ assembler verifies input hashes, applies the patch and overlays a separate UWP
 client archive in a new workspace. Synthetic tests and a local assembly of the
 first candidate passed. A development runner can now build and sign that exact
 split-source candidate; an x64 output and its separate resource framework were
-verified and installed in Sandbox. The wizard still uses the old local
-checkout, and authenticated public releases and the other target builds remain
-unverified.
+verified and installed in Sandbox. The wizard's catalog path, authenticated
+public releases and the other target builds remain unverified end to end.

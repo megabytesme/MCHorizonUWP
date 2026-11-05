@@ -109,7 +109,11 @@ The maintainer's user-owned catalog key was subsequently created on
 Ben-Desktop. Its public key is embedded in the builder, and a locally signed
 candidate catalog was verified with that embedded key. The private key was not
 exported. The catalog points to draft releases that are not publicly
-downloadable yet; rollback protection and the wizard connection remain open.
+downloadable yet; rollback protection remains open.
+The wizard can now select a verified catalog combination and start the pinned
+split-source build. A Sandbox UI test confirmed that an unavailable catalog
+leaves the local checkout option available; a live catalog-driven build has not
+yet been tested.
 
 ## 2026-11-05: user-owned publisher support
 

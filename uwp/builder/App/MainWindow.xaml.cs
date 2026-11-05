@@ -20,8 +20,10 @@ public sealed partial class MainWindow : Window
         UpdateRendererChoices();
         UpdateResourceChoices();
         UpdateWizard();
+        UpdateReleaseChoices();
         UpstreamNightly.Text = $"Horizon nightly {LocalRecipe.UpstreamNightlyDate} · {LocalRecipe.UpstreamNightlyShortCommit} (UWP port)";
         _ = CheckNightlyAsync();
+        _ = LoadCatalogAsync();
     }
 
     private async Task CheckNightlyAsync()
@@ -43,6 +45,11 @@ public sealed partial class MainWindow : Window
     private string? minecraftDirectory;
     private IReadOnlyList<NativeModListing> nativeMods = [];
     private CancellationTokenSource? minecraftSignInCancellation;
+    private CompatibilityCatalog? catalog;
+    private sealed record ReleaseChoice(string Patch, string Client, string Architecture, CompatibilityResult Compatibility)
+    {
+        public override string ToString() => $"Patch {Patch} · UWP client {Client} · {(Compatibility.BuildVerified ? "build verified" : "build not verified")}";
+    }
     private int wizardStep;
 
     private void Back_Click(object sender, RoutedEventArgs e)
@@ -78,7 +85,7 @@ public sealed partial class MainWindow : Window
         if (!nativeD3d11) NativeTouchMod.IsChecked = false;
     }
 
-    private void Profile_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateRendererChoices();
+    private void Profile_SelectionChanged(object sender, SelectionChangedEventArgs e) { UpdateRendererChoices(); UpdateReleaseChoices(); }
     private void Renderer_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateRendererChoices();
     private void ResourceMode_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateResourceChoices();
 
@@ -98,6 +105,59 @@ public sealed partial class MainWindow : Window
         ResourceMode.SelectedIndex == 0, NativeDeviceVibration.IsChecked == true,
         HorizonIdentity.ClientId, SelectedRenderer, ResourceMode.SelectedIndex == 1,
         ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "");
+
+    private string SelectedArchitecture => (TargetProfile)Profile.SelectedIndex switch
+    {
+        TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
+        TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "",
+    };
+
+    private void UpdateReleaseChoices(bool preferCatalog = false)
+    {
+        if (ReleaseSelection is null || Profile is null) return;
+        var previous = ReleaseSelection.SelectedItem as ReleaseChoice;
+        var previousLocal = ReleaseSelection.SelectedItem is string;
+        ReleaseSelection.Items.Clear();
+        ReleaseSelection.Items.Add("Local source checkout");
+        if (catalog is not null)
+        {
+            var arch = SelectedArchitecture;
+            foreach (var patch in catalog.Patches.OrderByDescending(item => new Version(item.Version)))
+                foreach (var client in catalog.Clients.OrderByDescending(item => new Version(item.Version)))
+                {
+                    var check = catalog.Check(patch.Version, client.Version, CatalogTrust.BuilderVersion, arch);
+                    if (check.Allowed) ReleaseSelection.Items.Add(new ReleaseChoice(patch.Version, client.Version, arch, check));
+                }
+            ReleaseStatus.Text = ReleaseSelection.Items.Count == 1
+                ? "No catalog release is declared compatible with this target and builder."
+                : "The signed catalog was verified. Candidate assets are still draft releases and cannot yet be downloaded.";
+        }
+        var matching = previous is null ? null : ReleaseSelection.Items.OfType<ReleaseChoice>()
+            .FirstOrDefault(item => item.Patch == previous.Patch && item.Client == previous.Client && item.Architecture == previous.Architecture);
+        ReleaseSelection.SelectedItem = matching ?? (previousLocal && !preferCatalog ? ReleaseSelection.Items[0]
+            : ReleaseSelection.Items.Count > 1 ? ReleaseSelection.Items[1] : ReleaseSelection.Items[0]);
+    }
+
+    private async Task LoadCatalogAsync()
+    {
+        RefreshReleases.IsEnabled = false;
+        ReleaseStatus.Text = "Checking the signed release catalog…";
+        try
+        {
+            using var transport = new CatalogTransport();
+            catalog = await CatalogTrust.FetchAsync(transport);
+            UpdateReleaseChoices(preferCatalog: true);
+        }
+        catch (Exception)
+        {
+            catalog = null;
+            UpdateReleaseChoices();
+            ReleaseStatus.Text = "The signed catalog could not be loaded. A local source checkout can still be used.";
+        }
+        finally { RefreshReleases.IsEnabled = true; }
+    }
+
+    private async void RefreshReleases_Click(object sender, RoutedEventArgs e) => await LoadCatalogAsync();
 
     private async Task<string?> PickFolderAsync()
     {
@@ -168,20 +228,25 @@ public sealed partial class MainWindow : Window
             var resources = resourceDirectory;
             var minecraft = minecraftDirectory;
             var selection = CurrentSelection();
+            var release = ReleaseSelection.SelectedItem as ReleaseChoice;
             var plan = LocalRecipe.Plan(selection);
-            if (source is null) throw new InvalidOperationException("Choose a local source tree.");
+            if (release is null && source is null) throw new InvalidOperationException("Choose a local source tree or a catalog release.");
             LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var probe = new SystemProbe();
-            await LocalRecipe.ValidateSourceAsync(source, probe);
+            if (release is null) await LocalRecipe.ValidateSourceAsync(source!, probe);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
             RecipeStatus.Text = blockers.Count == 0
-                ? "Pinned source revision and required tool locations were found. Cargo will fetch missing dependencies when the build starts; signing is not yet available."
+                ? release is null ? "Pinned source revision and required tool locations were found. The local build will be unsigned."
+                    : "The catalog combination and required tool locations were found. Draft release assets must be published before download."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
             if (selection.ValidatedExistingResourceFramework is null && !selection.PrepareSounds && LocalRecipe.SoundWarning(resources!) is { } warning)
                 RecipeSteps.Children.Add(new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap });
-            foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name, TextWrapping = TextWrapping.Wrap });
-            foreach (var note in plan.Notes) RecipeSteps.Children.Add(new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap });
+            foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = release is not null && step.Name == "Snapshot pinned source" ? "Download and verify the selected release source" : step.Name, TextWrapping = TextWrapping.Wrap });
+            if (release is null)
+                foreach (var note in plan.Notes) RecipeSteps.Children.Add(new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap });
+            else
+                RecipeSteps.Children.Add(new TextBlock { Text = "The client and any new resource framework will be signed with your local certificate. The public certificate and installation guide are included.", TextWrapping = TextWrapping.Wrap });
         }
         catch (Exception error) { RecipeStatus.Text = $"Could not validate the recipe: {error.Message}"; }
         finally { CheckRecipe.IsEnabled = true; }
@@ -196,12 +261,33 @@ public sealed partial class MainWindow : Window
             var resources = resourceDirectory;
             var minecraft = minecraftDirectory;
             var selection = CurrentSelection();
-            if (source is null) throw new InvalidOperationException("Choose a local source tree.");
+            var release = ReleaseSelection.SelectedItem as ReleaseChoice;
+            if (release is null && source is null) throw new InvalidOperationException("Choose a local source tree or a catalog release.");
             LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
-            var result = await LocalBuildRunner.RunAsync(source, resources, selection, new SystemProbe(), progress, minecraft);
-            RecipeStatus.Text = $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
-            if (result.ResourceFrameworkPackage is { } framework)
+            var probe = new SystemProbe();
+            LocalBuildResult result;
+            if (release is null) result = await LocalBuildRunner.RunAsync(source!, resources, selection, probe, progress, minecraft);
+            else
+            {
+                var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
+                if (blockers.Count > 0) throw new InvalidOperationException(string.Join(" ", blockers));
+                var git = probe.FindOnPath("git.exe") ?? throw new InvalidOperationException("Git is required to assemble the release.");
+                var baseDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
+                Directory.CreateDirectory(baseDirectory);
+                var workspace = Path.Combine(baseDirectory, "r" + Guid.NewGuid().ToString("N")[..15]);
+                RecipeStatus.Text = "Downloading and verifying the selected source release…";
+                using var transport = new CatalogTransport();
+                var prepared = await ReleaseSource.PrepareAsync(transport, CatalogTrust.CatalogUri, CatalogTrust.SignatureUri,
+                    CatalogTrust.PublicKey(), release.Patch, release.Client, CatalogTrust.BuilderVersion, release.Architecture, workspace, git);
+                result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft);
+            }
+            RecipeStatus.Text = result.SignedOutput is { } signed
+                ? $"Signed client: {signed.Client}. Public certificate: {signed.Certificate}. Installation guide: {signed.InstallationGuide}."
+                : $"Unsigned client package: {result.UnsignedPackage}. Sign it with a matching publisher certificate before installation.";
+            if (result.SignedOutput?.ResourceFramework is { } signedFramework)
+                RecipeStatus.Text += $" Signed resource framework: {signedFramework}. It contains private Minecraft resources.";
+            else if (result.ResourceFrameworkPackage is { } framework)
                 RecipeStatus.Text += $" Unsigned resource framework: {framework}. Sign it with the same publisher and install it as a dependency. It contains private Minecraft resources.";
             if (selection.ValidatedExistingResourceFramework is { } existing)
                 RecipeStatus.Text += $" Requires existing resource framework {existing} on the target.";
