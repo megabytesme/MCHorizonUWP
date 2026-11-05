@@ -1,5 +1,13 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 3 && args[0] == "--verify-local-catalog")
+{
+    var candidateCatalog = CatalogSignature.Verify(await File.ReadAllBytesAsync(args[1]), await File.ReadAllBytesAsync(args[2]), CatalogTrust.PublicKey());
+    Require(candidateCatalog.Check("0.1.0", "0.1.0", CatalogTrust.BuilderVersion, "x64").Allowed, "signed candidate catalog is readable");
+    Console.WriteLine("The embedded key verified the candidate catalog.");
+    return;
+}
+
 if (args.Length == 1 && args[0] == "--auth-mock-only")
 {
     await TestMinecraftSignIn();
@@ -143,6 +151,11 @@ Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm64) == TargetProfile.SurfaceProX, "ARM64 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm) == TargetProfile.WindowsMobile, "ARM32 default target");
 Require(Guid.TryParse(HorizonIdentity.ClientId, out _), "Horizon public client ID has the expected format");
+using (var catalogKey = System.Security.Cryptography.ECDsa.Create())
+{
+    catalogKey.ImportSubjectPublicKeyInfo(CatalogTrust.PublicKey(), out var consumed);
+    Require(consumed == CatalogTrust.PublicKey().Length && catalogKey.KeySize == 256, "embedded catalog verification key is P-256");
+}
 var fakeLocal = Path.Combine(Path.GetTempPath(), "fake-user");
 Require(SystemProbe.IsPythonExecutionAlias("python.exe", Path.Combine(fakeLocal, "Microsoft", "WindowsApps", "python.exe"), fakeLocal, FileAttributes.ReparsePoint), "Python Store execution alias skipped");
 Require(!SystemProbe.IsPythonExecutionAlias("python.exe", Path.Combine(fakeLocal, "Programs", "Python", "python.exe"), fakeLocal, FileAttributes.Normal), "real Python executable retained");

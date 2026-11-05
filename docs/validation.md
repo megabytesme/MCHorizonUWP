@@ -105,6 +105,12 @@ key, signed the candidate catalog and verified the signature. The private key
 was not exported. This does not establish a production trust key or publish a
 signed catalog.
 
+The maintainer's user-owned catalog key was subsequently created on
+Ben-Desktop. Its public key is embedded in the builder, and a locally signed
+candidate catalog was verified with that embedded key. The private key was not
+exported. The catalog points to draft releases that are not publicly
+downloadable yet; rollback protection and the wizard connection remain open.
+
 ## 2026-11-05: user-owned publisher support
 
 The x64 UWP host was rebuilt from the assembled test source with the resource

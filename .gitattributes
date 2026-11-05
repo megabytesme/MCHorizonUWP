@@ -1,1 +1,4 @@
 *.patch binary
+*.sig binary
+*.der binary
+catalog/*.json text eol=lf

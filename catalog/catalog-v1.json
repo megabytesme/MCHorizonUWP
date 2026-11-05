@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "patches": [
+    {
+      "version": "0.1.0",
+      "upstream_commit": "f42ef42ef6ceccb3c6a20bea2481d87949a51c81",
+      "bridge": 1,
+      "upstream": {
+        "url": "https://github.com/horizon-rust/horizon/archive/f42ef42ef6ceccb3c6a20bea2481d87949a51c81.zip",
+        "sha256": "97205ce67c81d1bbfb754aed11185d779dbfa114cdb9898c0ad0b8adf9851467"
+      },
+      "artifact": {
+        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/patch-v0.1.0/horizon-uwp-0.1.0.patch",
+        "sha256": "b9a9e882060095eca2f92e24940065ee89c63e420c1bb0a3e4110224962c37ea"
+      }
+    }
+  ],
+  "clients": [
+    {
+      "version": "0.1.0",
+      "bridge": 1,
+      "artifact": {
+        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/client-v0.1.0/uwp-client-0.1.0.zip",
+        "sha256": "c84106e1762cb799acaca9235bbeb5a3042d28d2cd08a222e6da538c06fd8e57"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "patch": {
+        "min_inclusive": "0.1.0",
+        "max_exclusive": "0.1.1"
+      },
+      "client": {
+        "min_inclusive": "0.1.0",
+        "max_exclusive": "0.1.1"
+      },
+      "builder": {
+        "min_inclusive": "0.1.0",
+        "max_exclusive": "0.1.1"
+      },
+      "architectures": [
+        "x64"
+      ]
+    }
+  ],
+  "evidence": []
+}
