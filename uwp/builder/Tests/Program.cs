@@ -15,6 +15,19 @@ if (args.Length == 3 && args[0] == "--bootstrap-xaml")
     return;
 }
 
+if (args.Length == 2 && args[0] == "--prepare-published-release")
+{
+    SystemProbe.RefreshProcessPath();
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git was not found.");
+    using var transport = new CatalogTransport();
+    var prepared = await ReleaseSource.PrepareAsync(transport, CatalogTrust.CatalogUri, CatalogTrust.SignatureUri,
+        CatalogTrust.PublicKey(), "0.1.0", "0.1.0", CatalogTrust.BuilderVersion, "x64", Path.GetFullPath(args[1]), git);
+    Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "build-game.cmd")), "published client source assembled");
+    Require(File.Exists(Path.Combine(prepared.SourceDirectory, "Cargo.toml")), "published upstream source assembled");
+    Console.WriteLine("Verified the public catalog and assembled its published x64 source release.");
+    return;
+}
+
 if (args.Length == 2 && args[0] == "--check-frameworks")
 {
     var programFiles = Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? throw new Exception("Windows SDK directory not found.");

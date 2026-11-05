@@ -101,7 +101,7 @@ public sealed partial class MainWindow : Window
                 }
             ReleaseStatus.Text = ReleaseSelection.Items.Count == 0
                 ? "No catalog release is declared compatible with this target and builder."
-                : "The signed catalog was verified. Candidate assets are still draft releases and cannot yet be downloaded.";
+                : "The signed catalog was verified. Choose a compatible preview release.";
         }
         var matching = previous is null ? null : ReleaseSelection.Items.OfType<ReleaseChoice>()
             .FirstOrDefault(item => item.Patch == previous.Patch && item.Client == previous.Client && item.Architecture == previous.Architecture);
@@ -211,7 +211,7 @@ public sealed partial class MainWindow : Window
             var probe = new SystemProbe();
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: true);
             RecipeStatus.Text = blockers.Count == 0
-                ? "The catalog combination and required tool locations were found. Draft release assets must be published before download."
+                ? "The catalog combination and required tool locations were found. The release files will be verified when downloaded."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
             if (selection.ValidatedExistingResourceFramework is null && !selection.PrepareSounds && LocalRecipe.SoundWarning(resources!) is { } warning)
