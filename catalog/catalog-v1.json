@@ -21,7 +21,7 @@
       "bridge": 1,
       "artifact": {
         "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/client-v0.1.0/uwp-client-0.1.0.zip",
-        "sha256": "c84106e1762cb799acaca9235bbeb5a3042d28d2cd08a222e6da538c06fd8e57"
+        "sha256": "261dc651c39e641a5ec0a0aca5eb75a7eae3c28ceb08d29bd112f2bd49cddce8"
       }
     }
   ],
