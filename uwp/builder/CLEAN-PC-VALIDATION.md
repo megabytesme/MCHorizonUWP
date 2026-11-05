@@ -12,6 +12,9 @@ results do not establish device compatibility.
   and removal were exercised through UI Automation. Git and Python were
   installed with WinGet in the Sandbox. WinGet was installed there separately
   because the user assumes it is available on a normal PC.
+- The user signed in through the Sandbox builder with an account that owns
+  Minecraft: Java Edition and confirmed that the ownership check succeeded.
+  Asset preparation and the UWP client's own sign-in were not tested there.
 - In an empty Sandbox test profile, the builder downloaded the pinned WinUI
   2.7.3 NuGet package, verified its digest, extracted its files, and reused the
   cache on a second call. The Microsoft UI and VC runtime APPXs from the SDK
@@ -21,6 +24,9 @@ results do not establish device compatibility.
   x64 source release from the upstream archive, patch and client prereleases.
   An earlier download ended with an unexpected EOF; interrupted and stalled
   transfers are now retried and every artifact must pass its SHA-256 check.
+- An automated approval review blocked the separate attempt to download and
+  launch the published builder ZIP inside Sandbox, reporting only "blocked by
+  policy". The wizard checks above used the locally published builder directory.
 - Horizon's own registry downloader staged the Zoom native mod. The builder's
   mod pipeline applied it to the UWP source and restored the crate setting
   needed for compilation. An independently staged copy of that same modified
@@ -60,11 +66,12 @@ not through a downloaded builder on a blank PC.
 
 ## Remaining work
 
-- Provision and verify the supported Visual C++ UWP toolchain, SDKs, Rust,
-  rust-src and ARM Clang automatically; allow Windows to request elevation when
+- Provision and verify the supported Visual C++ UWP toolchain, SDKs, Rust and
+  rust-src automatically; allow Windows to request elevation when
   necessary. Current scripts assume specific Visual Studio locations.
-- Complete and test actual Minecraft ownership sign-in, asset download and
-  preparation, including the privacy of generated resources.
+- Complete and test Minecraft asset download and preparation after ownership
+  sign-in, including the privacy of generated resources. Test sign-in in the
+  UWP client separately.
 - Test the local installation offer and first-time certificate approval end to
   end, and complete installation guidance for other devices. Run the client on
   real target hardware, including ARM32.

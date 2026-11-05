@@ -40,8 +40,9 @@ Other targets use the included guide. For an existing resource framework, its
 exact identity and publisher must match the client; resource
 frameworks contain private Minecraft files and should not be published.
 
-The preview installs missing Git and Python through WinGet when a build starts
-and invokes Rustup interactively. It does not yet provision the complete compiler, SDK, Clang and
+The preview installs missing Git, Python and ARM-target Clang through WinGet
+when a build starts and invokes Rustup interactively. It does not yet provision
+the complete Visual C++ toolchain, SDK and
 Rust toolchain automatically, and its scripts currently expect particular
 Visual Studio installation paths. Administrator approval may be needed when
 installing development tools or trusting the locally generated certificate.
