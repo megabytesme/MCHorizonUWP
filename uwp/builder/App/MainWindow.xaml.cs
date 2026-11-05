@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? minecraftSignInCancellation;
     private CompatibilityCatalog? catalog;
     private bool buildActionRunning;
+    private bool minecraftOwnershipVerified;
     private sealed record ReleaseChoice(string Patch, string Client, string Architecture, CompatibilityResult Compatibility)
     {
         public override string ToString() => $"Patch {Patch} · UWP client {Client} · {(Compatibility.BuildVerified ? "build verified" : "build not verified")}";
@@ -110,7 +111,7 @@ public sealed partial class MainWindow : Window
     {
         if (ReleaseSelection is null || RunRecipe is null || CheckRecipe is null) return;
         var available = !buildActionRunning && ReleaseSelection.SelectedItem is ReleaseChoice;
-        RunRecipe.IsEnabled = available;
+        RunRecipe.IsEnabled = available && minecraftOwnershipVerified;
         CheckRecipe.IsEnabled = available;
     }
 
@@ -145,6 +146,8 @@ public sealed partial class MainWindow : Window
 
     private async void StartMinecraftSignIn_Click(object sender, RoutedEventArgs e)
     {
+        minecraftOwnershipVerified = false;
+        UpdateBuildActions();
         StartMinecraftSignIn.IsEnabled = false;
         CancelMinecraftSignIn.IsEnabled = true;
         MinecraftSignInLink.Visibility = Visibility.Collapsed;
@@ -159,6 +162,8 @@ public sealed partial class MainWindow : Window
             MinecraftSignInLink.Visibility = Visibility.Visible;
             MinecraftSignInStatus.Text = $"Open the sign-in page and enter code {challenge.UserCode}.";
             var owns = await signIn.CompleteOwnershipCheckAsync(challenge, cancellation.Token);
+            minecraftOwnershipVerified = owns;
+            UpdateBuildActions();
             MinecraftSignInStatus.Text = owns
                 ? "Minecraft: Java Edition ownership confirmed. Automatic resource preparation is not available in this preview."
                 : "This account does not have Minecraft: Java Edition. Sign in with an account that owns it.";
@@ -222,6 +227,7 @@ public sealed partial class MainWindow : Window
         UpdateBuildActions();
         try
         {
+            if (!minecraftOwnershipVerified) throw new InvalidOperationException("Sign in with an account that owns Minecraft: Java Edition before building.");
             var resources = resourceDirectory;
             var minecraft = minecraftDirectory;
             var selection = CurrentSelection();

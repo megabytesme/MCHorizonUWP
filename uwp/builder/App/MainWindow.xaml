@@ -101,7 +101,7 @@
             </StackPanel>
             <StackPanel x:Name="BuildPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Build your package" Style="{StaticResource TitleTextBlockStyle}" />
-              <TextBlock Text="Validate the plan, then build. The client package and its reusable resources are signed with your local certificate." TextWrapping="Wrap" />
+              <TextBlock Text="Sign in with an account that owns Minecraft: Java Edition, validate the plan, then build. The client package and its reusable resources are signed with your local certificate." TextWrapping="Wrap" />
               <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />
               <Button x:Name="RunRecipe" Content="Build client" Click="RunRecipe_Click" />
               <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
