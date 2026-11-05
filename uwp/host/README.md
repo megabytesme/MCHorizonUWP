@@ -1,13 +1,13 @@
 # UWP host
 
 The CoreWindow host can run a native graphics probe or the Horizon game bridge.
-The x64 and ARM64 clients can package native D3D11, WGPU Direct3D 12, and ANGLE/OpenGL ES
-at once. It probes each packaged backend on the device and lets the player
-choose among those that work. ARM32 uses the phone-tested native D3D11 path.
+All four architectures can package native D3D11 and ANGLE/OpenGL ES; x64 and
+ARM64 can also package WGPU Direct3D 12. The host probes each packaged backend
+on the device and lets the player choose among those that initialize.
 
 Build the Rust bridge with the desired features using the patched Rust source,
 then set `HORIZON_UWP_GAME_LIB` to its static library and run
-`cmd /c uwp\host\build-game.cmd <x64|arm|arm64>`. Enable host adapters with
+`cmd /c uwp\host\build-game.cmd <x86|x64|arm|arm64>`. Enable host adapters with
 `HORIZON_UWP_XAUDIO=1` and `HORIZON_UWP_HTTP=1` when the matching Rust features
 are enabled. See `../xaudio-stream/README.md` and `../https-bridge/README.md`.
 The host uses a strict UWP link and the locally installed Visual Studio and SDK

@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('x64', 'arm64', 'arm')][string]$Architecture = 'x64',
+    [ValidateSet('x86', 'x64', 'arm64', 'arm')][string]$Architecture = 'x64',
     [string]$AngleBin,
     [string]$AngleLicense,
     [string]$ZlibLicense,
@@ -19,7 +19,7 @@ if (-not $WinUIFramework) { $WinUIFramework = if ($Architecture -eq 'arm') { '2.
 if ($Resources -and $ResourceFrameworkName) { throw 'Choose embedded resources or a resource framework, not both.' }
 if ($ResourceFrameworkName -and $ResourceFrameworkName.Length -gt 50) { throw 'Resource framework identity is too long.' }
 function Assert-PEArchitecture([string]$Path, [string]$TargetArchitecture) {
-    $machine = @{ x64 = 0x8664; arm64 = 0xaa64; arm = 0x1c4 }[$TargetArchitecture]
+    $machine = @{ x86 = 0x14c; x64 = 0x8664; arm64 = 0xaa64; arm = 0x1c4 }[$TargetArchitecture]
     $stream = [IO.File]::OpenRead($Path)
     $reader = [IO.BinaryReader]::new($stream)
     try {
@@ -47,6 +47,8 @@ $stage = Join-Path $build 'package'
 $repositoryRoot = Split-Path -Parent (Split-Path -Parent $hostDir)
 if (-not $AngleBin) {
     $candidate = switch ($Architecture) {
+        'arm' { Join-Path $repositoryRoot '.local\vcpkg-arm32\installed\arm-uwp-local\bin' }
+        'x86' { Join-Path $repositoryRoot '.local\vcpkg-x86\installed\x86-uwp-local\bin' }
         'x64' { Join-Path $repositoryRoot '.local\vcpkg-x64\installed\x64-uwp-local\bin' }
         'arm64' { Join-Path $repositoryRoot '.local\vcpkg\installed\arm64-uwp-local\bin' }
     }
@@ -64,6 +66,12 @@ if ($AngleBin) {
         $angleFiles += $file
     }
     $zlib = Join-Path $AngleBin 'z.dll'
+    # The ARM32 and x86 builds link zlib statically; its notice is still
+    # required even though there is no separate z.dll in the package.
+    if ($Architecture -in @('arm', 'x86')) {
+        if (-not $ZlibLicense) { $ZlibLicense = Join-Path $anglePrefix 'share\zlib\copyright' }
+        if (-not (Test-Path -LiteralPath $ZlibLicense -PathType Leaf)) { throw 'ANGLE zlib license notice missing; pass -ZlibLicense.' }
+    }
     if (Test-Path -LiteralPath $zlib -PathType Leaf) {
         if (-not $ZlibLicense) { $ZlibLicense = Join-Path $anglePrefix 'share\zlib\copyright' }
         if (-not (Test-Path -LiteralPath $ZlibLicense -PathType Leaf)) { throw 'zlib license notice missing; pass -ZlibLicense.' }

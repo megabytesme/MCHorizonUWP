@@ -67,6 +67,7 @@ public static class LocalRecipe
         var arch = selection.Target switch
         {
             TargetProfile.DesktopX64 => "x64",
+            TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64",
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
@@ -178,6 +179,7 @@ public static class LocalRecipe
         var arch = selection.Target switch
         {
             TargetProfile.DesktopX64 => "x64",
+            TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64",
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),

@@ -166,7 +166,7 @@ if (args.Contains("--framework-probe"))
     catch (ArgumentException) { }
     var root = Path.Combine(Path.GetTempPath(), "HorizonBuilderFrameworkProbe-" + Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(root);
-    foreach (var (target, architecture) in new[] { (TargetProfile.DesktopX64, "x64"), (TargetProfile.WindowsMobile, "arm") })
+    foreach (var (target, architecture) in new[] { (TargetProfile.DesktopX64, "x64"), (TargetProfile.DesktopX86, "x86"), (TargetProfile.WindowsMobile, "arm") })
     {
         var output = Path.Combine(root, architecture);
         var package = await SyntheticFrameworkPacker.PackAsync(output, "26.3", target);
@@ -295,8 +295,14 @@ catch (ArgumentException) { }
 try { _ = LocalRecipe.Plan(reuse with { UseResourceFramework = true }); throw new Exception("conflicting framework modes accepted"); }
 catch (ArgumentException) { }
 var arm64Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false));
+Require(new BuildSelection(TargetProfile.WindowsMobile, false, Renderer: "angle").ValidatedRenderer == "angle", "ARM32 ANGLE can be requested when runtime DLLs are available");
 Require(arm64Recipe.Target == "aarch64-uwp-windows-msvc"
     && arm64Recipe.Features.Contains("uwp-dx12-renderer"), "ARM64 recipe includes the tablet target and DX12 renderer");
+var x86Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX86, false));
+Require(x86Recipe.Target == "i686-uwp-windows-msvc" && !x86Recipe.Features.Contains("uwp-dx12-renderer")
+    && x86Recipe.Steps.Single(step => step.Name == "Strict-link host").Arguments.Contains("x86"), "x86 recipe targets x86 without the unavailable DX12 backend");
+try { _ = new BuildSelection(TargetProfile.DesktopX86, false, Renderer: "dx12").ValidatedRenderer; throw new Exception("x86 DX12 accepted"); }
+catch (NotSupportedException) { }
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
 Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");
 Require(missingToolchain.Any(blocker => blocker.Contains("rust-src")), "rust-src checked");

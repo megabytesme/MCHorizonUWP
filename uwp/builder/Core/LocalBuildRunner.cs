@@ -30,10 +30,9 @@ public static class LocalBuildRunner
             ValidateResourceTree(resources!);
         }
         string? angleBin = null;
-        if (selection.Target != TargetProfile.WindowsMobile)
         {
-            var triplet = selection.Target == TargetProfile.SurfaceProX ? "arm64-uwp-local" : "x64-uwp-local";
-            var vcpkgRoot = selection.Target == TargetProfile.SurfaceProX ? "vcpkg" : "vcpkg-x64";
+            var triplet = selection.Target switch { TargetProfile.WindowsMobile => "arm-uwp-local", TargetProfile.SurfaceProX => "arm64-uwp-local", TargetProfile.DesktopX86 => "x86-uwp-local", _ => "x64-uwp-local" };
+            var vcpkgRoot = selection.Target switch { TargetProfile.WindowsMobile => "vcpkg-arm32", TargetProfile.SurfaceProX => "vcpkg", TargetProfile.DesktopX86 => "vcpkg-x86", _ => "vcpkg-x64" };
             var candidate = Path.Combine(Path.GetFullPath(source), ".local", vcpkgRoot, "installed", triplet, "bin");
             if (new[] { "libEGL.dll", "libGLESv2.dll" }.All(name => File.Exists(Path.Combine(candidate, name))))
                 angleBin = candidate;
@@ -118,6 +117,7 @@ public static class LocalBuildRunner
         var arch = selection.Target switch
         {
             TargetProfile.DesktopX64 => "x64",
+            TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64",
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
@@ -128,7 +128,7 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = "1";
         vcEnvironment["HORIZON_UWP_TOUCH_MOD"] = selection.IncludesNativeTouchMod ? "1" : "";
-        vcEnvironment["HORIZON_UWP_DX12"] = arm ? "" : "1";
+        vcEnvironment["HORIZON_UWP_DX12"] = selection.Target is TargetProfile.DesktopX64 or TargetProfile.SurfaceProX ? "1" : "";
         vcEnvironment["HORIZON_UWP_ANGLE"] = angleBin is null ? "" : "1";
         vcEnvironment["HORIZON_UWP_DEFAULT_RENDERER"] = selection.ValidatedRenderer;
         vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
@@ -203,6 +203,7 @@ public static class LocalBuildRunner
     {
         var arm = profile == TargetProfile.WindowsMobile;
         var arm64 = profile == TargetProfile.SurfaceProX;
+        var x86 = profile == TargetProfile.DesktopX86;
         var root = arm ? probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)" : probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files";
         var vcvars = arm
             ? Path.Combine(root, "Microsoft Visual Studio", "2017", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
@@ -211,6 +212,8 @@ public static class LocalBuildRunner
             ? ["/d", "/c", "call", vcvars, "x64_arm", "store", "10.0.15063.0", "&&", "set"]
             : arm64
                 ? ["/d", "/c", "call", vcvars, "x64_arm64", "store", "10.0.26100.0", "&&", "set"]
+                : x86
+                    ? ["/d", "/c", "call", vcvars, "x64_x86", "store", "10.0.26100.0", "&&", "set"]
                 : ["/d", "/c", "call", vcvars, "x64", "&&", "set"];
         var output = await RunProcess(cmd, Path.GetDirectoryName(vcvars)!, args, captureOutput: true);
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

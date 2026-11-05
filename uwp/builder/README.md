@@ -16,8 +16,8 @@ package verification. The local recipe can embed prepared resources, build a
 separate resource framework, or use a framework already installed on the target.
 The existing-framework option requires its exact name and no local resource
 directory. The builder does not sign or install packages. Tool presence does not establish version or recipe
-compatibility with every machine; the x64, ARM64 and ARM32 recipes have been
-built locally. ARM64 and ARM32 Rust builds use the installed LLVM Clang
+compatibility with every machine; the x86, x64, ARM64 and ARM32 recipes have
+been built locally. ARM64 and ARM32 Rust builds use the installed LLVM Clang
 compiler for their cross-target C dependencies. Visual Studio detection checks
 common installation locations and may miss custom locations.
 
@@ -69,12 +69,13 @@ does not download or execute the new release. The pinned nightly notes are
 also checked into `uwp/host/Assets`, so the matching What's New page remains
 available if GitHub's moving release metadata changes. Minecraft resource
 framework versions remain tied to the Minecraft resources, not to the Horizon nightly date.
-The x64 and ARM64 clients include native D3D11 and WGPU's DX12 backend; both
-include ANGLE when matching UWP DLLs are available in the selected checkout.
-The ARM32 client includes native D3D11 only. Runtime device and surface probes
-show only renderers that the installed package can use on that device. DX12
-and ANGLE are package inputs on x64 and ARM64; this recipe has no ARM32 ANGLE
-runtime and does not include DX12 in ARM32 packages.
+All four architectures include native D3D11 and can package ANGLE when matching
+UWP DLLs are available in the selected checkout. x64 and ARM64 also include
+WGPU's DX12 backend. Runtime device and surface probes enable only renderers
+that initialize and present on that device. ARM32 ANGLE reached a world on the
+Lumia 950 XL but was slow and later reported a pipeline error; the startup probe
+does not guarantee stable gameplay. See `../angle-arm32/README.md` for the
+32-bit ANGLE build and notices.
 These are build-input constraints, not assumptions about the device GPU. The
 native D3D11 pre-game check creates a feature-level 9_1 device while XAML owns
 the view. The launcher and game share one attached XAML root and one
@@ -88,7 +89,7 @@ handlers are registered before gameplay
 starts, and the game receives its initial size after the shared surface is
 shown. The pre-game page and gameplay share one CoreWindow on every target,
 including desktop and Windows 10 Mobile. The preview runs x64,
-ARM64 and ARM32 plans in fresh builder-owned folders under
+x86, ARM64 and ARM32 plans in fresh builder-owned folders under
 `%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
 Cargo fetches missing dependencies for the selected target and x64 build host
 from configured registries before the offline build. It can also create a reusable

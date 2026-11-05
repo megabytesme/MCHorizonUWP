@@ -23,6 +23,7 @@ public static class SyntheticFrameworkPacker
         var architecture = target switch
         {
             TargetProfile.DesktopX64 => "x64",
+            TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64",
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(target)),

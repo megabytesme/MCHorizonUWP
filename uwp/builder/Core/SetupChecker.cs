@@ -1,6 +1,6 @@
 namespace Horizon.Builder.Core;
 
-public enum TargetProfile { DesktopX64, SurfaceProX, WindowsMobile }
+public enum TargetProfile { DesktopX64, SurfaceProX, WindowsMobile, DesktopX86 }
 public enum CheckStatus { Found, Missing, Review }
 public sealed record SetupCheck(string Name, CheckStatus Status, string Detail, Uri? Instructions = null);
 
@@ -41,7 +41,7 @@ public sealed class SetupChecker(IProbe probe)
         var vsRoots = new[] { probe.EnvironmentValue("ProgramFiles(x86)"), probe.EnvironmentValue("ProgramFiles") }
             .Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(path => Path.Combine(path!, "Microsoft Visual Studio"));
-        var arch = profile switch { TargetProfile.DesktopX64 => "x64", TargetProfile.SurfaceProX => "arm64", _ => "arm" };
+        var arch = profile switch { TargetProfile.DesktopX86 => "x86", TargetProfile.DesktopX64 => "x64", TargetProfile.SurfaceProX => "arm64", _ => "arm" };
         var msvc = vsRoots.SelectMany(probe.Directories).SelectMany(probe.Directories)
             .SelectMany(edition => probe.Directories(Path.Combine(edition, "VC", "Tools", "MSVC")))
             .FirstOrDefault(toolset => probe.FileExists(Path.Combine(toolset, "bin", "Hostx64", arch, "cl.exe"))

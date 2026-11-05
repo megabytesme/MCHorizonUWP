@@ -49,3 +49,11 @@ SENTINEL(RegisterClipboardFormatW);
 SENTINEL(EnumClipboardFormats);
 SENTINEL(CountClipboardFormats);
 SENTINEL(NotifyIpInterfaceChange);
+
+/* On x86 Windows imports use stdcall-decorated names. These are still
+ * link-only sentinels: strict-link rejects any that survive /OPT:REF. */
+#if defined(_M_IX86)
+#pragma comment(linker, "/alternatename:__imp__lstrlenW@4=___imp_lstrlenW")
+#pragma comment(linker, "/alternatename:__imp__CreatePipe@16=___imp_CreatePipe")
+#pragma comment(linker, "/alternatename:__imp__NotifyIpInterfaceChange@20=___imp_NotifyIpInterfaceChange")
+#endif

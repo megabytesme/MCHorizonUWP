@@ -30,6 +30,7 @@
       <ComboBoxItem Content="Windows desktop (x64)" />
       <ComboBoxItem Content="Surface Pro X (ARM64)" />
       <ComboBoxItem Content="Windows 10 Mobile (ARM32, 15063)" />
+      <ComboBoxItem Content="Windows desktop (x86)" />
     </ComboBox>
     <TextBlock Text="Renderer build" Style="{StaticResource BodyStrongTextBlockStyle}" />
     <ComboBox x:Name="Renderer" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="Renderer_SelectionChanged">

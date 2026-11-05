@@ -37,17 +37,18 @@ public sealed partial class MainWindow : Window
     private string? resourceDirectory;
     private string? minecraftDirectory;
 
-    private string SelectedRenderer => (TargetProfile)Profile.SelectedIndex == TargetProfile.WindowsMobile
-        ? "native-d3d11" : Renderer.SelectedIndex switch { 1 => "angle", 2 => "dx12", _ => "native-d3d11" };
+    private string SelectedRenderer => Renderer.SelectedIndex switch { 1 => "angle", 2 => "dx12", _ => "native-d3d11" };
 
     private void UpdateRendererChoices()
     {
         if (Profile is null || Renderer is null) return;
         var phone = (TargetProfile)Profile.SelectedIndex == TargetProfile.WindowsMobile;
-        Renderer.IsEnabled = !phone;
-        if (phone && Renderer.SelectedIndex != 0) Renderer.SelectedIndex = 0;
-        var nativeD3d11 = (TargetProfile)Profile.SelectedIndex == TargetProfile.WindowsMobile
-            || Renderer.SelectedIndex == 0;
+        var x86 = (TargetProfile)Profile.SelectedIndex == TargetProfile.DesktopX86;
+        if (Renderer.Items.Count > 2 && Renderer.Items[2] is ComboBoxItem dx12) dx12.IsEnabled = !phone && !x86;
+        if (x86 && Renderer.SelectedIndex == 2) Renderer.SelectedIndex = 0;
+        Renderer.IsEnabled = true;
+        if (phone && Renderer.SelectedIndex == 2) Renderer.SelectedIndex = 0;
+        var nativeD3d11 = Renderer.SelectedIndex == 0;
         NativeTouchMod.IsEnabled = nativeD3d11;
         if (!nativeD3d11) NativeTouchMod.IsChecked = false;
     }

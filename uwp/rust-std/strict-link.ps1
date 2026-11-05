@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory)][string[]]$Objects,
     [Parameter(Mandatory)][string]$RustLibrary,
     [Parameter(Mandatory)][string]$Output,
-    [ValidateSet('X64', 'ARM64', 'ARM')][string]$Machine = 'X64',
+    [ValidateSet('X86', 'X64', 'ARM64', 'ARM')][string]$Machine = 'X64',
     [string[]]$ExtraLibraries = @(),
     [ValidateRange(0, 1073741824)][long]$StackReserve = 0
 )
@@ -27,6 +27,7 @@ $linkArgs = @('/nologo', '/APPCONTAINER', '/SUBSYSTEM:WINDOWS', "/MACHINE:$Machi
 # final native link, so add the matching Microsoft compiler-rt archive when it
 # is installed. Do not mix architectures or fall back to desktop CRT libraries.
 $runtimeRelativePath = switch ($Machine) {
+    'X86' { 'lib\x86\clang_rt.builtins-i386.lib' }
     'X64' { 'lib\x64\clang_rt.builtins-x86_64.lib' }
     'ARM64' { 'lib\arm64\clang_rt.builtins-aarch64.lib' }
     'ARM' { 'lib\arm\clang_rt.builtins-arm.lib' }

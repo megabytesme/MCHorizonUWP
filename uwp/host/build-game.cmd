@@ -5,6 +5,10 @@ if "%ARCH%"=="" set "ARCH=x64"
 set "VCARCH=x64"
 set "GAME_MACHINE=X64"
 set "SDK=10.0.15063.0"
+if /i "%ARCH%"=="x86" (
+    set "VCARCH=x64_x86"
+    set "GAME_MACHINE=X86"
+)
 if /i "%ARCH%"=="arm64" (
     set "VCARCH=x64_arm64"
     set "GAME_MACHINE=ARM64"
@@ -15,7 +19,7 @@ if /i "%ARCH%"=="arm" (
     set "GAME_MACHINE=ARM"
     set "SDK=10.0.15063.0"
 )
-if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="arm" exit /b 1
+if /i not "%ARCH%"=="x86" if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="arm" exit /b 1
 if defined HORIZON_UWP_DX12 if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" exit /b 1
 
 if not defined HORIZON_UWP_GAME_LIB (

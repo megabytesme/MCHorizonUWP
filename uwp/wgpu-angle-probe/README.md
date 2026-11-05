@@ -14,4 +14,9 @@ compute/storage buffers on its GLES 3.0 adapter.
 
 For a runtime experiment, stage the host manifest and assets from ../host/build/package, rename the exe to HorizonUWP.exe, give the manifest a distinct package identity, include matching UWP ANGLE libEGL.dll and libGLESv2.dll plus their dependencies, then register the staged manifest in Developer Mode. The first x64 test used deprecated ANGLE.WindowsStore 2.1.14 binaries solely for diagnosis. Later x64 and ARM64 tests used the modern vcpkg ANGLE builds described in ../host/README.md. No ANGLE binaries are committed here.
 
-Phone compatibility is unverified. Microsoft documents that Windows Phone must import LoadPackagedLibrary from PhoneAppModelHost.dll rather than Kernel32.dll: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-loadpackagedlibrary . The vendored patch links WindowsApp.lib and has not been checked for the actual ARM32 import mapping or tested on build 15063. The UWP patch is compile-checked on x64 only. Also, wgpu requests OpenGL ES 3; devices exposing only GLES 2 through ANGLE cannot run this path unchanged.
+An ARM32 ANGLE build created a wgpu surface, presented a frame, and entered a
+world on a Lumia 950 XL running Windows 10 Mobile build 16241. Gameplay was slow
+and a render-pipeline error later occurred. Build 15063 remains untested. x86,
+x64, and ARM64 have also passed a device and presentation probe. Wgpu requires
+OpenGL ES 3; devices exposing only GLES 2 cannot run this path unchanged. See
+`../angle-arm32/README.md` for the ARM32 and x86 runtime build.

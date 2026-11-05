@@ -54,6 +54,7 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     public string RustTarget => Target switch
     {
         TargetProfile.DesktopX64 => "x86_64-uwp-windows-msvc",
+        TargetProfile.DesktopX86 => "i686-uwp-windows-msvc",
         TargetProfile.SurfaceProX => "aarch64-uwp-windows-msvc",
         TargetProfile.WindowsMobile => "thumbv7a-uwp-windows-msvc",
         _ => throw new ArgumentOutOfRangeException(nameof(Target)),
@@ -62,10 +63,9 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     public string ValidatedRenderer => Renderer switch
     {
         "native-d3d11" => Renderer,
-        "angle" when Target != TargetProfile.WindowsMobile => Renderer,
-        "angle" => throw new NotSupportedException("The current package recipe contains ANGLE runtime DLLs for x64 and ARM64 only."),
-        "dx12" when Target != TargetProfile.WindowsMobile => Renderer,
-        "dx12" => throw new NotSupportedException("The Direct3D 12 renderer is not included in ARM32 packages."),
+        "angle" => Renderer,
+        "dx12" when Target is TargetProfile.DesktopX64 or TargetProfile.SurfaceProX => Renderer,
+        "dx12" => throw new NotSupportedException("The Direct3D 12 renderer is not included in this architecture's package."),
         _ => throw new ArgumentException("Choose a supported renderer."),
     };
 
@@ -73,7 +73,7 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     // fragments or paths are interpolated. Execution requires a verified recipe.
     public IReadOnlyList<string> Features => new[]
         { "native-d3d11",
-          Target != TargetProfile.WindowsMobile ? "uwp-dx12-renderer" : null,
+          Target is TargetProfile.DesktopX64 or TargetProfile.SurfaceProX ? "uwp-dx12-renderer" : null,
           IncludesNativeTouchMod ? "native-touch-mod" : null,
           NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell" }
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();
