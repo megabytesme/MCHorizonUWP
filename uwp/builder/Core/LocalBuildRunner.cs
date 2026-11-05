@@ -67,8 +67,6 @@ public static class LocalBuildRunner
             var candidate = Path.Combine(Path.GetFullPath(source), ".local", vcpkgRoot, "installed", triplet, "bin");
             if (new[] { "libEGL.dll", "libGLESv2.dll" }.All(name => File.Exists(Path.Combine(candidate, name))))
                 angleBin = candidate;
-            else if (selection.ValidatedRenderer == "angle")
-                throw new FileNotFoundException($"ANGLE was selected, but its UWP runtime DLLs are missing. Install/build ANGLE for the {triplet} vcpkg triplet, then retry.", candidate);
         }
         var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: release is not null);
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
@@ -162,7 +160,8 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_TOUCH_MOD"] = selection.IncludesNativeTouchMod ? "1" : "";
         vcEnvironment["HORIZON_UWP_DX12"] = "1";
         vcEnvironment["HORIZON_UWP_ANGLE"] = angleBin is null ? "" : "1";
-        vcEnvironment["HORIZON_UWP_DEFAULT_RENDERER"] = selection.ValidatedRenderer;
+        // The UWP client probes available renderers and chooses on the target device.
+        vcEnvironment["HORIZON_UWP_DEFAULT_RENDERER"] = "";
         vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
         var hostOutput = Path.Combine(root, "native-host", "game-" + arch);

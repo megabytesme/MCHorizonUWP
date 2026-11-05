@@ -1,8 +1,10 @@
 # Horizon UWP Builder preview
 
 This desktop WinUI 3 preview checks a small set of build prerequisites and
-records a target, renderer build, and optional native touch and device-vibration
+records a target and optional native touch and device-vibration
 source-mod selections.
+The UWP client probes its packaged graphics backends and chooses an available
+renderer on the target device; the builder does not select one.
 The options page can browse and search Horizon's native-mod registry; adding
 those registry mods to a UWP build and determining their UWP compatibility are
 not yet available.

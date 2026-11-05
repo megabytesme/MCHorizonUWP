@@ -562,7 +562,6 @@ catch (ArgumentException) { }
 try { _ = LocalRecipe.Plan(reuse with { UseResourceFramework = true }); throw new Exception("conflicting framework modes accepted"); }
 catch (ArgumentException) { }
 var arm64Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false));
-Require(new BuildSelection(TargetProfile.WindowsMobile, false, Renderer: "angle").ValidatedRenderer == "angle", "ARM32 ANGLE can be requested when runtime DLLs are available");
 Require(arm64Recipe.Target == "aarch64-uwp-windows-msvc"
     && arm64Recipe.Features.Contains("uwp-dx12-renderer"), "ARM64 recipe includes the tablet target and DX12 renderer");
 var x86Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX86, false));
@@ -570,8 +569,8 @@ Require(x86Recipe.Target == "i686-uwp-windows-msvc" && x86Recipe.Features.Contai
     && x86Recipe.Steps.Single(step => step.Name == "Strict-link host").Arguments.Contains("x86"), "x86 recipe includes the DX12 backend");
 foreach (var target in Enum.GetValues<TargetProfile>())
 {
-    var dx12Selection = new BuildSelection(target, false, Renderer: "dx12");
-    Require(dx12Selection.ValidatedRenderer == "dx12" && dx12Selection.Features.Contains("uwp-dx12-renderer"), $"DX12 available in the {target} build");
+    var targetSelection = new BuildSelection(target, false);
+    Require(targetSelection.Features.Contains("uwp-dx12-renderer") && targetSelection.Features.Contains("native-d3d11"), $"both packaged renderers available in the {target} build");
 }
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
 Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");

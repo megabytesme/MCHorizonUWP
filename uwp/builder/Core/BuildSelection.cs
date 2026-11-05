@@ -1,7 +1,7 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", string Renderer = "native-d3d11", bool ReuseResourceFramework = false, string ExistingResourceFramework = "")
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", bool ReuseResourceFramework = false, string ExistingResourceFramework = "")
 {
     public static TargetProfile DefaultTarget(System.Runtime.InteropServices.Architecture architecture) => architecture switch
     {
@@ -64,14 +64,6 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
         TargetProfile.SurfaceProX => "aarch64-uwp-windows-msvc",
         TargetProfile.WindowsMobile => "thumbv7a-uwp-windows-msvc",
         _ => throw new ArgumentOutOfRangeException(nameof(Target)),
-    };
-
-    public string ValidatedRenderer => Renderer switch
-    {
-        "native-d3d11" => Renderer,
-        "angle" => Renderer,
-        "dx12" => Renderer,
-        _ => throw new ArgumentException("Choose a supported renderer."),
     };
 
     // These features are recorded as individual tokens; no user-supplied shell
