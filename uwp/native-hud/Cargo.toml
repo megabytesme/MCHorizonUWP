@@ -1,0 +1,24 @@
+[package]
+name = "horizon-native-hud"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+horizon = ["dep:horizon-client-render"]
+d3d11 = ["dep:horizon-uwp-d3d11"]
+
+[dependencies]
+log = "0.4"
+horizon-client-render = { path = "../../crates/horizon-client-render", default-features = false, optional = true }
+
+[patch.crates-io]
+wgpu-hal = { path = "../../third_party/wgpu-hal" }
+winit = { path = "../../third_party/winit" }
+parking_lot_core = { path = "../../third_party/parking_lot_core" }
+
+[dependencies.horizon-uwp-d3d11]
+path = "../d3d11-backend"
+optional = true

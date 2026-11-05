@@ -1,0 +1,15 @@
+[package]
+name = "uwp-fs-probe"
+version = "0.1.0"
+edition = "2024"
+[workspace]
+[lib]
+crate-type = ["staticlib"]
+[profile.release]
+panic = "abort"
+
+[dependencies]
+parking_lot = "0.12.5"
+[patch.crates-io]
+parking_lot_core = { path = "../../../third_party/parking_lot_core" }
+

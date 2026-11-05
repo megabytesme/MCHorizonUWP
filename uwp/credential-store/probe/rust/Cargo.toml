@@ -1,0 +1,12 @@
+[package]
+name = "horizon-uwp-vault-rust-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+[workspace]
+[lib]
+crate-type = ["staticlib"]
+[dependencies]
+horizon-uwp-credential-store = { path = "../.." }
+[profile.release]
+panic = "abort"

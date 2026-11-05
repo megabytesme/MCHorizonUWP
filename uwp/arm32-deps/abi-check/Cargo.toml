@@ -1,0 +1,12 @@
+[package]
+name = "horizon-arm32-windows-abi-check"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+w52 = { package = "windows-sys", version = "=0.52.0", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_Memory", "Win32_System_WindowsProgramming"] }
+w59 = { package = "windows-sys", version = "=0.59.0", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_Memory", "Win32_System_WindowsProgramming"] }
+w61 = { package = "windows-sys", version = "=0.61.2", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_Memory", "Win32_System_WindowsProgramming"] }

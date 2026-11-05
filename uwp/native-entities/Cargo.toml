@@ -1,0 +1,18 @@
+[package]
+name = "horizon-native-entities"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+glam = "0.30"
+horizon-client-render = { path = "../../crates/horizon-client-render", default-features = false }
+horizon-native-hud = { path = "../native-hud" }
+horizon-uwp-d3d11 = { path = "../d3d11-backend" }
+
+[patch.crates-io]
+wgpu-hal = { path = "../../third_party/wgpu-hal" }
+winit = { path = "../../third_party/winit" }
+parking_lot_core = { path = "../../third_party/parking_lot_core" }

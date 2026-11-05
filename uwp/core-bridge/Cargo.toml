@@ -1,0 +1,16 @@
+[package]
+name = "horizon-uwp-core-bridge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+horizon-core = { path = "../../crates/horizon-core" }
+
+[profile.release]
+panic = "abort"

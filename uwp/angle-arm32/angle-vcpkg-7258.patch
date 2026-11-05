@@ -1,0 +1,105 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -27,7 +27,7 @@
+ endif()
+ 
+ if (WINDOWS_STORE)
+-    set(WINRT_DEFINES -DANGLE_ENABLE_WINDOWS_UWP -DWINAPI_FAMILY=WINAPI_FAMILY_PC_APP)
++    set(WINRT_DEFINES -DANGLE_IS_WINUWP -DANGLE_ENABLE_WINDOWS_UWP -DWINAPI_FAMILY=WINAPI_FAMILY_PC_APP)
+ else()
+     set(WINRT_DEFINES)
+ endif()
+@@ -456,3 +456,4 @@
+         endif()
+     endforeach()
+ endif()
++set_source_files_properties(src/compiler/translator/SymbolTable_autogen.cpp PROPERTIES COMPILE_OPTIONS "/Od")
+--- a/src/common/system_utils_win.cpp
++++ b/src/common/system_utils_win.cpp
+@@ -11,6 +11,11 @@
+ #include <fileapi.h>
+ #include <stdarg.h>
+ #include <windows.h>
++#if defined(ANGLE_IS_WINUWP)
++#include <windows.storage.h>
++#include <wrl/client.h>
++#include <wrl/wrappers/corewrappers.h>
++#endif
+ #include <algorithm>
+ #include <array>
+ #include <vector>
+@@ -206,6 +211,22 @@
+ 
+ Optional<std::string> GetTempDirectory()
+ {
++#if defined(ANGLE_IS_WINUWP)
++    using namespace ABI::Windows::Storage;
++    using Microsoft::WRL::ComPtr;
++    using Microsoft::WRL::Wrappers::HString;
++    using Microsoft::WRL::Wrappers::HStringReference;
++    ComPtr<IApplicationDataStatics> statics;
++    ComPtr<IApplicationData> data;
++    ComPtr<IStorageFolder> folder;
++    ComPtr<IStorageItem> item;
++    HString path;
++    if (FAILED(RoGetActivationFactory(HStringReference(RuntimeClass_Windows_Storage_ApplicationData).Get(), IID_PPV_ARGS(&statics))) ||
++        FAILED(statics->get_Current(&data)) || FAILED(data->get_TemporaryFolder(&folder)) ||
++        FAILED(folder.As(&item)) || FAILED(item->get_Path(path.GetAddressOf())))
++        return Optional<std::string>::Invalid();
++    return Narrow(path.GetRawBuffer(nullptr));
++#else
+     char tempDirOut[MAX_PATH + 1];
+     GetTempPathA(MAX_PATH + 1, tempDirOut);
+     std::string tempDir = std::string(tempDirOut);
+@@ -221,15 +242,37 @@
+     }
+ 
+     return tempDir;
++#endif
+ }
+ 
+ Optional<std::string> CreateTemporaryFileInDirectory(const std::string &directory)
+ {
++#if defined(ANGLE_IS_WINUWP)
++    for (int attempt = 0; attempt < 16; ++attempt)
++    {
++        GUID id;
++        if (FAILED(CoCreateGuid(&id))) return Optional<std::string>::Invalid();
++        char leaf[64];
++        sprintf_s(leaf, "ANGLE-%08lx-%04x-%04x-%02x%02x%02x%02x%02x%02x%02x%02x.tmp",
++            id.Data1, id.Data2, id.Data3, id.Data4[0], id.Data4[1], id.Data4[2], id.Data4[3],
++            id.Data4[4], id.Data4[5], id.Data4[6], id.Data4[7]);
++        const std::string path = directory + "\\" + leaf;
++        HANDLE file = CreateFile2(Widen(path).c_str(), GENERIC_WRITE, 0, CREATE_NEW, nullptr);
++        if (file != INVALID_HANDLE_VALUE)
++        {
++            CloseHandle(file);
++            return path;
++        }
++        if (GetLastError() != ERROR_FILE_EXISTS) return Optional<std::string>::Invalid();
++    }
++    return Optional<std::string>::Invalid();
++#else
+     char fileName[MAX_PATH + 1];
+     if (GetTempFileNameA(directory.c_str(), "ANGLE", 0, fileName) == 0)
+         return Optional<std::string>::Invalid();
+ 
+     return std::string(fileName);
++#endif
+ }
+ 
+ std::string GetLibraryPath(void *libraryHandle)
+--- a/src/libANGLE/Context.inl.h
++++ b/src/libANGLE/Context.inl.h
+@@ -38,9 +38,9 @@
+ 
+ // All bits except |DIRTY_BIT_READ_FRAMEBUFFER_BINDING| because |mDrawDirtyObjects| does not contain
+ // |DIRTY_OBJECT_READ_FRAMEBUFFER|, to avoid synchronizing with invalid read framebuffer state.
+-constexpr state::DirtyBits kDrawDirtyBits =
++const state::DirtyBits kDrawDirtyBits =
+     ~state::DirtyBits{state::DIRTY_BIT_READ_FRAMEBUFFER_BINDING};
+-constexpr state::ExtendedDirtyBits kDrawExtendedDirtyBits = state::ExtendedDirtyBits().set();
++const state::ExtendedDirtyBits kDrawExtendedDirtyBits = state::ExtendedDirtyBits().set();
+ 
+ ANGLE_INLINE void MarkTransformFeedbackBufferUsage(const Context *context,
+                                                    GLsizei count,

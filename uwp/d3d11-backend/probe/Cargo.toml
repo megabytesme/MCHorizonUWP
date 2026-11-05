@@ -1,0 +1,20 @@
+[package]
+name = "horizon-uwp-d3d11-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+horizon-uwp-d3d11 = { path = "..", features = ["readback-probe"] }
+horizon-native-scene = { path = "../../native-scene" }
+horizon-native-terrain = { path = "../../native-terrain" }
+horizon-native-hud = { path = "../../native-hud", features = ["d3d11"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 32

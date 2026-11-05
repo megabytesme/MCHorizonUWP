@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/target/
+.local/
+**/.local/
+deliverables/
+*.appx
+*.msix
+*.pfx
+*.p12

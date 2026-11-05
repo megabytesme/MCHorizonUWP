@@ -1,0 +1,45 @@
+[package]
+name = "horizon-uwp-game-bridge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[features]
+native-d3d11 = ["horizon-client/native-d3d11"]
+uwp-https = ["horizon-client/uwp-https"]
+native-d3d11-readback = ["horizon-client/native-d3d11-readback"]
+native-touch-mod = ["horizon-client/native-touch-mod"]
+native-device-vibration-mod = ["horizon-client/native-device-vibration-mod"]
+uwp-dx12-renderer = ["wgpu/dx12"]
+uwp-audio = ["horizon-client/uwp-audio"]
+uwp-controller = ["horizon-client/uwp-controller"]
+uwp-account = ["dep:horizon-account-core", "uwp-https"]
+xaml-shell = ["uwp-account"]
+
+[dependencies]
+horizon-client = { path = "../../crates/horizon-client", default-features = false }
+pollster = "0.4"
+horizon-protocol = { path = "../../crates/horizon-protocol" }
+serde_json = "1.0.151"
+
+[target.'cfg(target_vendor = "uwp")'.dependencies]
+horizon-threads = { path = "../../crates/horizon-threads" }
+horizon-account-core = { path = "../../crates/horizon-account-core", optional = true }
+horizon-core = { path = "../../crates/horizon-core" }
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "parking_lot", "gles"] }
+raw-window-handle = "0.6.2"
+
+[patch.crates-io]
+gilrs-core = { path = "../../third_party/gilrs-core" }
+wgpu-hal = { path = "../../third_party/wgpu-hal" }
+winit = { path = "../../third_party/winit" }
+parking_lot_core = { path = "../../third_party/parking_lot_core" }
+
+[profile.release]
+panic = "abort"
+codegen-units = 32

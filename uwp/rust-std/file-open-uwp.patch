@@ -1,0 +1,90 @@
+--- a/library/std/src/sys/fs/windows.rs
++++ b/library/std/src/sys/fs/windows.rs
+@@ -84,6 +84,39 @@
+     inherit_handle: bool,
+     freeze_last_access_time: bool,
+     freeze_last_write_time: bool,
++}
++
++#[cfg(target_vendor = "uwp")]
++#[repr(C)]
++struct CreateFile2Parameters {
++    size: u32,
++    file_attributes: u32,
++    file_flags: u32,
++    security_qos_flags: u32,
++    security_attributes: *const c::SECURITY_ATTRIBUTES,
++    template: c::HANDLE,
++}
++
++#[cfg(target_vendor = "uwp")]
++unsafe extern "system" {
++    #[link_name = "CreateFile2"]
++    fn create_file2(path: *const u16, access: u32, share: u32, disposition: u32,
++                    params: *const CreateFile2Parameters) -> c::HANDLE;
++}
++
++#[cfg(target_vendor = "uwp")]
++unsafe fn open_uwp(path: *const u16, opts: &OpenOptions, creation: u32,
++                   security: *const c::SECURITY_ATTRIBUTES, extra_flags: u32) -> io::Result<c::HANDLE> {
++    let params = CreateFile2Parameters {
++        size: size_of::<CreateFile2Parameters>() as u32,
++        file_attributes: opts.attributes,
++        file_flags: opts.custom_flags | extra_flags |
++            if opts.create_new { c::FILE_FLAG_OPEN_REPARSE_POINT } else { 0 },
++        security_qos_flags: opts.security_qos_flags,
++        security_attributes: security,
++        template: ptr::null_mut(),
++    };
++    Ok(unsafe { create_file2(path, opts.get_access_mode()?, opts.share_mode, creation, &params) })
+ }
+ 
+ #[derive(Clone, PartialEq, Eq, Debug)]
+@@ -349,6 +382,7 @@
+             lpSecurityDescriptor: ptr::null_mut(),
+             bInheritHandle: opts.inherit_handle as c::BOOL,
+         };
++        #[cfg(not(target_vendor = "uwp"))]
+         let handle = unsafe {
+             c::CreateFileW(
+                 path.as_ptr(),
+@@ -360,6 +394,9 @@
+                 ptr::null_mut(),
+             )
+         };
++        #[cfg(target_vendor = "uwp")]
++        let handle = unsafe { open_uwp(path.as_ptr(), opts, creation,
++            if opts.inherit_handle { &sa } else { ptr::null() }, 0)? };
+         let handle = unsafe { HandleOrInvalid::from_raw_handle(handle) };
+         if let Ok(handle) = OwnedHandle::try_from(handle) {
+             if opts.freeze_last_access_time || opts.freeze_last_write_time {
+--- a/library/std/src/sys/fs/windows/dir.rs
++++ b/library/std/src/sys/fs/windows/dir.rs
+@@ -94,6 +94,7 @@
+             lpSecurityDescriptor: ptr::null_mut(),
+             bInheritHandle: opts.inherit_handle as c::BOOL,
+         };
++        #[cfg(not(target_vendor = "uwp"))]
+         let handle = unsafe {
+             c::CreateFileW(
+                 path.as_ptr(),
+@@ -106,6 +107,9 @@
+                 ptr::null_mut(),
+             )
+         };
++        #[cfg(target_vendor = "uwp")]
++        let handle = unsafe { super::open_uwp(path.as_ptr(), opts, creation,
++            &raw const sa, c::FILE_FLAG_BACKUP_SEMANTICS)? };
+         match OwnedHandle::try_from(unsafe { HandleOrInvalid::from_raw_handle(handle) }) {
+             Ok(handle) => Ok(Self { handle: Handle::from_inner(handle) }),
+             Err(_) => Err(io::Error::last_os_error()),
+--- a/library/std/src/sys/io/error/windows.rs
++++ b/library/std/src/sys/io/error/windows.rs
+@@ -105,6 +105,7 @@
+         // NTSTATUS errors may be encoded as HRESULT, which may returned from
+         // GetLastError. For more information about Windows error codes, see
+         // `[MS-ERREF]`: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/0642cb2f-2075-4469-918c-4441e69c548a
++        #[cfg(not(target_vendor = "uwp"))]
+         if (errnum & c::FACILITY_NT_BIT as i32) != 0 {
+             // format according to https://support.microsoft.com/en-us/help/259693
+             const NTDLL_DLL: &[u16] = &[
