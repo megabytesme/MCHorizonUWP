@@ -1,8 +1,9 @@
 # Fresh-PC builder validation (2026-11-05)
 
 The complete clean-PC acceptance test has **not passed**. The builder still
-needs automatic compiler and SDK provisioning, Minecraft asset download and
-preparation after real-account sign-in, and a full installation trial. These
+needs automatic compiler and SDK provisioning and a full installation trial.
+Minecraft asset preparation has been exercised on the development machine,
+but not yet as part of a complete clean-PC build. These
 results do not establish device compatibility.
 
 ## Component results
@@ -20,6 +21,8 @@ results do not establish device compatibility.
   cache on a second call. The Microsoft UI and VC runtime APPXs from the SDK
   were signature and architecture checked for x86, x64 and ARM64. The ARM32
   VC runtime APPX was absent from the development machine's SDK installation.
+- The Sandbox also installed LLVM 23.1.4 through the builder's WinGet setup
+  path and confirmed that `clang.exe` was present afterwards.
 - The Sandbox verified the public signed catalog and assembled the published
   x64 source release from the upstream archive, patch and client prereleases.
   An earlier download ended with an unexpected EOF; interrupted and stalled
@@ -38,6 +41,11 @@ results do not establish device compatibility.
   frameworks and a neutral resource framework. The ARM32 and ARM64 signatures
   verified in Sandbox; their target architectures cannot be run there. No game
   was launched in these checks.
+- A private development-machine test downloaded and checked the pinned 26.3
+  resources and used Horizon's preparer to produce resources including sounds.
+  The integrated builder helper repeated the download and preparation in
+  `E:\temp\HorizonUWPAssetProof-20261105`. The owner confirmed Minecraft
+  ownership separately in the Sandbox. This is not an end-to-end Sandbox build.
 - The builder's local-install helper installed a separately signed x86 proof
   package and its Microsoft dependencies for the Sandbox user. The test used
   a certificate already trusted in Sandbox; the interactive first-time Windows
@@ -58,6 +66,11 @@ available memory is low, after an ARM32 rebuild hit Windows' paging-file limit.
 | ARM64 | `horizon-arm64-sdk-build-20261105` | `build.cmd` built the Rust bridge; `uwp\host\build-game.cmd arm64` strict-linked the host; signed package signature verified in Sandbox. |
 | x64 with Zoom | `horizon-mixins-apply-proof-20261105` | `build-modded.cmd` built the UWP bridge from the transformed source. |
 
+The ARM32 bridge and strict host were also rebuilt with VS 2022 and SDK 19041
+in `horizon-vs2022-host-proof-20261105`, limiting Cargo to three jobs after a
+32-job attempt exhausted the Windows paging-file limit. This was a developer
+machine toolchain check, not a clean-PC package build.
+
 The bridge build uses `cargo +stable build --offline --manifest-path
 uwp/game-bridge/Cargo.toml` with the selected target and UWP features, after
 fetching dependencies and preparing the patched Rust standard library. ARM32
@@ -70,9 +83,9 @@ not through a downloaded builder on a blank PC.
 - Provision and verify the supported Visual C++ UWP toolchain, SDKs, Rust and
   rust-src automatically; allow Windows to request elevation when
   necessary. Current scripts assume specific Visual Studio locations.
-- Complete and test Minecraft asset download and preparation after ownership
-  sign-in, including the privacy of generated resources. Test sign-in in the
-  UWP client separately.
+- Test Minecraft asset preparation after ownership sign-in in the clean-PC
+  flow, including the privacy of generated resources. Test sign-in in the UWP
+  client separately.
 - Test the local installation offer and first-time certificate approval end to
   end, and complete installation guidance for other devices. Run the client on
   real target hardware, including ARM32.

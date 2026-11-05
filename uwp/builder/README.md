@@ -17,9 +17,10 @@ You can choose bundled Minecraft resources, a new reusable resource framework,
 or an existing framework on the target. Minecraft: Java Edition ownership
 sign-in is required before a build. The Microsoft client ID is the same public
 ID used by the Horizon launcher and UWP client; the builder keeps its sign-in
-tokens in memory. **Automatic downloading and preparation of Minecraft assets
-is not implemented**, and a real-account end-to-end test remains outstanding.
-Choose prepared resources or an existing framework until that work is complete.
+tokens in memory. After ownership is confirmed, the development version can
+download and prepare resources privately using Horizon's pinned tooling. You can
+also choose prepared resources or an existing framework. Do not publish packages
+or resource frameworks containing Minecraft files.
 
 The options page can browse Horizon's native-mod registry, select and remove
 mods, and apply verified bundles through Horizon's mixin tool. Native mods run
@@ -43,8 +44,9 @@ frameworks contain private Minecraft files and should not be published.
 The preview installs missing Git, Python and ARM-target Clang through WinGet
 when a build starts and invokes Rustup interactively. It does not yet provision
 the complete Visual C++ toolchain, SDK and
-Rust toolchain automatically, and its scripts currently expect particular
-Visual Studio installation paths. Administrator approval may be needed when
+Rust toolchain automatically. The newer client recipe can use supported Visual
+Studio 2022 and 2026 editions with the required UWP components installed.
+Administrator approval may be needed when
 installing development tools or trusting the locally generated certificate.
 A complete build from a clean PC has not passed. See
 [CLEAN-PC-VALIDATION.md](CLEAN-PC-VALIDATION.md) for tested paths and limitations.
@@ -63,6 +65,7 @@ dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release
 in Windows Sandbox without a separate .NET runtime. A native ARM64 or x86
 builder distribution has not been established. Builds use private workspaces
 under `%USERPROFILE%\.huwp\b` and parallel jobs limited by available memory. At least
-10 GiB of free space is required, and actual requirements can be higher.
+20 GiB of free space is required for automatic resource preparation; actual
+requirements can be higher.
 See [installation guidance](../../docs/install.md) and
 [builder design](../BUILDER-DESIGN.md) for further details.
