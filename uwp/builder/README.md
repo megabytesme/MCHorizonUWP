@@ -33,14 +33,17 @@ dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release -- --framew
 ```
 
 The normal build bundles the Windows App SDK but requires the .NET 8 runtime.
-`-Publish` bundles both runtimes. One self-contained x64 publish was 164.9 MiB
-and its process started in a clean Windows Sandbox without .NET installed;
-interactive controls and clean-machine tool installation remain untested. See
+`-Publish` bundles both runtimes. The self-contained x64 publish opens in a
+clean Windows Sandbox without .NET installed. Target selection and setup
+scanning were exercised there; clean-machine tool installation and building
+remain unverified. See
 Microsoft's
 [unpackaged WinUI deployment guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/unpackage-winui-app).
 This is a development build, not a tested clean-machine installer. The full
 plan and unresolved device and licensing requirements are in
 [BUILDER-DESIGN.md](../BUILDER-DESIGN.md).
+The latest clean-Sandbox results and remaining blockers are recorded in
+[CLEAN-PC-VALIDATION.md](CLEAN-PC-VALIDATION.md).
 
 The core includes a canonical input record with hashes for the recipe, source
 revision, lockfile, patched Rust standard library, resource inventory and
@@ -49,7 +52,7 @@ This is groundwork only: callers must verify each input, and the current list
 is not a complete reproducibility guarantee or a verified recipe.
 
 The local plan uses pinned source commit
-`336e3e2d00dd4e876169abc2d40aec8ade58b544`, Rust 1.99.1 and Minecraft
+`8b7ab39874de3dbc3a32ce683f86e0e5dd6cc46d`, Rust 1.99.1 and Minecraft
 26.3 resources. It checks that the selected Git repository contains that
 revision, validates the prepared-resource manifest version, and reports the
 exact tool locations required by that revision's host/package scripts. The
@@ -59,7 +62,7 @@ date and short commit in Horizon's version fields. The complete release notes
 for the pinned nightly are included with the client and shown in What's New.
 They are UWP port builds, not the official Horizon binaries. The upstream
 nightly's publication version is `2026.1103.930.50`; the current default UWP
-APPX version is `2026.1105.5.0`. Keep the same package identity for upgrades and choose a
+APPX version is `2026.1105.14.0`. Keep the same package identity for upgrades and choose a
 higher version when rebuilding the port for the same nightly. This
 recipe is pinned; a newer upstream nightly must be integrated and verified
 before the builder's pin is updated. On startup the builder checks GitHub's

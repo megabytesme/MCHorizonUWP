@@ -3,6 +3,14 @@ namespace Horizon.Builder.Core;
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
 public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", string Renderer = "native-d3d11", bool ReuseResourceFramework = false, string ExistingResourceFramework = "")
 {
+    public static TargetProfile DefaultTarget(System.Runtime.InteropServices.Architecture architecture) => architecture switch
+    {
+        System.Runtime.InteropServices.Architecture.X86 => TargetProfile.DesktopX86,
+        System.Runtime.InteropServices.Architecture.X64 => TargetProfile.DesktopX64,
+        System.Runtime.InteropServices.Architecture.Arm => TargetProfile.WindowsMobile,
+        System.Runtime.InteropServices.Architecture.Arm64 => TargetProfile.SurfaceProX,
+        _ => TargetProfile.DesktopX64,
+    };
     // Public Fluent Launcher application ID, selected at the user's request while their own is reviewed.
     public const string FluentLauncherClientId = "0844e754-1d2e-4861-8e2b-18059609badb";
     public const string TouchModId = "horizon_touch";

@@ -13,7 +13,7 @@
     <Button Content="Choose Horizon source" Click="ChooseSource_Click" />
     <TextBlock x:Name="SourcePath" Text="No source selected" TextWrapping="Wrap" />
     <TextBlock Text="Minecraft resources" Style="{StaticResource BodyStrongTextBlockStyle}" />
-    <ComboBox x:Name="ResourceMode" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="ResourceMode_SelectionChanged">
+    <ComboBox x:Name="ResourceMode" SelectedIndex="0" HorizontalAlignment="Stretch">
       <ComboBoxItem Content="Build a separate reusable resource framework" />
       <ComboBoxItem Content="Use a resource framework already installed on the target" />
       <ComboBoxItem Content="Include resources in the client package" />
@@ -26,14 +26,14 @@
     <TextBlock x:Name="MinecraftPath" Text="No Minecraft installation selected" TextWrapping="Wrap" />
     <CheckBox x:Name="PrepareSounds" Content="Prepare missing sounds from this installation in the build workspace" />
     <TextBlock Text="Target device" Style="{StaticResource BodyStrongTextBlockStyle}" />
-    <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="Profile_SelectionChanged">
-      <ComboBoxItem Content="Windows desktop (x64)" />
-      <ComboBoxItem Content="Surface Pro X (ARM64)" />
-      <ComboBoxItem Content="Windows 10 Mobile (ARM32, 15063)" />
-      <ComboBoxItem Content="Windows desktop (x86)" />
+    <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch">
+      <ComboBoxItem Content="x64 — most Intel and AMD Windows PCs" />
+      <ComboBoxItem Content="ARM64 — Snapdragon, Microsoft SQ and Copilot+ PCs" />
+      <ComboBoxItem Content="ARM32 — Windows 10 Mobile phones (15063 or newer)" />
+      <ComboBoxItem Content="x86 — 32-bit Intel and AMD Windows PCs" />
     </ComboBox>
     <TextBlock Text="Renderer build" Style="{StaticResource BodyStrongTextBlockStyle}" />
-    <ComboBox x:Name="Renderer" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="Renderer_SelectionChanged">
+    <ComboBox x:Name="Renderer" SelectedIndex="0" HorizontalAlignment="Stretch">
       <ComboBoxItem Content="Native Direct3D 11 (feature level 9_1)" />
       <ComboBoxItem Content="ANGLE (OpenGL ES 3.0)" />
       <ComboBoxItem Content="Direct3D 12 (WGPU)" />

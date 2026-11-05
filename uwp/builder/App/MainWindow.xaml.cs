@@ -11,6 +11,10 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Profile.SelectionChanged += Profile_SelectionChanged;
+        Renderer.SelectionChanged += Renderer_SelectionChanged;
+        ResourceMode.SelectionChanged += ResourceMode_SelectionChanged;
+        Profile.SelectedIndex = (int)BuildSelection.DefaultTarget(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture);
         MicrosoftClientId.Text = BuildSelection.FluentLauncherClientId;
         PackageVersion.Text = LocalRecipe.DefaultPackageVersion;
         UpdateRendererChoices();
@@ -41,7 +45,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateRendererChoices()
     {
-        if (Profile is null || Renderer is null) return;
+        if (Profile is null || Renderer is null || NativeTouchMod is null) return;
         Renderer.IsEnabled = true;
         var nativeD3d11 = Renderer.SelectedIndex == 0;
         NativeTouchMod.IsEnabled = nativeD3d11;
