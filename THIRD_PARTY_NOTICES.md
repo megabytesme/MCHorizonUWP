@@ -1,5 +1,11 @@
 # Third-party notices
 
+## ANGLE and zlib
+
+Packages that include ANGLE and its zlib runtime also include their license
+notices in `licenses/ANGLE.txt` and `licenses/zlib.txt`, respectively. Packages
+without those runtime libraries do not include these additional notices.
+
 ## USB ID Repository
 
 `third_party/usb-ids/usb.ids` is the 2026-06-26 snapshot of the

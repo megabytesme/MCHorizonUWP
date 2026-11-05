@@ -1,6 +1,8 @@
 param(
     [ValidateSet('x64', 'arm64', 'arm')][string]$Architecture = 'x64',
     [string]$AngleBin,
+    [string]$AngleLicense,
+    [string]$ZlibLicense,
     [switch]$RequireAngle,
     [switch]$Game,
     [string]$Executable,
@@ -52,6 +54,9 @@ if (-not $AngleBin) {
 }
 $angleFiles = @()
 if ($AngleBin) {
+    $anglePrefix = Split-Path -Parent ([IO.Path]::GetFullPath($AngleBin))
+    if (-not $AngleLicense) { $AngleLicense = Join-Path $anglePrefix 'share\angle\copyright' }
+    if (-not (Test-Path -LiteralPath $AngleLicense -PathType Leaf)) { throw 'ANGLE license notice missing; pass -AngleLicense.' }
     foreach ($name in @('libEGL.dll', 'libGLESv2.dll')) {
         $file = Join-Path $AngleBin $name
         if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing ANGLE DLL: $file" }
@@ -60,6 +65,8 @@ if ($AngleBin) {
     }
     $zlib = Join-Path $AngleBin 'z.dll'
     if (Test-Path -LiteralPath $zlib -PathType Leaf) {
+        if (-not $ZlibLicense) { $ZlibLicense = Join-Path $anglePrefix 'share\zlib\copyright' }
+        if (-not (Test-Path -LiteralPath $ZlibLicense -PathType Leaf)) { throw 'zlib license notice missing; pass -ZlibLicense.' }
         Assert-PEArchitecture $zlib $Architecture
         $angleFiles += $zlib
     }
@@ -111,6 +118,10 @@ foreach ($name in $licenseFiles.Keys) {
     $source = Join-Path $repositoryRoot $licenseFiles[$name]
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing license: $source" }
     Copy-Item -LiteralPath $source -Destination (Join-Path $licenseStage $name) -Force
+}
+if ($AngleBin) {
+    Copy-Item -LiteralPath $AngleLicense -Destination (Join-Path $licenseStage 'ANGLE.txt') -Force
+    if ($ZlibLicense) { Copy-Item -LiteralPath $ZlibLicense -Destination (Join-Path $licenseStage 'zlib.txt') -Force }
 }
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'THIRD_PARTY_NOTICES.md') -Destination (Join-Path $stage 'THIRD_PARTY_NOTICES.md') -Force
 $manifest = (Get-Content (Join-Path $hostDir 'AppxManifest.xml') -Raw).Replace('ProcessorArchitecture="x64"', "ProcessorArchitecture=`"$Architecture`"")

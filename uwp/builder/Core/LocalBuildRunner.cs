@@ -38,7 +38,7 @@ public static class LocalBuildRunner
             if (new[] { "libEGL.dll", "libGLESv2.dll" }.All(name => File.Exists(Path.Combine(candidate, name))))
                 angleBin = candidate;
             else if (selection.ValidatedRenderer == "angle")
-                throw new FileNotFoundException("ANGLE was selected, but its UWP runtime DLLs are missing. Install/build ANGLE for the x64-uwp-local vcpkg triplet, then retry.", candidate);
+                throw new FileNotFoundException($"ANGLE was selected, but its UWP runtime DLLs are missing. Install/build ANGLE for the {triplet} vcpkg triplet, then retry.", candidate);
         }
         var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));

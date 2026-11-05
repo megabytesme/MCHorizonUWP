@@ -1,7 +1,7 @@
 # UWP host
 
 The CoreWindow host can run a native graphics probe or the Horizon game bridge.
-The x64 client can package native D3D11, WGPU Direct3D 12, and ANGLE/OpenGL ES
+The x64 and ARM64 clients can package native D3D11, WGPU Direct3D 12, and ANGLE/OpenGL ES
 at once. It probes each packaged backend on the device and lets the player
 choose among those that work. ARM32 uses the phone-tested native D3D11 path.
 
@@ -18,8 +18,10 @@ address space; Windows commits stack pages as they are needed.
 
 Run `./uwp/host/package.ps1 -Architecture x64 -Game -Resources <prepared-dir>`
 with a fresh `-OutputDirectory` to package prepared resources. `-Executable`
-can select an explicit host; include ANGLE DLLs with `-AngleBin` when building
-a multi-renderer x64 client.
+can select an explicit host; set `HORIZON_UWP_ANGLE=1` when linking and include
+matching ANGLE DLLs with `-AngleBin` when packaging a multi-renderer client.
+The script reads ANGLE and zlib notices from the vcpkg installation's `share`
+directory, or accepts explicit `-AngleLicense` and `-ZlibLicense` paths.
 Packages are unsigned and require matching VCLibs and a certificate trusted by
 the target. Game data lives in `LocalState/game`. A local `LocalState/resources`
 tree takes precedence over bundled resources. Do not overwrite existing state

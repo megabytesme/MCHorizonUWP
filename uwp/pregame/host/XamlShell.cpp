@@ -283,6 +283,26 @@ NativeRendererProbe probe_native_renderer() {
     // This probes device support only. The game uses a XAML composition panel.
     return { result, selected };
 }
+
+// The native renderer deliberately requests 9_1 for compatibility. Probe
+// separately so diagnostics report what the device can actually support.
+void trace_hardware_feature_level() {
+    const D3D_FEATURE_LEVEL levels[] = {
+        D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0,
+        D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1,
+    };
+    D3D_FEATURE_LEVEL selected = static_cast<D3D_FEATURE_LEVEL>(0);
+    Microsoft::WRL::ComPtr<ID3D11Device> device;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+    HRESULT result = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
+        D3D11_CREATE_DEVICE_BGRA_SUPPORT, levels, ARRAYSIZE(levels), D3D11_SDK_VERSION,
+        &device, &selected, &context);
+    char event[120];
+    sprintf_s(event, "D3D11 hardware feature level 0x%04X (HRESULT 0x%08X)",
+        static_cast<unsigned>(selected), static_cast<unsigned>(result));
+    horizon_uwp_trace_shell_event(event);
+}
 enum class AppAppearance { Automatic, Windows10, Windows10Fluent, Windows11SunValley };
 AppAppearance selected_appearance = AppAppearance::Automatic;
 AppAppearance startup_appearance = AppAppearance::Automatic;
@@ -2944,6 +2964,7 @@ protected:
         renderer_availability[0] = SUCCEEDED(d3d11_probe.result);
         horizon_uwp_trace_shell_event(renderer_availability[0]
             ? "D3D11 renderer probe succeeded" : "D3D11 renderer probe failed");
+        trace_hardware_feature_level();
 #endif
 #ifdef HORIZON_UWP_ANGLE
         horizon_uwp_trace_shell_event("ANGLE renderer probe starting");
