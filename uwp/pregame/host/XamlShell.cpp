@@ -231,6 +231,7 @@ DispatcherTimer^ controller_navigation_timer;
 bool controller_navigation_sounds = true;
 bool controller_is_last_input = false;
 bool controller_face_buttons_swapped = false;
+ULONGLONG controller_test_standard_east_since = 0;
 
 int read_controller_face_swap() {
     auto game_path = Platform::String::Concat(ApplicationData::Current->LocalFolder->Path, L"\\game");
@@ -1305,6 +1306,7 @@ void show_controller_test() {
     });
     dialog->Closed += ref new TypedEventHandler<ContentDialog^, ContentDialogClosedEventArgs^>([timer](ContentDialog^, ContentDialogClosedEventArgs^) {
         timer->Stop(); horizon_uwp_controller_test_stop(); controller_test_dialog = nullptr; controller_test_scroll = nullptr;
+        controller_test_standard_east_since = 0;
     });
     timer->Start();
     dialog->ShowAsync();
@@ -1315,6 +1317,16 @@ void show_controller_test() {
 void controller_activate_focused() {
     auto element = dynamic_cast<FrameworkElement^>(FocusManager::GetFocusedElement());
     if (!element) return;
+    if (auto item = dynamic_cast<ComboBoxItem^>(element)) {
+        auto box = dynamic_cast<ComboBox^>(ItemsControl::ItemsControlFromItemContainer(item));
+        if (box && item->IsEnabled) {
+            const int index = box->IndexFromContainer(item);
+            if (index >= 0) box->SelectedIndex = index;
+            box->IsDropDownOpen = false;
+            box->Focus(FocusState::Programmatic);
+        }
+        return;
+    }
     if (auto box = dynamic_cast<ComboBox^>(element)) {
         box->IsDropDownOpen = !box->IsDropDownOpen; return;
     }
@@ -1390,13 +1402,21 @@ void controller_cancel_focused() {
     if (navigation && home_navigation) navigation->SelectedItem = home_navigation;
 }
 
-bool handle_swapped_gamepad_key(Windows::System::VirtualKey key, bool down) {
+bool handle_swapped_gamepad_key(Windows::System::VirtualKey key, bool down, bool up, bool repeat) {
     using Windows::System::VirtualKey;
-    if (!controller_face_buttons_swapped ||
-        (launcher_content && launcher_content->Visibility != Visibility::Visible) ||
+    if ((launcher_content && launcher_content->Visibility != Visibility::Visible) ||
         (key != VirtualKey::GamepadA && key != VirtualKey::GamepadB)) return false;
-    // The test dialog must receive button readings without activating controls.
-    if (down && !controller_test_dialog) {
+    // Keep testing independent of the chosen layout: physical East is the
+    // advertised hold-to-close gesture, while short presses remain test input.
+    if (controller_test_dialog) {
+        if (key == VirtualKey::GamepadB) {
+            if (up) controller_test_standard_east_since = 0;
+            else if (down && !controller_test_standard_east_since) controller_test_standard_east_since = GetTickCount64();
+        }
+        return true;
+    }
+    if (!controller_face_buttons_swapped) return false;
+    if (down && !repeat) {
         set_controller_last_input(true);
         if (key == VirtualKey::GamepadA) controller_cancel_focused();
         else controller_activate_focused();
@@ -1446,6 +1466,7 @@ void start_controller_navigation() {
 #else
             unsigned keys = horizon_uwp_controller_navigation_read();
 #endif
+            const unsigned physical_keys = keys;
             const unsigned face = keys & 48;
             if (previous_swap != controller_face_buttons_swapped && face) wait_for_face_release = true;
             previous_swap = controller_face_buttons_swapped;
@@ -1470,9 +1491,13 @@ void start_controller_navigation() {
                     const double offset = (std::max)(0.0, controller_test_scroll->VerticalOffset + amount);
                     controller_test_scroll->ChangeView(nullptr, ref new Platform::Box<double>(offset), nullptr);
                 }
-                if (!(keys & 32)) test_cancel_at = 0;
+                if (!(physical_keys & 32)) test_cancel_at = 0;
                 else if (!test_cancel_at) test_cancel_at = now + 1500;
                 else if (now >= test_cancel_at) { test_cancel_at = 0; controller_cancel_focused(); }
+                if (controller_test_standard_east_since && now - controller_test_standard_east_since >= 1500) {
+                    controller_test_standard_east_since = 0;
+                    controller_cancel_focused();
+                }
                 return;
             }
             test_cancel_at = 0;
@@ -2686,15 +2711,15 @@ protected:
                 const auto kind = event->EventType;
                 const bool down = kind == CoreAcceleratorKeyEventType::KeyDown || kind == CoreAcceleratorKeyEventType::SystemKeyDown;
                 const bool up = kind == CoreAcceleratorKeyEventType::KeyUp || kind == CoreAcceleratorKeyEventType::SystemKeyUp;
-                if ((down || up) && handle_swapped_gamepad_key(event->VirtualKey, down && !event->KeyStatus.WasKeyDown))
+                if ((down || up) && handle_swapped_gamepad_key(event->VirtualKey, down, up, event->KeyStatus.WasKeyDown))
                     event->Handled = true;
             });
         if (Windows::Foundation::Metadata::ApiInformation::IsEventPresent(L"Windows.UI.Xaml.UIElement", L"PreviewKeyDown")) {
             page->PreviewKeyDown += ref new KeyEventHandler([](Platform::Object^, KeyRoutedEventArgs^ event) {
-                if (handle_swapped_gamepad_key(event->Key, !event->KeyStatus.WasKeyDown)) event->Handled = true;
+                if (handle_swapped_gamepad_key(event->Key, true, false, event->KeyStatus.WasKeyDown)) event->Handled = true;
             });
             page->PreviewKeyUp += ref new KeyEventHandler([](Platform::Object^, KeyRoutedEventArgs^ event) {
-                if (handle_swapped_gamepad_key(event->Key, false)) event->Handled = true;
+                if (handle_swapped_gamepad_key(event->Key, false, true, false)) event->Handled = true;
             });
         }
         page->AddHandler(UIElement::KeyDownEvent, ref new KeyEventHandler([](Platform::Object^, KeyRoutedEventArgs^ event) {
