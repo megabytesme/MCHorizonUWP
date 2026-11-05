@@ -17,6 +17,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.applicationmodel.h>
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
+#include <windows.system.h>
 #include <windows.system.threading.h>
 #include <windows.ui.viewmanagement.h>
 #include <windows.ui.popups.h>
@@ -498,6 +499,15 @@ extern "C" int __cdecl horizon_uwp_is_local_test() {
         return 1;
     } catch (...) { return 0; }
 }
+extern "C" int __cdecl horizon_uwp_memory_usage(uint64_t* used, uint64_t* limit) {
+    if (!used || !limit) return 0;
+    try {
+        *used = Windows::System::MemoryManager::AppMemoryUsage;
+        *limit = Windows::System::MemoryManager::AppMemoryUsageLimit;
+        return 1;
+    } catch (Platform::Exception^) { return 0; }
+}
+
 extern "C" void __cdecl horizon_uwp_report_error(const uint8_t* text, size_t len) {
     if (!text && len != 0) return;
     try {

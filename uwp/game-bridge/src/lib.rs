@@ -140,6 +140,7 @@ pub extern "C" fn horizon_uwp_port_ref(buffer: *mut u8, capacity: usize) -> usiz
 #[cfg(target_vendor = "uwp")]
 unsafe extern "C" {
     fn horizon_uwp_report_error(text: *const u8, len: usize);
+    fn horizon_uwp_memory_usage(used: *mut u64, limit: *mut u64) -> i32;
     fn horizon_uwp_fatal_begin(text: *const u8, len: usize);
     fn horizon_uwp_fatal_done() -> i32;
     fn horizon_uwp_is_ui_thread() -> i32;
@@ -736,7 +737,22 @@ unsafe fn run(
     match result {
         Ok(()) => 0,
         Err(error) => {
-            let message = format!("Horizon UWP startup failed: {error}");
+            let detail = error.to_string();
+            let mut message = if detail.to_ascii_uppercase().contains("0X8007000E") {
+                format!(
+                    "Windows reported insufficient memory (0x8007000E) while Horizon was running. Reducing the render distance may help. Details: {detail}"
+                )
+            } else {
+                format!("Horizon UWP encountered an error: {detail}")
+            };
+            let (mut used, mut limit) = (0u64, 0u64);
+            if unsafe { horizon_uwp_memory_usage(&mut used, &mut limit) } != 0 {
+                message.push_str(&format!(
+                    "\nApp memory: {} MiB of {} MiB limit.",
+                    used / 1_048_576,
+                    limit / 1_048_576
+                ));
+            }
             report_failure(&message);
             1
         }

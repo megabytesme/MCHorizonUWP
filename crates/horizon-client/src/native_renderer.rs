@@ -314,13 +314,15 @@ impl NativeRenderer {
             sample.restart();
         }
         if !frame.title {
-            self.entities.draw_entities(
-                self.window.renderer(),
-                &self.atlas,
-                &converted.patches,
-                frame,
-                self.viewport,
-            )?;
+            self.entities
+                .draw_entities(
+                    self.window.renderer(),
+                    &self.atlas,
+                    &converted.patches,
+                    frame,
+                    self.viewport,
+                )
+                .map_err(|error| format!("native entity rendering: {error}"))?;
             #[cfg(feature = "native-d3d11-readback")]
             if let Some(sample) = &mut sample {
                 sample.mark(2);
@@ -339,27 +341,31 @@ impl NativeRenderer {
             }
             if !frame.hand.is_empty() {
                 self.window.renderer().clear_depth()?;
-                self.entities.draw_hand(
-                    self.window.renderer(),
-                    &self.atlas,
-                    &converted.patches,
-                    frame,
-                    self.viewport,
-                )?;
+                self.entities
+                    .draw_hand(
+                        self.window.renderer(),
+                        &self.atlas,
+                        &converted.patches,
+                        frame,
+                        self.viewport,
+                    )
+                    .map_err(|error| format!("native hand rendering: {error}"))?;
             }
         }
         #[cfg(feature = "native-d3d11-readback")]
         if let Some(sample) = &mut sample {
             sample.mark(4);
         }
-        self.hud.draw_supported(
-            self.window.renderer(),
-            &self.atlas,
-            &converted.patches,
-            &converted.draws,
-            self.viewport,
-            converted.scale,
-        )?;
+        self.hud
+            .draw_supported(
+                self.window.renderer(),
+                &self.atlas,
+                &converted.patches,
+                &converted.draws,
+                self.viewport,
+                converted.scale,
+            )
+            .map_err(|error| format!("native HUD rendering: {error}"))?;
         #[cfg(feature = "native-d3d11-readback")]
         if let Some(sample) = &mut sample {
             sample.mark(5);
@@ -379,7 +385,10 @@ impl NativeRenderer {
         if let Some(sample) = &mut sample {
             sample.restart();
         }
-        self.window.renderer().present_with_vsync(!self.benchmark)?;
+        self.window
+            .renderer()
+            .present_with_vsync(!self.benchmark)
+            .map_err(|error| format!("native frame presentation: {error}"))?;
         #[cfg(feature = "native-d3d11-readback")]
         if let (Some(mut sample), Some(timings)) = (sample, &mut self.timings) {
             sample.mark(6);
