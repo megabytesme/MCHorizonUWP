@@ -3,7 +3,9 @@
 An unofficial UWP port of [Horizon](https://github.com/horizon-rust/horizon),
 with a WinUI 3 desktop builder. This repository is under development: the
 builder cannot yet provision a fresh PC, authenticate and prepare all game
-resources, sign packages, browse native mods, or complete an install. Do not
+resources, sign its build output, install native mods, or complete an install.
+The preview can browse Horizon's native-mod index, but does not establish UWP
+compatibility or include those mods in a build. Do not
 treat the current preview as a supported release.
 
 The intended distribution separates three independently versioned components:

@@ -1,5 +1,12 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 1 && args[0] == "--native-index-probe")
+{
+    var nativeResults = await NativeModIndex.FetchAsync();
+    Console.WriteLine($"Horizon registry: {nativeResults.Count} native projects list Minecraft {LocalRecipe.MinecraftVersion}; UWP compatibility was not checked.");
+    return;
+}
+
 if (args.Length == 4 && args[0] == "--signing-proof")
 {
     var identity = PackageSigning.GetOrCreateIdentity();
@@ -309,6 +316,20 @@ catch (InvalidDataException) { }
 
 await TestSourceAssembler();
 await TestReleaseSource();
+var nativeFixture = $$$"""
+{"schema":1,"projects":[
+ {"id":"example","kind":"native-mod","name":"Example","summary":"A native mod","authors":["A"],"versions":[
+  {"version":"2.0","game":"26.3","file":{"name":"example.hnmod","sha256":"{{{new string('a', 64)}}}"}},
+  {"version":"1.0","game":"26.3","file":{"name":"example.hnmod","sha256":"{{{new string('b', 64)}}}"}}]},
+ {"id":"revoked","kind":"native-mod","name":"Revoked","summary":"gone","authors":[],"versions":[
+  {"version":"1.0","game":"26.3","file":{"name":"revoked.hnmod","sha256":"{{{new string('c', 64)}}}"}}]},
+ {"id":"other","kind":"mod","name":"Not native","summary":"","versions":[]}],
+ "revoked":[{"id":"example","sha256":"{{{new string('a', 64)}}}","reason":"taken down"},{"id":"revoked","reason":"taken down"}]}
+""";
+var nativeMods = NativeModIndex.Parse(System.Text.Encoding.UTF8.GetBytes(nativeFixture));
+Require(nativeMods.Count == 1 && nativeMods[0].Id == "example" && nativeMods[0].Version == "1.0", "native index excludes revoked files, projects and other kinds");
+try { _ = NativeModIndex.Parse(System.Text.Encoding.UTF8.GetBytes(nativeFixture.Replace("\"schema\":1", "\"schema\":2"))); throw new Exception("unsupported mod schema accepted"); }
+catch (InvalidDataException) { }
 
 var catalogJson = $$"""
 {

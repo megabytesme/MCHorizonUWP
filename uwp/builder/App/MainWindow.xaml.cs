@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
     private string? sourceDirectory;
     private string? resourceDirectory;
     private string? minecraftDirectory;
+    private IReadOnlyList<NativeModListing> nativeMods = [];
     private int wizardStep;
 
     private void Back_Click(object sender, RoutedEventArgs e)
@@ -199,6 +200,41 @@ public sealed partial class MainWindow : Window
             InstallStatus.Text = $"The tool was not installed: {error.Message}";
         }
         finally { InstallRustup.IsEnabled = true; InstallGit.IsEnabled = true; InstallPython.IsEnabled = true; }
+    }
+
+    private async void BrowseNativeMods_Click(object sender, RoutedEventArgs e)
+    {
+        BrowseNativeMods.IsEnabled = false;
+        NativeModSearch.IsEnabled = false;
+        NativeModsResults.Children.Clear();
+        NativeModsStatus.Text = "Loading Horizon’s native mod registry…";
+        try
+        {
+            nativeMods = await NativeModIndex.FetchAsync();
+            NativeModSearch.IsEnabled = true;
+            RenderNativeMods();
+        }
+        catch (Exception error) { NativeModsStatus.Text = $"Could not load native mods: {error.Message}"; }
+        finally { BrowseNativeMods.IsEnabled = true; }
+    }
+    private void NativeModSearch_TextChanged(object sender, TextChangedEventArgs e) => RenderNativeMods();
+
+    private void RenderNativeMods()
+    {
+        if (NativeModsResults is null || NativeModSearch is null || NativeModsStatus is null) return;
+        NativeModsResults.Children.Clear();
+        var search = NativeModSearch.Text.Trim();
+        var matching = nativeMods.Where(mod => search.Length == 0 || mod.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || mod.Id.Contains(search, StringComparison.OrdinalIgnoreCase) || mod.Summary.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || mod.Authors.Any(author => author.Contains(search, StringComparison.OrdinalIgnoreCase))).ToArray();
+        NativeModsStatus.Text = $"{matching.Length} native mods list Minecraft {LocalRecipe.MinecraftVersion}. UWP compatibility is not yet verified; installing registry mods is not available in this preview.";
+        foreach (var mod in matching)
+        {
+            var item = new StackPanel { Spacing = 3 };
+            item.Children.Add(new TextBlock { Text = $"{mod.Name} · {mod.Version}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            item.Children.Add(new TextBlock { Text = mod.Summary, TextWrapping = TextWrapping.Wrap });
+            NativeModsResults.Children.Add(item);
+        }
     }
     private void CheckSetup_Click(object sender, RoutedEventArgs e)
     {

@@ -73,6 +73,22 @@ one public certificate from synthetic inputs in the same Sandbox.
 It also wrote an installation guide alongside those files; the guide calls out
 the framework dependencies that the preview does not yet collect.
 
+## 2026-11-05: native-mod browsing
+
+The WinUI preview read the live Horizon registry inside Windows Sandbox and
+listed 85 native projects advertising Minecraft 26.3. UI automation searched
+for `zoom` and the list narrowed to two results. The index reader's tests also
+cover revoked files, revoked projects and an unsupported schema. This checks
+browsing only; neither UWP compatibility nor installation of registry mods has
+been implemented or validated.
+
+As a separate integration experiment, the published Horizon launcher 0.2.42
+was checked against its GitHub release digest and run with isolated launcher,
+game and desktop paths. It searched for Zoom and downloaded the `zoom.hnmod`
+bundle into that scratch home using the launcher's own registry checks. The
+launcher reported the bundle as unsigned and checked its SHA-256. It was not
+compiled into a UWP app or installed by the builder.
+
 ## 2026-11-05: catalog signing component
 
 In Sandbox, a separate ephemeral self-signed P-256 certificate was created in

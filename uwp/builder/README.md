@@ -3,6 +3,9 @@
 This desktop WinUI 3 preview checks a small set of build prerequisites and
 records a target, renderer build, and optional native touch and device-vibration
 source-mod selections.
+The options page can browse and search Horizon's native-mod registry; adding
+those registry mods to a UWP build and determining their UWP compatibility are
+not yet available.
 The latter has its own in-game setting, separate from controller vibration.
 The touch selection maps to the `native-touch-mod` Cargo feature and includes
 touch-look sensitivity and on-screen control-size sliders, plus optional
@@ -17,8 +20,9 @@ silent installation has been exercised in Sandbox. The local recipe can embed pr
 separate resource framework, or use a framework already installed on the target.
 The existing-framework option requires its exact name and no local resource
 directory. The builder does not sign or install packages. Tool presence does not establish version or recipe
-compatibility with every machine; the x86, x64, ARM64 and ARM32 recipes have
-been built locally. ARM64 and ARM32 Rust builds use the installed LLVM Clang
+compatibility with every machine. Earlier port work built x86, x64, ARM64 and
+ARM32 locally; the split-source release pipeline has not been validated for all
+four. ARM64 and ARM32 Rust builds use the installed LLVM Clang
 compiler for their cross-target C dependencies. Visual Studio detection checks
 common installation locations and may miss custom locations.
 
