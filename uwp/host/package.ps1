@@ -97,6 +97,21 @@ if ($Resources) {
     Copy-Item -LiteralPath $resourceRoot -Destination $resourceStage -Recurse
     Write-Host "Staged user-provided resources from $resourceRoot"
 }
+# Include the notices for the controller code and identification databases in
+# the binary distribution, including the BSD-3-Clause redistribution terms.
+$licenseStage = Join-Path $stage 'licenses'
+New-Item -ItemType Directory -Force -Path $licenseStage | Out-Null
+$licenseFiles = @{
+    'gilrs-core-MIT.txt' = 'third_party/gilrs-core/LICENSE-MIT'
+    'SDL-GameControllerDB.txt' = 'third_party/controller-mappings/LICENSE'
+    'USB-ID-Repository.txt' = 'third_party/usb-ids/LICENSE'
+}
+foreach ($name in $licenseFiles.Keys) {
+    $source = Join-Path $repositoryRoot $licenseFiles[$name]
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing license: $source" }
+    Copy-Item -LiteralPath $source -Destination (Join-Path $licenseStage $name) -Force
+}
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'THIRD_PARTY_NOTICES.md') -Destination (Join-Path $stage 'THIRD_PARTY_NOTICES.md') -Force
 $manifest = (Get-Content (Join-Path $hostDir 'AppxManifest.xml') -Raw).Replace('ProcessorArchitecture="x64"', "ProcessorArchitecture=`"$Architecture`"")
 if ($IdentityName) {
     $manifest = $manifest.Replace('Name="HorizonUWPPrototype"', "Name=`"$IdentityName`"")
