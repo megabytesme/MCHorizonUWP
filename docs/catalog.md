@@ -4,9 +4,9 @@ The goal is a signed, versioned release catalog for three independent release
 types: `builder-vX.Y.Z`, `client-vX.Y.Z` and `patch-vX.Y.Z`. The catalog
 implementation includes a parser, compatibility checker, P-256 signature
 verifier, HTTPS transport and an embedded public verification key. The wizard
-can select catalog releases and pass verified inputs to the build runner, but
-the first client and patch releases are still drafts and cannot be downloaded.
-They are not a supported release.
+can select catalog releases and pass verified inputs to the build runner. The
+first client and patch are available as development prereleases; they are not
+a supported release.
 
 Schema 1 uses three-part numeric stable versions. A rule has inclusive lower
 and exclusive upper bounds for patch, client and builder versions, and an
@@ -24,10 +24,9 @@ artifact references and conflicting evidence.
 The verifier accepts a detached P-256 ECDSA signature over the exact UTF-8
 catalog bytes, using SHA-256 and a 64-byte IEEE P1363 signature. The builder
 embeds the public SubjectPublicKeyInfo key in `uwp/builder/Core/Assets/`.
-`catalog/catalog-v1.json` and its detached `.sig` contain the initial candidate;
-their client and patch download URLs will not work until those draft releases
-are published. The candidate currently declares only x64 and records no build
-or device evidence.
+`catalog/catalog-v1.json` and its detached `.sig` contain the initial candidate.
+The catalog declares x86, x64, ARM32 and ARM64 combinations and records no
+end-to-end builder or device evidence.
 
 The maintainer's P-256 private key is in the current Windows user's personal
 certificate store, with friendly name `MCHorizonUWP release catalog signing`.
@@ -51,7 +50,8 @@ automation must only publish evidence backed by actual tests.
 The first candidate patch applies to the pinned upstream commit. The source
 assembler verifies input hashes, applies the patch and overlays a separate UWP
 client archive in a new workspace. Synthetic tests and a local assembly of the
-first candidate passed. A development runner can now build and sign that exact
-split-source candidate; an x64 output and its separate resource framework were
-verified and installed in Sandbox. The wizard's catalog path, authenticated
-public releases and the other target builds remain unverified end to end.
+first candidate passed. The Sandbox verified the public catalog and assembled
+the x64 source release. Development-machine proofs produced signed packages
+for all four targets, and x64 and x86 packages were installed in Sandbox. The
+complete builder flow on a fresh PC and runtime behavior on target devices
+remain unverified.
