@@ -15,7 +15,7 @@ public interface IProbe
 
 public sealed class SetupChecker(IProbe probe)
 {
-    public IReadOnlyList<SetupCheck> Scan(TargetProfile profile, bool splitRelease = false)
+    public IReadOnlyList<SetupCheck> Scan(TargetProfile profile, bool splitRelease = false, bool unifiedToolchain = false)
     {
         var checks = new List<SetupCheck>();
         CheckPath(checks, "Git", "git.exe", "Install Git for Windows from its official publisher.", "https://git-scm.com/install/windows");
@@ -24,7 +24,7 @@ public sealed class SetupChecker(IProbe probe)
         CheckPath(checks, "Python", "python.exe", "Install Python from its official publisher.", "https://www.python.org/downloads/windows/");
 
         var kitsRoot = Path.Combine(probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)", "Windows Kits", "10");
-        var hostSdk = profile == TargetProfile.SurfaceProX ? "10.0.26100.0" : splitRelease ? "10.0.17763.0" : "10.0.15063.0";
+        var hostSdk = profile == TargetProfile.SurfaceProX ? "10.0.26100.0" : unifiedToolchain ? "10.0.19041.0" : splitRelease ? "10.0.17763.0" : "10.0.15063.0";
         var hostBin = Path.Combine(kitsRoot, "bin", hostSdk, "x64");
         var packageBin = Path.Combine(kitsRoot, "bin", "10.0.26100.0", "x64");
         var hasSdk = probe.FileExists(Path.Combine(hostBin, "fxc.exe"))

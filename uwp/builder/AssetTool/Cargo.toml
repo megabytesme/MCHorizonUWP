@@ -1,0 +1,13 @@
+[package]
+name = "horizon-uwp-assets"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+[workspace]
+[dependencies]
+dirs = "5"
+serde_json = "1"
+sha1 = "0.10"
+ureq = { version = "2", features = ["tls"], default-features = false }
+url = "2"
+horizon-prepare = { path = "../source/crates/horizon-prepare" }

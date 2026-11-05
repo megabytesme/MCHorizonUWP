@@ -9,6 +9,9 @@
     <EmbeddedResource Include="Assets/catalog-public.der" LogicalName="Horizon.Builder.Core.CatalogPublicKey.der" />
     <EmbeddedResource Include="../../shared/horizon-client-id.txt" LogicalName="Horizon.Builder.Core.HorizonClientId.txt" />
     <EmbeddedResource Include="../../../docs/install.md" LogicalName="Horizon.Builder.Core.InstallGuide.md" />
+    <EmbeddedResource Include="../AssetTool/Cargo.toml" LogicalName="Horizon.Builder.Core.AssetTool.Cargo.toml" />
+    <EmbeddedResource Include="../AssetTool/Cargo.lock" LogicalName="Horizon.Builder.Core.AssetTool.Cargo.lock" />
+    <EmbeddedResource Include="../AssetTool/main.rs" LogicalName="Horizon.Builder.Core.AssetTool.main.rs" />
     <InternalsVisibleTo Include="Horizon.Builder.Tests" />
   </ItemGroup>
 </Project>

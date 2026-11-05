@@ -1,5 +1,38 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 5 && args[0] == "--prepare-assets-candidate")
+{
+    static string InputHash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+    var root = Path.GetFullPath(args[4]);
+    if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new asset proof workspace.");
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git was not found.");
+    Directory.CreateDirectory(root);
+    var source = Path.Combine(root, "source");
+    var upstream = new CatalogArtifact("https://example.test/source", InputHash(args[1]));
+    var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
+    var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
+    await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
+    var release = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
+        new CatalogClient("0.1.1", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+    var resources = await MinecraftAssetPreparation.PrepareAsync(release, new BuildSelection(TargetProfile.DesktopX64, false), true,
+        new SystemProbe(), new ConsoleProgress());
+    Require(File.Exists(Path.Combine(resources, "horizon-resources.json")), "automatic resource preparation produced its manifest");
+    Console.WriteLine($"Verified integrated asset preparation: {resources}");
+    return;
+}
+
+if (args.Length == 2 && args[0] == "--stage-asset-helper")
+{
+    var workspace = Path.GetFullPath(args[1]);
+    var source = Path.Combine(workspace, "source");
+    var staged = await MinecraftAssetPreparation.StageHelperAsync(source, workspace);
+    Require(File.Exists(Path.Combine(staged, "Cargo.lock")) && File.Exists(Path.Combine(staged, "src", "mojang.rs")), "asset helper and pinned Horizon downloader staged");
+    try { await MinecraftAssetPreparation.StageHelperAsync(source, workspace); throw new Exception("existing asset helper accepted"); }
+    catch (IOException) { }
+    Console.WriteLine($"Asset helper staged: {staged}");
+    return;
+}
+
 if (args.Length == 1 && args[0] == "--install-clang-proof")
 {
     SystemProbe.RefreshProcessPath();
@@ -158,6 +191,30 @@ if (args.Length == 1 && args[0] == "--native-index-probe")
     return;
 }
 
+if ((args.Length == 4 || args.Length == 5) && args[0] == "--build-unified-candidate")
+{
+    static string InputHash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed for the candidate build.");
+    var root = Path.Combine(Path.GetTempPath(), "horizon-unified-recipe-proof-" + Guid.NewGuid().ToString("N"));
+    var source = Path.Combine(root, "source");
+    Directory.CreateDirectory(root);
+    var upstream = new CatalogArtifact("https://example.test/source", InputHash(args[1]));
+    var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
+    var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
+    await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
+    var prepared = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
+        new CatalogClient("0.1.1", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+    var hasResources = args.Length == 5;
+    var candidateSelection = new BuildSelection(TargetProfile.DesktopX64, true, UseResourceFramework: hasResources,
+        NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId, ReuseResourceFramework: !hasResources,
+        ExistingResourceFramework: hasResources ? "" : "Horizon.Asset.26-3.2d21cce5593c8e6e7f3fa20b5f9f9f");
+    var result = await LocalBuildRunner.RunPreparedAsync(prepared, hasResources ? args[4] : null, candidateSelection, new SystemProbe(), new ConsoleProgress());
+    Require(result.SignedOutput is { } signed && File.Exists(signed.Client) && signed.Dependencies is { Count: 2 }, "unified recipe produced a signed client with frameworks");
+    Require(!hasResources || File.Exists(result.SignedOutput!.ResourceFramework), "prepared resources produced a signed framework");
+    Console.WriteLine($"Unified Build Tools candidate: {result.SignedOutput!.Client}");
+    return;
+}
+
 if (args.Length == 5 && args[0] == "--build-split-candidate")
 {
     // Development proof: the files are hashed locally, not authenticated as releases.
@@ -171,7 +228,7 @@ if (args.Length == 5 && args[0] == "--build-split-candidate")
     var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
     await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
     var prepared = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
-        new CatalogClient("0.1.0", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), "0.1.0", "x64");
+        new CatalogClient("0.1.0", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
     var result = await LocalBuildRunner.RunPreparedAsync(prepared, args[4], new BuildSelection(TargetProfile.DesktopX64, true,
         UseResourceFramework: true, NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId), new SystemProbe(), new ConsoleProgress());
     var signed = result.SignedOutput ?? throw new Exception("The candidate package was not signed.");
@@ -782,6 +839,23 @@ try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, hash, "C
 catch (ArgumentException) { }
 
 var missing = new SetupChecker(new FakeProbe()).Scan(TargetProfile.WindowsMobile);
+var unverifiedOwnershipBlocked = false;
+try { await MinecraftAssetPreparation.PrepareAsync(null!, new BuildSelection(TargetProfile.DesktopX64, false), false, new FakeProbe()); }
+catch (InvalidOperationException) { unverifiedOwnershipBlocked = true; }
+Require(unverifiedOwnershipBlocked, "asset downloads require confirmed Minecraft ownership");
+var unifiedProbe = new FakeProbe();
+var vsRoot = Path.Combine(unifiedProbe.Root, "Microsoft Visual Studio", "2022", "BuildTools");
+var toolsets = Path.Combine(vsRoot, "VC", "Tools", "MSVC");
+var fakeToolset = Path.Combine(toolsets, "14.44.35207");
+unifiedProbe.Files.Add(Path.Combine(vsRoot, "VC", "Auxiliary", "Build", "vcvarsall.bat"));
+unifiedProbe.AddDirectory(toolsets, fakeToolset);
+foreach (var arch in new[] { "x64", "arm64" })
+{
+    unifiedProbe.Files.Add(Path.Combine(fakeToolset, "bin", "Hostx64", arch, "cl.exe"));
+    unifiedProbe.Files.Add(Path.Combine(fakeToolset, "lib", arch, "store", "vcruntime.lib"));
+}
+Require(VisualCppInstallation.FindForTarget(unifiedProbe, TargetProfile.SurfaceProX) == vsRoot, "one Build Tools installation supplies host and target compilers");
+Require(VisualCppInstallation.FindForTarget(unifiedProbe, TargetProfile.WindowsMobile) is null, "missing ARM32 tools are not accepted");
 Require(LocalPackageInstaller.CanInstall(TargetProfile.DesktopX86, System.Runtime.InteropServices.Architecture.X64, new Version(10, 0, 19045)), "x86 can install on x64 Windows");
 Require(!LocalPackageInstaller.CanInstall(TargetProfile.WindowsMobile, System.Runtime.InteropServices.Architecture.X64, new Version(10, 0, 19045)), "ARM32 is not offered on x64 Windows");
 Require(!LocalPackageInstaller.CanInstall(TargetProfile.DesktopX64, System.Runtime.InteropServices.Architecture.Arm64, new Version(10, 0, 19045)), "Windows 10 ARM64 does not offer x64 installation");
@@ -912,7 +986,7 @@ static async Task TestReleaseSource()
         Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
         Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
         var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = "0.1.0", UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
-            prepared.Client with { Version = "0.1.0" }, prepared.Compatibility, "0.1.0", "x64");
+            prepared.Client with { Version = "0.1.0" }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.DesktopX64, true));
         try { LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.WindowsMobile, true)); throw new Exception("wrong build architecture accepted"); }
         catch (InvalidOperationException) { }

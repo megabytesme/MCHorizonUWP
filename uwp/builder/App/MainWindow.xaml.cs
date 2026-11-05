@@ -11,6 +11,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"Horizon UWP Builder — Preview {CatalogTrust.BuilderVersion}";
         Closed += (_, _) => minecraftSignInCancellation?.Cancel();
         Profile.SelectionChanged += Profile_SelectionChanged;
         ReleaseSelection.SelectionChanged += (_, _) => UpdateBuildActions();
@@ -61,16 +62,20 @@ public sealed partial class MainWindow : Window
 
     private void Profile_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateReleaseChoices();
     private void ResourceMode_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateResourceChoices();
+    private void DownloadMinecraft_Click(object sender, RoutedEventArgs e) => UpdateResourceChoices();
 
     private void UpdateResourceChoices()
     {
-        if (ResourceMode is null || ExistingFrameworkName is null || ChooseResources is null || ChooseMinecraft is null || PrepareSounds is null) return;
+        if (ResourceMode is null || ExistingFrameworkName is null || DownloadMinecraft is null || ChooseResources is null || ChooseMinecraft is null || PrepareSounds is null) return;
         var reuse = ResourceMode.SelectedIndex == 1;
+        if (reuse) DownloadMinecraft.IsChecked = false;
+        var download = !reuse && DownloadMinecraft.IsChecked == true;
         ExistingFrameworkName.IsEnabled = reuse;
-        ChooseResources.IsEnabled = !reuse;
-        ChooseMinecraft.IsEnabled = !reuse;
-        PrepareSounds.IsEnabled = !reuse;
-        if (reuse) PrepareSounds.IsChecked = false;
+        DownloadMinecraft.IsEnabled = !reuse;
+        ChooseResources.IsEnabled = !reuse && !download;
+        ChooseMinecraft.IsEnabled = !reuse && !download;
+        PrepareSounds.IsEnabled = !reuse && !download;
+        if (reuse || download) PrepareSounds.IsChecked = false;
     }
 
     private BuildSelection CurrentSelection() => new((TargetProfile)Profile.SelectedIndex,
@@ -168,7 +173,7 @@ public sealed partial class MainWindow : Window
             minecraftOwnershipVerified = owns;
             UpdateBuildActions();
             MinecraftSignInStatus.Text = owns
-                ? "Minecraft: Java Edition ownership confirmed. Automatic resource preparation is not available in this preview."
+                ? "Minecraft: Java Edition ownership confirmed. Your resources can now be downloaded and prepared."
                 : "This account does not have Minecraft: Java Edition. Sign in with an account that owns it.";
         }
         catch (OperationCanceledException) { MinecraftSignInStatus.Text = "Sign-in cancelled."; }
@@ -208,15 +213,18 @@ public sealed partial class MainWindow : Window
             var selection = CurrentSelection();
             var release = ReleaseSelection.SelectedItem as ReleaseChoice ?? throw new InvalidOperationException("Choose a compatible catalog release.");
             var plan = LocalRecipe.Plan(selection);
-            LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
+            var download = ResourceMode.SelectedIndex != 1 && DownloadMinecraft.IsChecked == true;
+            if (!download) LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var probe = new SystemProbe();
-            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: true);
+            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
+                splitRelease: true, unifiedToolchain: release.Client == "0.1.1");
             RecipeStatus.Text = blockers.Count == 0
                 ? "The catalog combination and required tool locations were found. The release files will be verified when downloaded."
                 : "The recipe has missing prerequisites:";
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
-            if (selection.ValidatedExistingResourceFramework is null && !selection.PrepareSounds && LocalRecipe.SoundWarning(resources!) is { } warning)
+            if (!download && selection.ValidatedExistingResourceFramework is null && !selection.PrepareSounds && LocalRecipe.SoundWarning(resources!) is { } warning)
                 RecipeSteps.Children.Add(new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap });
+            if (download) RecipeSteps.Children.Add(new TextBlock { Text = "Download and prepare Minecraft resources in the private build workspace.", TextWrapping = TextWrapping.Wrap });
             foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name == "Snapshot pinned source" ? "Download and verify the selected release source" : step.Name, TextWrapping = TextWrapping.Wrap });
             if (selection.RegistryNativeMods is { Count: > 0 } mods)
                 RecipeSteps.Children.Add(new TextBlock { Text = $"Selected native mods: {string.Join(", ", mods)}. Their compatibility is checked while building.", TextWrapping = TextWrapping.Wrap });
@@ -239,13 +247,15 @@ public sealed partial class MainWindow : Window
             var minecraft = minecraftDirectory;
             var selection = CurrentSelection();
             var release = ReleaseSelection.SelectedItem as ReleaseChoice ?? throw new InvalidOperationException("Choose a compatible catalog release.");
-            LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
+            var download = ResourceMode.SelectedIndex != 1 && DownloadMinecraft.IsChecked == true;
+            if (!download) LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var probe = new SystemProbe();
             await WindowsPackageManager.EnsureBuildBasicsAsync(probe, tool => WindowsPackageManager.InstallAsync(probe, tool),
                 SystemProbe.RefreshProcessPath, progress);
             await WindowsPackageManager.EnsureClangAsync(probe, selection.Target, tool => WindowsPackageManager.InstallAsync(probe, tool), progress);
-            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: true);
+            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
+                splitRelease: true, unifiedToolchain: release.Client == "0.1.1");
             if (blockers.Count > 0) throw new InvalidOperationException(string.Join(" ", blockers));
             var git = probe.FindOnPath("git.exe") ?? throw new InvalidOperationException("Git is required to assemble the release.");
             var baseDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
@@ -255,6 +265,7 @@ public sealed partial class MainWindow : Window
             using var transport = new CatalogTransport();
             var prepared = await ReleaseSource.PrepareAsync(transport, CatalogTrust.CatalogUri, CatalogTrust.SignatureUri,
                 CatalogTrust.PublicKey(), release.Patch, release.Client, CatalogTrust.BuilderVersion, release.Architecture, workspace, git);
+            if (download) resources = await MinecraftAssetPreparation.PrepareAsync(prepared, selection, minecraftOwnershipVerified, probe, progress);
             var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft);
             var signed = result.SignedOutput ?? throw new InvalidOperationException("The build did not produce signed output.");
             builtOutput = signed;
@@ -368,7 +379,8 @@ public sealed partial class MainWindow : Window
             Text = $"Requested target: {selection.RustTarget} | Features: {string.Join(", ", selection.Features)}",
             TextWrapping = TextWrapping.Wrap
         });
-        foreach (var check in new SetupChecker(new SystemProbe()).Scan(selection.Target, splitRelease: true))
+        foreach (var check in new SetupChecker(new SystemProbe()).Scan(selection.Target, splitRelease: true,
+            unifiedToolchain: ReleaseSelection.SelectedItem is ReleaseChoice { Client: "0.1.1" }))
         {
             var panel = new StackPanel { Spacing = 4 };
             panel.Children.Add(new TextBlock { Text = $"{check.Name} — {check.Status}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });

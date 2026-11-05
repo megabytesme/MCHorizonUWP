@@ -35,6 +35,7 @@ public static class LocalBuildRunner
         if (!GlobalMemoryStatusEx(ref status)) return GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
         return (long)Math.Min(Math.Min(status.TotalPhysical, status.AvailablePageFile), (ulong)long.MaxValue);
     }
+    internal static int CurrentCargoJobCount() => CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory());
 
     public static async Task<LocalBuildResult> RunAsync(string source, string? resources, BuildSelection selection,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
@@ -53,8 +54,8 @@ public static class LocalBuildRunner
         ArgumentNullException.ThrowIfNull(release);
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
-        if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != "0.1.0"
-            || release.Patch.Version != "0.1.0" || release.Client.Version != "0.1.0"
+        if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
+            || release.Patch.Version != "0.1.0" || release.Client.Version is not ("0.1.0" or "0.1.1")
             || !release.Patch.UpstreamCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
     }
@@ -88,8 +89,12 @@ public static class LocalBuildRunner
             if (new[] { "libEGL.dll", "libGLESv2.dll" }.All(name => File.Exists(Path.Combine(candidate, name))))
                 angleBin = candidate;
         }
-        var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: release is not null);
+        var unifiedToolchain = release?.Client.Version == "0.1.1";
+        var toolchainRoot = unifiedToolchain ? VisualCppInstallation.FindForTarget(probe, selection.Target) : null;
+        var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
+            splitRelease: release is not null, unifiedToolchain: unifiedToolchain);
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
+        if (unifiedToolchain && toolchainRoot is null) throw new InvalidOperationException("The selected Visual Studio toolchain is no longer available. Check setup again.");
         var profileRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             ?? throw new InvalidOperationException("Could not determine the builder workspace drive.");
         if (new DriveInfo(profileRoot).AvailableFreeSpace < MinimumFreeBytes)
@@ -104,7 +109,7 @@ public static class LocalBuildRunner
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
         var cmd = Path.Combine(system, "cmd.exe");
         var powershell = Path.Combine(system, "WindowsPowerShell", "v1.0", "powershell.exe");
-        var jobs = CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory());
+        var jobs = CurrentCargoJobCount();
 
         var targetArchitecture = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => throw new ArgumentOutOfRangeException(nameof(selection)) };
@@ -121,7 +126,7 @@ public static class LocalBuildRunner
         if (selection.RegistryNativeMods is { Count: > 0 } selectedMods)
         {
             if (release is null) throw new InvalidOperationException("Native registry mods require an authenticated source release.");
-            var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: true);
+            var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: true, unifiedRoot: toolchainRoot);
             hostEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
             snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, progress);
         }
@@ -137,7 +142,8 @@ public static class LocalBuildRunner
         }
 
         progress?.Report("Preparing the Visual C++ environment.");
-        var vcEnvironment = await VisualCppEnvironment(cmd, selection.Target, probe, splitRelease: release is not null);
+        var vcEnvironment = await VisualCppEnvironment(cmd, selection.Target, probe, splitRelease: release is not null, unifiedRoot: toolchainRoot);
+        if (toolchainRoot is not null) vcEnvironment["HORIZON_UWP_VSROOT"] = toolchainRoot;
         // Never inherit an unrelated client ID from the parent environment.
         vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
         vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
@@ -148,6 +154,7 @@ public static class LocalBuildRunner
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
+        jobs = CurrentCargoJobCount();
         vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
         progress?.Report($"Using {jobs} parallel Cargo jobs based on available processors and memory.");
         if (selection.Target == TargetProfile.SurfaceProX)
@@ -171,7 +178,7 @@ public static class LocalBuildRunner
         }
 
         var packageResources = existingFramework is not null ? null : selection.PrepareSounds
-            ? await PrepareSoundResourcesAsync(snapshot, resources!, minecraftDirectory!, probe, progress)
+            ? await PrepareSoundResourcesAsync(snapshot, resources!, minecraftDirectory!, probe, progress, toolchainRoot)
             : Path.GetFullPath(resources!);
 
         progress?.Report("Building the game bridge. This may take several minutes.");
@@ -277,17 +284,17 @@ public static class LocalBuildRunner
         return root;
     }
 
-    private static async Task<Dictionary<string, string>> VisualCppEnvironment(string cmd, TargetProfile profile, IProbe probe, bool splitRelease)
+    internal static async Task<Dictionary<string, string>> VisualCppEnvironment(string cmd, TargetProfile profile, IProbe probe, bool splitRelease, string? unifiedRoot = null)
     {
         var arm = profile == TargetProfile.WindowsMobile;
         var arm64 = profile == TargetProfile.SurfaceProX;
         var x86 = profile == TargetProfile.DesktopX86;
         var root = arm ? probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)" : probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files";
-        var vcvars = arm
+        var vcvars = unifiedRoot is not null ? Path.Combine(unifiedRoot, "VC", "Auxiliary", "Build", "vcvarsall.bat") : arm
             ? Path.Combine(root, "Microsoft Visual Studio", splitRelease ? "2022" : "2017", splitRelease ? "BuildTools" : "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
             : Path.Combine(root, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");
         IReadOnlyList<string> args = arm
-            ? ["/d", "/c", "call", vcvars, "x64_arm", "store", splitRelease ? "10.0.17763.0" : "10.0.15063.0", "&&", "set"]
+            ? ["/d", "/c", "call", vcvars, "x64_arm", "store", unifiedRoot is not null ? "10.0.19041.0" : splitRelease ? "10.0.17763.0" : "10.0.15063.0", "&&", "set"]
             : arm64
                 ? ["/d", "/c", "call", vcvars, "x64_arm64", "store", "10.0.26100.0", "&&", "set"]
                 : x86
@@ -343,7 +350,7 @@ public static class LocalBuildRunner
 
     /// Prepares sounds only in a new resource tree under the selected build snapshot.
     internal static async Task<string> PrepareSoundResourcesAsync(string snapshot, string resources, string minecraftDirectory,
-        IProbe probe, IProgress<string>? progress = null)
+        IProbe probe, IProgress<string>? progress = null, string? unifiedRoot = null)
     {
         LocalRecipe.ValidateResources(resources);
         LocalRecipe.ValidateSoundPreparation(resources, minecraftDirectory);
@@ -353,8 +360,8 @@ public static class LocalBuildRunner
         await Task.Run(() => StageResources(resources, destination));
         var cargo = probe.FindOnPath("cargo.exe") ?? throw new InvalidOperationException("Cargo is required to prepare sounds.");
         var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
-        var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: false);
-        hostEnvironment["CARGO_BUILD_JOBS"] = CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory()).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: false, unifiedRoot: unifiedRoot);
+        hostEnvironment["CARGO_BUILD_JOBS"] = CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var plan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
         progress?.Report("Building Horizon's resource preparation tool.");
         await RunProcess(cargo, root, plan.Steps.Single(step => step.Name == "Build resource preparer").Arguments, hostEnvironment);

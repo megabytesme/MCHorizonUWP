@@ -20,7 +20,7 @@
             <StackPanel x:Name="WelcomePage" Spacing="14">
               <TextBlock Text="Welcome to Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="Create a Horizon package for a Windows PC or a Windows 10 Mobile device." TextWrapping="Wrap" />
-              <TextBlock Text="This preview still needs prepared Minecraft resources and development tools. Complete automatic setup and resource preparation are not ready." TextWrapping="Wrap" />
+              <TextBlock Text="This preview still needs development tools. Complete automatic setup and a full clean-PC build have not yet been validated." TextWrapping="Wrap" />
               <TextBlock Text="The builder retrieves compatible releases from the MCHorizonUWP repository." TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel x:Name="TargetPage" Spacing="14" Visibility="Collapsed">
@@ -52,7 +52,7 @@
               <TextBlock x:Name="ReleaseStatus" Text="Checking the signed release catalog…" TextWrapping="Wrap" />
               <Button x:Name="RefreshReleases" Content="Refresh releases" Click="RefreshReleases_Click" />
               <TextBlock Text="Minecraft resources" Style="{StaticResource BodyStrongTextBlockStyle}" />
-              <TextBlock Text="Sign in with a Microsoft account that owns Minecraft: Java Edition. This preview can check ownership; downloading and preparing resources is not available yet." TextWrapping="Wrap" />
+              <TextBlock Text="Sign in with a Microsoft account that owns Minecraft: Java Edition. The builder can download and prepare your resources privately from Mojang." TextWrapping="Wrap" />
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button x:Name="StartMinecraftSignIn" Content="Sign in to Microsoft" Click="StartMinecraftSignIn_Click" />
                 <Button x:Name="CancelMinecraftSignIn" Content="Cancel sign-in" Click="CancelMinecraftSignIn_Click" IsEnabled="False" />
@@ -65,6 +65,8 @@
                 <ComboBoxItem Content="Include resources in the client package" />
               </ComboBox>
               <TextBlock Text="A separate framework can be reused by compatible client packages. Bundled resources travel with each client package." TextWrapping="Wrap" />
+              <CheckBox x:Name="DownloadMinecraft" Content="Download and prepare my Minecraft resources automatically" IsChecked="True" Click="DownloadMinecraft_Click" />
+              <TextBlock Text="Downloaded Minecraft files and generated resources remain in your private build workspace. Do not share packages containing those resources." TextWrapping="Wrap" />
               <TextBlock Text="For an existing framework, enter its exact package name and ensure it is installed on the target." TextWrapping="Wrap" />
               <TextBox x:Name="ExistingFrameworkName" PlaceholderText="Horizon.Asset.26-3.…" IsEnabled="False" />
               <Button x:Name="ChooseResources" Content="Choose prepared resources" Click="ChooseResources_Click" />

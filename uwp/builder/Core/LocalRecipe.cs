@@ -171,7 +171,7 @@ public static class LocalRecipe
             throw new InvalidDataException("Selected resources already contain some sound data. Use complete resources without sound preparation, or choose a sound-free copy.");
     }
 
-    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust, bool splitRelease = false)
+    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust, bool splitRelease = false, bool unifiedToolchain = false)
     {
         var blockers = new List<string>();
         foreach (var tool in new[] { "git.exe", "rustup.exe", "cargo.exe", "python.exe" })
@@ -189,16 +189,19 @@ public static class LocalRecipe
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
         };
-        var vc = arch == "arm"
+        var unifiedRoot = unifiedToolchain ? VisualCppInstallation.FindForTarget(probe, selection.Target) : null;
+        var vc = unifiedToolchain ? (unifiedRoot is null ? "" : Path.Combine(unifiedRoot, "VC", "Auxiliary", "Build", "vcvarsall.bat")) : arch == "arm"
             ? Path.Combine(pfx86, "Microsoft Visual Studio", splitRelease ? "2022" : "2017", splitRelease ? "BuildTools" : "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
             : Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");
-        if (!probe.FileExists(vc)) blockers.Add($"The checked-in {arch} host script's Visual Studio installation was not found.");
-        if (arch == "arm" && selection.PrepareSounds && !probe.FileExists(Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")))
+        if (!probe.FileExists(vc)) blockers.Add(unifiedToolchain
+            ? $"Visual Studio Build Tools with x64 and {arch} C++ UWP tools was not found."
+            : $"The checked-in {arch} host script's Visual Studio installation was not found.");
+        if (!unifiedToolchain && arch == "arm" && selection.PrepareSounds && !probe.FileExists(Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")))
             blockers.Add("Sound preparation requires the x64 Visual Studio installation used by the checked-in desktop host script.");
         if ((arch is "arm" or "arm64") && !probe.FileExists(Path.Combine(pf, "LLVM", "bin", "clang.exe")))
             blockers.Add($"The {arch.ToUpperInvariant()} recipe requires clang.exe in the standard LLVM installation.");
         var sdk = Path.Combine(pfx86, "Windows Kits", "10", "bin");
-        var hostSdk = arch == "arm64" ? "10.0.26100.0" : splitRelease ? "10.0.17763.0" : "10.0.15063.0";
+        var hostSdk = arch == "arm64" ? "10.0.26100.0" : unifiedToolchain ? "10.0.19041.0" : splitRelease ? "10.0.17763.0" : "10.0.15063.0";
         if (!probe.FileExists(Path.Combine(sdk, hostSdk, "x64", "fxc.exe")))
             blockers.Add($"The host script requires Windows SDK {hostSdk} fxc.exe.");
         var kitRoot = Path.Combine(pfx86, "Windows Kits", "10");
