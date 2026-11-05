@@ -124,6 +124,23 @@ impl MenuCursor {
 }
 
 impl Game<'_> {
+    /// Give text entry and menu focus back to touch, mouse or keyboard.
+    #[cfg(target_vendor = "uwp")]
+    pub(super) fn pad_other_input(&mut self) {
+        if self.pad.in_use {
+            self.pad.inactive_baseline = self.pad.last_hardware;
+        }
+        self.pad.in_use = false;
+        self.pad.menu.osk = None;
+        self.pad.menu.osk_dismissed = false;
+        if !self.pad.menu.keyboard {
+            self.pad.menu.pos = None;
+            self.pad.menu.focus = None;
+            self.pad.menu.repeat = None;
+            self.pad.menu.stick = None;
+        }
+    }
+
     /// A menu, a screen, the title, a sign or a book is open: the pad drives
     /// it instead of the player.
     pub(super) fn pad_in_menu(&self) -> bool {
@@ -803,7 +820,11 @@ impl Game<'_> {
             self.pad.in_use = false;
         }
         // Focus lands on the menu as it opens when the pad was in use.
-        if self.pad.in_use && self.pad.menu.pos.is_none() && self.pad.menu.open_polls == 3 {
+        if self.pad.in_use
+            && self.pad.menu.pos.is_none()
+            && self.pad.menu.open_polls >= 3
+            && (!self.pad_focus_mode() || !self.pad_targets().is_empty())
+        {
             self.pad_take_pointer(event_loop);
         }
         let focus_mode = self.pad_focus_mode();
@@ -1474,7 +1495,12 @@ impl Game<'_> {
                 .is_some_and(|f| f.center().1 > batch.height / 2.0)
                 || self.screen == Screen::Chat;
             let mut ui = horizon_client::ui_theme::Ui::new(&self.gui.atlas, batch, self.cursor);
-            keyboard.draw(&mut ui, at_top, self.ui.options.pad_style);
+            keyboard.draw(
+                &mut ui,
+                at_top,
+                self.ui.options.pad_style,
+                self.settings.controller.swap_face_buttons,
+            );
             ui.finish();
             return;
         }

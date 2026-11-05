@@ -7182,6 +7182,7 @@ impl Game<'_> {
     }
     /// MultiPlayerGameMode.destroyBlock: the predicted break.
     fn predict_break(&mut self, pos: [i32; 3], state: BlockStateId, sequence: i32) {
+        self.pad_rumble(horizon_client::gamepad::Rumble::BlockBroken);
         self.tutorial_destroy(state, 1.0);
         // BlockStatePredictionHandler.retainKnownServerState.
         if let Some(r) = self.remote.as_mut() {
@@ -8969,8 +8970,7 @@ impl Game<'_> {
     }
     /// A container click: the server answers with the authoritative slots.
     pub(super) fn remote_click(&mut self, right: bool) {
-        let Some(size) = self.renderer_viewport()
-        else {
+        let Some(size) = self.renderer_viewport() else {
             return;
         };
         let batch = HudBatch::new(size);

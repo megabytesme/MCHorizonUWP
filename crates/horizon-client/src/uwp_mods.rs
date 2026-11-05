@@ -61,9 +61,30 @@ impl Hooks for DeviceVibration {
                 "Device vibrations: {}",
                 if on { "On" } else { "Off" }
             ));
+            let controller_on = horizon_device_vibration_native::enabled(
+                host.setting(
+                    event.mod_id,
+                    horizon_device_vibration_native::WHILE_CONTROLLER_KEY,
+                )
+                .as_deref(),
+            );
+            event.buttons.push(format!(
+                "Vibrate while using a controller: {}",
+                if controller_on { "On" } else { "Off" }
+            ));
         }
     }
     fn settings_click(&self, host: &mut dyn Host, event: &mut SettingsClickEvent<'_>) {
+        if event.mod_id == horizon_device_vibration_native::MOD_ID && event.button == 1 {
+            let key = horizon_device_vibration_native::WHILE_CONTROLLER_KEY;
+            let on = horizon_device_vibration_native::enabled(
+                host.setting(event.mod_id, key).as_deref(),
+            );
+            host.set_setting(event.mod_id, key, if on { "false" } else { "true" });
+            if on {
+                horizon_device_vibration_native::cancel();
+            }
+        }
         if event.mod_id == horizon_device_vibration_native::MOD_ID && event.button == 0 {
             let on = horizon_device_vibration_native::enabled(
                 host.setting(event.mod_id, horizon_device_vibration_native::ENABLED_KEY)

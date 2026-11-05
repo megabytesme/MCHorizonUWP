@@ -70,6 +70,9 @@ pub(super) struct TouchControls {
     suppressed: u8,
     pub(super) movement: Option<[f32; 2]>,
     used: bool,
+    visible: bool,
+    compat_touch: Option<u64>,
+    compat_mouse_events: u8,
     #[cfg(all(
         any(target_vendor = "uwp", test),
         feature = "native-d3d11",
@@ -119,6 +122,9 @@ impl Default for TouchControls {
             suppressed: 0,
             movement: None,
             used: false,
+            visible: cfg!(target_arch = "arm"),
+            compat_touch: None,
+            compat_mouse_events: 0,
             #[cfg(all(
                 any(target_vendor = "uwp", test),
                 feature = "native-d3d11",
@@ -207,6 +213,43 @@ fn distance(a: [f32; 2], b: [f32; 2]) -> f32 {
 }
 
 impl TouchControls {
+    /// UWP follows a touch with one or two mouse-compatible events for menus.
+    /// Keep those usable without treating them as a switch to a real mouse.
+    pub(super) fn note_touch(&mut self, id: u64, phase: TouchPhase) {
+        if phase == TouchPhase::Started {
+            self.visible = true;
+            if self.compat_touch.is_none() {
+                self.compat_touch = Some(id);
+            }
+        }
+        if self.compat_touch == Some(id) {
+            self.compat_mouse_events = if phase == TouchPhase::Moved { 1 } else { 2 };
+            if matches!(phase, TouchPhase::Ended | TouchPhase::Cancelled) {
+                self.compat_touch = None;
+            }
+        } else {
+            self.compat_mouse_events = 0;
+        }
+    }
+
+    pub(super) fn touch_compatible_mouse(&mut self, event: &WindowEvent) -> bool {
+        if self.compat_mouse_events > 0
+            && matches!(
+                event,
+                WindowEvent::CursorMoved { .. } | WindowEvent::MouseInput { .. }
+            )
+        {
+            self.compat_mouse_events -= 1;
+            true
+        } else {
+            self.compat_mouse_events = 0;
+            false
+        }
+    }
+
+    pub(super) fn hide_for_other_input(&mut self) {
+        self.visible = false;
+    }
     /// On disable, release any held gameplay inputs before resetting touch state.
     #[cfg(all(
         any(target_vendor = "uwp", test),
@@ -495,6 +538,9 @@ impl TouchControls {
         }
     }
     pub(super) fn draw(&mut self, hud: &mut HudBatch, atlas: &HudAtlas) {
+        if !self.visible {
+            return;
+        }
         #[cfg(all(
             any(target_vendor = "uwp", test),
             feature = "native-d3d11",
@@ -645,6 +691,10 @@ impl super::Game<'_> {
     }
 
     pub(super) fn touch_event(&mut self, touch: Touch) {
+        if touch.phase == TouchPhase::Started {
+            self.pad_other_input();
+        }
+        self.touch.note_touch(touch.id, touch.phase);
         #[cfg(all(feature = "native-d3d11", feature = "native-touch-mod"))]
         self.sync_touch_mod();
         let Some(size) = self.renderer_viewport() else {
@@ -730,6 +780,33 @@ impl super::Game<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn touch_mouse_compatibility_does_not_hide_touch_controls() {
+        use winit::event::{DeviceId, ElementState, MouseButton};
+        let mut controls = TouchControls::default();
+        controls.hide_for_other_input();
+        assert!(!controls.visible);
+        controls.note_touch(7, TouchPhase::Started);
+        assert!(controls.visible);
+        let motion = WindowEvent::CursorMoved {
+            device_id: DeviceId::dummy(),
+            position: (20.0, 30.0).into(),
+        };
+        let press = WindowEvent::MouseInput {
+            device_id: DeviceId::dummy(),
+            state: ElementState::Pressed,
+            button: MouseButton::Left,
+        };
+        assert!(controls.touch_compatible_mouse(&motion));
+        assert!(controls.touch_compatible_mouse(&press));
+        assert!(!controls.touch_compatible_mouse(&motion));
+        controls.hide_for_other_input();
+        assert!(!controls.visible);
+        controls.note_touch(7, TouchPhase::Ended);
+        controls.note_touch(8, TouchPhase::Started);
+        assert!(controls.visible);
+    }
 
     #[cfg(feature = "native-touch-mod")]
     #[test]

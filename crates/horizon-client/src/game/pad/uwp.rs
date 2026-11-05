@@ -38,6 +38,16 @@ fn gilrs_button(button: Button) -> gilrs::Button {
 }
 
 impl Pads {
+    pub(in crate::game) fn adopt_gilrs(
+        &mut self,
+        gilrs: gilrs::Gilrs,
+        active: Option<gilrs::GamepadId>,
+    ) {
+        self.devices.gilrs = Some(gilrs);
+        self.devices.started = true;
+        self.devices.active = active;
+    }
+
     fn start(&mut self) {
         if self.devices.started {
             return;

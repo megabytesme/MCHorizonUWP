@@ -19,26 +19,58 @@ pub fn new_gilrs() -> Result<gilrs::Gilrs, gilrs::Error> {
 /// Live mapped readings for the launcher controller test.
 pub struct ControllerTest {
     gilrs: gilrs::Gilrs,
+    last_active: Option<gilrs::GamepadId>,
 }
 
 impl ControllerTest {
     pub fn new() -> Result<Self, gilrs::Error> {
         Ok(Self {
             gilrs: new_gilrs()?,
+            last_active: None,
         })
     }
 
     /// Navigation for raw controllers. Standard Windows Gamepads already send
     /// native XAML navigation keys and must not be handled a second time.
     pub fn navigation(&mut self) -> u32 {
+        self.navigation_impl(false)
+    }
+
+    /// The game's loading menu owns all controller input, including Gamepad.
+    pub fn navigation_all(&mut self) -> u32 {
+        self.navigation_impl(true)
+    }
+
+    pub fn into_gilrs(self) -> (gilrs::Gilrs, Option<gilrs::GamepadId>) {
+        (self.gilrs, self.last_active)
+    }
+
+    fn navigation_impl(&mut self, include_standard: bool) -> u32 {
         while self.gilrs.next_event().is_some() {}
         let mut keys = 0;
-        for (_, pad) in self.gilrs.gamepads() {
-            if pad.uuid() == [0; 16] {
+        for (id, pad) in self.gilrs.gamepads() {
+            if !include_standard && pad.uuid() == [0; 16] {
                 continue;
             }
             let x = pad.value(gilrs::Axis::LeftStickX);
             let y = pad.value(gilrs::Axis::LeftStickY);
+            let scroll_y = pad.value(gilrs::Axis::RightStickY);
+            if x.abs() > 0.6
+                || y.abs() > 0.6
+                || scroll_y.abs() > 0.6
+                || [
+                    gilrs::Button::South,
+                    gilrs::Button::East,
+                    gilrs::Button::DPadUp,
+                    gilrs::Button::DPadDown,
+                    gilrs::Button::DPadLeft,
+                    gilrs::Button::DPadRight,
+                ]
+                .into_iter()
+                .any(|button| pad.is_pressed(button))
+            {
+                self.last_active = Some(id);
+            }
             if pad.is_pressed(gilrs::Button::DPadUp) || y > 0.6 {
                 keys |= 1;
             }
@@ -56,6 +88,25 @@ impl ControllerTest {
             }
             if pad.is_pressed(gilrs::Button::East) {
                 keys |= 32;
+            }
+            if scroll_y > 0.6 {
+                keys |= 64;
+            }
+            if scroll_y < -0.6 {
+                keys |= 128;
+            }
+            if include_standard {
+                for (button, bit) in [
+                    (gilrs::Button::West, 256),
+                    (gilrs::Button::North, 512),
+                    (gilrs::Button::Start, 1024),
+                    (gilrs::Button::LeftTrigger2, 2048),
+                    (gilrs::Button::RightTrigger, 4096),
+                ] {
+                    if pad.is_pressed(button) {
+                        keys |= bit;
+                    }
+                }
             }
         }
         keys

@@ -41,6 +41,7 @@ pub(super) struct Pads {
     /// Buttons a `pad ... tap` releases at the next poll.
     taps: Vec<Button>,
     edges: Edges,
+    face_layout: gamepad::FaceLayout,
     /// The game tick each button went down in, and releases held back until
     /// a tick has passed: vanilla samples keys once per tick, so a click
     /// shorter than that (a quick stick click for sprint) would be lost.
@@ -50,7 +51,10 @@ pub(super) struct Pads {
     pub(super) state: PadState,
     /// The hardware's buttons at the last poll, for `input-log`'s `pad`
     /// events: the merged state hides which source moved.
-    last_hardware: PadState,
+    pub(super) last_hardware: PadState,
+    /// Controller state when touch, mouse or keyboard last took control.
+    #[cfg(target_vendor = "uwp")]
+    pub(super) inactive_baseline: PadState,
     /// The pad drove the game last (the mouse and keyboard hand control back).
     pub(super) in_use: bool,
     pub(super) style: GlyphStyle,
@@ -214,9 +218,25 @@ impl Game<'_> {
             self.pad_menu_frame(event_loop);
             return;
         }
-        let hardware = match self.pad.feed {
+        let mut hardware = match self.pad.feed {
             Some(state) => state,
             None => self.pad.read(),
+        };
+        self.pad
+            .face_layout
+            .apply(&mut hardware, self.settings.controller.swap_face_buttons);
+        #[cfg(target_vendor = "uwp")]
+        let controller_activity = {
+            let previous = if self.pad.in_use {
+                self.pad.last_hardware
+            } else {
+                self.pad.inactive_baseline
+            };
+            let active = hardware.activity_since(&previous, settings);
+            if active {
+                self.touch.hide_for_other_input();
+            }
+            active
         };
         // A person's pad, for `input-log` and the repro recording; the virtual
         // pad is an agent's `pad` line and is recorded as that.
@@ -240,7 +260,14 @@ impl Game<'_> {
         let edges = self.pad.edges.update(&state, threshold);
         if state.active(&self.settings.controller) {
             self.last_input = Instant::now();
-            self.pad.in_use = true;
+            #[cfg(not(target_vendor = "uwp"))]
+            {
+                self.pad.in_use = true;
+            }
+            #[cfg(target_vendor = "uwp")]
+            if controller_activity || self.pad.virtual_input {
+                self.pad.in_use = true;
+            }
         }
         self.pad.state = state;
         self.pad_output_frame();
@@ -430,6 +457,11 @@ impl Game<'_> {
                 self.native_setting(id, horizon_device_vibration_native::ENABLED_KEY)
                     .as_deref(),
             )
+            && horizon_device_vibration_native::allows_input(
+                self.native_setting(id, horizon_device_vibration_native::WHILE_CONTROLLER_KEY)
+                    .as_deref(),
+                self.pad.in_use,
+            )
     }
 
     /// Vibrate the active pad, when vibration is on and the pad is the one
@@ -439,7 +471,7 @@ impl Game<'_> {
             return;
         };
         #[cfg(all(target_vendor = "uwp", feature = "native-device-vibration-mod"))]
-        if self.focused && self.device_vibration_on() {
+        if self.options.execution_role.is_client() && self.focused && self.device_vibration_on() {
             horizon_device_vibration_native::vibrate(pulse.strong.max(pulse.weak), pulse.millis);
         }
         let settings = &self.settings.controller;

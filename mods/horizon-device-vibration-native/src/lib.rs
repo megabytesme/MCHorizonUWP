@@ -4,9 +4,14 @@ pub const MOD_TITLE: &str = "Device Vibration 0.1.0";
 pub const MOD_DESCRIPTION: &str =
     "Vibrate this device for game events. This setting is separate from controller vibration.";
 pub const ENABLED_KEY: &str = "enabled";
+pub const WHILE_CONTROLLER_KEY: &str = "while_controller";
 
 pub fn enabled(setting: Option<&str>) -> bool {
     setting != Some("false")
+}
+
+pub fn allows_input(setting: Option<&str>, controller_in_use: bool) -> bool {
+    !controller_in_use || enabled(setting)
 }
 
 /// Short, bounded device pulses; controller rumble is controlled separately.
@@ -43,5 +48,8 @@ mod tests {
         assert!(enabled(None));
         assert!(enabled(Some("true")));
         assert!(!enabled(Some("false")));
+        assert!(allows_input(None, true));
+        assert!(!allows_input(Some("false"), true));
+        assert!(allows_input(Some("false"), false));
     }
 }

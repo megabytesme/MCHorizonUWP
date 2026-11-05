@@ -268,6 +268,7 @@ impl Opt {
             // Horizon's own options: vanilla has no keys for them, so they read
             // the namespace the client bundles (assets/horizon/lang).
             Opt::PadEnabled => "horizon.options.controller",
+            Opt::PadSwapFaceButtons => "horizon.options.swap_face_buttons",
             Opt::PadVibration => "horizon.options.vibration",
             Opt::PadAdaptiveTriggers => "horizon.options.adaptive_triggers",
             Opt::PadLightbar => "horizon.options.lightbar",
@@ -770,6 +771,7 @@ impl Opt {
             Opt::ForceUnicode => on_off(s.force_unicode),
             Opt::JapaneseGlyphs => on_off(s.japanese_glyphs),
             Opt::PadEnabled => on_off(s.controller.enabled),
+            Opt::PadSwapFaceButtons => on_off(s.controller.swap_face_buttons),
             Opt::PadVibration => on_off(s.controller.vibration),
             Opt::PadAdaptiveTriggers => on_off(s.controller.adaptive_triggers),
             Opt::PadInvertX => on_off(s.controller.invert_x),
@@ -1065,6 +1067,9 @@ impl Opt {
             Opt::ForceUnicode => s.force_unicode = !s.force_unicode,
             Opt::JapaneseGlyphs => s.japanese_glyphs = !s.japanese_glyphs,
             Opt::PadEnabled => s.controller.enabled = !s.controller.enabled,
+            Opt::PadSwapFaceButtons => {
+                s.controller.swap_face_buttons = !s.controller.swap_face_buttons
+            }
             Opt::PadVibration => s.controller.vibration = !s.controller.vibration,
             Opt::PadAdaptiveTriggers => {
                 s.controller.adaptive_triggers = !s.controller.adaptive_triggers
@@ -2670,6 +2675,7 @@ impl OptionsUi {
                 )];
                 rows.extend(pairs(&[
                     Opt::PadEnabled,
+                    Opt::PadSwapFaceButtons,
                     Opt::PadVibration,
                     Opt::PadAdaptiveTriggers,
                     Opt::PadLightbar,
@@ -3147,8 +3153,13 @@ impl OptionsUi {
                     });
                     let mut message = match pad.binding(action) {
                         Some(b) => {
-                            let [r, g, bl] = b.color(self.pad_style);
-                            Text::literal(b.label(self.pad_style))
+                            let displayed = if s.controller.swap_face_buttons {
+                                b.swap_face()
+                            } else {
+                                b
+                            };
+                            let [r, g, bl] = displayed.color(self.pad_style);
+                            Text::literal(displayed.label(self.pad_style))
                                 .with_color(u32::from(r) << 16 | u32::from(g) << 8 | u32::from(bl))
                         }
                         None => tr("key.keyboard.unknown"),

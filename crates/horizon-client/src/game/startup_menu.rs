@@ -25,6 +25,10 @@ pub(super) struct StartupMenu {
     dragging: bool,
     #[cfg(target_vendor = "uwp")]
     ime_allowed: bool,
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    pub(super) controller_active: bool,
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    pub(super) controller_osk: Option<horizon_client::osk::Keyboard>,
     clipboard: SystemClipboard,
     selection: AppendSelection,
     /// The narrator's `NARRATOR_TOGGLE` toast, handed to the game with the title.
@@ -112,6 +116,11 @@ impl StartupMenu {
     }
 
     pub(super) fn handoff(&mut self, game: &mut Game<'_>) {
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        {
+            game.pad.in_use = self.controller_active;
+            game.pad.menu.osk = self.controller_osk.take();
+        }
         game.title = self
             .title
             .take()
@@ -391,6 +400,194 @@ pub(super) fn spawn_loader(
 }
 
 impl Loading {
+    /// The title is usable while world resources load. Give it the same
+    /// controller reader that will later drive the completed game.
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    pub(super) fn poll_startup_controller(&mut self, event_loop: &dyn EventLoopCtl) {
+        if !self.settings.controller.enabled {
+            return;
+        }
+        let Some(controller) = self.controller.as_mut() else {
+            return;
+        };
+        let mut keys = controller.navigation_all();
+        let swap = self.settings.controller.swap_face_buttons;
+        if swap {
+            let south = keys & 16;
+            let east = keys & 32;
+            keys = (keys & !48) | (south << 1) | (east >> 1);
+            let west = keys & 256;
+            let north = keys & 512;
+            keys = (keys & !768) | (west << 1) | (north >> 1);
+        }
+        if self
+            .controller_swap
+            .is_some_and(|previous| previous != swap)
+        {
+            // The held press that toggled this setting must not become Back.
+            self.controller_previous = (self.controller_previous & !48) | (keys & 48);
+        }
+        self.controller_swap = Some(swap);
+        let pressed = keys & !self.controller_previous;
+        self.controller_previous = keys;
+        if pressed != 0 {
+            self.menu.controller_active = true;
+        }
+        let now = Instant::now();
+        let held = keys & 15;
+        let mut directions = pressed & 15;
+        if held == 0 {
+            self.controller_repeat = None;
+        } else if directions != 0 {
+            self.controller_repeat = Some(now + Duration::from_millis(350));
+        } else if self.controller_repeat.is_some_and(|next| now >= next) {
+            directions = held;
+            self.controller_repeat = Some(now + Duration::from_millis(120));
+        }
+        if self.menu.controller_osk.is_some() {
+            use horizon_client::gamepad::Button;
+            let button = if directions & 1 != 0 {
+                Some(Button::DPadUp)
+            } else if directions & 2 != 0 {
+                Some(Button::DPadDown)
+            } else if directions & 4 != 0 {
+                Some(Button::DPadLeft)
+            } else if directions & 8 != 0 {
+                Some(Button::DPadRight)
+            } else if pressed & 16 != 0 {
+                Some(Button::South)
+            } else if pressed & 32 != 0 {
+                Some(Button::East)
+            } else if pressed & 256 != 0 {
+                Some(Button::West)
+            } else if pressed & 512 != 0 {
+                Some(Button::North)
+            } else if pressed & 1024 != 0 {
+                Some(Button::Start)
+            } else if pressed & 2048 != 0 {
+                Some(Button::LeftTrigger)
+            } else if pressed & 4096 != 0 {
+                Some(Button::RightBumper)
+            } else {
+                None
+            };
+            if let Some(button) = button {
+                let output = self
+                    .menu
+                    .controller_osk
+                    .as_mut()
+                    .and_then(|osk| osk.button(button));
+                if let Some(output) = output {
+                    self.startup_osk_output(output);
+                }
+            }
+            return;
+        }
+        let key = if directions & 1 != 0 {
+            Some(KeyCode::ArrowUp)
+        } else if directions & 2 != 0 {
+            Some(KeyCode::ArrowDown)
+        } else if directions & 4 != 0 {
+            Some(KeyCode::ArrowLeft)
+        } else if directions & 8 != 0 {
+            Some(KeyCode::ArrowRight)
+        } else if pressed & 16 != 0 {
+            Some(KeyCode::Enter)
+        } else {
+            None
+        };
+        if let Some(key) = key {
+            self.menu_key_focus(event_loop, key);
+            if key == KeyCode::Enter && self.startup_text_focused() {
+                self.menu.controller_osk = Some(horizon_client::osk::Keyboard::default());
+            }
+        }
+        if keys & 192 == 0 {
+            self.controller_scroll = None;
+        } else if self.controller_scroll.is_none_or(|next| now >= next) {
+            self.controller_scroll = Some(now + Duration::from_millis(100));
+            let delta = if keys & 64 != 0 { 1.0 } else { -1.0 };
+            let was = std::mem::replace(&mut self.menu.key_synthetic, true);
+            let result = self.menu_event(
+                event_loop,
+                WindowEvent::MouseWheel {
+                    device_id: DeviceId::dummy(),
+                    delta: MouseScrollDelta::LineDelta(0.0, delta),
+                    phase: winit::event::TouchPhase::Moved,
+                },
+            );
+            self.menu.key_synthetic = was;
+            if let Err(error) = result {
+                log::warn!("Horizon: startup controller scroll failed: {error}");
+            }
+        }
+        if pressed & 32 != 0 {
+            if self.menu.pending.take().is_some() {
+                self.menu.perf.cancel_world_opening();
+            } else if self.menu.win.take().is_some() {
+                // Closing credits needs no further action.
+            } else if self.menu.options_open {
+                let events = self.menu.options.back(&mut self.settings);
+                self.menu_option_events(events);
+            } else if let Some(title) = &mut self.menu.title {
+                title.escape();
+            }
+        }
+    }
+
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    fn startup_text_focused(&mut self) -> bool {
+        if self.menu.options_open {
+            return self.menu.options.typing();
+        }
+        self.menu
+            .title
+            .as_mut()
+            .is_some_and(|title| title.has_caret_field() || title.focused_field().is_some())
+    }
+
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    fn startup_osk_output(&mut self, output: horizon_client::osk::Output) {
+        use horizon_client::osk::Output;
+        match output {
+            Output::Close => self.menu.controller_osk = None,
+            Output::Text(text) => {
+                if self.menu.options_open {
+                    if let Some(gui) = &self.gui {
+                        self.menu.options.type_text(&gui.atlas, &text);
+                    }
+                } else if let Some(title) = &mut self.menu.title {
+                    title.type_text(&text);
+                }
+            }
+            Output::Backspace | Output::Enter => {
+                let key = if matches!(output, Output::Enter) {
+                    KeyCode::Enter
+                } else {
+                    KeyCode::Backspace
+                };
+                if self.menu.options_open {
+                    if let Some(gui) = &self.gui {
+                        let events =
+                            self.menu
+                                .options
+                                .key(&mut self.settings, &gui.atlas, key, None);
+                        self.menu_option_events(events);
+                    }
+                } else if let Some(title) = &mut self.menu.title {
+                    if key == KeyCode::Enter {
+                        title.confirm_edit();
+                    } else {
+                        title.backspace();
+                    }
+                }
+                if key == KeyCode::Enter {
+                    self.menu.controller_osk = None;
+                }
+            }
+        }
+    }
+
     pub(super) fn poll_menu_resources(&mut self) -> Result<()> {
         // Once `Done` arrived the generation is over: the caller may have taken
         // its result, and the finished loader's channel is closed.
@@ -1198,13 +1395,17 @@ impl Loading {
 
     #[cfg(target_vendor = "uwp")]
     pub(super) fn sync_menu_ime(&mut self) {
-        let want = !self.menu.options_open
-            && self.menu.pending.is_none()
-            && self
-                .menu
-                .title
-                .as_mut()
-                .is_some_and(|title| title.focused_field().is_some());
+        let want = self.menu.pending.is_none()
+            && if self.menu.options_open {
+                self.menu.options.typing()
+            } else {
+                self.menu
+                    .title
+                    .as_mut()
+                    .is_some_and(|title| title.has_caret_field() || title.focused_field().is_some())
+            };
+        #[cfg(feature = "uwp-controller")]
+        let want = want && !self.menu.controller_active;
         if want != self.menu.ime_allowed {
             if let Some(window) = &self.window {
                 window.set_ime_allowed(want);
@@ -1275,6 +1476,24 @@ impl Loading {
             && self.menu.win.is_none()
         {
             key_focus::draw_outline(&gui.atlas, batch, focus);
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        if let Some(keyboard) = &self.menu.controller_osk {
+            let at_top = self
+                .menu
+                .key_focus
+                .is_some_and(|focus| focus.center().1 > batch.height / 2.0);
+            let mut ui = horizon_client::ui_theme::Ui::new(&gui.atlas, batch, self.menu.cursor);
+            keyboard.draw(
+                &mut ui,
+                at_top,
+                self.settings
+                    .controller
+                    .glyphs
+                    .resolve(horizon_client::gamepad::GlyphStyle::Auto),
+                self.settings.controller.swap_face_buttons,
+            );
+            ui.finish();
         }
         // Over every screen, as the game's; no sound before the sound engine.
         let title_toast = self.menu.title.as_ref().is_some_and(|t| t.has_toast());

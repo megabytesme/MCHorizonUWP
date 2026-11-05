@@ -73,6 +73,16 @@ impl Button {
     pub fn parse(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|b| b.name() == name)
     }
+    /// Exchange the two horizontal face-button pairs, retaining positional bindings.
+    pub fn swap_face(self) -> Self {
+        match self {
+            Self::South => Self::East,
+            Self::East => Self::South,
+            Self::West => Self::North,
+            Self::North => Self::West,
+            other => other,
+        }
+    }
     fn bit(self) -> u32 {
         1 << self as u32
     }
@@ -167,6 +177,30 @@ pub fn from_windows_gaming_input(buttons: u32, axes: [f32; 6]) -> PadState {
     state
 }
 impl PadState {
+    /// Fresh controller input relative to the last non-controller handoff.
+    pub fn activity_since(&self, previous: &Self, settings: &PadSettings) -> bool {
+        let moved = |now: f32, before: f32, deadzone: f32| {
+            now.abs() > deadzone && (now - before).abs() > 0.05
+        };
+        self.buttons & !previous.buttons != 0
+            || (0..2).any(|i| {
+                moved(self.left[i], previous.left[i], settings.move_deadzone)
+                    || moved(self.right[i], previous.right[i], settings.look_deadzone)
+                    || moved(
+                        self.triggers[i],
+                        previous.triggers[i],
+                        settings.trigger_threshold,
+                    )
+            })
+    }
+    /// Apply a face-button layout preference without altering other inputs.
+    pub fn swap_faces(&mut self) {
+        for (a, b) in [(Button::South, Button::East), (Button::West, Button::North)] {
+            let (a_down, b_down) = (self.held(a), self.held(b));
+            self.set(a, b_down);
+            self.set(b, a_down);
+        }
+    }
     pub fn set(&mut self, button: Button, down: bool) {
         if down {
             self.buttons |= button.bit();
@@ -205,6 +239,98 @@ impl PadState {
                 .triggers
                 .iter()
                 .any(|t| *t >= settings.trigger_threshold)
+    }
+}
+
+/// Prevent the press that changes layout from also activating the newly mapped button.
+#[derive(Default)]
+pub struct FaceLayout {
+    previous: Option<bool>,
+    waiting_for_release: bool,
+}
+impl FaceLayout {
+    pub fn apply(&mut self, state: &mut PadState, swap: bool) {
+        let faces = [Button::South, Button::East, Button::West, Button::North];
+        let held = faces.iter().any(|&button| state.held(button));
+        if self.previous.is_some_and(|old| old != swap) && held {
+            self.waiting_for_release = true;
+        }
+        self.previous = Some(swap);
+        if self.waiting_for_release {
+            if !held {
+                self.waiting_for_release = false;
+            }
+            for button in faces {
+                state.set(button, false);
+            }
+        } else if swap {
+            state.swap_faces();
+        }
+    }
+}
+
+#[cfg(test)]
+mod face_swap_tests {
+    use super::{Button, FaceLayout, PadSettings, PadState};
+
+    #[test]
+    fn face_swap_preserves_other_inputs_and_round_trips() {
+        let mut state = PadState {
+            left: [0.25, -0.5],
+            triggers: [0.75, 0.0],
+            ..Default::default()
+        };
+        state.set(Button::South, true);
+        state.set(Button::West, true);
+        state.set(Button::Start, true);
+        let original = state;
+        state.swap_faces();
+        assert!(!state.held(Button::South) && state.held(Button::East));
+        assert!(!state.held(Button::West) && state.held(Button::North));
+        assert!(state.held(Button::Start));
+        assert_eq!(state.left, original.left);
+        assert_eq!(state.triggers, original.triggers);
+        state.swap_faces();
+        assert_eq!(state, original);
+
+        let settings = PadSettings {
+            swap_face_buttons: true,
+            ..Default::default()
+        };
+        assert!(PadSettings::parse(&settings.serialize()).swap_face_buttons);
+        assert!(!PadSettings::parse("enabled:true\n").swap_face_buttons);
+    }
+
+    #[test]
+    fn changing_layout_while_pressed_waits_for_release() {
+        let mut layout = FaceLayout::default();
+        let mut state = PadState::default();
+        layout.apply(&mut state, false);
+        state.set(Button::South, true);
+        layout.apply(&mut state, true);
+        assert!(!state.held(Button::South) && !state.held(Button::East));
+        let mut released = PadState::default();
+        layout.apply(&mut released, true);
+        released.set(Button::South, true);
+        layout.apply(&mut released, true);
+        assert!(released.held(Button::East));
+    }
+
+    #[test]
+    fn controller_handoff_requires_new_input_not_a_held_button_or_stick_noise() {
+        let settings = PadSettings::default();
+        let mut held = PadState::default();
+        held.set(Button::South, true);
+        held.left[0] = 0.5;
+        assert!(!held.activity_since(&held, &settings));
+        let mut next = held;
+        next.left[0] = 0.53;
+        assert!(!next.activity_since(&held, &settings));
+        next.left[0] = 0.6;
+        assert!(next.activity_since(&held, &settings));
+        next = held;
+        next.set(Button::East, true);
+        assert!(next.activity_since(&held, &settings));
     }
 }
 
@@ -419,6 +545,7 @@ pub fn steam_keyboard(choice: TextKeyboard) -> bool {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PadSettings {
     pub enabled: bool,
+    pub swap_face_buttons: bool,
     pub vibration: bool,
     /// A DualSense's triggers push back (Horizon's; docs/controllers.md).
     pub adaptive_triggers: bool,
@@ -444,6 +571,7 @@ impl Default for PadSettings {
     fn default() -> Self {
         Self {
             enabled: true,
+            swap_face_buttons: false,
             vibration: true,
             adaptive_triggers: true,
             lightbar: Lightbar::Health,
@@ -499,6 +627,7 @@ impl PadSettings {
             };
             match key.trim() {
                 "enabled" => s.enabled = flag(s.enabled),
+                "swapFaceButtons" => s.swap_face_buttons = flag(s.swap_face_buttons),
                 "vibration" => s.vibration = flag(s.vibration),
                 "adaptiveTriggers" => s.adaptive_triggers = flag(s.adaptive_triggers),
                 "lightbar" => s.lightbar = Lightbar::parse(value),
@@ -532,8 +661,9 @@ impl PadSettings {
     }
     pub fn serialize(&self) -> String {
         let mut text = format!(
-            "enabled:{}\nvibration:{}\nadaptiveTriggers:{}\nlightbar:{}\nlookSensitivity:{}\ninvertX:{}\ninvertY:{}\nmoveDeadzone:{}\nlookDeadzone:{}\ntriggerThreshold:{}\ntoggleSneak:{}\nglyphs:{}\nmenuNavigation:{}\nkeyboard:{}\n",
+            "enabled:{}\nswapFaceButtons:{}\nvibration:{}\nadaptiveTriggers:{}\nlightbar:{}\nlookSensitivity:{}\ninvertX:{}\ninvertY:{}\nmoveDeadzone:{}\nlookDeadzone:{}\ntriggerThreshold:{}\ntoggleSneak:{}\nglyphs:{}\nmenuNavigation:{}\nkeyboard:{}\n",
             bool_text(self.enabled),
+            bool_text(self.swap_face_buttons),
             bool_text(self.vibration),
             bool_text(self.adaptive_triggers),
             self.lightbar.name(),

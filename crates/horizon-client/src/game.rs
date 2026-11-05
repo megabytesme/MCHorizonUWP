@@ -17125,6 +17125,11 @@ impl ApplicationHandler for Game<'_> {
             && let DeviceEvent::MouseMotion { delta: (x, y) } = event
         {
             // MouseHandler.onMove with the pointer grabbed; applied once per frame.
+            #[cfg(target_vendor = "uwp")]
+            if x != 0.0 || y != 0.0 {
+                self.touch.hide_for_other_input();
+                self.pad_other_input();
+            }
             self.note_input(
                 input_trace::InputOrigin::User,
                 input_trace::TraceKind::Motion { x, y },
@@ -17171,8 +17176,28 @@ impl Game<'_> {
                 self.touch_event(touch);
                 return;
             }
-            if self.touch.suppress_mouse(&event) {
+            let touch_mouse =
+                if origin == input_trace::InputOrigin::User && !self.pad_synthetic_input() {
+                    self.touch.touch_compatible_mouse(&event)
+                } else {
+                    false
+                };
+            if !self.pad_synthetic_input() && self.touch.suppress_mouse(&event) {
                 return;
+            }
+            if origin == input_trace::InputOrigin::User
+                && !touch_mouse
+                && !self.pad_synthetic_input()
+                && matches!(
+                    event,
+                    WindowEvent::KeyboardInput { .. }
+                        | WindowEvent::MouseInput { .. }
+                        | WindowEvent::MouseWheel { .. }
+                        | WindowEvent::CursorMoved { .. }
+                )
+            {
+                self.touch.hide_for_other_input();
+                self.pad_other_input();
             }
         }
         follow_keymap(&mut event);
@@ -20980,6 +21005,16 @@ fn run_event_loop(mut game: Game<'_>) -> Result<()> {
 struct Loading {
     window: Option<Arc<Window>>,
     renderer: Option<Renderer>,
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    controller: Option<crate::uwp_controller::ControllerTest>,
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    controller_previous: u32,
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    controller_repeat: Option<Instant>,
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    controller_swap: Option<bool>,
+    #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+    controller_scroll: Option<Instant>,
 
     #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
     native_renderer: Option<horizon_client::native_renderer::NativeRenderer>,
@@ -21127,10 +21162,32 @@ impl Loading {
         }
         horizon_client::hud::GUI_SCALE.store(self.settings.gui_scale, Ordering::Relaxed);
         self.window = Some(window);
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        if self.settings.controller.enabled {
+            self.controller = match crate::uwp_controller::ControllerTest::new() {
+                Ok(controller) => Some(controller),
+                Err(error) => {
+                    log::warn!("Horizon: startup controller input is unavailable: {error}");
+                    None
+                }
+            };
+        }
     }
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, mut event: WindowEvent) {
         if self.window.as_ref().is_none_or(|w| w.id() != id) {
             return;
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        if matches!(
+            event,
+            WindowEvent::Touch(_)
+                | WindowEvent::KeyboardInput { .. }
+                | WindowEvent::MouseInput { .. }
+                | WindowEvent::MouseWheel { .. }
+                | WindowEvent::CursorMoved { .. }
+        ) {
+            self.menu.controller_active = false;
+            self.menu.controller_osk = None;
         }
         follow_keymap(&mut event);
         if let Err(error) = self.menu_event(event_loop, event) {
@@ -21220,6 +21277,11 @@ impl Loading {
             self.error = Some(error);
             event_loop.exit();
             return;
+        }
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        {
+            self.poll_startup_controller(event_loop);
+            self.sync_menu_ime();
         }
         if let Some(w) = &self.window {
             if self.options.as_ref().is_some_and(|o| o.offscreen) {
@@ -21380,6 +21442,11 @@ impl Loading {
         drop(game_step);
         let game_ms = game_at.elapsed().as_millis();
         game.window = Some(window);
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        if let Some(controller) = self.controller.take() {
+            let (gilrs, active) = controller.into_gilrs();
+            game.pad.adopt_gilrs(gilrs, active);
+        }
         game.renderer = renderer;
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         {
@@ -21540,6 +21607,16 @@ fn run_loading(
     let loading = Loading {
         window: None,
         renderer: None,
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        controller: None,
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        controller_previous: 0,
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        controller_repeat: None,
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        controller_swap: None,
+        #[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+        controller_scroll: None,
 
         #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
         native_renderer: None,

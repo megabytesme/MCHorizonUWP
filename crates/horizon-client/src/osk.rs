@@ -273,7 +273,7 @@ impl Keyboard {
 
     /// Draw the keyboard across the bottom of the screen, or the top when
     /// the field it types into is in the lower half.
-    pub fn draw(&self, ui: &mut Ui, at_top: bool, glyphs: GlyphStyle) {
+    pub fn draw(&self, ui: &mut Ui, at_top: bool, glyphs: GlyphStyle, swap_faces: bool) {
         const UNIT: f32 = 50.0;
         const GAP: f32 = 6.0;
         const KEY_H: f32 = 38.0;
@@ -347,7 +347,10 @@ impl Keyboard {
         ];
         let line: Vec<String> = hints
             .iter()
-            .map(|(b, what)| format!("{} {what}", b.label(glyphs)))
+            .map(|(b, what)| {
+                let displayed = if swap_faces { b.swap_face() } else { *b };
+                format!("{} {what}", displayed.label(glyphs))
+            })
             .collect();
         ui.text_centered(
             Face::Regular,
