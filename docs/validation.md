@@ -118,8 +118,23 @@ During a split-source build, MakeAppx rejected a prepared Minecraft resource
 whose full staging path was 262 characters. A direct retry with Windows
 extended-length paths succeeded. The packer now passes extended paths to
 MakeAppx, retries a failure once, and retains a private diagnostic log if both
-attempts fail. A synthetic framework test with a long resource path passed;
-the full split-source build is being repeated.
+attempts fail. A synthetic framework test with a long resource path passed.
+
+The split-source x64 build was then repeated successfully on Ben-Desktop using
+`dotnet %TEMP%\horizon-builder-long-path-tests-20261105\Horizon.Builder.Tests.dll
+--build-split-candidate %TEMP%\horizon-upstream-f42-official.zip
+%TEMP%\horizon-release-candidate-shared-id-20261105\horizon-uwp-0.1.0.patch
+%TEMP%\horizon-release-candidate-shared-id-20261105\uwp-client-0.1.0.zip
+<private-resources>`. Its build directory was
+`%TEMP%\horizon-split-recipe-proof-fcece00382d041cb9f05e30d4b67efa4`.
+It compiled the game,
+strict-linked the host, packaged the prepared resources separately, signed
+both APPXs with a local identity and exported the public certificate. The
+candidate inputs were verified local files; this did not test an authenticated
+published catalog. In Windows Sandbox, after trusting that public certificate
+inside the Sandbox, SignTool verified both packages and Windows installed the
+client and framework. The app was not launched. This is not a fresh-PC builder
+run, and no ARM32, ARM64 or x86 split-source build was performed.
 
 ## 2026-11-05: Horizon launcher client ID
 

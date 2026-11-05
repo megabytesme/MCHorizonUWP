@@ -40,6 +40,28 @@ if (args.Length == 1 && args[0] == "--native-index-probe")
     return;
 }
 
+if (args.Length == 5 && args[0] == "--build-split-candidate")
+{
+    // Development proof: the files are hashed locally, not authenticated as releases.
+    static string InputHash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed for the candidate build.");
+    var root = Path.Combine(Path.GetTempPath(), "horizon-split-recipe-proof-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    var source = Path.Combine(root, "source");
+    var upstream = new CatalogArtifact("https://example.test/source", InputHash(args[1]));
+    var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
+    var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
+    await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
+    var prepared = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
+        new CatalogClient("0.1.0", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), "0.1.0", "x64");
+    var result = await LocalBuildRunner.RunPreparedAsync(prepared, args[4], new BuildSelection(TargetProfile.DesktopX64, true,
+        UseResourceFramework: true, NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId), new SystemProbe(), new ConsoleProgress());
+    var signed = result.SignedOutput ?? throw new Exception("The candidate package was not signed.");
+    Require(File.Exists(signed.Client) && File.Exists(signed.Certificate) && File.Exists(signed.ResourceFramework), "signed candidate package set produced");
+    Console.WriteLine($"Signed x64 candidate package set: {signed.Client}");
+    return;
+}
+
 if (args.Length == 4 && args[0] == "--signing-proof")
 {
     var identity = PackageSigning.GetOrCreateIdentity();
@@ -703,6 +725,13 @@ static async Task TestReleaseSource()
         var prepared = await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", destination, git);
         Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
         Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
+        var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = "0.1.0", UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
+            prepared.Client with { Version = "0.1.0" }, prepared.Compatibility, "0.1.0", "x64");
+        LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.DesktopX64, true));
+        try { LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.WindowsMobile, true)); throw new Exception("wrong build architecture accepted"); }
+        catch (InvalidOperationException) { }
+        try { LocalBuildRunner.ValidatePreparedRelease(prepared, new BuildSelection(TargetProfile.DesktopX64, true)); throw new Exception("unknown recipe accepted"); }
+        catch (InvalidOperationException) { }
         var incompatible = Path.Combine(root, "incompatible");
         try { await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "arm", incompatible, git); throw new Exception("incompatible release accepted"); }
         catch (InvalidOperationException) { Require(!Directory.Exists(incompatible), "incompatible release makes no workspace"); }

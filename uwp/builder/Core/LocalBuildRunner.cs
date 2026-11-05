@@ -4,7 +4,8 @@ using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
 
-public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, string? SoundWarning, string? ResourceFrameworkPackage = null);
+public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, string? SoundWarning,
+    string? ResourceFrameworkPackage = null, SignedPackageOutput? SignedOutput = null);
 
 /// <summary>Runs only the pinned local recipe in a fresh, builder-owned workspace.</summary>
 public static class LocalBuildRunner
@@ -17,9 +18,33 @@ public static class LocalBuildRunner
 
     public static async Task<LocalBuildResult> RunAsync(string source, string? resources, BuildSelection selection,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
+        => await RunCoreAsync(source, resources, selection, probe, progress, minecraftDirectory, null);
+
+    /// <summary>Build the exact split-source recipe and sign its output. Other catalog versions need their own recipe.</summary>
+    public static async Task<LocalBuildResult> RunPreparedAsync(PreparedRelease release, string? resources, BuildSelection selection,
+        IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
+    {
+        ValidatePreparedRelease(release, selection);
+        return await RunCoreAsync(release.SourceDirectory, resources, selection, probe, progress, minecraftDirectory, release);
+    }
+
+    internal static void ValidatePreparedRelease(PreparedRelease release, BuildSelection selection)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+        var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
+            TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
+        if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != "0.1.0"
+            || release.Patch.Version != "0.1.0" || release.Client.Version != "0.1.0"
+            || !release.Patch.UpstreamCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
+    }
+
+    private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,
+        IProbe probe, IProgress<string>? progress, string? minecraftDirectory, PreparedRelease? release)
     {
         var plan = LocalRecipe.Plan(selection);
-        await LocalRecipe.ValidateSourceAsync(source, probe);
+        if (release is null) await LocalRecipe.ValidateSourceAsync(source, probe);
+        else if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The prepared release source is missing.");
         var existingFramework = selection.ValidatedExistingResourceFramework;
         LocalRecipe.ValidateResourceSelection(selection, resources, minecraftDirectory);
         var workspaceBase = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
@@ -27,8 +52,14 @@ public static class LocalBuildRunner
         {
             if (ResourcesContainWorkspace(resources!, workspaceBase))
                 throw new InvalidOperationException("Choose a resource directory that does not contain the builder workspace.");
+            if (release is not null && ResourcesContainWorkspace(resources!, Path.GetDirectoryName(Path.GetFullPath(source))!))
+                throw new InvalidOperationException("Choose a resource directory that does not contain the release workspace.");
             ValidateResourceTree(resources!);
         }
+        var signTool = Path.Combine(probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)",
+            "Windows Kits", "10", "bin", "10.0.26100.0", "x64", "signtool.exe");
+        if (release is not null && !probe.FileExists(signTool))
+            throw new FileNotFoundException("The signing tool for this recipe is missing.", signTool);
         string? angleBin = null;
         {
             var triplet = selection.Target switch { TargetProfile.WindowsMobile => "arm-uwp-local", TargetProfile.SurfaceProX => "arm64-uwp-local", TargetProfile.DesktopX86 => "x86-uwp-local", _ => "x64-uwp-local" };
@@ -46,9 +77,10 @@ public static class LocalBuildRunner
         if (new DriveInfo(profileRoot).AvailableFreeSpace < MinimumFreeBytes)
             throw new IOException("At least 10 GiB of free space is required on the builder workspace drive before starting a build.");
 
-        progress?.Report("Creating an isolated snapshot of the pinned source revision.");
-        var root = await CreateSnapshotAsync(source, probe);
-        var snapshot = Path.Combine(root, "source");
+        progress?.Report(release is null ? "Creating an isolated snapshot of the pinned source revision." : "Using the authenticated release source workspace.");
+        var root = release is null ? await CreateSnapshotAsync(source, probe)
+            : Directory.GetParent(Path.GetFullPath(source))?.FullName ?? throw new InvalidOperationException("Invalid release workspace.");
+        var snapshot = release is null ? Path.Combine(root, "source") : Path.GetFullPath(source);
         var cargo = probe.FindOnPath("cargo.exe")!;
         var python = probe.FindOnPath("python.exe")!;
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
@@ -72,7 +104,7 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
         vcEnvironment["HORIZON_NIGHTLY"] = LocalRecipe.UpstreamNightly;
         vcEnvironment["HORIZON_UPSTREAM_COMMIT"] = LocalRecipe.UpstreamNightlyCommit;
-        vcEnvironment["HORIZON_UWP_PORT_REF"] = LocalRecipe.SourceCommit;
+        vcEnvironment["HORIZON_UWP_PORT_REF"] = release is null ? LocalRecipe.SourceCommit : "client-v" + release.Client.Version;
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
@@ -144,13 +176,14 @@ public static class LocalBuildRunner
         var packageDir = Path.Combine(root, "package");
         var manifestPath = Path.Combine(snapshot, "uwp", "host", "AppxManifest.xml");
         var manifest = XDocument.Load(manifestPath);
-        LocalRecipe.ConfigureManifest(manifest, selection);
+        var identity = release is null ? null : PackageSigning.GetOrCreateIdentity();
+        LocalRecipe.ConfigureManifest(manifest, selection, identity);
         manifest.Save(manifestPath);
         ResourceFramework? framework = null;
         if (selection.UseResourceFramework)
         {
             progress?.Report("Packaging a reusable resource framework from a private snapshot.");
-            framework = await ResourceFrameworkPacker.PackAsync(packageResources!, Path.Combine(root, "resource-framework"), progress);
+            framework = await ResourceFrameworkPacker.PackAsync(packageResources!, Path.Combine(root, "resource-framework"), progress, identity?.Publisher);
         }
         string? releaseNotes = null;
         try { releaseNotes = await NightlyRelease.FetchPinnedNotesAsync(LocalRecipe.UpstreamNightlyDate, LocalRecipe.UpstreamNightlyCommit); }
@@ -171,14 +204,20 @@ public static class LocalBuildRunner
         progress?.Report("Packaging the unsigned client.");
         var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
-            "-IdentityName", "HorizonUWPPrototype", "-WinUIFramework", "2.7" };
+            "-IdentityName", identity is null ? "HorizonUWPPrototype" : "MCHorizonUWP", "-WinUIFramework", "2.7" };
         packageArguments.AddRange(LocalRecipe.ResourceArguments(selection, packageResources, framework?.Name));
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
         packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath);
         await RunProcess(powershell, snapshot, packageArguments);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
-        return new(root, package, packageResources is null ? null : LocalRecipe.SoundWarning(packageResources), framework?.Package);
+        SignedPackageOutput? signed = null;
+        if (identity is not null)
+        {
+            progress?.Report("Signing the package and exporting its public certificate.");
+            signed = await PackageOutput.CreateAsync(package, framework?.Package, identity, signTool, Path.Combine(root, "signed-output"));
+        }
+        return new(root, package, packageResources is null ? null : LocalRecipe.SoundWarning(packageResources), framework?.Package, signed);
     }
 
     public static async Task<string> CreateSnapshotAsync(string source, IProbe probe)
