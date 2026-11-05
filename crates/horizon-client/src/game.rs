@@ -17049,17 +17049,36 @@ impl ApplicationHandler for Game<'_> {
         }
         drop(window_step);
         horizon_client::telemetry::note_display(&window);
-        match self.new_renderer(window.clone()) {
-            Ok(r) => {
-                self.renderer = Some(r);
-                self.world_renderer_ready = true;
-            }
-            Err(e) => {
-                self.error = Some(e);
-                event_loop.exit();
-                return;
-            }
+        // Synchronous startup (including the benchmark) skips Loading, so it
+        // must honor the same renderer selection as that path.
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        let renderer_result = if uwp_uses_native_d3d11() {
+            let size = window.inner_size();
+            horizon_client::native_renderer::NativeRenderer::new(
+                &self.gui.atlas,
+                &self.gui.panorama,
+                [size.width, size.height],
+            )
+            .and_then(|mut renderer| {
+                renderer.set_terrain(&self.pack.render)?;
+                self.native_renderer = Some(renderer);
+                Ok(())
+            })
+        } else {
+            self.new_renderer(window.clone()).map(|renderer| {
+                self.renderer = Some(renderer);
+            })
+        };
+        #[cfg(not(all(target_vendor = "uwp", feature = "native-d3d11")))]
+        let renderer_result = self.new_renderer(window.clone()).map(|renderer| {
+            self.renderer = Some(renderer);
+        });
+        if let Err(error) = renderer_result {
+            self.error = Some(error);
+            event_loop.exit();
+            return;
         }
+        self.world_renderer_ready = true;
         self.window = Some(window);
         self.ime_allowed = false;
         self.ime_area = None;
