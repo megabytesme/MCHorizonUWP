@@ -1,5 +1,49 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 7 && args[0] == "--create-local-install-proof")
+{
+    var root = Path.GetFullPath(args[4]);
+    if (Directory.Exists(root)) throw new IOException("Choose a new proof workspace.");
+    var stage = Path.Combine(root, "stage");
+    Directory.CreateDirectory(stage);
+    using (var source = System.IO.Compression.ZipFile.OpenRead(args[1]))
+        foreach (var entry in source.Entries)
+        {
+            if (entry.FullName is "AppxBlockMap.xml" or "[Content_Types].xml" or "AppxSignature.p7x"
+                || entry.FullName.StartsWith("AppxMetadata/", StringComparison.Ordinal)) continue;
+            var path = Path.Combine(stage, entry.FullName);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            System.IO.Compression.ZipFileExtensions.ExtractToFile(entry, path);
+        }
+    var manifestPath = Path.Combine(stage, "AppxManifest.xml");
+    var manifest = System.Xml.Linq.XDocument.Load(manifestPath);
+    var ns = manifest.Root!.Name.Namespace;
+    var identity = PackageSigning.GetOrCreateIdentity();
+    var identityElement = manifest.Root.Element(ns + "Identity")!;
+    identityElement.SetAttributeValue("Name", "MCHorizonUWP.LocalInstallProof");
+    identityElement.SetAttributeValue("Publisher", identity.Publisher);
+    foreach (var dependency in manifest.Root.Element(ns + "Dependencies")!.Elements(ns + "PackageDependency")
+        .Where(element => ((string?)element.Attribute("Name"))?.StartsWith("Horizon.Asset.", StringComparison.Ordinal) == true).ToArray()) dependency.Remove();
+    manifest.Save(manifestPath);
+    var unsigned = Path.Combine(root, "unsigned.appx");
+    await LocalBuildRunner.RunProcess(args[2], root, ["pack", "/d", stage, "/p", unsigned]);
+    var output = await PackageOutput.CreateAsync(unsigned, null, identity, args[3], Path.Combine(root, "signed-set"), [args[5], args[6]]);
+    Require(File.Exists(output.Client) && File.Exists(output.Certificate), "local installation fixture signed");
+    Console.WriteLine("Created a signed synthetic installation fixture.");
+    return;
+}
+
+if (args.Length == 2 && args[0] == "--install-local-proof")
+{
+    var directory = Path.GetFullPath(args[1]);
+    var dependencies = Directory.GetFiles(Path.Combine(directory, "Dependencies"), "*.appx");
+    var output = new SignedPackageOutput(Path.Combine(directory, "HorizonUWP.appx"), Path.Combine(directory, "HorizonUWP.cer"), null,
+        Path.Combine(directory, "Install.md"), dependencies);
+    await LocalPackageInstaller.InstallAsync(output, new Progress<string>(Console.WriteLine));
+    Console.WriteLine("Installed the signed synthetic package and its dependencies for the current user.");
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--bootstrap-xaml")
 {
     var profile = Path.GetFullPath(args[1]);
@@ -715,6 +759,10 @@ try { _ = BuildInputs.Create(selection, commit, hash, hash, hash, hash, hash, "C
 catch (ArgumentException) { }
 
 var missing = new SetupChecker(new FakeProbe()).Scan(TargetProfile.WindowsMobile);
+Require(LocalPackageInstaller.CanInstall(TargetProfile.DesktopX86, System.Runtime.InteropServices.Architecture.X64, new Version(10, 0, 19045)), "x86 can install on x64 Windows");
+Require(!LocalPackageInstaller.CanInstall(TargetProfile.WindowsMobile, System.Runtime.InteropServices.Architecture.X64, new Version(10, 0, 19045)), "ARM32 is not offered on x64 Windows");
+Require(!LocalPackageInstaller.CanInstall(TargetProfile.DesktopX64, System.Runtime.InteropServices.Architecture.Arm64, new Version(10, 0, 19045)), "Windows 10 ARM64 does not offer x64 installation");
+Require(LocalPackageInstaller.CanInstall(TargetProfile.DesktopX64, System.Runtime.InteropServices.Architecture.Arm64, new Version(10, 0, 22621)), "Windows 11 ARM64 can offer x64 installation");
 Require(missing.Single(c => c.Name == "Git").Status == CheckStatus.Missing, "missing Git");
 Require(missing.Single(c => c.Name == "Git").Instructions?.Host == "git-scm.com", "official Git instructions");
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Instructions?.Host == "learn.microsoft.com", "official SDK instructions");

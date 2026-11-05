@@ -1,7 +1,7 @@
 # Installing a Horizon UWP package
 
-This guide describes the signed output. Installation is not yet automatic, and
-these steps have not yet been verified on a Windows 10 Mobile device.
+This guide describes the signed output. The builder can offer installation on
+the current PC; these steps have not yet been verified on a Windows 10 Mobile device.
 
 Keep the client APPX, its public `.cer` file, and any separately built resource
 framework together. The resource framework contains your Minecraft resources;

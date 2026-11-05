@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window
     private CompatibilityCatalog? catalog;
     private bool buildActionRunning;
     private bool minecraftOwnershipVerified;
+    private SignedPackageOutput? builtOutput;
     private sealed record ReleaseChoice(string Patch, string Client, string Architecture, CompatibilityResult Compatibility)
     {
         public override string ToString() => $"Patch {Patch} · UWP client {Client} · {(Compatibility.BuildVerified ? "build verified" : "build not verified")}";
@@ -227,6 +228,8 @@ public sealed partial class MainWindow : Window
 
     private async void RunRecipe_Click(object sender, RoutedEventArgs e)
     {
+        builtOutput = null;
+        InstallLocal.Visibility = Visibility.Collapsed;
         buildActionRunning = true;
         UpdateBuildActions();
         try
@@ -253,6 +256,9 @@ public sealed partial class MainWindow : Window
                 CatalogTrust.PublicKey(), release.Patch, release.Client, CatalogTrust.BuilderVersion, release.Architecture, workspace, git);
             var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft);
             var signed = result.SignedOutput ?? throw new InvalidOperationException("The build did not produce signed output.");
+            builtOutput = signed;
+            if (LocalPackageInstaller.CanInstall(selection.Target, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture, Environment.OSVersion.Version))
+                InstallLocal.Visibility = Visibility.Visible;
             RecipeStatus.Text = $"Signed client: {signed.Client}. Public certificate: {signed.Certificate}. Installation guide: {signed.InstallationGuide}.";
             if (signed.Dependencies is { Count: > 0 })
                 RecipeStatus.Text += $" Microsoft framework dependencies: {Path.GetDirectoryName(signed.Dependencies[0])}.";
@@ -265,6 +271,27 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception error) { RecipeStatus.Text = $"{RecipeStatus.Text} Build failed: {error.Message}"; }
         finally { buildActionRunning = false; UpdateBuildActions(); }
+    }
+
+    private async void InstallLocal_Click(object sender, RoutedEventArgs e)
+    {
+        if (builtOutput is not { } output) return;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = ((FrameworkElement)Content).XamlRoot,
+            Title = "Install Horizon on this PC?",
+            Content = "Windows will trust your local signing certificate for packages from this builder and install the client and its required frameworks for your account. Windows may ask for administrator approval.",
+            PrimaryButtonText = "Install", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        InstallLocal.IsEnabled = false;
+        try
+        {
+            await LocalPackageInstaller.InstallAsync(output, new Progress<string>(message => RecipeStatus.Text = message));
+            RecipeStatus.Text = "Horizon was installed for your Windows account.";
+        }
+        catch (Exception error) { RecipeStatus.Text = $"Installation did not complete: {error.Message}"; }
+        finally { InstallLocal.IsEnabled = true; }
     }
     private async void InstallTool_Click(object sender, RoutedEventArgs e)
     {

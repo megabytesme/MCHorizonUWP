@@ -20,7 +20,7 @@
             <StackPanel x:Name="WelcomePage" Spacing="14">
               <TextBlock Text="Welcome to Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="Create a Horizon package for a Windows PC or a Windows 10 Mobile device." TextWrapping="Wrap" />
-              <TextBlock Text="This preview still needs prepared Minecraft resources and development tools. Automatic setup, resource preparation and installation are not ready." TextWrapping="Wrap" />
+              <TextBlock Text="This preview still needs prepared Minecraft resources and development tools. Complete automatic setup and resource preparation are not ready." TextWrapping="Wrap" />
               <TextBlock Text="The builder retrieves compatible releases from the MCHorizonUWP repository." TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel x:Name="TargetPage" Spacing="14" Visibility="Collapsed">
@@ -104,6 +104,7 @@
               <TextBlock Text="Sign in with an account that owns Minecraft: Java Edition, validate the plan, then build. The client package and its reusable resources are signed with your local certificate." TextWrapping="Wrap" />
               <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />
               <Button x:Name="RunRecipe" Content="Build client" Click="RunRecipe_Click" />
+              <Button x:Name="InstallLocal" Content="Install on this PC" Click="InstallLocal_Click" Visibility="Collapsed" />
               <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
               <StackPanel x:Name="RecipeSteps" Spacing="6" />
             </StackPanel>
