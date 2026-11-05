@@ -57,3 +57,12 @@ process PATH. Git installed without interacting with the installer, and the
 same running builder subsequently reported Git as found. The Git installer
 had been downloaded during the earlier interactive attempt, so this is not a
 fresh-download test. Python's silent installer and Rustup remain unverified.
+
+## 2026-11-05: package signing component
+
+In Sandbox, a standalone test harness created a user-owned signing identity,
+reopened it in a later process, signed a synthetic framework APPX and exported
+its public certificate. After the certificate was trusted inside that Sandbox,
+SignTool verified the package and Windows installed it. The private key stayed
+in the Sandbox user's certificate store. This component is not yet connected
+to the builder's real package pipeline or installation guide.

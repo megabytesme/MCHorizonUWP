@@ -1,5 +1,50 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 4 && args[0] == "--signing-proof")
+{
+    var identity = PackageSigning.GetOrCreateIdentity();
+    Require(PackageSigning.GetOrCreateIdentity() == identity, "signing identity remains stable");
+    var output = Path.GetFullPath(args[3]);
+    Directory.CreateDirectory(output);
+    var stage = Path.Combine(output, "stage");
+    Directory.CreateDirectory(Path.Combine(stage, "Assets"));
+    await File.WriteAllBytesAsync(Path.Combine(stage, "Assets", "StoreLogo.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/aWQAAAAASUVORK5CYII="));
+    System.Xml.Linq.XNamespace ns = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
+    var manifest = new System.Xml.Linq.XDocument(new System.Xml.Linq.XDeclaration("1.0", "utf-8", null),
+        new System.Xml.Linq.XElement(ns + "Package",
+            new System.Xml.Linq.XElement(ns + "Identity", new System.Xml.Linq.XAttribute("Name", "MCHorizonUWP.SigningProof"),
+                new System.Xml.Linq.XAttribute("Publisher", identity.Publisher), new System.Xml.Linq.XAttribute("Version", "1.0.0.0"), new System.Xml.Linq.XAttribute("ProcessorArchitecture", "neutral")),
+            new System.Xml.Linq.XElement(ns + "Properties", new System.Xml.Linq.XElement(ns + "Framework", "true"),
+                new System.Xml.Linq.XElement(ns + "DisplayName", "MCHorizonUWP signing proof"), new System.Xml.Linq.XElement(ns + "PublisherDisplayName", "MCHorizonUWP"),
+                new System.Xml.Linq.XElement(ns + "Logo", "Assets/StoreLogo.png")),
+            new System.Xml.Linq.XElement(ns + "Dependencies", new System.Xml.Linq.XElement(ns + "TargetDeviceFamily", new System.Xml.Linq.XAttribute("Name", "Windows.Universal"),
+                new System.Xml.Linq.XAttribute("MinVersion", "10.0.15063.0"), new System.Xml.Linq.XAttribute("MaxVersionTested", "10.0.15063.0"))),
+            new System.Xml.Linq.XElement(ns + "Resources", new System.Xml.Linq.XElement(ns + "Resource", new System.Xml.Linq.XAttribute("Language", "en-us")))));
+    manifest.Save(Path.Combine(stage, "AppxManifest.xml"));
+    var unsigned = Path.Combine(output, "unsigned.appx");
+    var start = new System.Diagnostics.ProcessStartInfo(args[1]) { UseShellExecute = false, CreateNoWindow = true };
+    foreach (var item in new[] { "pack", "/d", stage, "/p", unsigned }) start.ArgumentList.Add(item);
+    using (var process = System.Diagnostics.Process.Start(start) ?? throw new Exception("MakeAppx did not start"))
+    {
+        await process.WaitForExitAsync();
+        Require(process.ExitCode == 0, "synthetic package created");
+    }
+    var signed = Path.Combine(output, "signed.appx");
+    var certificate = Path.Combine(output, "public.cer");
+    try
+    {
+        await PackageSigning.SignAsync(unsigned, signed, certificate, identity with { Publisher = "CN=Wrong" }, args[2]);
+        throw new Exception("a mismatched signing identity was accepted");
+    }
+    catch (InvalidOperationException) { Require(!File.Exists(signed), "mismatched identity did not create a package"); }
+    await PackageSigning.SignAsync(unsigned, signed, certificate, identity, args[2]);
+    using (var zip = System.IO.Compression.ZipFile.OpenRead(signed)) Require(zip.GetEntry("AppxSignature.p7x") is not null, "signed package contains signature");
+    using (var publicCert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate))
+        Require(publicCert.Thumbprint == identity.Thumbprint && !publicCert.HasPrivateKey, "export contains only the public certificate");
+    Console.WriteLine($"Synthetic package signed with {identity.Publisher}; public certificate exported.");
+    return;
+}
+
 if (args.Length == 2 && args[0] == "--inspect-candidate-catalog")
 {
     var candidate = CompatibilityCatalog.Parse(await File.ReadAllTextAsync(args[1]));
