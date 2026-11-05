@@ -1,7 +1,10 @@
 # Fresh-PC builder validation (2026-11-05)
 
 The complete clean-PC acceptance test has **not passed**. The builder still
-needs automatic compiler and SDK provisioning and a full installation trial.
+needs a full installation trial. Rustup, Visual Studio and SDK provisioning are
+implemented, but their complete clean-Sandbox validation is not yet established.
+The Visual Studio setup test was interrupted when the host unexpectedly restarted;
+it had not finished. Windows did not record a crash code.
 Minecraft asset preparation has been exercised on the development machine,
 but not yet as part of a complete clean-PC build. These
 results do not establish device compatibility.
@@ -23,6 +26,21 @@ results do not establish device compatibility.
   VC runtime APPX was absent from the development machine's SDK installation.
 - The Sandbox also installed LLVM 23.1.4 through the builder's WinGet setup
   path and confirmed that `clang.exe` was present afterwards.
+- A later fresh Sandbox started the Visual Studio 2022 Build Tools installation
+  through WinGet. Its installer verified the download and progressed into the
+  Windows 11 SDK before the host restart interrupted it. No completion result
+  or clean-PC build was recorded.
+- A reset 8192 MB Sandbox downloaded and verified the Microsoft VC runtime
+  framework fallback for all four architectures. This component test used a
+  shared copy of Microsoft's SignTool, so it is not an end-to-end clean-PC
+  build. The ARM32 package is Microsoft-signed version 14.0.33519.0.
+- On the development PC, UI Automation checked that Next on Welcome shows
+  the dependency consent dialog and that declining advances to the target page
+  with one of six pages marked complete. The dependency expander exposed eight
+  separate progress bars. No dependency installer was run in this UI check.
+- A strict x64 UWP host link succeeded using a private builder WinUI profile
+  instead of the user's NuGet cache; its retained output is in
+  `E:\temp\HorizonPrivateProfileHostProof-20261105`.
 - The Sandbox verified the public signed catalog and assembled the published
   x64 source release from the upstream archive, patch and client prereleases.
   An earlier download ended with an unexpected EOF; interrupted and stalled
@@ -53,9 +71,9 @@ results do not establish device compatibility.
 
 ## Build records
 
-The following folders are on Ben-Desktop under `$env:TEMP`; they are retained
-for inspection and are not release artifacts. The actual builder workspaces on
-a user's PC are separate. The builder now limits parallel Cargo jobs when
+The following records were made on Ben-Desktop under `$env:TEMP`; those
+temporary folders are no longer present. They were not release artifacts.
+The actual builder workspaces on a user's PC are separate. The builder limits parallel Cargo jobs when
 available memory is low, after an ARM32 rebuild hit Windows' paging-file limit.
 
 | Target | Proof workspace | Result |
@@ -80,9 +98,9 @@ not through a downloaded builder on a blank PC.
 
 ## Remaining work
 
-- Provision and verify the supported Visual C++ UWP toolchain, SDKs, Rust and
-  rust-src automatically; allow Windows to request elevation when
-  necessary. Current scripts assume specific Visual Studio locations.
+- Finish the clean-PC test of Visual C++ UWP tools and SDK setup. Test automatic
+  Rustup installation and installation of the pinned Rust toolchain and rust-src
+  as part of the full builder flow.
 - Test Minecraft asset preparation after ownership sign-in in the clean-PC
   flow, including the privacy of generated resources. Test sign-in in the UWP
   client separately.

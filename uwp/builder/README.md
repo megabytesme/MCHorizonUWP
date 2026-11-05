@@ -33,20 +33,23 @@ The built-in touch and vibration options are separate from registry mods.
 Packages from the authenticated release recipe are signed with a locally
 created certificate. The output includes the public certificate, an installation
 guide and the target's Microsoft UI and VC runtime framework packages. The
-builder restores the pinned WinUI package automatically when absent; it
-currently requires the Microsoft VC runtime APPX to be present in the installed
-UWP SDK. When the target can run on this PC, the builder offers installation
+builder restores the pinned WinUI package automatically when absent. If an SDK
+does not contain the target's VC runtime APPX, the builder downloads a pinned
+Microsoft redistributable, verifies its signature and extracts the signed APPX.
+When the target can run on this PC, the builder offers installation
 and explains that trusting its certificate may require administrator approval.
 Other targets use the included guide. For an existing resource framework, its
 exact identity and publisher must match the client; resource
 frameworks contain private Minecraft files and should not be published.
 
-The preview installs missing Git, Python and ARM-target Clang through WinGet
-when a build starts and invokes Rustup interactively. It does not yet provision
-the complete Visual C++ toolchain, SDK and
-Rust toolchain automatically. The newer client recipe can use supported Visual
-Studio 2022 and 2026 editions with the required UWP components installed.
-Administrator approval may be needed when
+When you continue from Welcome, the development builder checks its requirements
+and offers to install missing components in the background. The Dependencies
+panel shows setup progress while you continue through the wizard. The builder
+uses WinGet for Git, Python, Rustup, Clang and Visual Studio 2022 Build Tools;
+it also prepares the UWP SDKs and Microsoft framework packages for all four
+targets. A new Rustup installation uses a private builder-owned home; the pinned
+compiler and rust-src are selected without changing an existing default
+toolchain. This setup is under Sandbox validation. Administrator approval may be needed when
 installing development tools or trusting the locally generated certificate.
 A complete build from a clean PC has not passed. See
 [CLEAN-PC-VALIDATION.md](CLEAN-PC-VALIDATION.md) for tested paths and limitations.
