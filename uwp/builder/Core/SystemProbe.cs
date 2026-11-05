@@ -2,12 +2,31 @@ namespace Horizon.Builder.Core;
 
 public sealed class SystemProbe : IProbe
 {
+    private static string PrivateRustRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MCHorizonUWP", "Rust");
+
+    /// <summary>Keep a new Rustup installation in a builder-owned location and only affect this process.</summary>
+    public static void UsePrivateRustupForProcess()
+    {
+        Environment.SetEnvironmentVariable("CARGO_HOME", Path.Combine(PrivateRustRoot, "cargo"));
+        Environment.SetEnvironmentVariable("RUSTUP_HOME", Path.Combine(PrivateRustRoot, "rustup"));
+    }
+
     /// <summary>Include paths installed since the builder process started, without removing existing paths.</summary>
     public static void RefreshProcessPath()
     {
         if (!OperatingSystem.IsWindows()) return;
+        if (File.Exists(Path.Combine(PrivateRustRoot, "cargo", "bin", "rustup.exe"))) UsePrivateRustupForProcess();
         var current = Environment.GetEnvironmentVariable("PATH") ?? "";
         var parts = current.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries).ToList();
+        var cargoHome = Environment.GetEnvironmentVariable("CARGO_HOME")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cargo");
+        var cargoBin = Path.Combine(cargoHome, "bin");
+        if (File.Exists(Path.Combine(cargoBin, "rustup.exe")))
+        {
+            // Rustup is used only in this process; do not change the user's PATH.
+            parts.RemoveAll(part => string.Equals(part.Trim().Trim('"'), cargoBin, StringComparison.OrdinalIgnoreCase));
+            parts.Insert(0, cargoBin);
+        }
         var known = new HashSet<string>(parts.Select(p => p.Trim().Trim('"')), StringComparer.OrdinalIgnoreCase);
         foreach (var scope in new[] { EnvironmentVariableTarget.Machine, EnvironmentVariableTarget.User })
         {

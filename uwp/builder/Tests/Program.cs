@@ -796,7 +796,10 @@ catch (InvalidOperationException) { failedRustCheck = true; }
 Require(failedRustCheck, "missing rust-src is rejected after installation");
 var soundBlockers = LocalRecipe.ToolchainBlockers(new BuildSelection(TargetProfile.WindowsMobile, true, PrepareSounds: true), new FakeProbe(), new RustToolchainFacts("rustc 1.99.1 (test)", true));
 Require(soundBlockers.Any(blocker => blocker.Contains("Sound preparation requires the x64")), "ARM sound preparation checks host compiler");
-Require(WindowsPackageManager.Arguments(InstallableTool.Rustup).SequenceEqual(["install", "--id", "Rustlang.Rustup", "--exact", "--source", "winget", "--interactive", "--no-upgrade"]), "fixed interactive Rustup install");
+var rustupArguments = WindowsPackageManager.Arguments(InstallableTool.Rustup);
+Require(rustupArguments.Contains("1.29.3") && rustupArguments.Contains("--disable-interactivity")
+    && rustupArguments.Contains("-y --no-modify-path --default-toolchain none --profile minimal --no-update-default-toolchain"),
+    "Rustup uses a pinned silent installer without changing the default toolchain or PATH");
 Require(WindowsPackageManager.Arguments(InstallableTool.Git)[2] == "Git.Git", "fixed Git package");
 Require(WindowsPackageManager.Arguments(InstallableTool.Python)[2] == "Python.Python.3.13", "fixed Python package");
 Require(WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--silent") && WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--disable-interactivity"), "Git setup is noninteractive");
@@ -807,12 +810,14 @@ var autoInstalled = new List<InstallableTool>();
 Task InstallFake(InstallableTool tool)
 {
     autoInstalled.Add(tool);
-    autoProbe.Executables.Add(tool == InstallableTool.Git ? "git.exe" : "python.exe");
+    autoProbe.Executables.Add(tool switch { InstallableTool.Git => "git.exe", InstallableTool.Python => "python.exe", InstallableTool.Rustup => "rustup.exe", _ => throw new Exception("Unexpected setup tool") });
     return Task.CompletedTask;
 }
-await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { });
-await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { });
-Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python]), "missing Git and Python installed once and then reused");
+var rustupHomesPrepared = 0;
+await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { }, prepareRustup: () => rustupHomesPrepared++);
+await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { }, prepareRustup: () => rustupHomesPrepared++);
+Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python, InstallableTool.Rustup]), "missing Git, Python and Rustup installed once and then reused");
+Require(rustupHomesPrepared == 1, "new Rustup gets a private home without changing an existing installation");
 Task InstallFakeClang(InstallableTool tool)
 {
     autoInstalled.Add(tool);
@@ -822,7 +827,7 @@ Task InstallFakeClang(InstallableTool tool)
 await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.DesktopX64, InstallFakeClang);
 await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.WindowsMobile, InstallFakeClang);
 await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.SurfaceProX, InstallFakeClang);
-Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python, InstallableTool.Llvm]), "Clang installed once only for ARM targets");
+Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python, InstallableTool.Rustup, InstallableTool.Llvm]), "Clang installed once only for ARM targets");
 try
 {
     await WindowsPackageManager.EnsureBuildBasicsAsync(new FakeProbe(), _ => Task.CompletedTask, () => { });
@@ -833,6 +838,12 @@ try { _ = WindowsPackageManager.Arguments((InstallableTool)99); throw new Except
 catch (ArgumentOutOfRangeException) { }
 try { await WindowsPackageManager.InstallAsync(new FakeProbe(), InstallableTool.Rustup); throw new Exception("missing WinGet accepted"); }
 catch (InvalidOperationException error) { Require(error.Message.Contains("not found"), "missing WinGet reported"); }
+var occupiedCargoProbe = new FakeProbe();
+occupiedCargoProbe.Files.Add(Path.Combine(occupiedCargoProbe.Root, "bin", "cargo.exe"));
+var occupiedCargoBlocked = false;
+try { await WindowsPackageManager.InstallAsync(occupiedCargoProbe, InstallableTool.Rustup); }
+catch (IOException) { occupiedCargoBlocked = true; }
+Require(occupiedCargoBlocked, "Rustup does not replace an existing unrelated Cargo executable");
 Require(new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: " 01234567-89AB-CDEF-0123-456789ABCDEF ").ValidatedMicrosoftClientId == "01234567-89ab-cdef-0123-456789abcdef", "public client ID canonicalized");
 try { _ = new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "not-an-id").ValidatedMicrosoftClientId; throw new Exception("invalid client ID accepted"); }
 catch (ArgumentException) { }

@@ -252,7 +252,7 @@ public sealed partial class MainWindow : Window
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var probe = new SystemProbe();
             await WindowsPackageManager.EnsureBuildBasicsAsync(probe, tool => WindowsPackageManager.InstallAsync(probe, tool),
-                SystemProbe.RefreshProcessPath, progress);
+                SystemProbe.RefreshProcessPath, progress, SystemProbe.UsePrivateRustupForProcess);
             await WindowsPackageManager.EnsureClangAsync(probe, selection.Target, tool => WindowsPackageManager.InstallAsync(probe, tool), progress);
             await WindowsPackageManager.EnsureRustToolchainAsync(() => LocalRecipe.InspectRustAsync(probe),
                 () => WindowsPackageManager.InstallRustToolchainAsync(probe), progress);
@@ -319,9 +319,10 @@ public sealed partial class MainWindow : Window
                 : ReferenceEquals(sender, InstallGit) ? InstallableTool.Git
                 : ReferenceEquals(sender, InstallPython) ? InstallableTool.Python
                 : throw new InvalidOperationException("Unknown tool selection.");
-            InstallStatus.Text = tool == InstallableTool.Rustup
-                ? "Windows Package Manager is running. Follow its prompts."
-                : $"Installing {tool} with Windows Package Manager…";
+            SystemProbe.RefreshProcessPath();
+            if (tool == InstallableTool.Rustup && new SystemProbe().FindOnPath("rustup.exe") is null)
+                SystemProbe.UsePrivateRustupForProcess();
+            InstallStatus.Text = $"Installing {tool} with Windows Package Manager…";
             await WindowsPackageManager.InstallAsync(new SystemProbe(), tool);
             SystemProbe.RefreshProcessPath();
             InstallStatus.Text = "WinGet completed. Check setup again.";

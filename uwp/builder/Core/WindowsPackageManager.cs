@@ -27,12 +27,13 @@ public static class WindowsPackageManager
     }
 
     public static async Task EnsureBuildBasicsAsync(IProbe probe, Func<InstallableTool, Task> install,
-        Action refreshPath, IProgress<string>? progress = null)
+        Action refreshPath, IProgress<string>? progress = null, Action? prepareRustup = null)
     {
         refreshPath();
-        foreach (var (tool, executable) in new[] { (InstallableTool.Git, "git.exe"), (InstallableTool.Python, "python.exe") })
+        foreach (var (tool, executable) in new[] { (InstallableTool.Git, "git.exe"), (InstallableTool.Python, "python.exe"), (InstallableTool.Rustup, "rustup.exe") })
         {
             if (probe.FindOnPath(executable) is not null) continue;
+            if (tool == InstallableTool.Rustup) prepareRustup?.Invoke();
             progress?.Report($"Installing {tool} with Windows Package Manager…");
             await install(tool);
             refreshPath();
@@ -64,14 +65,25 @@ public static class WindowsPackageManager
         };
         var args = new List<string> { "install", "--id", package, "--exact", "--source", "winget" };
         if (tool == InstallableTool.Llvm) args.AddRange(["--version", "23.1.4"]);
-        if (tool == InstallableTool.Rustup) args.Add("--interactive");
-        else args.AddRange(["--silent", "--disable-interactivity", "--accept-package-agreements", "--accept-source-agreements"]);
-        args.Add("--no-upgrade");
+        if (tool == InstallableTool.Rustup)
+            args.AddRange(["--version", "1.29.3", "--override", "-y --no-modify-path --default-toolchain none --profile minimal --no-update-default-toolchain"]);
+        args.AddRange(["--silent", "--disable-interactivity", "--accept-package-agreements", "--accept-source-agreements"]);
+        // A separate Rustup installation can be registered with WinGet while absent
+        // from PATH. Install our private copy without replacing that installation.
+        args.Add(tool == InstallableTool.Rustup ? "--force" : "--no-upgrade");
         return args.AsReadOnly();
     }
 
     public static async Task InstallAsync(IProbe probe, InstallableTool tool)
     {
+        if (tool == InstallableTool.Rustup)
+        {
+            var cargoHome = probe.EnvironmentValue("CARGO_HOME")
+                ?? Path.Combine(probe.EnvironmentValue("USERPROFILE") ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cargo");
+            var bin = Path.Combine(cargoHome, "bin");
+            if (probe.FileExists(Path.Combine(bin, "cargo.exe")) && !probe.FileExists(Path.Combine(bin, "rustup.exe")))
+                throw new IOException("A Cargo installation already occupies Rustup's intended location. Resolve that installation before continuing.");
+        }
         var arguments = Arguments(tool);
         var executable = probe.FindOnPath("winget.exe")
             ?? throw new InvalidOperationException("Windows Package Manager was not found. Open the publisher instructions or install App Installer first.");
