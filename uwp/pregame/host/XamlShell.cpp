@@ -44,6 +44,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cwctype>
 #include <cstring>
 #include <mutex>
@@ -217,11 +218,13 @@ muxc::NavigationViewItem^ servers_navigation;
 muxc::NavigationViewItem^ saves_navigation;
 muxc::NavigationViewItem^ home_navigation;
 Flyout^ profile_flyout;
+bool profile_flyout_open = false;
 Button^ fallback_profile;
 ContentDialog^ active_dialog;
 #ifndef HORIZON_UWP_SHELL_PROBE
 ContentDialog^ controller_test_dialog;
 ScrollViewer^ controller_test_scroll;
+ScrollViewer^ controller_page_scroll;
 DispatcherTimer^ controller_navigation_timer;
 bool controller_navigation_sounds = true;
 bool controller_is_last_input = false;
@@ -1286,7 +1289,7 @@ void controller_activate_focused() {
     }
     if (auto input = dynamic_cast<TextBox^>(element)) {
         input->Focus(FocusState::Programmatic);
-        Windows::UI::ViewManagement::InputPane::GetForCurrentView()->TryShow();
+        if (!input->IsReadOnly) Windows::UI::ViewManagement::InputPane::GetForCurrentView()->TryShow();
         return;
     }
     auto peer = FrameworkElementAutomationPeer::CreatePeerForElement(element);
@@ -1296,18 +1299,75 @@ void controller_activate_focused() {
     if (auto select = dynamic_cast<ISelectionItemProvider^>(peer->GetPattern(PatternInterface::SelectionItem))) select->Select();
 }
 
+bool is_in_controller_page(DependencyObject^ element) {
+    while (element) {
+        if (element == content) return true;
+        element = VisualTreeHelper::GetParent(element);
+    }
+    return false;
+}
+
+bool is_in_controller_dialog(DependencyObject^ element) {
+    while (element) {
+        if (dynamic_cast<ContentDialog^>(element)) return true;
+        element = VisualTreeHelper::GetParent(element);
+    }
+    return false;
+}
+
+bool scroll_controller_page(double amount) {
+    if (!controller_page_scroll || controller_page_scroll->ScrollableHeight <= 0) return false;
+    const auto offset = (std::max)(0.0, (std::min)(controller_page_scroll->ScrollableHeight,
+        controller_page_scroll->VerticalOffset + amount));
+    controller_page_scroll->ChangeView(nullptr, ref new Platform::Box<double>(offset), nullptr);
+    return true;
+}
+
+bool focus_controller_page() {
+    if (!content) return false;
+    auto first = (show_logs || show_news) && controller_page_scroll
+        ? safe_cast<Control^>(controller_page_scroll)
+        : dynamic_cast<Control^>(FocusManager::FindFirstFocusableElement(content));
+    if (!first || !first->Focus(FocusState::Programmatic)) return false;
+    first->StartBringIntoView();
+    return true;
+}
+
 void controller_cancel_focused() {
     if (controller_test_dialog) { controller_test_dialog->Hide(); return; }
+    if (active_dialog) { dialog_result = -1; active_dialog->Hide(); return; }
+    if (profile_flyout && profile_flyout_open) {
+        profile_flyout->Hide();
+        if (profile_navigation) profile_navigation->Focus(FocusState::Programmatic);
+        return;
+    }
     auto element = dynamic_cast<DependencyObject^>(FocusManager::GetFocusedElement());
+    bool in_page = false;
     while (element) {
         if (auto dialog = dynamic_cast<ContentDialog^>(element)) { dialog->Hide(); return; }
         if (auto box = dynamic_cast<ComboBox^>(element)) {
             if (box->IsDropDownOpen) { box->IsDropDownOpen = false; return; }
         }
+        if (element == content) in_page = true;
         element = VisualTreeHelper::GetParent(element);
     }
-    if (active_dialog) { dialog_result = -1; active_dialog->Hide(); return; }
+    if (in_page && navigation) {
+        auto selected = dynamic_cast<Control^>(navigation->SelectedItem);
+        if (!selected) selected = home_navigation;
+        if (selected && selected->Focus(FocusState::Programmatic)) return;
+    }
     if (navigation && home_navigation) navigation->SelectedItem = home_navigation;
+}
+
+// NavigationView changes replace the entire page body. Restore controller focus
+// into the new body after XAML has laid it out, so narrow/mobile panes do not
+// strand focus in the navigation rail.
+void focus_new_controller_page() {
+    if (!controller_is_last_input || !dispatcher) return;
+    dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([]() {
+        if (!controller_is_last_input || !content || prompt_kind != 0) return;
+        focus_controller_page();
+    }));
 }
 
 void start_controller_navigation() {
@@ -1324,7 +1384,21 @@ void start_controller_navigation() {
                 previous = 0; horizon_uwp_controller_navigation_stop(); return;
             }
 #endif
+#ifdef HORIZON_UWP_CONTROLLER_AUTOMATION
+            // A test-only package reads a controller-state bitmask from its
+            // isolated LocalState. Release builds never compile this path.
+            unsigned keys = 0;
+            const std::wstring input_path = std::wstring(ApplicationData::Current->LocalFolder->Path->Data()) + L"\\controller-automation.txt";
+            const HANDLE input = CreateFile2(input_path.c_str(), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, nullptr);
+            if (input != INVALID_HANDLE_VALUE) {
+                char data[24] = {}; DWORD count = 0;
+                if (ReadFile(input, data, sizeof(data) - 1, &count, nullptr)) keys = static_cast<unsigned>(strtoul(data, nullptr, 10));
+                CloseHandle(input);
+            }
+#else
             const unsigned keys = horizon_uwp_controller_navigation_read();
+#endif
             if (keys) set_controller_last_input(true);
             const unsigned pressed = keys & ~previous;
             const auto now = GetTickCount64();
@@ -1346,18 +1420,56 @@ void start_controller_navigation() {
                 return;
             }
             test_cancel_at = 0;
+            if (keys & 64) scroll_controller_page(-24.0);
+            if (keys & 128) scroll_controller_page(24.0);
             if (directions) {
                 bool moved = false;
-                if (!FocusManager::GetFocusedElement()) {
+                auto focused = dynamic_cast<Control^>(FocusManager::GetFocusedElement());
+                const bool in_page = is_in_controller_page(focused);
+                const bool in_overlay = profile_flyout_open || is_in_controller_dialog(focused);
+                if (in_page && (directions & 12)) {
+                    const int delta = (directions & 4) ? -1 : 1;
+                    if (auto slider = dynamic_cast<Slider^>(focused)) {
+                        const double step = slider->StepFrequency > 0 ? slider->StepFrequency : slider->SmallChange;
+                        slider->Value = (std::max)(slider->Minimum, (std::min)(slider->Maximum,
+                            slider->Value + delta * step));
+                        moved = true;
+                    } else if (auto box = dynamic_cast<ComboBox^>(focused)) {
+                        const int next = box->SelectedIndex + delta;
+                        if (!box->IsDropDownOpen && next >= 0 && next < static_cast<int>(box->Items->Size)) {
+                            box->SelectedIndex = next; moved = true;
+                        }
+                    }
+                }
+                if (!moved && focused == controller_page_scroll && (directions & 3)) {
+                    moved = scroll_controller_page((directions & 1) ? -80.0 : 80.0);
+                }
+                if (!moved && !in_page && !in_overlay && (directions & 8)) {
+                    moved = focus_controller_page();
+                }
+                if (!moved && in_page && (directions & 3)) {
+                    auto next = dynamic_cast<Control^>(FocusManager::FindNextFocusableElement(
+                        (directions & 1) ? FocusNavigationDirection::Previous : FocusNavigationDirection::Next));
+                    if (next && is_in_controller_page(next)) moved = next->Focus(FocusState::Programmatic);
+                    if (!moved) moved = scroll_controller_page((directions & 1) ? -80.0 : 80.0);
+                }
+                // At the end of a page's authored tab order, keep focus in
+                // the page instead of jumping unpredictably into the rail.
+                const bool page_vertical = in_page && (directions & 3);
+                if (!moved && !page_vertical && !focused) {
                     auto first = dynamic_cast<Control^>(FocusManager::FindFirstFocusableElement(nullptr));
                     if (first) moved = first->Focus(FocusState::Programmatic);
-                } else {
+                } else if (!moved && !page_vertical) {
                     if (directions & 1) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Up);
                     else if (directions & 2) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Down);
                     else if (directions & 4) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Left);
                     else if (directions & 8) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Right);
                 }
-                if (moved && controller_navigation_sounds) ElementSoundPlayer::Play(ElementSoundKind::Focus);
+                if (moved) {
+                    auto focused = dynamic_cast<FrameworkElement^>(FocusManager::GetFocusedElement());
+                    if (focused) focused->StartBringIntoView();
+                    if (controller_navigation_sounds) ElementSoundPlayer::Play(ElementSoundKind::Focus);
+                }
             }
             if (pressed & 16) {
                 if (controller_navigation_sounds) ElementSoundPlayer::Play(ElementSoundKind::Invoke);
@@ -1374,6 +1486,7 @@ void start_controller_navigation() {
 #endif
 
 void show_prompt_dialog(Platform::String^ message, Platform::String^ accounts, unsigned kind, unsigned generation) {
+    if (profile_flyout && profile_flyout_open) profile_flyout->Hide();
     auto dialog = ref new ContentDialog();
     dialog->Title = (kind == 1 || kind == 5) ? L"Account Management" : kind == 8 ? L"Add an account" :
         kind == 2 ? L"Microsoft sign-in" : L"Horizon";
@@ -2070,6 +2183,7 @@ void refresh() {
         auto controller_card = ref new StackPanel();
         controller_card->Children->Append(text(L"Controllers", 18));
         controller_card->Children->Append(text(L"Test connected controllers and their game mappings.", 14));
+        controller_card->Children->Append(text(L"Use the right stick to scroll. Press Back to return to page navigation.", 14));
         controller_card->Children->Append(action_button(L"Test controller", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_controller_test(); })));
         auto controller_sounds = ref new ToggleSwitch();
         controller_sounds->Header = L"Controller navigation sounds";
@@ -2406,6 +2520,10 @@ void refresh() {
         panel->Children->Append(profile_card());
     }
     auto scroll = ref new ScrollViewer();
+#ifndef HORIZON_UWP_SHELL_PROBE
+    controller_page_scroll = scroll;
+    if (show_logs || show_news) scroll->IsTabStop = true;
+#endif
     scroll->HorizontalScrollMode = ScrollMode::Disabled;
     scroll->HorizontalScrollBarVisibility = ScrollBarVisibility::Disabled;
     auto layout = ref new Grid();
@@ -2436,6 +2554,11 @@ public:
         // WinUI activation is deferred until OnLaunched, after the UWP XAML
         // application runtime has initialized.
         metadata_ = nullptr;
+        if (Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamily == L"Windows.Xbox") {
+            // Xbox apps otherwise default to an emulated mouse, which competes
+            // with XAML's directional controller focus.
+            RequiresPointerMode = ApplicationRequiresPointerMode::WhenRequested;
+        }
     }
     virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Windows::UI::Xaml::Interop::TypeName type) {
         return metadata_ ? metadata_->GetXamlType(type) : nullptr;
@@ -2480,6 +2603,16 @@ protected:
             const auto key = static_cast<int>(event->Key);
             set_controller_last_input(key >= static_cast<int>(Windows::System::VirtualKey::GamepadA)
                 && key <= static_cast<int>(Windows::System::VirtualKey::GamepadRightThumbstickLeft));
+            if (event->Key == Windows::System::VirtualKey::GamepadB && !event->Handled
+                && (!launcher_content || launcher_content->Visibility == Visibility::Visible)) {
+                controller_cancel_focused();
+                event->Handled = true;
+            }
+            if (!event->Handled && (event->Key == Windows::System::VirtualKey::GamepadRightThumbstickUp
+                || event->Key == Windows::System::VirtualKey::GamepadRightThumbstickDown)) {
+                scroll_controller_page(event->Key == Windows::System::VirtualKey::GamepadRightThumbstickUp ? -80.0 : 80.0);
+                event->Handled = true;
+            }
         }), true);
         page->AddHandler(UIElement::PointerPressedEvent, ref new PointerEventHandler([](Platform::Object^, PointerRoutedEventArgs^) {
             set_controller_last_input(false);
@@ -2609,6 +2742,20 @@ protected:
             profile_navigation->SelectsOnInvoked = false;
             update_profile_navigation();
             profile_flyout = ref new Flyout();
+            profile_flyout->Opened += ref new EventHandler<Platform::Object^>([](Platform::Object^, Platform::Object^) {
+                profile_flyout_open = true;
+#ifndef HORIZON_UWP_SHELL_PROBE
+                if (controller_is_last_input && dispatcher) {
+                    dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([]() {
+                        if (!profile_flyout_open || !profile_flyout) return;
+                        auto root = dynamic_cast<DependencyObject^>(profile_flyout->Content);
+                        auto first = root ? dynamic_cast<Control^>(FocusManager::FindFirstFocusableElement(root)) : nullptr;
+                        if (first) first->Focus(FocusState::Programmatic);
+                    }));
+                }
+#endif
+            });
+            profile_flyout->Closed += ref new EventHandler<Platform::Object^>([](Platform::Object^, Platform::Object^) { profile_flyout_open = false; });
             profile_flyout->Content = profile_card();
             FlyoutBase::SetAttachedFlyout(profile_navigation, profile_flyout);
             navigation->FooterMenuItems->Append(profile_navigation);
@@ -2637,6 +2784,9 @@ protected:
                         show_saves = tag && tag == L"saves";
                     }
                     refresh();
+#ifndef HORIZON_UWP_SHELL_PROBE
+                    focus_new_controller_page();
+#endif
                 });
             navigation->SelectedItem = home_navigation;
             page->Content = navigation;
