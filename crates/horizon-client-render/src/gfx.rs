@@ -2182,13 +2182,7 @@ impl Renderer {
                     config.width, config.height, config.format, config.present_mode
                 ));
             }
-            if let Err(error) = Self::configure(
-                &device,
-                surface,
-                &config,
-                None,
-                &device_lost,
-            ) {
+            if let Err(error) = Self::configure(&device, surface, &config, None, &device_lost) {
                 log::error!(
                     "Horizon renderer: {} surface configuration failed: {error}",
                     api.label()
@@ -2674,6 +2668,8 @@ impl Renderer {
         };
         let mut mip_levels = 1;
         let gl = adapter.get_info().backend == wgpu::Backend::Gl;
+        let batch_array_uploads = cfg!(all(target_vendor = "uwp", target_pointer_width = "32"))
+            && adapter.get_info().backend == wgpu::Backend::Dx12;
 
         // Downlevel GLES adapters cannot bind storage textures. The CPU sprite
         // animator only needs COPY_DST, so request storage usage for GPU jobs only.
@@ -2691,7 +2687,8 @@ impl Renderer {
                         // The extra layers are empty.
                         let layer_bytes = data.len() / layers as usize;
                         data.resize(layer_bytes * count as usize, 0);
-                        device.create_texture_with_data(
+                        upload::array_texture_with_data(
+                            &device,
                             &queue,
                             &wgpu::TextureDescriptor {
                                 label: Some(label),
@@ -2707,8 +2704,8 @@ impl Renderer {
                                 usage: wgpu::TextureUsages::TEXTURE_BINDING,
                                 view_formats: &[],
                             },
-                            wgpu::util::TextureDataOrder::LayerMajor,
                             &data,
+                            batch_array_uploads,
                         )
                     },
                 )
@@ -2725,7 +2722,8 @@ impl Renderer {
                 // The extra layers are empty.
                 mips.resize(mips.len() / used as usize * count as usize, 0);
                 mip_levels = levels;
-                device.create_texture_with_data(
+                upload::array_texture_with_data(
+                    &device,
                     &queue,
                     &wgpu::TextureDescriptor {
                         label: Some("Block sprites"),
@@ -2749,8 +2747,8 @@ impl Renderer {
                             },
                         view_formats: &[],
                     },
-                    wgpu::util::TextureDataOrder::LayerMajor,
                     &mips,
+                    batch_array_uploads,
                 )
             })
             .collect();

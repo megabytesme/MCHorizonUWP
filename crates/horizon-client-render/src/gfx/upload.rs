@@ -4,6 +4,106 @@
 //! texture writes a spike on every tick that changes a frame. The belt keeps a
 //! few mapped buffers and records the copies into the frame's encoder instead.
 use std::num::NonZeroU64;
+use wgpu::util::DeviceExt;
+
+// DeviceExt uploads each array layer and mip separately. D3D12 rounds every
+// staging allocation, so thousands of sprites can exhaust a 32-bit process's
+// address space before its first frame. Group adjacent layers of each mip.
+pub(super) fn array_texture_with_data(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    desc: &wgpu::TextureDescriptor<'_>,
+    data: &[u8],
+    batch_layers: bool,
+) -> wgpu::Texture {
+    if !batch_layers {
+        return device.create_texture_with_data(
+            queue,
+            desc,
+            wgpu::util::TextureDataOrder::LayerMajor,
+            data,
+        );
+    }
+    debug_assert_eq!(desc.dimension, wgpu::TextureDimension::D2);
+    debug_assert_eq!(desc.format, wgpu::TextureFormat::Rgba8Unorm);
+    let mut copy_desc = desc.clone();
+    copy_desc.usage |= wgpu::TextureUsages::COPY_DST;
+    let texture = device.create_texture(&copy_desc);
+    let layers = desc.size.depth_or_array_layers as usize;
+    let sizes: Vec<usize> = (0..desc.mip_level_count)
+        .map(|mip| {
+            (desc.size.width >> mip).max(1) as usize * (desc.size.height >> mip).max(1) as usize * 4
+        })
+        .collect();
+    let layer_stride: usize = sizes.iter().sum();
+    assert_eq!(data.len(), layer_stride * layers);
+    let mut mip_offset = 0;
+    for (mip, &mip_bytes) in sizes.iter().enumerate() {
+        let width = (desc.size.width >> mip).max(1);
+        let height = (desc.size.height >> mip).max(1);
+        for first in (0..layers).step_by(64) {
+            let count = (layers - first).min(64);
+            let bytes = gather_mip_layers(data, layer_stride, mip_offset, mip_bytes, first, count);
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &texture,
+                    mip_level: mip as u32,
+                    origin: wgpu::Origin3d {
+                        x: 0,
+                        y: 0,
+                        z: first as u32,
+                    },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &bytes,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(width * 4),
+                    rows_per_image: Some(height),
+                },
+                wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: count as u32,
+                },
+            );
+        }
+        mip_offset += mip_bytes;
+    }
+    texture
+}
+
+fn gather_mip_layers(
+    data: &[u8],
+    stride: usize,
+    offset: usize,
+    len: usize,
+    first: usize,
+    count: usize,
+) -> Vec<u8> {
+    let mut result = Vec::with_capacity(len * count);
+    for layer in first..first + count {
+        let start = layer * stride + offset;
+        result.extend_from_slice(&data[start..start + len]);
+    }
+    result
+}
+
+#[cfg(test)]
+mod array_upload_tests {
+    use super::gather_mip_layers;
+
+    #[test]
+    fn extracts_each_mip_from_only_the_requested_layers() {
+        // Each layer has a 4-byte first mip followed by a 1-byte second mip.
+        let data = [0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24];
+        assert_eq!(
+            gather_mip_layers(&data, 5, 0, 4, 1, 2),
+            [10, 11, 12, 13, 20, 21, 22, 23]
+        );
+        assert_eq!(gather_mip_layers(&data, 5, 4, 1, 0, 3), [4, 14, 24]);
+    }
+}
 
 /// Large enough for a tick of animated sprites at 16x16 with every mip level.
 const CHUNK: u64 = 1 << 20;
@@ -132,6 +232,15 @@ mod tests {
 
     /// Every mip level of one layer, read back as tightly packed RGBA8.
     fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture) -> Vec<u8> {
+        read_back_layer(device, queue, texture, 1)
+    }
+
+    fn read_back_layer(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        texture: &wgpu::Texture,
+        layer: u32,
+    ) -> Vec<u8> {
         let mut out = Vec::new();
         for level in 0..texture.mip_level_count() {
             let edge = texture.width() >> level;
@@ -147,7 +256,11 @@ mod tests {
                 wgpu::TexelCopyTextureInfo {
                     texture,
                     mip_level: level,
-                    origin: wgpu::Origin3d { x: 0, y: 0, z: 1 },
+                    origin: wgpu::Origin3d {
+                        x: 0,
+                        y: 0,
+                        z: layer,
+                    },
                     aspect: wgpu::TextureAspect::All,
                 },
                 wgpu::TexelCopyBufferInfo {
@@ -175,6 +288,39 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn batched_array_upload_matches_layer_major_upload() {
+        let Some((device, queue)) = device() else {
+            return;
+        };
+        let desc = wgpu::TextureDescriptor {
+            label: Some("array upload test"),
+            size: wgpu::Extent3d {
+                width: 4,
+                height: 4,
+                depth_or_array_layers: 70,
+            },
+            mip_level_count: 3,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        };
+        let data: Vec<u8> = (0..70 * (4 * 4 * 4 + 2 * 2 * 4 + 4))
+            .map(|i| ((i * 37 + i / 11) % 251) as u8)
+            .collect();
+        let expected = array_texture_with_data(&device, &queue, &desc, &data, false);
+        let actual = array_texture_with_data(&device, &queue, &desc, &data, true);
+        for layer in [0, 1, 63, 64, 69] {
+            assert_eq!(
+                read_back_layer(&device, &queue, &actual, layer),
+                read_back_layer(&device, &queue, &expected, layer),
+                "layer {layer}"
+            );
+        }
     }
 
     #[test]

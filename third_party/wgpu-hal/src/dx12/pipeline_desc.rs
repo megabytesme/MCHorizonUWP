@@ -96,7 +96,7 @@ implement_stream_object! { unsafe D3D12_VIEW_INSTANCING_DESC => D3D12_PIPELINE_S
 /// Implementaation of a pipeline state stream, which is a sequence of subobjects put into
 /// a byte array according to some basic alignment rules.
 ///
-/// Each subobject must start on an 8 byte boundary. Each subobject contains a 32 bit
+/// Each subobject must start on a pointer-sized boundary. Each subobject contains a 32 bit
 /// type identifier, followed by the actual subobject data, aligned as required by the
 /// subobject's structure.
 ///
@@ -131,8 +131,13 @@ impl<'a> RenderPipelineStateStream<'a> {
 
     /// Adds a subobject to the pipeline state stream.
     fn add_object<T: RenderPipelineStreamObject>(&mut self, object: T) {
-        // Ensure 8-byte alignment for the subobject start.
-        self.align_to(8);
+        self.add_object_aligned(object, align_of::<usize>());
+    }
+
+    fn add_object_aligned<T: RenderPipelineStreamObject>(&mut self, object: T, word_align: usize) {
+        // Each enum/value pair is a struct aligned to at least a pointer.
+        // On 32-bit Windows this is four bytes, not eight.
+        self.align_to(word_align.max(align_of::<T>()));
 
         // Append the type tag (u32)
         let tag: u32 = T::SUBOBJECT_TYPE.0 as u32;
@@ -157,6 +162,7 @@ impl<'a> RenderPipelineStateStream<'a> {
         &mut self,
         device: &ID3D12Device2,
     ) -> windows::core::Result<ID3D12PipelineState> {
+        self.align_to(align_of::<usize>());
         let stream_desc = D3D12_PIPELINE_STATE_STREAM_DESC {
             SizeInBytes: self.bytes.len(),
             pPipelineStateSubobjectStream: self.bytes.as_mut_ptr().cast(),
@@ -306,6 +312,28 @@ mod tests {
     implement_stream_object!(unsafe u32 => D3D12_PIPELINE_STATE_SUBOBJECT_TYPE(2));
     implement_stream_object!(unsafe u64 => D3D12_PIPELINE_STATE_SUBOBJECT_TYPE(3));
 
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct TwoWords(u32, u32);
+    implement_stream_object!(unsafe TwoWords => D3D12_PIPELINE_STATE_SUBOBJECT_TYPE(4));
+
+    #[test]
+    fn stream_uses_target_pointer_alignment() {
+        for (word_align, second_offset) in [(4, 12), (8, 16)] {
+            let mut stream = RenderPipelineStateStream::new();
+            stream.add_object_aligned(TwoWords(1, 2), word_align);
+            stream.add_object_aligned(84u32, word_align);
+            assert_eq!(
+                &stream.bytes[second_offset..second_offset + 4],
+                &2u32.to_ne_bytes()
+            );
+            assert_eq!(
+                &stream.bytes[second_offset + 4..second_offset + 8],
+                &84u32.to_ne_bytes()
+            );
+        }
+    }
+
     #[test]
     fn stream() {
         let mut stream = RenderPipelineStateStream::new();
@@ -314,7 +342,8 @@ mod tests {
         stream.add_object(84u32);
         stream.add_object(168u64);
 
-        assert_eq!(stream.bytes.len(), 32);
+        let value_offset = 20usize.next_multiple_of(align_of::<u64>());
+        assert_eq!(stream.bytes.len(), value_offset + size_of::<u64>());
 
         // Object 1: u16
 
@@ -336,9 +365,9 @@ mod tests {
 
         // Tag at the beginning
         assert_eq!(&stream.bytes[16..20], &3u32.to_ne_bytes());
-        // Padding to align the u64 to an 8 byte boundary.
-        assert_eq!(&stream.bytes[20..24], &[0, 0, 0, 0]);
+        // Padding, when needed, aligns the u64 to its native boundary.
+        assert!(stream.bytes[20..value_offset].iter().all(|byte| *byte == 0));
         // Data tucked in, aligned to the natural alignment of u64
-        assert_eq!(&stream.bytes[24..32], &168u64.to_ne_bytes());
+        assert_eq!(&stream.bytes[value_offset..], &168u64.to_ne_bytes());
     }
 }
