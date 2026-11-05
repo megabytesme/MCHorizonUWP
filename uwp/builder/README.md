@@ -1,157 +1,67 @@
 # Horizon UWP Builder preview
 
-This desktop WinUI 3 preview checks a small set of build prerequisites and
-records a target and optional native touch and device-vibration
-source-mod selections.
-The UWP client probes its packaged graphics backends and chooses an available
-renderer on the target device; the builder does not select one.
-The options page can browse and search Horizon's native-mod registry; adding
-those registry mods to a UWP build and determining their UWP compatibility are
-not yet available.
-The resources page can start a Microsoft device-code sign-in and check Java
-Edition ownership using Horizon's public application ID. Tokens are kept in
-memory for that check and are not written to Horizon's account store. This does
-not yet download or prepare resources, and real-account validation is pending.
-The latter has its own in-game setting, separate from controller vibration.
-The touch selection maps to the `native-touch-mod` Cargo feature and includes
-touch-look sensitivity and on-screen control-size sliders, plus optional
-gyroscope aiming when the device exposes a Windows gyrometer. Gyro aiming is
-off by default and is separate from controller input. The touch mod has been
-tested on a Lumia in its separate branch. The local recipe builds from a pinned source
-snapshot and links to official setup instructions for
-missing tools. On request it can invoke the system Windows Package Manager for
-fixed Rustup, Git and Python packages. Git and Python are requested silently;
-Rustup remains interactive, and Windows can request elevation. Git's silent
-installation and Python's equivalent WinGet command have been exercised in
-Sandbox. The local recipe can embed prepared resources, build a
-separate resource framework, or use a framework already installed on the target.
-The existing-framework option requires its exact name and no local resource
-directory. The wizard can select a signed catalog release and build signed
-packages, but the first catalog's client and patch releases are still drafts
-and cannot yet be downloaded. A local-checkout build remains unsigned, and the
-builder does not yet install packages. Tool presence does not establish version or recipe
-compatibility with every machine. Earlier port work built x86, x64, ARM64 and
-ARM32 locally; the split-source release pipeline has not been validated for all
-four. ARM64 and ARM32 Rust builds use the installed LLVM Clang
-compiler for their cross-target C dependencies. Visual Studio detection checks
-common installation locations and may miss custom locations.
+The WinUI 3 builder is an in-development wizard for assembling a Horizon UWP
+client package. It selects the current Windows architecture by default and
+supports x86, x64, ARM32 and ARM64 targets. The client probes its packaged
+renderers and selects one on the target device.
 
-Build on Windows with the .NET 8 SDK, Windows App SDK NuGet packages and Visual
-Studio's AppxPackage build tasks (the script looks in standard install locations):
+The builder fetches its signed compatibility catalog from this repository,
+then verifies the hashes of the selected Horizon source, patch and client
+artifacts before assembling them. The first patch and client are published as
+prereleases. A catalog compatibility rule is not a successful build or device
+test: the wizard labels combinations without recorded build evidence as
+unverified. This preview has one pinned recipe; later patch and client versions
+need compatible recipes and catalog entries.
+
+You can choose bundled Minecraft resources, a new reusable resource framework,
+or an existing framework on the target. Minecraft: Java Edition ownership
+sign-in is required before a build. The Microsoft client ID is the same public
+ID used by the Horizon launcher and UWP client; the builder keeps its sign-in
+tokens in memory. **Automatic downloading and preparation of Minecraft assets
+is not implemented**, and a real-account end-to-end test remains outstanding.
+Choose prepared resources or an existing framework until that work is complete.
+
+The options page can browse Horizon's native-mod registry, select and remove
+mods, and apply verified bundles through Horizon's mixin tool. Native mods run
+code with the player's permissions. A real Zoom bundle has been transformed
+and its x64 UWP game bridge compiled, but other mods and devices have not been
+established compatible. The builder refuses unsupported combinations, including
+mods requiring different mixin revisions, bundled data or post-build steps.
+The built-in touch and vibration options are separate from registry mods.
+
+Packages from the authenticated release recipe are signed with a locally
+created certificate. The output includes the public certificate, an installation
+guide and the target's Microsoft UI and VC runtime framework packages. The
+builder restores the pinned WinUI package automatically when absent; it
+currently requires the Microsoft VC runtime APPX to be present in the installed
+UWP SDK. When the target can run on this PC, the builder offers installation
+and explains that trusting its certificate may require administrator approval.
+Other targets use the included guide. For an existing resource framework, its
+exact identity and publisher must match the client; resource
+frameworks contain private Minecraft files and should not be published.
+
+The preview installs missing Git and Python through WinGet when a build starts
+and invokes Rustup interactively. It does not yet provision the complete compiler, SDK, Clang and
+Rust toolchain automatically, and its scripts currently expect particular
+Visual Studio installation paths. Administrator approval may be needed when
+installing development tools or trusting the locally generated certificate.
+A complete build from a clean PC has not passed. See
+[CLEAN-PC-VALIDATION.md](CLEAN-PC-VALIDATION.md) for tested paths and limitations.
+
+## Building the builder
+
+On a development PC with the .NET 8 SDK, Windows App SDK NuGet packages and
+Visual Studio AppxPackage build tasks:
 
 ```powershell
-.\build.ps1
-.\build.ps1 -Publish
+.\build.ps1 -Configuration Release -Publish
 dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release
-dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release -- --scan
-dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release -- --framework-probe
 ```
 
-The normal build bundles the Windows App SDK but requires the .NET 8 runtime.
-`-Publish` bundles both runtimes. The self-contained x64 publish opens in a
-clean Windows Sandbox without .NET installed. Target selection and setup
-scanning were exercised there; clean-machine tool installation and building
-remain unverified. See
-Microsoft's
-[unpackaged WinUI deployment guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/unpackage-winui-app).
-This is a development build, not a tested clean-machine installer. The full
-plan and unresolved device and licensing requirements are in
-[BUILDER-DESIGN.md](../BUILDER-DESIGN.md).
-The latest clean-Sandbox results and remaining blockers are recorded in
-[CLEAN-PC-VALIDATION.md](CLEAN-PC-VALIDATION.md).
-
-The core includes a canonical input record with hashes for the recipe, source
-revision, lockfile, patched Rust standard library, resource inventory and
-selected native mods, plus toolchain versions. It contains no file paths or keys.
-This is groundwork only: callers must verify each input, and the current list
-is not a complete reproducibility guarantee or a verified recipe.
-
-The local plan uses pinned source commit
-`8b7ab39874de3dbc3a32ce683f86e0e5dd6cc46d`, Rust 1.99.1 and Minecraft
-26.3 resources. It checks that the selected Git repository contains that
-revision, validates the prepared-resource manifest version, and reports the
-exact tool locations required by that revision's host/package scripts. The
-port is based on Horizon nightly `2026-11-03` at upstream source commit
-`f42ef42ef6ceccb3c6a20bea2481d87949a51c81`; builds embed the upstream nightly
-date and short commit in Horizon's version fields. The complete release notes
-for the pinned nightly are included with the client and shown in What's New.
-They are UWP port builds, not the official Horizon binaries. The upstream
-nightly's publication version is `2026.1103.930.50`; the current default UWP
-APPX version is `2026.1105.14.0`. Keep the same package identity for upgrades and choose a
-higher version when rebuilding the port for the same nightly. This
-recipe is pinned; a newer upstream nightly must be integrated and verified
-before the builder's pin is updated. On startup the builder checks GitHub's
-public nightly release metadata and reports when its source differs; a failed
-check does not prevent an offline build from the pinned source. The check
-does not download or execute the new release. The pinned nightly notes are
-also checked into `uwp/host/Assets`, so the matching What's New page remains
-available if GitHub's moving release metadata changes. Minecraft resource
-framework versions remain tied to the Minecraft resources, not to the Horizon nightly date.
-All four architectures include native D3D11 and can package ANGLE when matching
-UWP DLLs are available in the selected checkout. All four include WGPU's DX12
-backend. Runtime device and surface probes enable only renderers that initialize
-and present on that device; D3D12 also checks shader-pipeline creation. ARM32
-D3D12 additionally requires a
-hardware adapter: the Lumia 950 XL exposed only Microsoft's software renderer,
-which exhausted the address space during startup. ARM32 ANGLE reached a world on the
-Lumia 950 XL but was slow and later reported a pipeline error; the startup probe
-does not guarantee stable gameplay. See `../angle-arm32/README.md` for the
-32-bit ANGLE build and notices.
-These are build-input constraints, not assumptions about the device GPU. The
-native D3D11 pre-game check creates a feature-level 9_1 device while XAML owns
-the view. The launcher and game share one attached XAML root and one
-`SwapChainPanel`; D3D11, DX12, and ANGLE all present through that panel. Renderer
-probes release their temporary swap chains before another backend is tested or
-the game starts. The desktop panel begins below the custom titlebar, and its
-physical size and input origin are shared with the game so the viewport and
-pointer coordinates use the same scale. The launcher page is collapsed during
-play, keeping the presentation surface valid. On Windows 10 Mobile, input
-handlers are registered before gameplay
-starts, and the game receives its initial size after the shared surface is
-shown. The pre-game page and gameplay share one CoreWindow on every target,
-including desktop and Windows 10 Mobile. The preview runs x64,
-x86, ARM64 and ARM32 plans in fresh builder-owned folders under
-`%USERPROFILE%\.huwp\b`. The selected checkout is never modified. The
-Cargo fetches missing dependencies for the selected target and x64 build host
-from configured registries before the offline build. It can also create a reusable
-resource framework package for the selected prepared resources. Parallel Rust
-compilation uses all available logical processor cores. Signing and installation
-remain user-controlled steps. A build requires
-at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
-dependency override; account, skin and Minecraft session requests use WinRT HTTPS.
-The Microsoft application (client) ID is public and is compiled into the client.
-The builder uses the same public client ID as the published Horizon launcher,
-as requested. This configuration has not yet been validated with a real account
-in the new builder. The native pre-game page uses Credential Locker, shows a device
-code to enter in a browser on another device, and asks before replacing or removing
-a saved account. The UWP client uses Windows service discovery for Minecraft SRV
-records, and its built-in native picker imports content mods and resource-pack ZIPs.
-Real-account and physical-device validation remain outstanding.
-The output uses the prototype publisher identity.
-The combined recipe has not yet been validated on a phone. The builder warns
-when `assets/minecraft/sounds.json` or the sounds directory is missing; this
-is only a presence check, not a complete sound-integrity check. To prepare
-missing sounds, select your Minecraft installation and enable sound preparation.
-The builder copies the chosen resources into its private workspace, builds
-`horizon-prepare` from the pinned source and uses it to verify and copy sound
-objects. It does not modify the selected resource tree or Minecraft install.
-If the selected resources already contain any sound data, disable sound
-preparation or choose a sound-free copy; existing data is not overwritten.
-For the existing-framework option, enter the exact `Horizon.Asset.26-3.…` name
-on the target. The client declares that package as a dependency with publisher
-`CN=HorizonUWPPrototype` and minimum version `1.0.0.0`; the builder cannot check
-the target's installation or resource contents. This mode does not build or
-bundle resources, and sound preparation is unavailable.
-
-The package-version field changes only the isolated manifest and cannot be
-lower than the pinned source version. Choose a version newer than the package
-with the same identity already installed on the target; the builder cannot
-yet inspect that device or guarantee an upgrade preserves data.
-
-The framework probe uses the installed Windows SDK MakeAppx to create unsigned
-x64 and ARM framework packages containing only a synthetic marker in new
-temporary directories. It validates their manifests and content and never
-reads Minecraft resources or signs packages. The separate x64 Sandbox package
-dependency probe established that a client can discover and read an installed
-synthetic framework. ARM32 framework installation and dependency access on
-Windows 10 Mobile remain untested.
+`-Publish` produces a self-contained x64 builder. Its WinUI application opens
+in Windows Sandbox without a separate .NET runtime. A native ARM64 or x86
+builder distribution has not been established. Builds use private workspaces
+under `%USERPROFILE%\.huwp\b` and all available processor cores. At least
+10 GiB of free space is required, and actual requirements can be higher.
+See [installation guidance](../../docs/install.md) and
+[builder design](../BUILDER-DESIGN.md) for further details.
