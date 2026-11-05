@@ -52,7 +52,7 @@ public static class ResourceFrameworkPacker
                     new XAttribute("Version", "1.0.0.0"), new XAttribute("ProcessorArchitecture", "neutral")),
                 new XElement(ns + "Properties", new XElement(ns + "Framework", "true"),
                     new XElement(ns + "DisplayName", "Horizon Minecraft resources"),
-                    new XElement(ns + "PublisherDisplayName", "Horizon UWP Prototype"),
+                    new XElement(ns + "PublisherDisplayName", "Horizon UWP"),
                     new XElement(ns + "Logo", @"Assets\StoreLogo.png")),
                 new XElement(ns + "Dependencies", new XElement(ns + "TargetDeviceFamily",
                     new XAttribute("Name", "Windows.Universal"), new XAttribute("MinVersion", "10.0.15063.0"),
@@ -62,17 +62,32 @@ public static class ResourceFrameworkPacker
 
         var package = Path.Combine(output, name + ".appx");
         progress?.Report("Building the resource framework package. This may take several minutes.");
-        var start = new ProcessStartInfo(makeAppx) { UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var argument in new[] { "pack", "/d", stage, "/p", package }) start.ArgumentList.Add(argument);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start MakeAppx.");
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        await Task.WhenAll(stdout, stderr); // Tool output can contain private resource paths.
-        if (process.ExitCode != 0 || !File.Exists(package))
-            throw new InvalidOperationException($"MakeAppx failed (exit code {process.ExitCode}); framework workspace retained.");
-        return new(package, name);
+        for (var attempt = 1; attempt <= 2; attempt++)
+        {
+            var start = new ProcessStartInfo(makeAppx) { UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = true, RedirectStandardError = true };
+            // The output directory belongs to this operation; /o replaces only a partial output from its first attempt.
+            foreach (var argument in new[] { "pack", "/d", ExtendedPath(stage), "/p", ExtendedPath(package), "/o" }) start.ArgumentList.Add(argument);
+            using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start MakeAppx.");
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            await Task.WhenAll(stdout, stderr);
+            if (process.ExitCode == 0 && File.Exists(package)) return new(package, name);
+            if (attempt == 1) { progress?.Report("Resource packaging failed; retrying once."); continue; }
+            // This log stays in the private build workspace and may include resource file names.
+            var lines = (await stdout + "\n" + await stderr).Split('\n').TakeLast(30);
+            await File.WriteAllLinesAsync(Path.Combine(output, "makeappx-error.log"), lines);
+            throw new InvalidOperationException($"MakeAppx failed (exit code {process.ExitCode}); see makeappx-error.log in the retained framework workspace.");
+        }
+        throw new InvalidOperationException("Resource packaging failed; framework workspace retained.");
+    }
+
+    private static string ExtendedPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (!OperatingSystem.IsWindows() || full.StartsWith(@"\\?\", StringComparison.Ordinal)) return full;
+        return full.StartsWith(@"\\", StringComparison.Ordinal) ? @"\\?\UNC\" + full[2..] : @"\\?\" + full;
     }
 
     private static string ReadGameVersion(string resources)

@@ -233,6 +233,10 @@ if (args.Contains("--resource-framework-probe"))
     File.WriteAllText(Path.Combine(resources, "horizon-resources.json"), "{\"minecraft\":\"26.3\"}");
     var marker = Path.Combine(resources, "assets", "minecraft", "fixture.txt");
     File.WriteAllText(marker, "synthetic fixture");
+    var longRelative = Path.Combine("assets", "minecraft", new string('a', 100), new string('b', 100), "fixture.txt");
+    var longFile = Path.Combine(resources, longRelative);
+    Directory.CreateDirectory(Path.GetDirectoryName(longFile)!);
+    File.WriteAllText(longFile, "long-path fixture");
     var first = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "one"));
     var second = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "two"));
     Require(first.Name == second.Name, "identical resources use the same framework identity");
@@ -248,6 +252,7 @@ if (args.Contains("--resource-framework-probe"))
         Require(identity.Attribute("ProcessorArchitecture")!.Value == "neutral", "framework architecture");
         Require(manifest.Root.Element(ns + "Properties")!.Element(ns + "Framework")!.Value == "true", "framework property");
         Require(zip.GetEntry("resources/assets/minecraft/fixture.txt") is not null, "resource payload");
+        Require(zip.GetEntry("resources/" + longRelative.Replace('\\', '/')) is not null, "resource payload beyond the legacy Windows path limit");
         Require(zip.GetEntry("AppxSignature.p7x") is null, "framework must be unsigned");
     }
     try { await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "one")); throw new Exception("existing output accepted"); }

@@ -110,6 +110,13 @@ resource framework and a dependent client with a non-prototype publisher; both
 package manifests and the framework dependency used that publisher. This is a
 component test and does not yet exercise the builder's signing pipeline.
 
+During a split-source build, MakeAppx rejected a prepared Minecraft resource
+whose full staging path was 262 characters. A direct retry with Windows
+extended-length paths succeeded. The packer now passes extended paths to
+MakeAppx, retries a failure once, and retains a private diagnostic log if both
+attempts fail. A synthetic framework test with a long resource path passed;
+the full split-source build is being repeated.
+
 ## 2026-11-05: Horizon launcher client ID
 
 The builder now supplies the public application ID used in the Horizon
