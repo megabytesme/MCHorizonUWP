@@ -623,6 +623,40 @@ impl Renderer {
         }
     }
 
+    /// Capture the current frame before presentation as a square RGBA thumbnail.
+    pub fn world_thumbnail(&self) -> Result<Vec<u8>> {
+        unsafe {
+            let back: ID3D11Texture2D = self.swap_chain.GetBuffer(0)?;
+            let mut desc = D3D11_TEXTURE2D_DESC::default();
+            back.GetDesc(&mut desc);
+            if desc.Width == 0 || desc.Height == 0 || desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM {
+                return Err(Error::from_hresult(E_INVALIDARG));
+            }
+            let (width, height) = (desc.Width as usize, desc.Height as usize);
+            desc.Usage = D3D11_USAGE_STAGING;
+            desc.BindFlags = 0;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
+            desc.MiscFlags = 0;
+            let mut staging = None;
+            self.device.CreateTexture2D(&desc, None, Some(&mut staging))?;
+            let staging = staging.ok_or_else(|| Error::from_hresult(E_INVALIDARG))?;
+            self.context.CopyResource(&staging, &back);
+            let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+            self.context.Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
+            let result = if mapped.pData.is_null() {
+                None
+            } else {
+                let stride = mapped.RowPitch as usize;
+                stride.checked_mul(height).and_then(|length| {
+                    let bytes = std::slice::from_raw_parts(mapped.pData as *const u8, length);
+                    crate::thumbnail::square_rgba(bytes, width, height, stride, 64)
+                })
+            };
+            self.context.Unmap(&staging, 0);
+            result.ok_or_else(|| Error::from_hresult(E_INVALIDARG))
+        }
+    }
+
     /// Count pixels differing from a black RGB clear before presentation.
     /// This blocking readback is intended only for one-off diagnostics.
     #[cfg(feature = "readback-probe")]

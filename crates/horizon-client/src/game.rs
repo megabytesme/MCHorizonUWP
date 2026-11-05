@@ -15376,6 +15376,17 @@ impl Game<'_> {
         {
             return;
         }
+        #[cfg(all(target_vendor = "uwp", feature = "native-d3d11"))]
+        if let Some(renderer) = self.native_renderer.as_mut() {
+            if renderer.world_icon_ready() {
+                let path = icon.path.clone();
+                if let Some(icon) = self.world_icon.as_mut() {
+                    icon.last_attempt = Some(Instant::now());
+                }
+                renderer.request_world_icon(path);
+            }
+            return;
+        }
         let Some(renderer) = self.renderer.as_mut() else {
             return;
         };

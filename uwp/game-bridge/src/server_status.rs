@@ -2,10 +2,10 @@
 
 const MAX_ICON: usize = 48 * 1024;
 
-fn icon(json: &serde_json::Value) -> Option<Vec<u8>> {
-    let encoded = json["favicon"]
-        .as_str()?
-        .strip_prefix("data:image/png;base64,")?;
+pub(crate) fn decode_saved_icon(encoded: &str) -> Option<Vec<u8>> {
+    let encoded = encoded
+        .strip_prefix("data:image/png;base64,")
+        .unwrap_or(encoded);
     if encoded.len() > MAX_ICON * 2 {
         return None;
     }
@@ -21,6 +21,14 @@ fn icon(json: &serde_json::Value) -> Option<Vec<u8>> {
         return None;
     }
     Some(bytes)
+}
+
+fn icon(json: &serde_json::Value) -> Option<Vec<u8>> {
+    let value = json["favicon"].as_str()?;
+    if !value.starts_with("data:image/png;base64,") {
+        return None;
+    }
+    decode_saved_icon(value)
 }
 
 fn payload(json: &serde_json::Value) -> Vec<u8> {
@@ -146,6 +154,7 @@ mod tests {
         assert!(icon(&serde_json::json!({"favicon":"https://example.com/icon.png"})).is_none());
         let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x40\0\0\0\x40".to_vec();
         let encoded = horizon_client::lan::base64(&png);
+        assert_eq!(decode_saved_icon(&encoded), Some(png.clone()));
         assert_eq!(
             icon(&serde_json::json!({"favicon":format!("data:image/png;base64,{encoded}")})),
             Some(png.clone())

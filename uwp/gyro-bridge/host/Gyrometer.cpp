@@ -6,6 +6,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.devices.sensors.h>
 #include <windows.graphics.display.h>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
@@ -16,6 +17,7 @@ using namespace Windows::Graphics::Display;
 
 namespace {
 std::mutex mutex;
+std::atomic<int> display_orientation{0};
 Gyrometer^ sensor;
 Windows::Foundation::EventRegistrationToken reading_token{};
 bool requested = false;
@@ -91,8 +93,12 @@ bool start_sensor() {
             if (generation == started_generation) starting = false;
             return false;
         }
-        const auto display = DisplayInformation::GetForCurrentView();
-        if (display != nullptr) candidate->ReadingTransform = display->CurrentOrientation;
+        // GetForCurrentView requires a UI view; this function also runs on
+        // the game worker, so use the orientation last reported by the shell.
+        try {
+            auto orientation = static_cast<DisplayOrientations>(display_orientation.load());
+            if (orientation != DisplayOrientations::None) candidate->ReadingTransform = orientation;
+        } catch (Platform::Exception^) { /* Orientation is optional for sensor startup. */ }
         candidate->ReportInterval = (std::max)(16u, candidate->MinimumReportInterval);
         token = candidate->ReadingChanged += ref new TypedEventHandler<Gyrometer^, GyrometerReadingChangedEventArgs^>(
             [started_generation](Gyrometer^, GyrometerReadingChangedEventArgs^ args) {
@@ -138,6 +144,16 @@ void reconcile() {
 }
 }
 
+extern "C" void __cdecl horizon_uwp_gyro_set_orientation(int value) {
+    display_orientation.store(value);
+    Gyrometer^ current = nullptr;
+    { std::lock_guard<std::mutex> guard(mutex); current = sensor; }
+    if (current != nullptr) {
+        try { current->ReadingTransform = static_cast<DisplayOrientations>(value); }
+        catch (Platform::Exception^) {}
+    }
+}
+
 extern "C" int __cdecl horizon_uwp_gyro_available() {
     try { return Gyrometer::GetDefault() != nullptr ? 1 : 0; }
     catch (...) { return 0; }
@@ -168,14 +184,6 @@ extern "C" void __cdecl horizon_uwp_gyro_set_visible(int is_visible) {
 extern "C" int __cdecl horizon_uwp_gyro_take(float* x, float* y, int* rotation) {
     if (x == nullptr || y == nullptr || rotation == nullptr) return 0;
     try {
-        Gyrometer^ current = nullptr;
-        {
-            std::lock_guard<std::mutex> guard(mutex);
-            if (!running) return 0;
-            current = sensor;
-        }
-        auto display = DisplayInformation::GetForCurrentView();
-        if (current != nullptr && display != nullptr) current->ReadingTransform = display->CurrentOrientation;
         std::lock_guard<std::mutex> guard(mutex);
         if (!running) return 0;
         *x = turned_x;

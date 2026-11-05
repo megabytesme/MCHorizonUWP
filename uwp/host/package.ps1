@@ -105,6 +105,7 @@ $licenseFiles = @{
     'gilrs-core-MIT.txt' = 'third_party/gilrs-core/LICENSE-MIT'
     'SDL-GameControllerDB.txt' = 'third_party/controller-mappings/LICENSE'
     'USB-ID-Repository.txt' = 'third_party/usb-ids/LICENSE'
+    'Pixelarticons-MIT.txt' = 'crates/horizon-theme/icons/pixel/LICENSE-pixelarticons.txt'
 }
 foreach ($name in $licenseFiles.Keys) {
     $source = Join-Path $repositoryRoot $licenseFiles[$name]
@@ -151,7 +152,7 @@ if ($ResourceFrameworkName) {
 }
 Set-Content -Path (Join-Path $stage 'AppxManifest.xml') -Value $manifest -Encoding UTF8
 $brandAssets = Join-Path $hostDir 'Assets'
-foreach ($name in @('StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.png', 'Wide310x150Logo.png', 'Square310x310Logo.png')) {
+foreach ($name in @('StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.png', 'Wide310x150Logo.png', 'Square310x310Logo.png', 'WorldPlaceholder.png', 'ServerPlaceholder.png')) {
     $sourceLogo = Join-Path $brandAssets $name
     if (-not (Test-Path -LiteralPath $sourceLogo -PathType Leaf)) { throw "Missing Horizon logo asset: $sourceLogo" }
     Copy-Item -LiteralPath $sourceLogo -Destination (Join-Path $stage (Join-Path 'Assets' $name)) -Force

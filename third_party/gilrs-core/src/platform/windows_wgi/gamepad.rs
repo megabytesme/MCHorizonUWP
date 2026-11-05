@@ -19,7 +19,6 @@ use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 use windows::core::HSTRING;
 use windows::Devices::Power::BatteryReport;
-use windows::Foundation::EventHandler;
 use windows::Gaming::Input::{
     GameControllerSwitchPosition, Gamepad as WgiGamepad, GamepadButtons, GamepadReading,
     RawGameController,
@@ -130,30 +129,11 @@ impl Gilrs {
     }
 
     fn spawn_thread(tx: Sender<WgiEvent>, stop_rx: Receiver<()>) -> JoinHandle<()> {
-        let added_tx = tx.clone();
-        let added_handler = EventHandler::<RawGameController>::new(move |_, g| {
-            if let Some(g) = g.as_ref() {
-                let _ = added_tx.send(WgiEvent::new(g.clone(), EventType::Connected));
-            }
-            Ok(())
-        });
-        let controller_added_token =
-            RawGameController::RawGameControllerAdded(&added_handler).unwrap();
-
-        let removed_tx = tx.clone();
-        let removed_handler = EventHandler::<RawGameController>::new(move |_, g| {
-            if let Some(g) = g.as_ref() {
-                let _ = removed_tx.send(WgiEvent::new(g.clone(), EventType::Disconnected));
-            }
-            Ok(())
-        });
-        let controller_removed_token =
-            RawGameController::RawGameControllerRemoved(&removed_handler).unwrap();
-
         std::thread::Builder::new()
             .name("gilrs".to_owned())
             .spawn(move || {
                 let mut controllers: Vec<RawGameController> = Vec::new();
+                let mut known: Vec<(ControllerIdentity, RawGameController)> = Vec::new();
                 // To avoid allocating every update, store old and new readings for every controller
                 // and swap their memory
                 let mut readings: Vec<(ControllerIdentity, Reading, Reading)> = Vec::new();
@@ -167,17 +147,54 @@ impl Gilrs {
                         Err(TryRecvError::Empty) => {}
                     }
                     controllers.clear();
-                    // Avoiding using RawGameControllers().into_iter() here due to it causing an
-                    // unhandled exception when the app is running through steam.
-                    // https://gitlab.com/gilrs-project/gilrs/-/issues/132
-                    if let Ok(raw_game_controllers) = RawGameController::RawGameControllers() {
-                        let count = raw_game_controllers.Size().unwrap_or_default();
-                        for index in 0..count {
-                            if let Ok(controller) = raw_game_controllers.GetAt(index) {
-                                controllers.push(controller);
-                            }
+                    // Subscribe-by-snapshot: the device can appear between the
+                    // initial enumeration and event registration. Comparing
+                    // complete snapshots also recovers after a power reset.
+                    let raw_game_controllers = match RawGameController::RawGameControllers() {
+                        Ok(devices) => devices,
+                        Err(_) => {
+                            thread::sleep(Duration::from_millis(EVENT_THREAD_SLEEP_TIME));
+                            continue;
+                        }
+                    };
+                    let count = match raw_game_controllers.Size() {
+                        Ok(count) => count,
+                        Err(_) => {
+                            thread::sleep(Duration::from_millis(EVENT_THREAD_SLEEP_TIME));
+                            continue;
+                        }
+                    };
+                    let mut complete = true;
+                    for index in 0..count {
+                        match raw_game_controllers.GetAt(index) {
+                            Ok(controller) => controllers.push(controller),
+                            Err(_) => complete = false,
                         }
                     }
+                    if !complete {
+                        thread::sleep(Duration::from_millis(EVENT_THREAD_SLEEP_TIME));
+                        continue;
+                    }
+                    let current: Vec<_> = controllers
+                        .iter()
+                        .map(|c| (ControllerIdentity::of(c), c.clone()))
+                        .collect();
+                    let before: Vec<_> = known.iter().map(|(id, _)| id.clone()).collect();
+                    let after: Vec<_> = current.iter().map(|(id, _)| id.clone()).collect();
+                    let (removed, added) = super::topology::changes(&before, &after);
+                    for index in removed {
+                        let _ = tx.send(WgiEvent::new(
+                            known[index].1.clone(),
+                            EventType::Disconnected,
+                        ));
+                    }
+                    for index in added {
+                        let _ = tx.send(WgiEvent::new(
+                            current[index].1.clone(),
+                            EventType::Connected,
+                        ));
+                    }
+                    known = current;
 
                     readings.retain(|(id, ..)| {
                         controllers.iter().any(|c| ControllerIdentity::of(c) == *id)
@@ -229,18 +246,6 @@ impl Gilrs {
                     }
                     thread::sleep(Duration::from_millis(EVENT_THREAD_SLEEP_TIME));
                 }
-
-                if let Err(e) =
-                    RawGameController::RemoveRawGameControllerAdded(controller_added_token)
-                {
-                    error!("Failed to remove RawGameControllerAdded event handler: {e}");
-                }
-
-                if let Err(e) =
-                    RawGameController::RemoveRawGameControllerRemoved(controller_removed_token)
-                {
-                    error!("Failed to remove RawGameControllerRemoved event handler: {e}");
-                }
             })
             .expect("failed to spawn thread")
     }
@@ -269,11 +274,10 @@ impl Gilrs {
     fn handle_event(&mut self, wgi_event: WgiEvent) -> Option<Event> {
         // Find the index of the gamepad in our vec or insert it
         let identity = ControllerIdentity::of(&wgi_event.raw_game_controller);
-        let id = match self
-            .gamepads
-            .iter()
-            .position(|gamepad| identity == gamepad.identity)
-        {
+        let id = match self.gamepads.iter().position(|gamepad| {
+            identity == gamepad.identity
+                || gamepad.raw_game_controller == wgi_event.raw_game_controller
+        }) {
             Some(id) => id,
             None => match Gamepad::new(self.gamepads.len() as u32, wgi_event.raw_game_controller) {
                 Ok(gamepad) => {

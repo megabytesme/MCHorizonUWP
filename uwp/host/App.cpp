@@ -295,6 +295,18 @@ static Platform::String^ resolve_resources(Platform::String^ local_path) {
     }
     return resources;
 }
+#ifdef HORIZON_UWP_XAML_SHELL
+extern "C" int __cdecl horizon_uwp_cache_vanilla_icon() {
+    try {
+        auto local = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
+        auto resources = resolve_resources(local);
+        auto source = Platform::String::Concat(resources, L"\\assets\\minecraft\\textures\\misc\\unknown_server.png");
+        auto target = Platform::String::Concat(local, L"\\horizon-default-icon.png");
+        return SUCCEEDED(CopyFile2(source->Data(), target->Data(), nullptr)) ? 1 : 0;
+    } catch (Platform::Exception^) { return 0; }
+}
+#endif
+
 #endif
 
 extern "C" void* __cdecl horizon_uwp_window_handle() {

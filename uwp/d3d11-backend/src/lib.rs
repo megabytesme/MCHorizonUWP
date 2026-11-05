@@ -5,6 +5,8 @@
 
 #[cfg(windows)]
 mod device;
+#[cfg(windows)]
+mod thumbnail;
 
 #[cfg(windows)]
 pub use device::{DepthConvention, DrawPass, DynamicMesh, Mesh, Renderer, Texture, Vertex};

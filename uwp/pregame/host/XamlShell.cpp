@@ -86,6 +86,9 @@ namespace muxc = Microsoft::UI::Xaml::Controls;
 extern "C" void __cdecl horizon_uwp_attach_shell(CoreWindow^ window);
 extern "C" void __cdecl horizon_uwp_open_game_view();
 extern "C" void __cdecl horizon_uwp_trace_shell_event(const char* event);
+#ifndef HORIZON_UWP_SHELL_PROBE
+extern "C" int __cdecl horizon_uwp_cache_vanilla_icon();
+#endif
 extern "C" int __cdecl horizon_uwp_prepare(const uint16_t*, size_t);
 extern "C" int __cdecl horizon_uwp_pick_files(const wchar_t*, size_t, unsigned);
 extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsigned);
@@ -103,6 +106,7 @@ extern "C" int __cdecl horizon_uwp_probe_renderer(void*, unsigned, unsigned, uns
 extern "C" ptrdiff_t __cdecl horizon_uwp_server_list_read(const uint16_t*, size_t, uint8_t*, size_t);
 extern "C" int32_t __cdecl horizon_uwp_server_list_add(const uint16_t*, size_t, const uint8_t*, size_t, const uint8_t*, size_t);
 extern "C" int32_t __cdecl horizon_uwp_server_list_remove(const uint16_t*, size_t, const uint8_t*, size_t);
+extern "C" ptrdiff_t __cdecl horizon_uwp_server_icon_read(const uint16_t*, size_t, const uint8_t*, size_t, uint8_t*, size_t);
 extern "C" ptrdiff_t __cdecl horizon_uwp_server_status(const uint8_t*, size_t, uint8_t*, size_t);
 extern "C" ptrdiff_t __cdecl horizon_uwp_world_summary(const uint16_t*, size_t, uint8_t*, size_t);
 extern "C" int32_t __cdecl horizon_uwp_dispatch_ui_sync(void(__cdecl*)(void*), void*);
@@ -113,6 +117,7 @@ extern "C" void __cdecl horizon_uwp_release_game_swapchain_panel(void*);
 #endif
 #ifdef HORIZON_UWP_TOUCH_MOD
 extern "C" int __cdecl horizon_uwp_gyro_available();
+extern "C" void __cdecl horizon_uwp_gyro_set_orientation(int);
 #endif
 
 namespace {
@@ -275,8 +280,11 @@ unsigned profile_kind = 0;
 unsigned live_tile_options = 7;
 bool tile_skin_available = false;
 struct SavedServer { std::wstring name; std::wstring address; };
-struct ServerDetails { std::wstring motd; std::wstring players; std::wstring image; bool online = false; bool pending = false; ULONGLONG checked = 0; };
-struct ServerView { TextBlock^ motd; TextBlock^ players; Image^ image; SymbolIcon^ placeholder; };
+std::wstring vanilla_unknown_icon;
+std::wstring server_fallback_icon() { return vanilla_unknown_icon.empty() ? L"ms-appx:///Assets/ServerPlaceholder.png" : vanilla_unknown_icon; }
+std::wstring world_fallback_icon() { return vanilla_unknown_icon.empty() ? L"ms-appx:///Assets/WorldPlaceholder.png" : vanilla_unknown_icon; }
+struct ServerDetails { std::wstring motd; std::wstring players; std::wstring image = server_fallback_icon(); bool online = false; bool pending = false; ULONGLONG checked = 0; };
+struct ServerView { TextBlock^ motd; TextBlock^ players; Image^ image; Image^ placeholder; };
 std::vector<SavedServer> server_entries;
 std::map<std::wstring, ServerDetails> server_details;
 std::map<std::wstring, ServerView> server_views;
@@ -727,12 +735,41 @@ bool valid_server_address(const std::wstring& address) {
     return valid_port(colon + 1);
 }
 
-std::wstring save_server_icon(const std::wstring& address, const uint8_t* data, size_t length, Platform::String^ local) {
-    if (!data || !length || length > 48 * 1024 || !local) return {};
+Image^ icon_placeholder(const wchar_t* uri) {
+    auto image = ref new Image(); image->Width = 56; image->Height = 56;
+    image->Stretch = Stretch::Uniform;
+    image->Source = ref new BitmapImage(ref new Uri(ref new Platform::String(uri)));
+    return image;
+}
+
+std::wstring server_icon_name(const std::wstring& address) {
     uint64_t hash = 14695981039346656037ull;
     for (wchar_t ch : address) { hash ^= static_cast<uint16_t>(ch); hash *= 1099511628211ull; }
     wchar_t name[64] = {};
     swprintf_s(name, L"horizon-server-%016llx.png", static_cast<unsigned long long>(hash));
+    return name;
+}
+
+std::wstring cached_server_icon(const std::wstring& address, Platform::String^ local) {
+    if (!local) return {};
+    const auto name = server_icon_name(address);
+    const auto path = std::wstring(local->Data(), local->Length()) + L"\\" + name;
+    HANDLE file = CreateFile2(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return {};
+    LARGE_INTEGER size = {}; uint8_t header[24] = {}; DWORD read = 0;
+    const uint8_t signature[] = {137, 80, 78, 71, 13, 10, 26, 10};
+    const uint8_t dimensions[] = {0, 0, 0, 64, 0, 0, 0, 64};
+    const bool valid = GetFileSizeEx(file, &size) && size.QuadPart >= 24 && size.QuadPart <= 48 * 1024 &&
+        ReadFile(file, header, sizeof(header), &read, nullptr) && read == sizeof(header) &&
+        !memcmp(header, signature, sizeof(signature)) && !memcmp(header + 12, "IHDR", 4) &&
+        !memcmp(header + 16, dimensions, sizeof(dimensions));
+    CloseHandle(file);
+    return valid ? std::wstring(L"ms-appdata:///local/") + name : std::wstring();
+}
+
+std::wstring save_server_icon(const std::wstring& address, const uint8_t* data, size_t length, Platform::String^ local) {
+    if (!data || !length || length > 48 * 1024 || !local) return {};
+    const auto name = server_icon_name(address);
     const std::wstring path = std::wstring(local->Data(), local->Length()) + L"\\" + name;
     HANDLE file = CreateFile2(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
     if (file == INVALID_HANDLE_VALUE) return {};
@@ -760,8 +797,9 @@ void request_server_status(const std::wstring& address) {
     if (current.pending || (current.checked && GetTickCount64() - current.checked < 60000)) return;
     current.pending = true;
     auto local = ApplicationData::Current->LocalFolder->Path;
-    ThreadPool::RunAsync(ref new WorkItemHandler([address, local](IAsyncAction^) {
-        ServerDetails result;
+    const auto cached_image = current.image;
+    ThreadPool::RunAsync(ref new WorkItemHandler([address, local, cached_image](IAsyncAction^) {
+        ServerDetails result; result.image = cached_image;
         const auto utf8 = encode_utf8(address);
         std::vector<uint8_t> data(64 * 1024);
         const auto length = horizon_uwp_server_status(reinterpret_cast<const uint8_t*>(utf8.data()), utf8.size(), data.data(), data.size());
@@ -773,7 +811,8 @@ void request_server_status(const std::wstring& address) {
             if (motd + players + icon <= static_cast<size_t>(length) - 8) {
                 result.motd = decode_utf8(data.data() + 8, motd);
                 result.players = decode_utf8(data.data() + 8 + motd, players);
-                result.image = save_server_icon(address, data.data() + 8 + motd + players, icon, local);
+                const auto image = save_server_icon(address, data.data() + 8 + motd + players, icon, local);
+                if (!image.empty()) result.image = image;
                 result.online = true;
             }
         }
@@ -852,7 +891,22 @@ void load_server_entries() {
             if (!server.name.empty() && server.name.size() <= 64 &&
                 valid_server_address(server.address)) server_entries.push_back(std::move(server));
         }
-        for (const auto& server : server_entries) request_server_status(server.address);
+        for (const auto& server : server_entries) {
+            auto& details = server_details[server.address];
+            const auto cached = cached_server_icon(server.address, local);
+            if (!cached.empty()) details.image = cached;
+            else {
+                auto utf8 = encode_utf8(server.address);
+                std::vector<uint8_t> icon(48 * 1024);
+                const auto size = horizon_uwp_server_icon_read(wide_path, path_length,
+                    reinterpret_cast<const uint8_t*>(utf8.data()), utf8.size(), icon.data(), icon.size());
+                if (size > 0) {
+                    auto saved = save_server_icon(server.address, icon.data(), static_cast<size_t>(size), local);
+                    if (!saved.empty()) details.image = saved;
+                }
+            }
+            request_server_status(server.address);
+        }
     } catch (Platform::Exception^) {}
 }
 
@@ -918,25 +972,26 @@ std::vector<RecentWorld> recent_worlds(const std::wstring& save_root) {
 }
 
 std::wstring world_tile_icon(const RecentWorld& world, Platform::String^ local) {
+    const std::wstring fallback = world_fallback_icon();
     const auto input = world.path + L"\\icon.png";
     HANDLE file = CreateFile2(input.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, nullptr);
-    if (file == INVALID_HANDLE_VALUE) return {};
+    if (file == INVALID_HANDLE_VALUE) return fallback;
     LARGE_INTEGER size = {};
-    if (!GetFileSizeEx(file, &size) || size.QuadPart < 8 || size.QuadPart > 512 * 1024) { CloseHandle(file); return {}; }
+    if (!GetFileSizeEx(file, &size) || size.QuadPart < 8 || size.QuadPart > 512 * 1024) { CloseHandle(file); return fallback; }
     std::vector<uint8_t> bytes(static_cast<size_t>(size.QuadPart)); DWORD read = 0;
     const bool loaded = ReadFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &read, nullptr) && read == bytes.size();
     CloseHandle(file);
     const uint8_t png[] = {137, 80, 78, 71, 13, 10, 26, 10};
-    if (!loaded || memcmp(bytes.data(), png, sizeof(png))) return {};
+    if (!loaded || memcmp(bytes.data(), png, sizeof(png))) return fallback;
     uint64_t hash = 14695981039346656037ull;
     for (wchar_t ch : world.name) { hash ^= static_cast<uint16_t>(ch); hash *= 1099511628211ull; }
     wchar_t name[64] = {}; swprintf_s(name, L"horizon-world-%016llx.png", static_cast<unsigned long long>(hash));
     const std::wstring path = std::wstring(local->Data(), local->Length()) + L"\\" + name;
     file = CreateFile2(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, nullptr);
-    if (file == INVALID_HANDLE_VALUE) return {};
+    if (file == INVALID_HANDLE_VALUE) return fallback;
     DWORD written = 0; const bool saved = WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) && written == bytes.size();
     CloseHandle(file);
-    return saved ? std::wstring(L"ms-appdata:///local/") + name : std::wstring();
+    return saved ? std::wstring(L"ms-appdata:///local/") + name : fallback;
 }
 
 void update_pinned_world_tiles(Platform::String^ local) {
@@ -1005,7 +1060,7 @@ void update_live_tile() {
                     const auto found = statuses.find(servers[i].address);
                     const bool online = found != statuses.end() && found->second.online;
                     const auto detail = online ? found->second.players + L"\n" + found->second.motd : servers[i].address;
-                    updates.push_back(tile_markup(servers[i].name, detail, online ? found->second.image : L""));
+                    updates.push_back(tile_markup(servers[i].name, detail, found != statuses.end() ? found->second.image : server_fallback_icon()));
                 }
             }
             if (updates.empty() || tile_generation.load() != generation) return;
@@ -1698,7 +1753,8 @@ void refresh_save_list(StackPanel^ output) {
                     auto info_column = ref new ColumnDefinition(); info_column->Width = GridLength(1, GridUnitType::Star);
                     details->ColumnDefinitions->Append(icon_column); details->ColumnDefinitions->Append(info_column);
                     auto icon_box = ref new Grid(); icon_box->Width = 56; icon_box->Height = 56; icon_box->Margin = Thickness(0, 0, 12, 0);
-                    auto placeholder = ref new SymbolIcon(Symbol::Globe);
+                    auto fallback_icon = world_fallback_icon();
+                    auto placeholder = icon_placeholder(fallback_icon.c_str());
                     auto image = ref new Image(); image->Width = 56; image->Height = 56; image->Stretch = Stretch::Uniform;
                     image->ImageOpened += ref new RoutedEventHandler([placeholder](Platform::Object^, RoutedEventArgs^) {
                         placeholder->Visibility = Visibility::Collapsed;
@@ -2210,7 +2266,8 @@ void refresh() {
             auto info_col = ref new ColumnDefinition(); info_col->Width = GridLength(1, GridUnitType::Star);
             row->ColumnDefinitions->Append(icon_col); row->ColumnDefinitions->Append(info_col);
             auto icon_box = ref new Grid(); icon_box->Width = 56; icon_box->Height = 56; icon_box->Margin = Thickness(0, 0, 12, 0);
-            auto placeholder = ref new SymbolIcon(Symbol::Globe);
+            auto fallback_icon = server_fallback_icon();
+            auto placeholder = icon_placeholder(fallback_icon.c_str());
             auto image = ref new Image(); image->Width = 56; image->Height = 56; image->Stretch = Stretch::Uniform;
             image->ImageOpened += ref new RoutedEventHandler([placeholder](Platform::Object^, RoutedEventArgs^) {
                 placeholder->Visibility = Visibility::Collapsed;
@@ -2450,6 +2507,10 @@ protected:
         } else {
             live_tile_options = 7;
         }
+#ifndef HORIZON_UWP_SHELL_PROBE
+        // Reuse the user's installed Minecraft texture; do not redistribute it.
+        if (horizon_uwp_cache_vanilla_icon()) vanilla_unknown_icon = L"ms-appdata:///local/horizon-default-icon.png";
+#endif
         load_server_entries();
         PROBE_STAGE(L"Before WinUI");
         try {
@@ -2639,6 +2700,16 @@ protected:
         window->Content = shell_root;
 #endif
         window->Activate();
+#ifdef HORIZON_UWP_TOUCH_MOD
+        try {
+            auto display = DisplayInformation::GetForCurrentView();
+            horizon_uwp_gyro_set_orientation(static_cast<int>(display->CurrentOrientation));
+            display->OrientationChanged += ref new TypedEventHandler<DisplayInformation^, Platform::Object^>(
+                [](DisplayInformation^ sender, Platform::Object^) {
+                    horizon_uwp_gyro_set_orientation(static_cast<int>(sender->CurrentOrientation));
+                });
+        } catch (Platform::Exception^) { /* The sensor still works without an orientation transform. */ }
+#endif
 #ifndef HORIZON_UWP_SHELL_PROBE
         start_controller_navigation();
 #endif

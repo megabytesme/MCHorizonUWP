@@ -91,6 +91,7 @@ pub struct NativeRenderer {
     viewport: [u32; 2],
     benchmark: bool,
     scene: Option<horizon_native_scene::TerrainScene>,
+    world_icon_request: Option<std::path::PathBuf>,
     layout: ColumnLayout,
     #[cfg(feature = "native-d3d11-readback")]
     probed: bool,
@@ -137,6 +138,7 @@ impl NativeRenderer {
             viewport,
             benchmark: std::env::var("HORIZON_UWP_BENCHMARK").as_deref() == Ok("standard"),
             scene: None,
+            world_icon_request: None,
             layout: ColumnLayout::VANILLA,
             #[cfg(feature = "native-d3d11-readback")]
             probed: !diagnostics,
@@ -197,6 +199,40 @@ impl NativeRenderer {
         self.window.resize(viewport[0], viewport[1])?;
         self.viewport = viewport;
         Ok(())
+    }
+
+    pub fn world_icon_ready(&self) -> bool {
+        self.scene
+            .as_ref()
+            .is_some_and(|scene| scene.drawable_section_count() > 10)
+    }
+
+    pub fn request_world_icon(&mut self, path: std::path::PathBuf) {
+        self.world_icon_request = Some(path);
+    }
+
+    fn capture_world_icon(&self, path: &std::path::Path) -> crate::Result<()> {
+        let pixels = self.window.renderer().world_thumbnail()?;
+        let temporary = path.with_extension("png.tmp");
+        let result = (|| -> crate::Result<()> {
+            let file = std::fs::File::create(&temporary)?;
+            let mut encoder = png::Encoder::new(file, 64, 64);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header()?;
+            writer.write_image_data(&pixels)?;
+            writer.finish()?;
+            if path.exists() {
+                std::fs::remove_file(&temporary)?;
+            } else {
+                std::fs::rename(&temporary, path)?;
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
+        result
     }
 
     pub fn present(&mut self, frame: &Frame<'_>) -> crate::Result<bool> {
@@ -295,6 +331,11 @@ impl NativeRenderer {
             #[cfg(feature = "native-d3d11-readback")]
             if let Some(sample) = &mut sample {
                 sample.mark(3);
+            }
+            if let Some(path) = self.world_icon_request.take() {
+                if let Err(error) = self.capture_world_icon(&path) {
+                    log::warn!("Horizon: native world icon capture failed: {error}");
+                }
             }
             if !frame.hand.is_empty() {
                 self.window.renderer().clear_depth()?;

@@ -406,6 +406,48 @@ pub unsafe extern "C" fn horizon_uwp_server_list_read(
 
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_server_icon_read(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    address: *const u8,
+    address_len: usize,
+    output: *mut u8,
+    capacity: usize,
+) -> isize {
+    use std::os::windows::ffi::OsStringExt;
+    if game_dir.is_null()
+        || address.is_null()
+        || output.is_null()
+        || game_dir_len > 32767
+        || address_len > 1024
+    {
+        return -1;
+    }
+    let game = std::path::PathBuf::from(std::ffi::OsString::from_wide(unsafe {
+        std::slice::from_raw_parts(game_dir, game_dir_len)
+    }));
+    let Ok(address) =
+        std::str::from_utf8(unsafe { std::slice::from_raw_parts(address, address_len) })
+    else {
+        return -1;
+    };
+    let Some(icon) = horizon_protocol::servers::load(&game.join("servers.dat"))
+        .into_iter()
+        .find(|entry| entry.ip == address)
+        .and_then(|entry| entry.icon)
+        .and_then(|value| server_status::decode_saved_icon(&value))
+    else {
+        return 0;
+    };
+    if icon.len() > capacity {
+        return -1;
+    }
+    unsafe { std::ptr::copy_nonoverlapping(icon.as_ptr(), output, icon.len()) };
+    icon.len() as isize
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_server_list_add(
     game_dir: *const u16,
     game_dir_len: usize,
