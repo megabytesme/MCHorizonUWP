@@ -518,6 +518,12 @@ using (var signingKey = System.Security.Cryptography.ECDsa.Create(System.Securit
                 await retryTransport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", digest), retry);
                 Require(File.ReadAllBytes(retry).SequenceEqual(content), "interrupted artifact download retried and verified");
             }
+            using (var stalledTransport = new CatalogTransport(new StalledDownloadHandler(content), TimeSpan.FromMilliseconds(50)))
+            {
+                var retry = Path.Combine(folder, "stalled");
+                await stalledTransport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", digest), retry);
+                Require(File.ReadAllBytes(retry).SequenceEqual(content), "stalled artifact download timed out, retried and verified");
+            }
             var bad = Path.Combine(folder, "bad");
             try { await transport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", new string('0', 64)), bad); throw new Exception("wrong download digest accepted"); }
             catch (InvalidDataException) { Require(!File.Exists(bad), "invalid download removed"); }
@@ -955,5 +961,22 @@ sealed class InterruptedStream(byte[] bytes) : MemoryStream(bytes)
         if (partialRead) throw new IOException("Simulated connection interruption");
         partialRead = true;
         return base.ReadAsync(buffer[..Math.Min(3, buffer.Length)], cancellationToken);
+    }
+}
+
+sealed class StalledDownloadHandler(byte[] artifact) : HttpMessageHandler
+{
+    private int requests;
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content =
+            Interlocked.Increment(ref requests) == 1 ? new StreamContent(new StalledStream()) : new ByteArrayContent(artifact) });
+}
+
+sealed class StalledStream : MemoryStream
+{
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        return 0;
     }
 }

@@ -8,9 +8,14 @@ public sealed class CatalogTransport : IDisposable
 {
     private const long MaxArtifactBytes = 4L * 1024 * 1024 * 1024;
     private readonly HttpClient http;
+    private readonly TimeSpan inactivityTimeout;
 
     public CatalogTransport() : this(new SocketsHttpHandler { AllowAutoRedirect = false }) { }
-    internal CatalogTransport(HttpMessageHandler handler) => http = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(10) };
+    internal CatalogTransport(HttpMessageHandler handler, TimeSpan? inactivityTimeout = null)
+    {
+        http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(90) };
+        this.inactivityTimeout = inactivityTimeout ?? TimeSpan.FromSeconds(45);
+    }
     public void Dispose() => http.Dispose();
 
     public async Task<CompatibilityCatalog> GetCatalogAsync(Uri catalogUri, Uri signatureUri, byte[] trustedPublicKey, CancellationToken cancellationToken = default)
@@ -26,7 +31,7 @@ public sealed class CatalogTransport : IDisposable
         {
             try { await DownloadArtifactOnceAsync(artifact, output, cancellationToken); return; }
             catch (Exception error) when (attempt < 2 && !cancellationToken.IsCancellationRequested
-                && error is HttpRequestException or IOException or TaskCanceledException)
+                && error is HttpRequestException or IOException or TaskCanceledException or TimeoutException)
             {
                 await Task.Delay(TimeSpan.FromSeconds(attempt + 1), cancellationToken);
             }
@@ -52,8 +57,14 @@ public sealed class CatalogTransport : IDisposable
             var buffer = new byte[81920];
             long total = 0;
             int read;
-            while ((read = await input.ReadAsync(buffer, cancellationToken)) != 0)
+            while (true)
             {
+                using var inactivity = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                inactivity.CancelAfter(inactivityTimeout);
+                try { read = await input.ReadAsync(buffer, inactivity.Token); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                { throw new TimeoutException("The download stopped receiving data."); }
+                if (read == 0) break;
                 total += read;
                 if (total > MaxArtifactBytes) throw new InvalidDataException("The artifact is too large.");
                 hash.AppendData(buffer, 0, read);
