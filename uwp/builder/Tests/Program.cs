@@ -280,6 +280,27 @@ using (var signingKey = System.Security.Cryptography.ECDsa.Create(System.Securit
         System.Security.Cryptography.DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
     var publicKey = signingKey.ExportSubjectPublicKeyInfo();
     Require(CatalogSignature.Verify(payload, signature, publicKey).Patches.Length == 2, "signed catalog accepted with trusted key");
+    var content = System.Text.Encoding.UTF8.GetBytes("synthetic release artifact");
+    using (var transport = new CatalogTransport(new CatalogFixtureHandler(payload, signature, content)))
+    {
+        var fetched = await transport.GetCatalogAsync(new Uri("https://example.test/catalog"), new Uri("https://example.test/signature"), publicKey);
+        Require(fetched.Check("1.4.0", "2.2.0", "1.3.0", "x64").BuildVerified, "verified catalog retrieved over HTTPS");
+        var folder = Path.Combine(Path.GetTempPath(), "horizon-catalog-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var good = Path.Combine(folder, "artifact");
+            var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(content));
+            await transport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", digest), good);
+            Require(File.ReadAllBytes(good).SequenceEqual(content), "downloaded artifact digest verified");
+            var bad = Path.Combine(folder, "bad");
+            try { await transport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/artifact", new string('0', 64)), bad); throw new Exception("wrong download digest accepted"); }
+            catch (InvalidDataException) { Require(!File.Exists(bad), "invalid download removed"); }
+            try { await transport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/insecure-redirect", digest), bad); throw new Exception("insecure redirect accepted"); }
+            catch (InvalidDataException) { Require(!File.Exists(bad), "insecure redirect created no artifact"); }
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
     payload[0] ^= 1;
     try { _ = CatalogSignature.Verify(payload, signature, publicKey); throw new Exception("tampered catalog accepted"); }
     catch (InvalidDataException) { }
@@ -523,4 +544,19 @@ sealed class FakeProbe : IProbe
 sealed class ConsoleProgress : IProgress<string>
 {
     public void Report(string value) => Console.WriteLine(value);
+}
+sealed class CatalogFixtureHandler(byte[] catalog, byte[] signature, byte[] artifact) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (request.RequestUri!.AbsolutePath == "/insecure-redirect")
+        {
+            var redirect = new HttpResponseMessage(System.Net.HttpStatusCode.Redirect);
+            redirect.Headers.Location = new Uri("http://example.test/artifact");
+            return Task.FromResult(redirect);
+        }
+        var bytes = request.RequestUri.AbsolutePath switch { "/catalog" => catalog, "/signature" => signature, "/artifact" => artifact, _ => null };
+        return Task.FromResult(bytes is null ? new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+            : new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+    }
 }

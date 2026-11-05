@@ -2,11 +2,11 @@
 
 The goal is a signed, versioned release catalog for three independent release
 types: `builder-vX.Y.Z`, `client-vX.Y.Z` and `patch-vX.Y.Z`. The initial
-catalog implementation includes a local parser, compatibility checker and
-P-256 signature verifier. It is not connected to the UI, does not retrieve
-artifacts, has no production trust key, and does not publish releases. It must
-not be used to trust or execute downloaded content until the trust key and
-authenticated distribution are implemented.
+catalog implementation includes a parser, compatibility checker, P-256
+signature verifier, and HTTPS transport that checks artifact digests. These
+are not connected to the UI, have no production trust key, and do not publish
+releases. They must not be used to trust or execute downloaded content until
+the trust key and authenticated distribution are implemented.
 
 Schema 1 uses three-part numeric stable versions. A rule has inclusive lower
 and exclusive upper bounds for patch, client and builder versions, and an
