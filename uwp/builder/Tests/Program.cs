@@ -1,17 +1,32 @@
 using Horizon.Builder.Core;
 
-if (args.Length == 3 && args[0] == "--framework-fallback-proof")
+if (args.Length == 2 && args[0] == "--install-vs-proof")
+{
+    if (!Enum.TryParse<TargetProfile>(args[1], out var target) || !Enum.IsDefined(target)) throw new ArgumentException("Invalid target profile.");
+    SystemProbe.RefreshProcessPath();
+    var probe = new SystemProbe();
+    await VisualStudioBootstrap.EnsureAsync(probe, target, requested => VisualStudioBootstrap.InstallAsync(probe, requested), new ConsoleProgress());
+    Require(VisualStudioBootstrap.IsReady(probe, target), "Visual Studio UWP compiler and SDK are present");
+    Console.WriteLine($"Verified automatic Visual Studio setup for {target}.");
+    return;
+}
+
+if ((args.Length == 3 || args.Length == 4) && args[0] == "--framework-fallback-proof")
 {
     var root = Path.GetFullPath(args[2]);
     if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new framework proof workspace.");
     Directory.CreateDirectory(root);
-    var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    var profile = Path.Combine(root, "profile");
+    Directory.CreateDirectory(profile);
     await WinUiBootstrap.EnsureAsync(profile, root, args[1], new ConsoleProgress());
     var systemSdkRoot = Environment.GetEnvironmentVariable("ProgramFiles(x86)")!;
-    var signTool = Path.Combine(systemSdkRoot, "Windows Kits", "10", "bin", "10.0.26100.0", "x64", "signtool.exe");
+    var signTool = args.Length == 4 ? Path.GetFullPath(args[3]) : Path.Combine(systemSdkRoot, "Windows Kits", "10", "bin", "10.0.26100.0", "x64", "signtool.exe");
     var packages = await FrameworkDependencies.FindAsync(args[1], Path.Combine(root, "empty-sdk"), profile, signTool, root);
     Require(packages.Count == 2 && packages.All(File.Exists) && packages[0].StartsWith(root, StringComparison.OrdinalIgnoreCase),
         "Microsoft runtime downloaded, extracted and verified without an SDK runtime package");
+    var cached = await FrameworkDependencies.FindAsync(args[1], Path.Combine(root, "empty-sdk"), profile, signTool, root);
+    Require(cached[0].StartsWith(Path.Combine(profile, ".huwp", "frameworks"), StringComparison.OrdinalIgnoreCase),
+        "verified runtime is reused from the private cache");
     Console.WriteLine($"Verified Microsoft VC runtime fallback for {args[1]}: {packages[0]}");
     return;
 }
@@ -903,6 +918,47 @@ foreach (var arch in new[] { "x64", "arm64" })
 }
 Require(VisualCppInstallation.FindForTarget(unifiedProbe, TargetProfile.SurfaceProX) == vsRoot, "one Build Tools installation supplies host and target compilers");
 Require(VisualCppInstallation.FindForTarget(unifiedProbe, TargetProfile.WindowsMobile) is null, "missing ARM32 tools are not accepted");
+Require(VisualStudioBootstrap.Components(TargetProfile.WindowsMobile).Contains("Microsoft.VisualStudio.Component.VC.Tools.ARM")
+    && VisualStudioBootstrap.Components(TargetProfile.WindowsMobile).Contains("Microsoft.VisualStudio.Component.Windows10SDK.19041"),
+    "ARM32 setup includes its compiler and older SDK");
+Require(VisualStudioBootstrap.Components(TargetProfile.SurfaceProX).Contains("Microsoft.VisualStudio.Component.UWP.VC.ARM64")
+    && VisualStudioBootstrap.Components(TargetProfile.SurfaceProX).Contains("Microsoft.VisualStudio.Component.Windows11SDK.26100"),
+    "ARM64 setup includes the target tools and SDK");
+var allComponents = VisualStudioBootstrap.ComponentsForAllTargets();
+Require(allComponents.Contains("Microsoft.VisualStudio.Component.VC.Tools.ARM")
+    && allComponents.Contains("Microsoft.VisualStudio.Component.VC.Tools.ARM64")
+    && allComponents.Contains("Microsoft.VisualStudio.Component.Windows10SDK.19041")
+    && allComponents.Distinct(StringComparer.Ordinal).Count() == allComponents.Count,
+    "welcome setup includes all targets without duplicate components");
+Require(!VisualStudioBootstrap.IsReadyForAllTargets(unifiedProbe), "one installed target does not count as setup for all targets");
+var cleanVsProbe = new FakeProbe();
+cleanVsProbe.Executables.Add("winget.exe");
+var cleanVsPlan = VisualStudioBootstrap.Plan(cleanVsProbe, TargetProfile.WindowsMobile);
+Require(!cleanVsPlan.Elevate && cleanVsPlan.Arguments.Contains(VisualStudioBootstrap.PackageId)
+    && cleanVsPlan.Arguments.Contains(VisualStudioBootstrap.TestedVersion)
+    && cleanVsPlan.Arguments.Single(arg => arg.Contains("--add")).Contains("Microsoft.VisualStudio.Component.VC.Tools.ARM"),
+    "clean PC uses the pinned Microsoft Build Tools package and ARM components");
+var setupPath = Path.Combine(unifiedProbe.Root, "Microsoft Visual Studio", "Installer", "setup.exe");
+unifiedProbe.Files.Add(setupPath);
+unifiedProbe.AddDirectory(Path.GetDirectoryName(vsRoot)!, vsRoot);
+var repairVsPlan = VisualStudioBootstrap.Plan(unifiedProbe, TargetProfile.SurfaceProX);
+Require(repairVsPlan.Elevate && repairVsPlan.Executable == setupPath && repairVsPlan.Arguments.Contains(vsRoot)
+    && repairVsPlan.Arguments.Contains("modify"), "existing Build Tools receive only the selected components");
+var sdkRoot = Path.Combine(unifiedProbe.Root, "Windows Kits", "10");
+var sdkVersion = "10.0.26100.0";
+var sdkInstalls = 0;
+Task InstallFakeSdk(TargetProfile profile)
+{
+    sdkInstalls++;
+    unifiedProbe.Files.Add(Path.Combine(sdkRoot, "bin", sdkVersion, "x64", "fxc.exe"));
+    unifiedProbe.Files.Add(Path.Combine(sdkRoot, "bin", sdkVersion, "x64", "makeappx.exe"));
+    unifiedProbe.Files.Add(Path.Combine(sdkRoot, "bin", sdkVersion, "x64", "signtool.exe"));
+    unifiedProbe.Files.Add(Path.Combine(sdkRoot, "Include", sdkVersion, "um", "Windows.h"));
+    return Task.CompletedTask;
+}
+await VisualStudioBootstrap.EnsureAsync(unifiedProbe, TargetProfile.SurfaceProX, InstallFakeSdk);
+await VisualStudioBootstrap.EnsureAsync(unifiedProbe, TargetProfile.SurfaceProX, InstallFakeSdk);
+Require(sdkInstalls == 1, "missing Visual Studio SDK tools are installed once and rechecked");
 Require(LocalPackageInstaller.CanInstall(TargetProfile.DesktopX86, System.Runtime.InteropServices.Architecture.X64, new Version(10, 0, 19045)), "x86 can install on x64 Windows");
 Require(!LocalPackageInstaller.CanInstall(TargetProfile.WindowsMobile, System.Runtime.InteropServices.Architecture.X64, new Version(10, 0, 19045)), "ARM32 is not offered on x64 Windows");
 Require(!LocalPackageInstaller.CanInstall(TargetProfile.DesktopX64, System.Runtime.InteropServices.Architecture.Arm64, new Version(10, 0, 19045)), "Windows 10 ARM64 does not offer x64 installation");

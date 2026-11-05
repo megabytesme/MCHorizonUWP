@@ -7,6 +7,7 @@ namespace Horizon.Builder.Core;
 /// <summary>Restores the exact WinUI 2 package used by the UWP client without requiring NuGet or the .NET SDK.</summary>
 internal static class WinUiBootstrap
 {
+    internal static string PrivateProfile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MCHorizonUWP", "ToolProfile");
     private const string PackageName = "microsoft.ui.xaml.2.7.3.nupkg";
     private static readonly CatalogArtifact Package = new(
         "https://api.nuget.org/v3-flatcontainer/microsoft.ui.xaml/2.7.3/" + PackageName,
@@ -62,7 +63,7 @@ internal static class WinUiBootstrap
         }
     }
 
-    private static bool IsComplete(string root, string architecture) =>
+    internal static bool IsComplete(string root, string architecture) =>
         File.Exists(Path.Combine(root, "lib", "uap10.0", "Microsoft.UI.Xaml.winmd"))
         && File.Exists(Path.Combine(root, "tools", "AppX", architecture, "Release", "Microsoft.UI.Xaml.2.7.appx"));
 }

@@ -16,13 +16,26 @@ internal static class FrameworkDependencies
         "https://download.visualstudio.microsoft.com/download/pr/d2fa077f-a814-4fb2-b903-1fca7658d17e/7c0c4411e978befc4f2e577ddebdae154798a82214d14b47c63c2c2dc17c2bbd/cab1.cab",
         "7c0c4411e978befc4f2e577ddebdae154798a82214d14b47c63c2c2dc17c2bbd");
 
+    private static string RuntimeCache(string userProfile, string architecture) =>
+        Path.Combine(userProfile, ".huwp", "frameworks", architecture, $"Microsoft.VCLibs.{architecture}.14.00.appx");
+
+    internal static bool IsAvailable(string architecture, string programFilesX86, string userProfile)
+    {
+        var sdkRuntime = Path.Combine(programFilesX86, "Microsoft SDKs", "Windows Kits", "10", "ExtensionSDKs",
+            "Microsoft.VCLibs", "14.0", "Appx", "Retail", architecture, $"Microsoft.VCLibs.{architecture}.14.00.appx");
+        return File.Exists(sdkRuntime) || File.Exists(RuntimeCache(userProfile, architecture));
+    }
+
     internal static async Task<IReadOnlyList<string>> FindAsync(string architecture, string programFilesX86,
         string userProfile, string signTool, string workingDirectory)
     {
         if (architecture is not ("x86" or "x64" or "arm" or "arm64")) throw new ArgumentException("Unsupported framework architecture.");
         var runtime = Path.Combine(programFilesX86, "Microsoft SDKs", "Windows Kits", "10", "ExtensionSDKs",
             "Microsoft.VCLibs", "14.0", "Appx", "Retail", architecture, $"Microsoft.VCLibs.{architecture}.14.00.appx");
-        if (!File.Exists(runtime)) runtime = await DownloadRuntimeAsync(architecture, signTool, workingDirectory);
+        var cachedRuntime = RuntimeCache(userProfile, architecture);
+        var downloaded = false;
+        if (!File.Exists(runtime) && File.Exists(cachedRuntime)) runtime = cachedRuntime;
+        if (!File.Exists(runtime)) { runtime = await DownloadRuntimeAsync(architecture, signTool, workingDirectory); downloaded = true; }
         var xaml = Path.Combine(userProfile, ".nuget", "packages", "microsoft.ui.xaml", "2.7.3", "tools", "AppX", architecture, "Release", "Microsoft.UI.Xaml.2.7.appx");
         foreach (var (path, name, minimum) in new[] { (runtime, "Microsoft.VCLibs.140.00", "14.0.0.0"), (xaml, "Microsoft.UI.Xaml.2.7", "7.2208.15002.0") })
         {
@@ -37,6 +50,12 @@ internal static class FrameworkDependencies
                 || !string.Equals((string?)identity.Attribute("ProcessorArchitecture"), architecture, StringComparison.OrdinalIgnoreCase)
                 || !Version.TryParse((string?)identity.Attribute("Version"), out var version) || version < new Version(minimum))
                 throw new InvalidDataException($"The {name} package does not match the target architecture and version.");
+        }
+        if (downloaded)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(cachedRuntime)!);
+            try { File.Copy(runtime, cachedRuntime, overwrite: false); }
+            catch (IOException) when (File.Exists(cachedRuntime)) { /* A concurrent build populated the cache. */ }
         }
         return [runtime, xaml];
     }

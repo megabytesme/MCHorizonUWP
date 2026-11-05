@@ -14,13 +14,35 @@
         <StackPanel Spacing="5">
           <TextBlock Text="HORIZON UWP BUILDER" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
           <TextBlock x:Name="StepLabel" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+          <PipsPager x:Name="WizardPips" NumberOfPages="6" MaxVisiblePips="6" HorizontalAlignment="Center" />
+          <ProgressBar x:Name="PageProgress" Minimum="0" Maximum="6" Value="0" AutomationProperties.Name="Wizard pages completed" />
+          <Expander x:Name="DependencyExpander" Header="Dependencies" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="7">
+              <TextBlock x:Name="DependencySummary" Text="Setup will be checked when you continue." TextWrapping="Wrap" />
+              <Grid ColumnSpacing="8" RowSpacing="5">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /><ColumnDefinition Width="170" /></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Git" /><ProgressBar x:Name="GitProgress" Grid.Row="0" Grid.Column="1" Maximum="100" AutomationProperties.Name="Git setup" /><TextBlock x:Name="GitState" Grid.Row="0" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="1" Text="Python" /><ProgressBar x:Name="PythonProgress" Grid.Row="1" Grid.Column="1" Maximum="100" AutomationProperties.Name="Python setup" /><TextBlock x:Name="PythonState" Grid.Row="1" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="2" Text="Rustup" /><ProgressBar x:Name="RustupProgress" Grid.Row="2" Grid.Column="1" Maximum="100" AutomationProperties.Name="Rustup setup" /><TextBlock x:Name="RustupState" Grid.Row="2" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="3" Text="Rust compiler" /><ProgressBar x:Name="RustProgress" Grid.Row="3" Grid.Column="1" Maximum="100" AutomationProperties.Name="Rust compiler setup" /><TextBlock x:Name="RustState" Grid.Row="3" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="4" Text="C++ and SDKs" /><ProgressBar x:Name="VsProgress" Grid.Row="4" Grid.Column="1" Maximum="100" AutomationProperties.Name="Visual C++ and SDK setup" /><TextBlock x:Name="VsState" Grid.Row="4" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="5" Text="LLVM" /><ProgressBar x:Name="LlvmProgress" Grid.Row="5" Grid.Column="1" Maximum="100" AutomationProperties.Name="LLVM setup" /><TextBlock x:Name="LlvmState" Grid.Row="5" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="6" Text="Microsoft UI" /><ProgressBar x:Name="UiProgress" Grid.Row="6" Grid.Column="1" Maximum="100" AutomationProperties.Name="Microsoft UI framework setup" /><TextBlock x:Name="UiState" Grid.Row="6" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="7" Text="VC runtimes" /><ProgressBar x:Name="VcProgress" Grid.Row="7" Grid.Column="1" Maximum="100" AutomationProperties.Name="Microsoft VC runtime setup" /><TextBlock x:Name="VcState" Grid.Row="7" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+              </Grid>
+              <Button x:Name="RetryDependencies" Content="Retry dependency setup" Click="RetryDependencies_Click" Visibility="Collapsed" />
+            </StackPanel>
+          </Expander>
         </StackPanel>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="16">
             <StackPanel x:Name="WelcomePage" Spacing="14">
               <TextBlock Text="Welcome to Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="Create a Horizon package for a Windows PC or a Windows 10 Mobile device." TextWrapping="Wrap" />
-              <TextBlock Text="This preview still needs development tools. Complete automatic setup and a full clean-PC build have not yet been validated." TextWrapping="Wrap" />
+              <TextBlock Text="You need Windows Package Manager (WinGet), an internet connection and enough free disk space. The builder can install the compiler, Windows SDKs, Rust, frameworks and other tools for every supported target." TextWrapping="Wrap" />
+              <TextBlock Text="Setup can download several gigabytes. Windows may ask an administrator to approve tool installation. You can continue through the wizard while setup runs." TextWrapping="Wrap" />
+              <TextBlock Text="This is a preview; a complete clean-PC build has not yet been validated." TextWrapping="Wrap" />
               <TextBlock Text="The builder retrieves compatible releases from the MCHorizonUWP repository." TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel x:Name="TargetPage" Spacing="14" Visibility="Collapsed">
@@ -91,14 +113,8 @@
             </StackPanel>
             <StackPanel x:Name="SetupPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Check your setup" Style="{StaticResource TitleTextBlockStyle}" />
-              <TextBlock Text="The builder installs missing Git, Python and ARM Clang when you start a build. This accepts their package and source agreements; Windows may request administrator approval. Rustup is still interactive, and the Visual C++ tools and SDKs are not yet installed automatically." TextWrapping="Wrap" />
+              <TextBlock Text="Dependencies are checked when you leave the welcome page. Open Dependencies above to follow setup or retry a failed installation." TextWrapping="Wrap" />
               <Button Content="Check setup" Click="CheckSetup_Click" />
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button x:Name="InstallRustup" Content="Install Rustup" Click="InstallTool_Click" />
-                <Button x:Name="InstallGit" Content="Install Git" Click="InstallTool_Click" />
-                <Button x:Name="InstallPython" Content="Install Python" Click="InstallTool_Click" />
-              </StackPanel>
-              <TextBlock x:Name="InstallStatus" TextWrapping="Wrap" />
               <StackPanel x:Name="Results" Spacing="12" />
             </StackPanel>
             <StackPanel x:Name="BuildPage" Spacing="14" Visibility="Collapsed">

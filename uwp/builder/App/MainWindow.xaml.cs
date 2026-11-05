@@ -12,6 +12,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         Title = $"Horizon UWP Builder — Preview {CatalogTrust.BuilderVersion}";
+        WizardPips.SelectedIndexChanged += WizardPips_SelectedIndexChanged;
         Closed += (_, _) => minecraftSignInCancellation?.Cancel();
         Profile.SelectionChanged += Profile_SelectionChanged;
         ReleaseSelection.SelectionChanged += (_, _) => UpdateBuildActions();
@@ -30,6 +31,14 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? minecraftSignInCancellation;
     private CompatibilityCatalog? catalog;
     private bool buildActionRunning;
+    private bool navigationBusy;
+    private bool dependencyRunning;
+    private bool dependencyReady;
+    private bool dependencyStarted;
+    private bool updatingPips;
+    private int highestVisited;
+    private int completedPages;
+    private string? activeDependency;
     private bool minecraftOwnershipVerified;
     private SignedPackageOutput? builtOutput;
     private sealed record ReleaseChoice(string Patch, string Client, string Architecture, CompatibilityResult Compatibility)
@@ -44,10 +53,110 @@ public sealed partial class MainWindow : Window
         UpdateWizard();
     }
 
-    private void Next_Click(object sender, RoutedEventArgs e)
+    private async void Next_Click(object sender, RoutedEventArgs e)
     {
+        if (navigationBusy) return;
+        if (wizardStep == 0 && !dependencyStarted)
+        {
+            navigationBusy = true;
+            UpdateWizard();
+            try
+            {
+                var missing = await DependencyProvisioner.MissingAsync(new SystemProbe());
+                if (missing.Contains("Windows Package Manager (WinGet)"))
+                {
+                    var required = new ContentDialog { XamlRoot = WelcomePage.XamlRoot, Title = "Windows Package Manager is required",
+                        Content = "Install or repair Microsoft App Installer (WinGet), then try again. The builder installs the remaining requirements for you.", CloseButtonText = "OK" };
+                    await required.ShowAsync();
+                    return;
+                }
+                if (missing.Count > 0)
+                {
+                    var content = new StackPanel { Spacing = 12 };
+                    content.Children.Add(new TextBlock { Text = "The builder needs these components for all four architectures:", TextWrapping = TextWrapping.Wrap });
+                    content.Children.Add(new TextBlock { Text = string.Join("\n", missing.Select(item => "• " + item)), TextWrapping = TextWrapping.Wrap });
+                    var elevation = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                    elevation.Children.Add(new FontIcon { Glyph = "\uEA18", FontSize = 18 });
+                    elevation.Children.Add(new TextBlock { Text = "Windows may ask for administrator approval.", TextWrapping = TextWrapping.Wrap });
+                    content.Children.Add(elevation);
+                    content.Children.Add(new TextBlock { Text = "Setup downloads several gigabytes and accepts the selected packages’ license agreements. You can continue while it runs.", TextWrapping = TextWrapping.Wrap });
+                    var dialog = new ContentDialog { XamlRoot = WelcomePage.XamlRoot, Title = "Install required dependencies?", Content = content,
+                        PrimaryButtonText = "Install in background", CloseButtonText = "Not now", DefaultButton = ContentDialogButton.Primary };
+                    if (await dialog.ShowAsync() == ContentDialogResult.Primary) BeginDependencySetup();
+                    else { DependencySummary.Text = "Setup has not started. Select Retry dependency setup when you are ready."; DependencyExpander.IsExpanded = true; RetryDependencies.Visibility = Visibility.Visible; }
+                }
+                else BeginDependencySetup(); // Verify existing framework signatures in the background.
+            }
+            catch (Exception error)
+            {
+                DependencySummary.Text = "Could not check dependencies: " + error.Message;
+                DependencyExpander.IsExpanded = true;
+                RetryDependencies.Visibility = Visibility.Visible;
+            }
+            finally { navigationBusy = false; UpdateWizard(); }
+        }
         if (wizardStep < 5) wizardStep++;
+        completedPages = Math.Max(completedPages, wizardStep);
+        highestVisited = Math.Max(highestVisited, wizardStep);
         UpdateWizard();
+    }
+
+    private void WizardPips_SelectedIndexChanged(PipsPager sender, PipsPagerSelectedIndexChangedEventArgs args)
+    {
+        if (updatingPips || navigationBusy) return;
+        var selected = sender.SelectedPageIndex;
+        if (selected <= highestVisited) wizardStep = selected;
+        UpdateWizard();
+    }
+
+    private void RetryDependencies_Click(object sender, RoutedEventArgs e) => BeginDependencySetup();
+
+    private void BeginDependencySetup()
+    {
+        if (dependencyRunning) return;
+        dependencyStarted = true;
+        dependencyReady = false;
+        dependencyRunning = true;
+        RetryDependencies.Visibility = Visibility.Collapsed;
+        DependencyExpander.IsExpanded = true;
+        DependencySummary.Text = "Preparing dependencies in the background. You can continue through the wizard.";
+        UpdateBuildActions();
+        var progress = new Progress<DependencyProgress>(ShowDependencyProgress);
+        _ = RunDependencySetupAsync(progress);
+    }
+
+    private async Task RunDependencySetupAsync(IProgress<DependencyProgress> progress)
+    {
+        try
+        {
+            await Task.Run(() => DependencyProvisioner.PrepareAsync(progress));
+            dependencyReady = true;
+            DependencySummary.Text = "All dependencies are ready for the four target architectures.";
+        }
+        catch (Exception error)
+        {
+            if (activeDependency is { } active) ShowDependencyProgress(new(active, "Failed; see details above", false, false));
+            DependencySummary.Text = "Dependency setup could not finish: " + error.Message;
+            RetryDependencies.Visibility = Visibility.Visible;
+        }
+        finally { dependencyRunning = false; UpdateBuildActions(); }
+    }
+
+    private void ShowDependencyProgress(DependencyProgress update)
+    {
+        var controls = update.Id switch
+        {
+            "git" => (GitProgress, GitState), "python" => (PythonProgress, PythonState), "rustup" => (RustupProgress, RustupState),
+            "rust" => (RustProgress, RustState), "vs" => (VsProgress, VsState), "llvm" => (LlvmProgress, LlvmState),
+            "ui" => (UiProgress, UiState), "vclibs" => (VcProgress, VcState), _ => (null, null)
+        };
+        if (controls.Item1 is null || controls.Item2 is null) return;
+        controls.Item1.IsIndeterminate = update.Running && update.Percent is null;
+        controls.Item1.Value = update.Complete ? 100 : update.Percent ?? 0;
+        controls.Item2.Text = update.Detail;
+        ToolTipService.SetToolTip(controls.Item2, update.Detail);
+        if (update.Running) { activeDependency = update.Id; DependencySummary.Text = update.Detail; }
+        else if (activeDependency == update.Id) activeDependency = null;
     }
 
     private void UpdateWizard()
@@ -56,8 +165,12 @@ public sealed partial class MainWindow : Window
         string[] labels = ["Welcome", "Target", "Source and resources", "Options", "Setup", "Build"];
         for (var i = 0; i < pages.Length; i++) pages[i].Visibility = i == wizardStep ? Visibility.Visible : Visibility.Collapsed;
         StepLabel.Text = $"Step {wizardStep + 1} of {pages.Length} · {labels[wizardStep]}";
-        BackButton.IsEnabled = wizardStep > 0;
-        NextButton.IsEnabled = wizardStep < pages.Length - 1;
+        updatingPips = true;
+        WizardPips.SelectedPageIndex = wizardStep;
+        updatingPips = false;
+        PageProgress.Value = completedPages;
+        BackButton.IsEnabled = !navigationBusy && wizardStep > 0;
+        NextButton.IsEnabled = !navigationBusy && wizardStep < pages.Length - 1;
     }
 
     private void Profile_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateReleaseChoices();
@@ -119,7 +232,7 @@ public sealed partial class MainWindow : Window
     {
         if (ReleaseSelection is null || RunRecipe is null || CheckRecipe is null) return;
         var available = !buildActionRunning && ReleaseSelection.SelectedItem is ReleaseChoice;
-        RunRecipe.IsEnabled = available && minecraftOwnershipVerified;
+        RunRecipe.IsEnabled = available && minecraftOwnershipVerified && dependencyReady;
         CheckRecipe.IsEnabled = available;
     }
 
@@ -254,6 +367,8 @@ public sealed partial class MainWindow : Window
             await WindowsPackageManager.EnsureBuildBasicsAsync(probe, tool => WindowsPackageManager.InstallAsync(probe, tool),
                 SystemProbe.RefreshProcessPath, progress, SystemProbe.UsePrivateRustupForProcess);
             await WindowsPackageManager.EnsureClangAsync(probe, selection.Target, tool => WindowsPackageManager.InstallAsync(probe, tool), progress);
+            if (release.Client == "0.1.1")
+                await VisualStudioBootstrap.EnsureAsync(probe, selection.Target, target => VisualStudioBootstrap.InstallAsync(probe, target), progress);
             await WindowsPackageManager.EnsureRustToolchainAsync(() => LocalRecipe.InspectRustAsync(probe),
                 () => WindowsPackageManager.InstallRustToolchainAsync(probe), progress);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
@@ -271,6 +386,8 @@ public sealed partial class MainWindow : Window
             var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft);
             var signed = result.SignedOutput ?? throw new InvalidOperationException("The build did not produce signed output.");
             builtOutput = signed;
+            completedPages = 6;
+            UpdateWizard();
             if (LocalPackageInstaller.CanInstall(selection.Target, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture, Environment.OSVersion.Version))
                 InstallLocal.Visibility = Visibility.Visible;
             RecipeStatus.Text = $"Signed client: {signed.Client}. Public certificate: {signed.Certificate}. Installation guide: {signed.InstallationGuide}.";
@@ -307,33 +424,6 @@ public sealed partial class MainWindow : Window
         catch (Exception error) { RecipeStatus.Text = $"Installation did not complete: {error.Message}"; }
         finally { InstallLocal.IsEnabled = true; }
     }
-    private async void InstallTool_Click(object sender, RoutedEventArgs e)
-    {
-        InstallRustup.IsEnabled = false;
-        InstallGit.IsEnabled = false;
-        InstallPython.IsEnabled = false;
-        InstallStatus.Text = "Starting Windows Package Manager…";
-        try
-        {
-            var tool = ReferenceEquals(sender, InstallRustup) ? InstallableTool.Rustup
-                : ReferenceEquals(sender, InstallGit) ? InstallableTool.Git
-                : ReferenceEquals(sender, InstallPython) ? InstallableTool.Python
-                : throw new InvalidOperationException("Unknown tool selection.");
-            SystemProbe.RefreshProcessPath();
-            if (tool == InstallableTool.Rustup && new SystemProbe().FindOnPath("rustup.exe") is null)
-                SystemProbe.UsePrivateRustupForProcess();
-            InstallStatus.Text = $"Installing {tool} with Windows Package Manager…";
-            await WindowsPackageManager.InstallAsync(new SystemProbe(), tool);
-            SystemProbe.RefreshProcessPath();
-            InstallStatus.Text = "WinGet completed. Check setup again.";
-        }
-        catch (Exception error)
-        {
-            InstallStatus.Text = $"The tool was not installed: {error.Message}";
-        }
-        finally { InstallRustup.IsEnabled = true; InstallGit.IsEnabled = true; InstallPython.IsEnabled = true; }
-    }
-
     private async void BrowseNativeMods_Click(object sender, RoutedEventArgs e)
     {
         BrowseNativeMods.IsEnabled = false;

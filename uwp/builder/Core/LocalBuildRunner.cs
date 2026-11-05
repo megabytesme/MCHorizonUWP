@@ -116,11 +116,11 @@ public static class LocalBuildRunner
         IReadOnlyList<string>? dependencies = null;
         if (release is not null)
         {
-            await WinUiBootstrap.EnsureAsync(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), root, targetArchitecture, progress);
+            await WinUiBootstrap.EnsureAsync(WinUiBootstrap.PrivateProfile, root, targetArchitecture, progress);
             progress?.Report("Checking the Microsoft frameworks needed to install on the target.");
             dependencies = await FrameworkDependencies.FindAsync(targetArchitecture,
                 probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)",
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), signTool, root);
+                WinUiBootstrap.PrivateProfile, signTool, root);
         }
 
         if (selection.RegistryNativeMods is { Count: > 0 } selectedMods)
@@ -217,7 +217,9 @@ public static class LocalBuildRunner
         progress?.Report("Strict-linking the UWP host.");
         // cmd.exe is required for the checked-in .cmd file. Its command is fixed;
         // selected paths are passed in the working directory or environment only.
-        await RunProcess(cmd, snapshot, ["/d", "/c", "uwp\\host\\build-game.cmd", arch], vcEnvironment);
+        var hostBuildEnvironment = new Dictionary<string, string>(vcEnvironment, StringComparer.OrdinalIgnoreCase);
+        if (release is not null) hostBuildEnvironment["USERPROFILE"] = WinUiBootstrap.PrivateProfile;
+        await RunProcess(cmd, snapshot, ["/d", "/c", "uwp\\host\\build-game.cmd", arch], hostBuildEnvironment);
 
         var executable = Path.Combine(hostOutput, "HorizonUWP.exe");
         var packageDir = Path.Combine(root, "package");
