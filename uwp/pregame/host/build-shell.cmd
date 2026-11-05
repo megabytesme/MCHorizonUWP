@@ -16,7 +16,7 @@ if /i "%ARCH%"=="arm64" (
 if /i "%ARCH%"=="arm" (
     set "VCARCH=x64_arm"
     set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
-    set "SDK=10.0.17763.0"
+    set "SDK=10.0.19041.0"
     set "WINUI_VERSION=2.7.3"
 )
 if defined HORIZON_UWP_VSROOT set "VSROOT=%HORIZON_UWP_VSROOT%"
