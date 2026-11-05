@@ -21,6 +21,12 @@ establish the publisher. Reject unknown schemas, malformed versions,
 duplicate release versions or JSON properties, invalid ranges, invalid
 artifact references and conflicting evidence.
 
+The verifier accepts a detached P-256 ECDSA signature over the exact UTF-8
+catalog bytes, using SHA-256 and a 64-byte IEEE P1363 signature. The trusted
+public key is supplied as SubjectPublicKeyInfo; there is currently no pinned
+production key, key-management workflow, or release signing process. Catalog
+URLs and digests are unusable as a trust anchor until those pieces exist.
+
 Evidence is separate from compatibility. It identifies exact patch, client,
 builder and architecture versions, with independent build and device results.
 A successful x64 build does not establish ARM32 success or device behavior.

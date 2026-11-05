@@ -1,5 +1,17 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 2 && args[0] == "--inspect-candidate-catalog")
+{
+    var candidate = CompatibilityCatalog.Parse(await File.ReadAllTextAsync(args[1]));
+    foreach (var architecture in new[] { "x86", "x64", "arm", "arm64" })
+    {
+        var result = candidate.Check("0.1.0", "0.1.0", "0.1.0", architecture);
+        Require(result.Allowed && !result.BuildVerified && !result.DeviceVerified, "candidate status is declared but unverified");
+        Console.WriteLine($"{architecture}: compatible candidate, no build or device evidence");
+    }
+    return;
+}
+
 if (args.Length == 5 && args[0] == "--assemble-candidate")
 {
     static string HashInput(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
