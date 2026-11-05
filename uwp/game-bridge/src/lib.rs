@@ -11,6 +11,41 @@ mod server_status;
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 mod xaml_pregame;
 
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    feature = "uwp-controller"
+))]
+thread_local! {
+    static CONTROLLER_TEST: std::cell::RefCell<Option<horizon_client::uwp_controller::ControllerTest>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_controller_test_read(buffer: *mut u8, capacity: usize) -> usize {
+    #[cfg(feature = "uwp-controller")]
+    let message = CONTROLLER_TEST.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.is_none() {
+            match horizon_client::uwp_controller::ControllerTest::new() {
+                Ok(test) => *slot = Some(test),
+                Err(error) => return format!("Controller input is unavailable: {error}"),
+            }
+        }
+        slot.as_mut().unwrap().read()
+    });
+    #[cfg(not(feature = "uwp-controller"))]
+    let message = String::from("Controller support is not included in this build.");
+    copy_build_label(buffer, capacity, &message)
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_controller_test_stop() {
+    #[cfg(feature = "uwp-controller")]
+    CONTROLLER_TEST.with(|slot| *slot.borrow_mut() = None);
+}
+
 // The XAML shell and DirectX game view have different UI threads. A successful
 // account session crosses that boundary only through this in-process slot;
 // it is consumed once and is never serialized to the command line or disk.

@@ -1,0 +1,92 @@
+//! Shared UWP controller discovery and mapping.
+// The bundled SDL database covers many controllers. This row supplements it
+// with the X2 layout measured on Windows 10 Mobile. Unknown controllers still
+// use gilrs' generic mapping; they are not filtered by vendor or product ID.
+const EXTRA_SDL_MAPPINGS: &str = concat!(
+    "03000000ac050000063b000000000000,GameSir X2 Type-C,",
+    "a:b1,b:b0,x:b4,y:b3,back:b10,start:b11,guide:b12,",
+    "leftshoulder:b6,rightshoulder:b7,leftstick:b13,rightstick:b14,",
+    "lefttrigger:b8,righttrigger:b9,leftx:a0,lefty:a1,rightx:a2,righty:a3,",
+    "dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,platform:Windows,\n",
+);
+
+pub fn new_gilrs() -> Result<gilrs::Gilrs, gilrs::Error> {
+    gilrs::GilrsBuilder::new()
+        .add_mappings(EXTRA_SDL_MAPPINGS)
+        .build()
+}
+
+/// Live mapped readings for the launcher controller test.
+pub struct ControllerTest {
+    gilrs: gilrs::Gilrs,
+}
+
+impl ControllerTest {
+    pub fn new() -> Result<Self, gilrs::Error> {
+        Ok(Self {
+            gilrs: new_gilrs()?,
+        })
+    }
+
+    pub fn read(&mut self) -> String {
+        while self.gilrs.next_event().is_some() {}
+        let mut output = String::new();
+        for (_, pad) in self.gilrs.gamepads() {
+            use std::fmt::Write;
+            let _ = writeln!(
+                output,
+                "{} ({:?} mapping)",
+                pad.name(),
+                pad.mapping_source()
+            );
+            let buttons = [
+                ("South", gilrs::Button::South),
+                ("East", gilrs::Button::East),
+                ("West", gilrs::Button::West),
+                ("North", gilrs::Button::North),
+                ("L1", gilrs::Button::LeftTrigger),
+                ("R1", gilrs::Button::RightTrigger),
+                ("L2", gilrs::Button::LeftTrigger2),
+                ("R2", gilrs::Button::RightTrigger2),
+                ("Select", gilrs::Button::Select),
+                ("Start", gilrs::Button::Start),
+                ("L3", gilrs::Button::LeftThumb),
+                ("R3", gilrs::Button::RightThumb),
+                ("Up", gilrs::Button::DPadUp),
+                ("Down", gilrs::Button::DPadDown),
+                ("Left", gilrs::Button::DPadLeft),
+                ("Right", gilrs::Button::DPadRight),
+            ];
+            let pressed: Vec<_> = buttons
+                .iter()
+                .filter(|(_, b)| pad.is_pressed(*b))
+                .map(|(n, _)| *n)
+                .collect();
+            let _ = writeln!(
+                output,
+                "Pressed: {}",
+                if pressed.is_empty() {
+                    "none".into()
+                } else {
+                    pressed.join(", ")
+                }
+            );
+            let _ = writeln!(
+                output,
+                "Left stick: {:.2}, {:.2}\nRight stick: {:.2}, {:.2}\nTriggers: {:.2}, {:.2}\n",
+                pad.value(gilrs::Axis::LeftStickX),
+                pad.value(gilrs::Axis::LeftStickY),
+                pad.value(gilrs::Axis::RightStickX),
+                pad.value(gilrs::Axis::RightStickY),
+                pad.button_data(gilrs::Button::LeftTrigger2)
+                    .map_or(0.0, |v| v.value()),
+                pad.button_data(gilrs::Button::RightTrigger2)
+                    .map_or(0.0, |v| v.value())
+            );
+        }
+        if output.is_empty() {
+            output.push_str("No controller connected. Connect one and press a button; this screen updates automatically.");
+        }
+        output
+    }
+}

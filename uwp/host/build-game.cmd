@@ -62,10 +62,6 @@ if defined HORIZON_UWP_HTTP (
     cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\https-bridge\host\HttpBridge.cpp"
     if errorlevel 1 (popd & exit /b 1)
 )
-if defined HORIZON_UWP_GAMEPAD (
-    cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\gamepad-bridge\host\Gamepad.cpp"
-    if errorlevel 1 (popd & exit /b 1)
-)
 if defined HORIZON_UWP_TOUCH_MOD (
     cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 /AI"%WindowsSdkDir%UnionMetadata\%SDK%" "%~dp0..\gyro-bridge\host\Gyrometer.cpp"
     if errorlevel 1 (popd & exit /b 1)

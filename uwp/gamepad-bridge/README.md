@@ -1,12 +1,17 @@
 # UWP controllers
 
-The optional `uwp-controller` feature reads `Windows.Gaming.Input.Gamepad`
-through the native host and feeds Horizon's existing controller mappings,
-deadzones, menu controls and vibration setting. The active controller changes
-when another connected controller is used. Motor pulses are time-limited and
-are stopped on focus loss, disconnect and shutdown.
+The `uwp-controller` feature uses Horizon's `gilrs` Windows.Gaming.Input
+backend. Standard `Gamepad` controllers use their mapped controls; other
+controllers exposed as `RawGameController` use the bundled SDL mapping
+database or gilrs' generic fallback. There is no controller allowlist. A
+supplemental mapping uses the X2 layout measured on the Lumia 950 XL. Unknown
+layouts may still need mapping, and system-reserved buttons may not reach the game.
 
-The host must be built with `HORIZON_UWP_GAMEPAD=1` when this feature is enabled.
-The bridge supports Windows Gaming Input gamepads; availability and physical
-controller behavior depend on the device and have not yet been tested on the
-target phone. Device vibration is a separate optional native mod.
+Input feeds the same controller settings, action bindings, deadzones and menus
+as desktop Horizon. Standard Gamepad vibration is used when available;
+device-specific HID effects are separate. The old native `Gamepad.cpp` bridge
+is retained for historical experiments; the game no longer links it.
+
+The UWP build uses a local `gilrs-core` compatibility patch for Windows 10
+15063, where `NonRoamableId` is unavailable. Runtime validation on the target
+OS and real controllers is still needed. Device vibration is a separate mod.

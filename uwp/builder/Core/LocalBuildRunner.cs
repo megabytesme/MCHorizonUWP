@@ -124,7 +124,6 @@ public static class LocalBuildRunner
         };
         vcEnvironment["HORIZON_UWP_XAUDIO"] = "1";
         vcEnvironment["HORIZON_UWP_HTTP"] = "1";
-        vcEnvironment["HORIZON_UWP_GAMEPAD"] = "1";
         vcEnvironment["HORIZON_UWP_ACCOUNT"] = "1";
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = "1";

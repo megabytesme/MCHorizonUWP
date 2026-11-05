@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["launcher", "crates/horizon-telemetry-server", "crates/horizon-mod-registry", "third_party/wgpu-hal", "third_party/winit", "uwp/native-terrain", "uwp/native-hud", "uwp/d3d11-backend", "uwp/native-scene", "uwp/native-window", "uwp/native-panorama", "uwp/native-entities", "mods/horizon-touch-native", "uwp/xaudio-stream", "uwp/https-bridge", "uwp/credential-store", "third_party/naga", "third_party/libmimalloc-sys", "mods/horizon-device-vibration-native", "uwp/gamepad-bridge", "uwp/device-vibration-bridge", "uwp/network-bridge", "uwp/picker"]
+exclude = ["launcher", "crates/horizon-telemetry-server", "crates/horizon-mod-registry", "third_party/wgpu-hal", "third_party/winit", "uwp/native-terrain", "uwp/native-hud", "uwp/d3d11-backend", "uwp/native-scene", "uwp/native-window", "uwp/native-panorama", "uwp/native-entities", "mods/horizon-touch-native", "uwp/xaudio-stream", "uwp/https-bridge", "uwp/credential-store", "third_party/naga", "third_party/libmimalloc-sys", "mods/horizon-device-vibration-native", "uwp/gamepad-bridge", "uwp/device-vibration-bridge", "uwp/network-bridge", "uwp/picker", "third_party/gilrs-core"]
 members = [
     "crates/horizon-core",
     "crates/horizon-dualsense",
@@ -67,6 +67,7 @@ large_enum_variant = "allow"
 # frame wait for the GPU to finish the one before (#4604).
 # Drop this and the folder once a wgpu release has these fixes.
 [patch.crates-io]
+gilrs-core = { path = "third_party/gilrs-core" }
 wgpu-hal = { path = "third_party/wgpu-hal" }
 parking_lot_core = { path = "third_party/parking_lot_core" }
 winit = { path = "third_party/winit" }

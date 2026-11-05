@@ -85,6 +85,10 @@ extern "C" void __cdecl horizon_uwp_trace_shell_event(const char* event);
 extern "C" int __cdecl horizon_uwp_prepare(const uint16_t*, size_t);
 extern "C" int __cdecl horizon_uwp_pick_files(const wchar_t*, size_t, unsigned);
 extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsigned);
+#ifndef HORIZON_UWP_SHELL_PROBE
+extern "C" size_t __cdecl horizon_uwp_controller_test_read(unsigned char*, size_t);
+extern "C" void __cdecl horizon_uwp_controller_test_stop();
+#endif
 extern "C" size_t __cdecl horizon_uwp_release_label(unsigned char*, size_t);
 extern "C" size_t __cdecl horizon_uwp_upstream_release(unsigned char*, size_t);
 extern "C" size_t __cdecl horizon_uwp_upstream_ref(unsigned char*, size_t);
@@ -1158,6 +1162,37 @@ void load_profile_skin(Platform::String^ value, unsigned generation) {
     } catch (...) { /* The account remains usable without its skin. */ }
 }
 
+#ifndef HORIZON_UWP_SHELL_PROBE
+void show_controller_test() {
+    auto dialog = ref new ContentDialog();
+    dialog->Title = L"Controller test";
+    dialog->PrimaryButtonText = L"Close";
+    auto body = ref new StackPanel();
+    body->Children->Append(text(L"Press buttons and move sticks to test their game mappings. South, East, West and North describe button positions.", 14));
+    auto readings = text(L"Looking for controllers...", 14);
+    readings->IsTextSelectionEnabled = true;
+    body->Children->Append(readings);
+    dialog->Content = body;
+    auto timer = ref new DispatcherTimer();
+    TimeSpan interval; interval.Duration = 1000000; timer->Interval = interval;
+    timer->Tick += ref new EventHandler<Platform::Object^>([readings](Platform::Object^, Platform::Object^) {
+        unsigned char bytes[8192] = {};
+        const auto length = horizon_uwp_controller_test_read(bytes, sizeof(bytes));
+        if (!length) return;
+        const int count = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(bytes), static_cast<int>(length), nullptr, 0);
+        if (count <= 0) return;
+        std::wstring value(count, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(bytes), static_cast<int>(length), &value[0], count);
+        readings->Text = ref new Platform::String(value.c_str());
+    });
+    dialog->Closed += ref new TypedEventHandler<ContentDialog^, ContentDialogClosedEventArgs^>([timer](ContentDialog^, ContentDialogClosedEventArgs^) {
+        timer->Stop(); horizon_uwp_controller_test_stop();
+    });
+    timer->Start();
+    dialog->ShowAsync();
+}
+#endif
+
 void show_prompt_dialog(Platform::String^ message, Platform::String^ accounts, unsigned kind, unsigned generation) {
     auto dialog = ref new ContentDialog();
     dialog->Title = (kind == 1 || kind == 5) ? L"Account Management" : kind == 8 ? L"Add an account" :
@@ -1850,6 +1885,13 @@ void refresh() {
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
+#ifndef HORIZON_UWP_SHELL_PROBE
+        auto controller_card = ref new StackPanel();
+        controller_card->Children->Append(text(L"Controllers", 18));
+        controller_card->Children->Append(text(L"Test connected controllers and their game mappings.", 14));
+        controller_card->Children->Append(action_button(L"Test controller", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_controller_test(); })));
+        panel->Children->Append(card(controller_card));
+#endif
         auto benchmark_card = ref new StackPanel();
         benchmark_card->Children->Append(text(L"Rendering benchmark", 18));
         benchmark_card->Children->Append(text(L"Run Horizon's standard game benchmark. It creates or replaces its own benchmark world and saves the report in the game's benchmarks folder.", 14));

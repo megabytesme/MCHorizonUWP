@@ -12,7 +12,6 @@ if ($env:HORIZON_UWP_ACCOUNT) {
     if ($env:HORIZON_UWP_XAML_SHELL) { $objects += 'XamlShell.obj' }
     else { $objects += 'NativeDialog.obj'; $libraries += @('d2d1.lib', 'dwrite.lib') }
 }
-if ($env:HORIZON_UWP_GAMEPAD) { $objects += 'Gamepad.obj' }
 if ($env:HORIZON_UWP_TOUCH_MOD) { $objects += 'Gyrometer.obj' }
 if ($env:HORIZON_UWP_DEVICE_VIBRATION) { $objects += 'DeviceVibration.obj' }
 & $linker -Objects $objects `

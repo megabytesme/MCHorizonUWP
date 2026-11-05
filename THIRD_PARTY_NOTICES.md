@@ -1,5 +1,18 @@
 # Third-party notices
 
+## SDL Game Controller Database
+
+The `gilrs` 0.11.2 dependency embeds [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB),
+Copyright (C) 1997-2025 Sam Lantinga, under the zlib license
+(`third_party/controller-mappings/LICENSE`).
+
+## gilrs-core
+
+`third_party/gilrs-core` is [gilrs-core](https://gitlab.com/gilrs-project/gilrs)
+0.6.8 at commit `07e286e24b046cf39e5c367daa2770b805a64692`, used under the
+MIT license (`LICENSE-MIT` in that directory). Its Windows backend uses a
+connection-scoped identity when older Windows does not provide NonRoamableId.
+
 ## parking_lot_core
 
 `third_party/parking_lot_core` is [parking_lot_core](https://github.com/Amanieu/parking_lot)

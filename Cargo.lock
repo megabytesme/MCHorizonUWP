@@ -1104,8 +1104,6 @@ dependencies = [
 [[package]]
 name = "gilrs-core"
 version = "0.6.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc7f0ce6237abcc0523f2a5502b1e3fe5802daaae47ac14e166fe49551301ea9"
 dependencies = [
  "inotify",
  "js-sys",
@@ -1119,7 +1117,7 @@ dependencies = [
  "vec_map",
  "wasm-bindgen",
  "web-sys",
- "windows 0.62.2",
+ "windows 0.54.0",
 ]
 
 [[package]]
@@ -1171,7 +1169,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 2.0.21",
- "windows 0.62.2",
+ "windows 0.54.0",
 ]
 
 [[package]]
@@ -1357,7 +1355,6 @@ dependencies = [
  "horizon-threads",
  "horizon-touch-native",
  "horizon-uwp-d3d11",
- "horizon-uwp-gamepad",
  "horizon-uwp-picker",
  "horizon-world",
  "log",
@@ -1875,10 +1872,6 @@ dependencies = [
 
 [[package]]
 name = "horizon-uwp-device-vibration"
-version = "0.1.0"
-
-[[package]]
-name = "horizon-uwp-gamepad"
 version = "0.1.0"
 
 [[package]]

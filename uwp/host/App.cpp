@@ -950,7 +950,9 @@ static void run_game_in_primary_view() {
         game_phone = phone;
         game_was_full_screen = was_full_screen;
         game_page_hidden = page_hidden;
+#ifdef HORIZON_UWP_TOUCH_MOD
         game_gyro_visible = gyro_visible;
+#endif
         stage = "starting Horizon on the game worker";
         Windows::System::Threading::ThreadPool::RunAsync(
             ref new Windows::System::Threading::WorkItemHandler([resources, game, renderer](Windows::Foundation::IAsyncAction^) {

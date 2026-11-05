@@ -76,3 +76,6 @@ pub fn run_uwp_with_session(
 pub mod native_renderer;
 #[cfg(target_vendor = "uwp")]
 mod uwp_mods;
+
+#[cfg(all(target_vendor = "uwp", feature = "uwp-controller"))]
+pub mod uwp_controller;
