@@ -1,6 +1,6 @@
 namespace Horizon.Builder.Core;
 
-public sealed record SignedPackageOutput(string Client, string Certificate, string? ResourceFramework);
+public sealed record SignedPackageOutput(string Client, string Certificate, string? ResourceFramework, string InstallationGuide);
 
 /// <summary>Creates distributable copies of the client and optional private resource framework.</summary>
 public static class PackageOutput
@@ -21,6 +21,11 @@ public static class PackageOutput
             framework = Path.Combine(output, "HorizonResources.appx");
             await PackageSigning.SignAsync(unsignedResourceFramework, framework, null, identity, signTool);
         }
-        return new(client, certificate, framework);
+        var guide = Path.Combine(output, "Install.md");
+        await using var guideSource = typeof(PackageOutput).Assembly.GetManifestResourceStream("Horizon.Builder.Core.InstallGuide.md")
+            ?? throw new InvalidOperationException("The installation guide is missing.");
+        await using var guideOutput = new FileStream(guide, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+        await guideSource.CopyToAsync(guideOutput);
+        return new(client, certificate, framework, guide);
     }
 }

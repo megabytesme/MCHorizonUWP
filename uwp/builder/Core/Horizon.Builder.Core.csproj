@@ -7,6 +7,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Assets/FrameworkLogo.png" />
     <EmbeddedResource Include="../../shared/horizon-client-id.txt" LogicalName="Horizon.Builder.Core.HorizonClientId.txt" />
+    <EmbeddedResource Include="../../../docs/install.md" LogicalName="Horizon.Builder.Core.InstallGuide.md" />
     <InternalsVisibleTo Include="Horizon.Builder.Tests" />
   </ItemGroup>
 </Project>

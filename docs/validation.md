@@ -70,6 +70,8 @@ The same Sandbox test subsequently signed a second synthetic package with the
 same identity without exporting a second public certificate.
 The package output component then created a signed client/framework pair and
 one public certificate from synthetic inputs in the same Sandbox.
+It also wrote an installation guide alongside those files; the guide calls out
+the framework dependencies that the preview does not yet collect.
 
 ## 2026-11-05: catalog signing component
 

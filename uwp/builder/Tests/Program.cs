@@ -45,7 +45,8 @@ if (args.Length == 4 && args[0] == "--signing-proof")
     using (var publicCert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate))
         Require(publicCert.Thumbprint == identity.Thumbprint && !publicCert.HasPrivateKey, "export contains only the public certificate");
     var set = await PackageOutput.CreateAsync(unsigned, unsigned, identity, args[2], Path.Combine(output, "signed-set"));
-    Require(File.Exists(set.Client) && File.Exists(set.Certificate) && File.Exists(set.ResourceFramework), "signed package set and public certificate created");
+    Require(File.Exists(set.Client) && File.Exists(set.Certificate) && File.Exists(set.ResourceFramework) && File.Exists(set.InstallationGuide), "signed package set, public certificate and installation guide created");
+    Require((await File.ReadAllTextAsync(set.InstallationGuide)).Contains("Windows 10 Mobile"), "installation guide covers phones");
     using (var frameworkZip = System.IO.Compression.ZipFile.OpenRead(set.ResourceFramework!))
         Require(frameworkZip.GetEntry("AppxSignature.p7x") is not null, "resource framework in set is signed");
     try { await PackageOutput.CreateAsync(unsigned, null, identity, args[2], Path.Combine(output, "signed-set")); throw new Exception("existing output accepted"); }
