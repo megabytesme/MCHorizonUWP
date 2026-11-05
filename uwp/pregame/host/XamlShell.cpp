@@ -223,6 +223,20 @@ ContentDialog^ active_dialog;
 ContentDialog^ controller_test_dialog;
 ScrollViewer^ controller_test_scroll;
 DispatcherTimer^ controller_navigation_timer;
+bool controller_navigation_sounds = true;
+bool controller_is_last_input = false;
+
+// These are XAML control sounds, separate from Minecraft's in-game audio.
+void update_controller_sounds() {
+    ElementSoundPlayer::State = controller_navigation_sounds && controller_is_last_input
+        ? ElementSoundPlayerState::On : ElementSoundPlayerState::Off;
+}
+
+void set_controller_last_input(bool controller) {
+    if (controller_is_last_input == controller) return;
+    controller_is_last_input = controller;
+    update_controller_sounds();
+}
 #endif
 int dialog_result = -1;
 Platform::String^ profile = L"Profile";
@@ -1311,6 +1325,7 @@ void start_controller_navigation() {
             }
 #endif
             const unsigned keys = horizon_uwp_controller_navigation_read();
+            if (keys) set_controller_last_input(true);
             const unsigned pressed = keys & ~previous;
             const auto now = GetTickCount64();
             unsigned directions = pressed & 15;
@@ -1332,18 +1347,26 @@ void start_controller_navigation() {
             }
             test_cancel_at = 0;
             if (directions) {
+                bool moved = false;
                 if (!FocusManager::GetFocusedElement()) {
                     auto first = dynamic_cast<Control^>(FocusManager::FindFirstFocusableElement(nullptr));
-                    if (first) first->Focus(FocusState::Programmatic);
+                    if (first) moved = first->Focus(FocusState::Programmatic);
                 } else {
-                    if (directions & 1) FocusManager::TryMoveFocus(FocusNavigationDirection::Up);
-                    else if (directions & 2) FocusManager::TryMoveFocus(FocusNavigationDirection::Down);
-                    else if (directions & 4) FocusManager::TryMoveFocus(FocusNavigationDirection::Left);
-                    else if (directions & 8) FocusManager::TryMoveFocus(FocusNavigationDirection::Right);
+                    if (directions & 1) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Up);
+                    else if (directions & 2) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Down);
+                    else if (directions & 4) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Left);
+                    else if (directions & 8) moved = FocusManager::TryMoveFocus(FocusNavigationDirection::Right);
                 }
+                if (moved && controller_navigation_sounds) ElementSoundPlayer::Play(ElementSoundKind::Focus);
             }
-            if (pressed & 16) controller_activate_focused();
-            if (pressed & 32) controller_cancel_focused();
+            if (pressed & 16) {
+                if (controller_navigation_sounds) ElementSoundPlayer::Play(ElementSoundKind::Invoke);
+                controller_activate_focused();
+            }
+            if (pressed & 32) {
+                if (controller_navigation_sounds) ElementSoundPlayer::Play(ElementSoundKind::GoBack);
+                controller_cancel_focused();
+            }
         } catch (Platform::Exception^) { /* Keep the launcher usable if a control has no automation peer. */ }
     });
     controller_navigation_timer->Start();
@@ -2048,6 +2071,16 @@ void refresh() {
         controller_card->Children->Append(text(L"Controllers", 18));
         controller_card->Children->Append(text(L"Test connected controllers and their game mappings.", 14));
         controller_card->Children->Append(action_button(L"Test controller", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) { show_controller_test(); })));
+        auto controller_sounds = ref new ToggleSwitch();
+        controller_sounds->Header = L"Controller navigation sounds";
+        controller_sounds->IsOn = controller_navigation_sounds;
+        controller_sounds->Toggled += ref new RoutedEventHandler([controller_sounds](Platform::Object^, RoutedEventArgs^) {
+            controller_navigation_sounds = controller_sounds->IsOn;
+            ApplicationData::Current->LocalSettings->Values->Insert(
+                L"controller-navigation-sounds", PropertyValue::CreateBoolean(controller_navigation_sounds));
+            update_controller_sounds();
+        });
+        controller_card->Children->Append(controller_sounds);
         panel->Children->Append(card(controller_card));
 #endif
         auto benchmark_card = ref new StackPanel();
@@ -2437,6 +2470,21 @@ protected:
         ui_settings = ref new UISettings();
         accessibility = ref new AccessibilitySettings();
         auto values = ApplicationData::Current->LocalSettings->Values;
+#ifndef HORIZON_UWP_SHELL_PROBE
+        if (values->HasKey(L"controller-navigation-sounds")) {
+            try { controller_navigation_sounds = safe_cast<IPropertyValue^>(values->Lookup(L"controller-navigation-sounds"))->GetBoolean(); }
+            catch (Platform::Exception^) {}
+        }
+        update_controller_sounds();
+        page->AddHandler(UIElement::KeyDownEvent, ref new KeyEventHandler([](Platform::Object^, KeyRoutedEventArgs^ event) {
+            const auto key = static_cast<int>(event->Key);
+            set_controller_last_input(key >= static_cast<int>(Windows::System::VirtualKey::GamepadA)
+                && key <= static_cast<int>(Windows::System::VirtualKey::GamepadRightThumbstickLeft));
+        }), true);
+        page->AddHandler(UIElement::PointerPressedEvent, ref new PointerEventHandler([](Platform::Object^, PointerRoutedEventArgs^) {
+            set_controller_last_input(false);
+        }), true);
+#endif
         int saved_exit_behavior = 0;
         if (values->HasKey(L"game-quit-behavior")) {
             try { saved_exit_behavior = safe_cast<IPropertyValue^>(values->Lookup(L"game-quit-behavior"))->GetInt32(); }
