@@ -6,6 +6,10 @@ source-mod selections.
 The options page can browse and search Horizon's native-mod registry; adding
 those registry mods to a UWP build and determining their UWP compatibility are
 not yet available.
+The resources page can start a Microsoft device-code sign-in and check Java
+Edition ownership using Horizon's public application ID. Tokens are kept in
+memory for that check and are not written to Horizon's account store. This does
+not yet download or prepare resources, and real-account validation is pending.
 The latter has its own in-game setting, separate from controller vibration.
 The touch selection maps to the `native-touch-mod` Cargo feature and includes
 touch-look sensitivity and on-screen control-size sliders, plus optional

@@ -1,5 +1,12 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 1 && args[0] == "--auth-mock-only")
+{
+    await TestMinecraftSignIn();
+    Console.WriteLine("Mock Microsoft and Minecraft ownership checks passed.");
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--stage-native-mod")
 {
     if (Directory.Exists(args[2]) || File.Exists(args[2])) throw new IOException("Choose a new test workspace.");
@@ -351,6 +358,7 @@ catch (InvalidDataException) { }
 await TestSourceAssembler();
 await TestReleaseSource();
 await TestNativeBundleStager();
+await TestMinecraftSignIn();
 var nativeFixture = $$$"""
 {"schema":1,"projects":[
  {"id":"example","kind":"native-mod","name":"Example","summary":"A native mod","authors":["A"],"versions":[
@@ -623,6 +631,21 @@ Require(new SetupChecker(fake).Scan(TargetProfile.WindowsMobile).Single(c => c.N
 Console.WriteLine("Setup checker tests passed.");
 
 static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }
+static async Task TestMinecraftSignIn()
+{
+    using (var signIn = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: true, fallback: false)))
+    {
+        var challenge = await signIn.BeginAsync();
+        Require(challenge.UserCode == "ABCD-EFGH" && challenge.VerificationUri.Host == "www.microsoft.com", "device sign-in instructions returned");
+        Require(!challenge.ToString().Contains("device-secret", StringComparison.Ordinal), "device secret is not displayed");
+        Require(await signIn.CompleteOwnershipCheckAsync(challenge), "Microsoft, Xbox and Minecraft ownership verified");
+    }
+    using (var signIn = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: false, fallback: true)))
+    {
+        var challenge = await signIn.BeginAsync();
+        Require(!await signIn.CompleteOwnershipCheckAsync(challenge), "an account without Minecraft is not treated as an owner");
+    }
+}
 static async Task TestNativeBundleStager()
 {
     var root = Path.Combine(Path.GetTempPath(), "horizon-native-stager-test-" + Guid.NewGuid().ToString("N"));
@@ -735,6 +758,39 @@ sealed class FakeProbe : IProbe
 sealed class ConsoleProgress : IProgress<string>
 {
     public void Report(string value) => Console.WriteLine(value);
+}
+sealed class MinecraftAuthFixtureHandler(bool owns, bool fallback) : HttpMessageHandler
+{
+    private int polls;
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var uri = request.RequestUri!;
+        string json;
+        var status = System.Net.HttpStatusCode.OK;
+        if (uri.Host == "login.microsoftonline.com" && uri.AbsolutePath.EndsWith("/devicecode", StringComparison.Ordinal))
+            json = "{\"user_code\":\"ABCD-EFGH\",\"device_code\":\"device-secret\",\"verification_uri\":\"https://www.microsoft.com/link\",\"interval\":1,\"expires_in\":60}";
+        else if (uri.Host == "login.microsoftonline.com" && uri.AbsolutePath.EndsWith("/token", StringComparison.Ordinal))
+        {
+            polls++;
+            if (polls == 1) { status = System.Net.HttpStatusCode.BadRequest; json = "{\"error\":\"authorization_pending\"}"; }
+            else json = "{\"access_token\":\"microsoft-token\"}";
+        }
+        else if (uri.Host == "user.auth.xboxlive.com") json = "{\"Token\":\"xbox-token\"}";
+        else if (uri.Host == "xsts.auth.xboxlive.com") json = "{\"Token\":\"xsts-token\",\"DisplayClaims\":{\"xui\":[{\"uhs\":\"user-hash\"}]}}";
+        else if (uri.AbsolutePath == "/launcher/login")
+        {
+            if (fallback) { status = System.Net.HttpStatusCode.Forbidden; json = "{}"; }
+            else json = "{\"access_token\":\"minecraft-token\"}";
+        }
+        else if (uri.AbsolutePath == "/authentication/login_with_xbox") json = "{\"access_token\":\"minecraft-token\"}";
+        else if (uri.AbsolutePath == "/entitlements/mcstore")
+        {
+            if (request.Headers.Authorization?.Parameter != "minecraft-token") throw new Exception("Minecraft token not passed to ownership check");
+            json = owns ? "{\"items\":[{\"name\":\"game_minecraft\"}]}" : "{\"items\":[]}";
+        }
+        else { status = System.Net.HttpStatusCode.NotFound; json = "{}"; }
+        return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(json) });
+    }
 }
 sealed class ReleaseFixtureHandler(Dictionary<string, byte[]> inputs) : HttpMessageHandler
 {

@@ -11,6 +11,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Closed += (_, _) => minecraftSignInCancellation?.Cancel();
         Profile.SelectionChanged += Profile_SelectionChanged;
         Renderer.SelectionChanged += Renderer_SelectionChanged;
         ResourceMode.SelectionChanged += ResourceMode_SelectionChanged;
@@ -41,6 +42,7 @@ public sealed partial class MainWindow : Window
     private string? resourceDirectory;
     private string? minecraftDirectory;
     private IReadOnlyList<NativeModListing> nativeMods = [];
+    private CancellationTokenSource? minecraftSignInCancellation;
     private int wizardStep;
 
     private void Back_Click(object sender, RoutedEventArgs e)
@@ -110,6 +112,39 @@ public sealed partial class MainWindow : Window
         var chosen = await PickFolderAsync();
         if (chosen is not null) { sourceDirectory = chosen; SourcePath.Text = chosen; }
     }
+
+    private async void StartMinecraftSignIn_Click(object sender, RoutedEventArgs e)
+    {
+        StartMinecraftSignIn.IsEnabled = false;
+        CancelMinecraftSignIn.IsEnabled = true;
+        MinecraftSignInLink.Visibility = Visibility.Collapsed;
+        MinecraftSignInStatus.Text = "Starting Microsoft sign-in…";
+        using var signIn = new MinecraftSignIn();
+        using var cancellation = new CancellationTokenSource();
+        minecraftSignInCancellation = cancellation;
+        try
+        {
+            var challenge = await signIn.BeginAsync(cancellation.Token);
+            MinecraftSignInLink.NavigateUri = challenge.VerificationUri;
+            MinecraftSignInLink.Visibility = Visibility.Visible;
+            MinecraftSignInStatus.Text = $"Open the sign-in page and enter code {challenge.UserCode}.";
+            var owns = await signIn.CompleteOwnershipCheckAsync(challenge, cancellation.Token);
+            MinecraftSignInStatus.Text = owns
+                ? "Minecraft: Java Edition ownership confirmed. Automatic resource preparation is not available in this preview."
+                : "This account does not have Minecraft: Java Edition. Sign in with an account that owns it.";
+        }
+        catch (OperationCanceledException) { MinecraftSignInStatus.Text = "Sign-in cancelled."; }
+        catch (Exception error) { MinecraftSignInStatus.Text = $"Sign-in could not be completed: {error.Message}"; }
+        finally
+        {
+            minecraftSignInCancellation = null;
+            MinecraftSignInLink.Visibility = Visibility.Collapsed;
+            StartMinecraftSignIn.IsEnabled = true;
+            CancelMinecraftSignIn.IsEnabled = false;
+        }
+    }
+
+    private void CancelMinecraftSignIn_Click(object sender, RoutedEventArgs e) => minecraftSignInCancellation?.Cancel();
 
     private async void ChooseResources_Click(object sender, RoutedEventArgs e)
     {

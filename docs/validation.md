@@ -139,3 +139,13 @@ client-ID environment variable unset. It passed in 8 minutes 8 seconds, and
 the resulting static library contained the ID. A small standalone Rust test
 also covered the default, explicit override and empty override. No account
 was used and this was not a fresh-PC build.
+
+## 2026-11-05: builder ownership check
+
+The builder's Microsoft device-code and Minecraft ownership component passed
+mocked Microsoft, Xbox and Minecraft service tests in Windows Sandbox, including
+a pending sign-in, the alternate Minecraft login endpoint and an account
+without ownership. In a separate live Sandbox UI test, Microsoft returned a
+device code and the cancellation action worked. No real account or live
+ownership check has been used, and the component is not yet connected to
+resource downloads.
