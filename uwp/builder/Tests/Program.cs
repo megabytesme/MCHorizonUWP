@@ -79,6 +79,7 @@ Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.X86) == TargetProfile.DesktopX86, "x86 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm64) == TargetProfile.SurfaceProX, "ARM64 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm) == TargetProfile.WindowsMobile, "ARM32 default target");
+Require(Guid.TryParse(HorizonIdentity.ClientId, out _), "Horizon public client ID has the expected format");
 
 if (args.Length == 1 && args[0] == "--nightly-probe")
 {

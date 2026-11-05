@@ -106,14 +106,9 @@ remain user-controlled steps. A build requires
 at least 10 GiB free on the workspace drive. ARM32 uses the existing offline
 dependency override; account, skin and Minecraft session requests use WinRT HTTPS.
 The Microsoft application (client) ID is public and is compiled into the client.
-At the user’s request the UI defaults to the [Fluent Launcher public client ID](https://github.com/Xcube-Studio/Natsurainko.FluentLauncher/blob/main/Natsurainko.FluentLauncher/Services/Accounts/AuthenticationService.cs).
-The user confirmed Microsoft sign-in and game launch in the desktop test build;
-physical-device sign-in remains to be checked. The ID can be cleared for offline
-play or changed to a separately approved ID.
-Register a public client supporting personal Microsoft accounts and device-code flow;
-New IDs require [Minecraft Java App ID review](https://aka.ms/mce-reviewappid)
-for Minecraft services, as described in [Horizon’s account documentation](../../docs/microsoft-account.md). Without one, offline
-play remains available. The native pre-game page uses Credential Locker, shows a device
+The builder uses the same public client ID as the published Horizon launcher,
+as requested. This configuration has not yet been validated with a real account
+in the new builder. The native pre-game page uses Credential Locker, shows a device
 code to enter in a browser on another device, and asks before replacing or removing
 a saved account. The UWP client uses Windows service discovery for Minecraft SRV
 records, and its built-in native picker imports content mods and resource-pack ZIPs.

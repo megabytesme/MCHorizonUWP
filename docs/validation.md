@@ -87,3 +87,15 @@ unsupported-import checks passed. A packaging probe then created a synthetic
 resource framework and a dependent client with a non-prototype publisher; both
 package manifests and the framework dependency used that publisher. This is a
 component test and does not yet exercise the builder's signing pipeline.
+
+## 2026-11-05: Horizon launcher client ID
+
+The builder now supplies the public application ID used in the Horizon
+launcher release build, rather than asking the player for an ID. The ID was
+read from the public Windows launcher workflow log for `launcher@0.2.42`.
+The core tests and WinUI builder compiled with this configuration; no account
+was signed in during this check. On Ben-Desktop, `dotnet build` alone could not
+locate the Visual Studio Appx tasks; `powershell -NoProfile -File
+uwp/builder/build.ps1 -Configuration Release` selected the installed tasks and
+built successfully from this repository. This does not test dependency setup on
+a fresh PC.

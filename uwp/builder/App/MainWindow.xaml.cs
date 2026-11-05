@@ -93,7 +93,7 @@ public sealed partial class MainWindow : Window
     private BuildSelection CurrentSelection() => new((TargetProfile)Profile.SelectedIndex,
         NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true,
         ResourceMode.SelectedIndex == 0, NativeDeviceVibration.IsChecked == true,
-        MicrosoftClientId.Text, SelectedRenderer, ResourceMode.SelectedIndex == 1,
+        HorizonIdentity.ClientId, SelectedRenderer, ResourceMode.SelectedIndex == 1,
         ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "");
 
     private async Task<string?> PickFolderAsync()

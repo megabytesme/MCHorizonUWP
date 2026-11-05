@@ -69,8 +69,7 @@
               <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls (Direct3D 11 only)" IsChecked="True" />
               <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration" IsChecked="True" />
               <TextBlock Text="The preview includes these two source mods; browsing the mod catalog is not available yet." TextWrapping="Wrap" />
-              <TextBlock Text="Microsoft application (client) ID for account sign-in" TextWrapping="Wrap" />
-              <TextBox x:Name="MicrosoftClientId" PlaceholderText="00000000-0000-0000-0000-000000000000" />
+              <TextBlock Text="The client uses Horizon’s public Microsoft sign-in application." TextWrapping="Wrap" />
               <TextBlock Text="Package version" TextWrapping="Wrap" />
               <TextBox x:Name="PackageVersion" />
             </StackPanel>
