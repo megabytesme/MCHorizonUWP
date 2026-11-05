@@ -98,4 +98,11 @@ was signed in during this check. On Ben-Desktop, `dotnet build` alone could not
 locate the Visual Studio Appx tasks; `powershell -NoProfile -File
 uwp/builder/build.ps1 -Configuration Release` selected the installed tasks and
 built successfully from this repository. This does not test dependency setup on
-a fresh PC.
+a fresh PC. The same public ID was also found in the published Windows launcher
+executable. The builder and UWP client now read one shared ID file. On
+Ben-Desktop, the x64 UWP bridge was rebuilt from
+`%TEMP%\horizon-uwp-assembled-lf-20261105` with the Cargo command above and the
+client-ID environment variable unset. It passed in 8 minutes 8 seconds, and
+the resulting static library contained the ID. A small standalone Rust test
+also covered the default, explicit override and empty override. No account
+was used and this was not a fresh-PC build.

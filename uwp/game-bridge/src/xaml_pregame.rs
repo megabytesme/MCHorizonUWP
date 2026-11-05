@@ -264,9 +264,7 @@ pub fn start() -> Option<Selection> {
         return None;
     }
     let store: Arc<dyn SecretStore> = Arc::new(CredentialLocker);
-    let client_id = option_env!("HORIZON_MSA_CLIENT_ID")
-        .map(str::trim)
-        .filter(|id| !id.is_empty());
+    let client_id = crate::account_client_id::client_id(option_env!("HORIZON_MSA_CLIENT_ID"));
     let mut active = Selection {
         session: None,
         offline_name: None,
@@ -344,7 +342,7 @@ pub fn start() -> Option<Selection> {
                         }
                         None => {
                             notice(
-                                "Microsoft sign-in is not configured for this build. Configure a Microsoft application ID in the builder.",
+                                "Microsoft sign-in is not configured for this build.",
                             );
                             Outcome::Menu
                         }

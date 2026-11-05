@@ -4,5 +4,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-  <ItemGroup><EmbeddedResource Include="Assets/FrameworkLogo.png" /><InternalsVisibleTo Include="Horizon.Builder.Tests" /></ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/FrameworkLogo.png" />
+    <EmbeddedResource Include="../../shared/horizon-client-id.txt" LogicalName="Horizon.Builder.Core.HorizonClientId.txt" />
+    <InternalsVisibleTo Include="Horizon.Builder.Tests" />
+  </ItemGroup>
 </Project>

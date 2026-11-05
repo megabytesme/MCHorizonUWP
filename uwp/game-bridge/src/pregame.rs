@@ -197,9 +197,7 @@ pub fn start() -> Option<Option<AuthSession>> {
         return None;
     }
     let store: Arc<dyn SecretStore> = Arc::new(CredentialLocker);
-    let client_id = option_env!("HORIZON_MSA_CLIENT_ID")
-        .map(str::trim)
-        .filter(|id| !id.is_empty());
+    let client_id = crate::account_client_id::client_id(option_env!("HORIZON_MSA_CLIENT_ID"));
     loop {
         match prompt("Choose how to start Horizon.", MENU) {
             1 => return Some(None),
@@ -225,7 +223,7 @@ pub fn start() -> Option<Option<AuthSession>> {
                         }
                         None => {
                             notice(
-                                "Microsoft sign-in is not configured for this build. Configure a Microsoft application ID in the builder.",
+                                "Microsoft sign-in is not configured for this build.",
                             );
                             Outcome::Menu
                         }

@@ -1,5 +1,8 @@
 //! C ABI for embedding the actual Horizon game loop in a UWP host.
 
+#[cfg(any(test, all(target_vendor = "uwp", feature = "uwp-account")))]
+mod account_client_id;
+
 #[cfg(target_vendor = "uwp")]
 #[global_allocator]
 static ALLOCATOR: horizon_threads::Allocator = horizon_threads::ALLOCATOR;

@@ -8,11 +8,11 @@ no access or refresh token is shown, logged, sent to the builder, or put in an
 argument. The in-memory game session comes from the shared Horizon account
 protocol, and refresh credentials are held in the app's Credential Locker.
 
-The builder passes the public `HORIZON_MSA_CLIENT_ID` into the Rust build. It
-defaults to Fluent Launcher's publicly documented client ID at the user's request;
-a different approved ID can be supplied or the field cleared. Microsoft accepted
-a device-code request for the temporary ID, but a real Xbox/Minecraft sign-in
-and the UI on target hardware remain to be tested.
+The builder and UWP client use the same public Microsoft application ID as the
+Horizon launcher. Standalone client builds can override it through
+`HORIZON_MSA_CLIENT_ID`; an explicitly empty setting disables sign-in.
+Real Xbox/Minecraft sign-in with this ID and the UI on target hardware remain
+to be tested.
 
 The builder embeds the configured public Microsoft client ID, the exact Horizon
 nightly and upstream source commit, and the UWP port commit. The About page shows
