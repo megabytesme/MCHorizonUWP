@@ -297,6 +297,7 @@ catch (InvalidDataException) { }
 
 
 await TestSourceAssembler();
+await TestReleaseSource();
 
 var catalogJson = $$"""
 {
@@ -555,6 +556,51 @@ Require(new SetupChecker(fake).Scan(TargetProfile.WindowsMobile).Single(c => c.N
 Console.WriteLine("Setup checker tests passed.");
 
 static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }
+static async Task TestReleaseSource()
+{
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed for the release test.");
+    var root = Path.Combine(Path.GetTempPath(), "horizon-release-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var upstream = Path.Combine(root, "upstream.zip");
+        using (var zip = System.IO.Compression.ZipFile.Open(upstream, System.IO.Compression.ZipArchiveMode.Create))
+        using (var writer = new StreamWriter(zip.CreateEntry("upstream-commit/main.txt").Open(), new System.Text.UTF8Encoding(false))) writer.Write("hello\n");
+        var patch = System.Text.Encoding.UTF8.GetBytes("diff --git a/main.txt b/main.txt\n--- a/main.txt\n+++ b/main.txt\n@@ -1 +1 @@\n-hello\n+world\n");
+        var client = Path.Combine(root, "client.zip");
+        using (var zip = System.IO.Compression.ZipFile.Open(client, System.IO.Compression.ZipArchiveMode.Create))
+        using (var writer = new StreamWriter(zip.CreateEntry("uwp/host/file.txt").Open())) writer.Write("client");
+        var inputs = new Dictionary<string, byte[]> { ["/source"] = File.ReadAllBytes(upstream), ["/patch"] = patch, ["/client"] = File.ReadAllBytes(client) };
+        static string Hash(byte[] bytes) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+        var json = $$$"""
+        {"schema_version":1,"patches":[{"version":"1.0.0","upstream_commit":"{{{new string('a', 40)}}}","bridge":1,
+        "upstream":{"url":"https://example.test/source","sha256":"{{{Hash(inputs["/source"])}}}"},"artifact":{"url":"https://example.test/patch","sha256":"{{{Hash(patch)}}}"}}],
+        "clients":[{"version":"1.0.0","bridge":1,"artifact":{"url":"https://example.test/client","sha256":"{{{Hash(inputs["/client"])}}}"}}],
+        "rules":[{"patch":{"min_inclusive":"1.0.0","max_exclusive":"2.0.0"},"client":{"min_inclusive":"1.0.0","max_exclusive":"2.0.0"},
+        "builder":{"min_inclusive":"1.0.0","max_exclusive":"2.0.0"},"architectures":["x64"]}],"evidence":[]}
+        """;
+        using var key = System.Security.Cryptography.ECDsa.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
+        inputs["/catalog"] = System.Text.Encoding.UTF8.GetBytes(json);
+        inputs["/signature"] = key.SignData(inputs["/catalog"], System.Security.Cryptography.HashAlgorithmName.SHA256,
+            System.Security.Cryptography.DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        using var transport = new CatalogTransport(new ReleaseFixtureHandler(inputs));
+        var catalogUri = new Uri("https://example.test/catalog");
+        var signatureUri = new Uri("https://example.test/signature");
+        var publicKey = key.ExportSubjectPublicKeyInfo();
+        var destination = Path.Combine(root, "prepared");
+        var prepared = await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", destination, git);
+        Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
+        Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
+        var incompatible = Path.Combine(root, "incompatible");
+        try { await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "arm", incompatible, git); throw new Exception("incompatible release accepted"); }
+        catch (InvalidOperationException) { Require(!Directory.Exists(incompatible), "incompatible release makes no workspace"); }
+        inputs["/patch"] = System.Text.Encoding.UTF8.GetBytes("tampered");
+        var corrupted = Path.Combine(root, "corrupted");
+        try { await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", corrupted, git); throw new Exception("corrupt artifact accepted"); }
+        catch (InvalidDataException) { Require(!Directory.Exists(Path.Combine(corrupted, "source")), "corrupt artifact is never assembled"); }
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
 static async Task TestSourceAssembler()
 {
     var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed for the source assembly test.");
@@ -600,6 +646,13 @@ sealed class FakeProbe : IProbe
 sealed class ConsoleProgress : IProgress<string>
 {
     public void Report(string value) => Console.WriteLine(value);
+}
+sealed class ReleaseFixtureHandler(Dictionary<string, byte[]> inputs) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(inputs.TryGetValue(request.RequestUri!.AbsolutePath, out var bytes)
+            ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }
+            : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
 }
 sealed class CatalogFixtureHandler(byte[] catalog, byte[] signature, byte[] artifact) : HttpMessageHandler
 {
