@@ -38,6 +38,9 @@ if (args.Length == 4 && args[0] == "--signing-proof")
     }
     catch (InvalidOperationException) { Require(!File.Exists(signed), "mismatched identity did not create a package"); }
     await PackageSigning.SignAsync(unsigned, signed, certificate, identity, args[2]);
+    var secondPackage = Path.Combine(output, "second-signed.appx");
+    await PackageSigning.SignAsync(unsigned, secondPackage, null, identity, args[2]);
+    using (var second = System.IO.Compression.ZipFile.OpenRead(secondPackage)) Require(second.GetEntry("AppxSignature.p7x") is not null, "second package signed without a duplicate certificate export");
     using (var zip = System.IO.Compression.ZipFile.OpenRead(signed)) Require(zip.GetEntry("AppxSignature.p7x") is not null, "signed package contains signature");
     using (var publicCert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate))
         Require(publicCert.Thumbprint == identity.Thumbprint && !publicCert.HasPrivateKey, "export contains only the public certificate");

@@ -54,7 +54,7 @@ public static class PackageSigning
         finally { mutex.ReleaseMutex(); }
     }
 
-    public static async Task SignAsync(string unsignedPackage, string signedPackage, string publicCertificate,
+    public static async Task SignAsync(string unsignedPackage, string signedPackage, string? publicCertificate,
         PackageSigningIdentity identity, string signTool)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Package signing requires Windows.");
@@ -79,8 +79,9 @@ public static class PackageSigning
                 throw new InvalidDataException("The package publisher does not match the signing certificate.");
         }
         var target = Path.GetFullPath(signedPackage);
-        var certificatePath = Path.GetFullPath(publicCertificate);
-        if (target.Equals(certificatePath, StringComparison.OrdinalIgnoreCase) || File.Exists(target) || Directory.Exists(target) || File.Exists(certificatePath) || Directory.Exists(certificatePath))
+        var certificatePath = publicCertificate is null ? null : Path.GetFullPath(publicCertificate);
+        if (target.Equals(certificatePath, StringComparison.OrdinalIgnoreCase) || File.Exists(target) || Directory.Exists(target)
+            || certificatePath is not null && (File.Exists(certificatePath) || Directory.Exists(certificatePath)))
             throw new IOException("Choose new package and certificate output paths.");
         File.Copy(unsignedPackage, target, overwrite: false);
         var start = new ProcessStartInfo(Path.GetFullPath(signTool)) { UseShellExecute = false, CreateNoWindow = true,
@@ -95,7 +96,10 @@ public static class PackageSigning
         using (var signed = ZipFile.OpenRead(target))
             if (signed.GetEntry("AppxSignature.p7x") is null)
                 throw new InvalidDataException("SignTool did not add an APPX signature; the output was retained for diagnosis.");
-        await using var certFile = new FileStream(certificatePath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, useAsync: true);
-        await certFile.WriteAsync(matches[0].Export(X509ContentType.Cert));
+        if (certificatePath is not null)
+        {
+            await using var certFile = new FileStream(certificatePath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+            await certFile.WriteAsync(matches[0].Export(X509ContentType.Cert));
+        }
     }
 }

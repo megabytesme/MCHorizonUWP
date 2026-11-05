@@ -66,6 +66,8 @@ its public certificate. After the certificate was trusted inside that Sandbox,
 SignTool verified the package and Windows installed it. The private key stayed
 in the Sandbox user's certificate store. This component is not yet connected
 to the builder's real package pipeline or installation guide.
+The same Sandbox test subsequently signed a second synthetic package with the
+same identity without exporting a second public certificate.
 
 ## 2026-11-05: catalog signing component
 
