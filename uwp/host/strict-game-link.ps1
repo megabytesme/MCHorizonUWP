@@ -31,6 +31,9 @@ if ($env:HORIZON_UWP_DX12) {
         # desktop HWND queries and a static DXGI dependency are not needed.
         $forbidden += @('user32.dll', 'dxgi.dll')
     }
+    if ($env:GAME_MACHINE -eq 'ARM' -and ($imports -match '^\s*[0-9A-F]+\s+SetThreadErrorMode\s*$')) {
+        throw 'The ARM renderer introduced a static SetThreadErrorMode import unavailable to older UWP versions.'
+    }
     foreach ($dll in $forbidden) {
         if ($imports -match ('^\s*' + [regex]::Escape($dll) + '\s*$')) {
             throw "Optional renderer introduced a static $dll import."

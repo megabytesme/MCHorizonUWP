@@ -144,7 +144,30 @@ impl DynLib {
     where
         P: AsRef<std::ffi::OsStr>,
     {
-        unsafe { libloading::Library::new(filename) }.map(|inner| Self { inner })
+        #[cfg(all(target_vendor = "uwp", target_arch = "arm"))]
+        {
+            use std::os::windows::ffi::OsStrExt;
+            // libloading's normal loader imports SetThreadErrorMode, which is
+            // not guaranteed on UWP until 16299. Load with the same flags but
+            // without changing the thread error mode on older Mobile builds.
+            #[link(name = "kernel32.dll", kind = "raw-dylib", modifiers = "+verbatim")]
+            unsafe extern "system" {
+                fn LoadLibraryExW(filename: *const u16, file: isize, flags: u32) -> isize;
+            }
+            let name: Vec<u16> = filename.as_ref().encode_wide().chain(Some(0)).collect();
+            let handle = unsafe { LoadLibraryExW(name.as_ptr(), 0, 0) };
+            if handle == 0 {
+                return Err(libloading::Error::LoadLibraryExWUnknown);
+            }
+            let native = unsafe { libloading::os::windows::Library::from_raw(handle) };
+            Ok(Self {
+                inner: native.into(),
+            })
+        }
+        #[cfg(not(all(target_vendor = "uwp", target_arch = "arm")))]
+        {
+            unsafe { libloading::Library::new(filename) }.map(|inner| Self { inner })
+        }
     }
 
     unsafe fn get<T>(
