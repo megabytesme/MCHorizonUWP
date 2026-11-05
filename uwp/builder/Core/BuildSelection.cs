@@ -1,7 +1,7 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", bool ReuseResourceFramework = false, string ExistingResourceFramework = "")
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", bool ReuseResourceFramework = false, string ExistingResourceFramework = "", IReadOnlyList<string>? RegistryNativeMods = null)
 {
     public static TargetProfile DefaultTarget(System.Runtime.InteropServices.Architecture architecture) => architecture switch
     {

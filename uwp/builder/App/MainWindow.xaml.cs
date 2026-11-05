@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
     private string? resourceDirectory;
     private string? minecraftDirectory;
     private IReadOnlyList<NativeModListing> nativeMods = [];
+    private readonly HashSet<string> selectedNativeMods = new(StringComparer.Ordinal);
     private CancellationTokenSource? minecraftSignInCancellation;
     private CompatibilityCatalog? catalog;
     private bool buildActionRunning;
@@ -75,7 +76,8 @@ public sealed partial class MainWindow : Window
         NativeTouchMod.IsChecked == true, PackageVersion.Text, PrepareSounds.IsChecked == true,
         ResourceMode.SelectedIndex == 0, NativeDeviceVibration.IsChecked == true,
         HorizonIdentity.ClientId, ReuseResourceFramework: ResourceMode.SelectedIndex == 1,
-        ExistingResourceFramework: ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "");
+        ExistingResourceFramework: ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "",
+        RegistryNativeMods: selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal).ToArray());
 
     private string SelectedArchitecture => (TargetProfile)Profile.SelectedIndex switch
     {
@@ -215,6 +217,8 @@ public sealed partial class MainWindow : Window
             if (selection.ValidatedExistingResourceFramework is null && !selection.PrepareSounds && LocalRecipe.SoundWarning(resources!) is { } warning)
                 RecipeSteps.Children.Add(new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap });
             foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name == "Snapshot pinned source" ? "Download and verify the selected release source" : step.Name, TextWrapping = TextWrapping.Wrap });
+            if (selection.RegistryNativeMods is { Count: > 0 } mods)
+                RecipeSteps.Children.Add(new TextBlock { Text = $"Selected native mods: {string.Join(", ", mods)}. Their compatibility is checked while building.", TextWrapping = TextWrapping.Wrap });
             RecipeSteps.Children.Add(new TextBlock { Text = "The client and any new resource framework will be signed with your local certificate. The public certificate and installation guide are included.", TextWrapping = TextWrapping.Wrap });
         }
         catch (Exception error) { RecipeStatus.Text = $"Could not validate the recipe: {error.Message}"; }
@@ -309,15 +313,20 @@ public sealed partial class MainWindow : Window
         var matching = nativeMods.Where(mod => search.Length == 0 || mod.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
             || mod.Id.Contains(search, StringComparison.OrdinalIgnoreCase) || mod.Summary.Contains(search, StringComparison.OrdinalIgnoreCase)
             || mod.Authors.Any(author => author.Contains(search, StringComparison.OrdinalIgnoreCase))).ToArray();
-        NativeModsStatus.Text = $"{matching.Length} native mods list Minecraft {LocalRecipe.MinecraftVersion}. UWP compatibility is not yet verified; installing registry mods is not available in this preview.";
+        NativeModsStatus.Text = $"{matching.Length} native mods list Minecraft {LocalRecipe.MinecraftVersion}; {selectedNativeMods.Count} selected. Native mods run code with the player's permissions. UWP compatibility varies by mod.";
         foreach (var mod in matching)
         {
             var item = new StackPanel { Spacing = 3 };
-            item.Children.Add(new TextBlock { Text = $"{mod.Name} · {mod.Version}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            var choice = new CheckBox { Content = $"{mod.Name} · {mod.Version}", IsChecked = selectedNativeMods.Contains(mod.Id) };
+            choice.Checked += (_, _) => { selectedNativeMods.Add(mod.Id); UpdateNativeModCount(matching.Length); };
+            choice.Unchecked += (_, _) => { selectedNativeMods.Remove(mod.Id); UpdateNativeModCount(matching.Length); };
+            item.Children.Add(choice);
             item.Children.Add(new TextBlock { Text = mod.Summary, TextWrapping = TextWrapping.Wrap });
             NativeModsResults.Children.Add(item);
         }
     }
+    private void UpdateNativeModCount(int visible) => NativeModsStatus.Text =
+        $"{visible} native mods list Minecraft {LocalRecipe.MinecraftVersion}; {selectedNativeMods.Count} selected. Native mods run code with the player's permissions. UWP compatibility varies by mod.";
     private void CheckSetup_Click(object sender, RoutedEventArgs e)
     {
         Results.Children.Clear();

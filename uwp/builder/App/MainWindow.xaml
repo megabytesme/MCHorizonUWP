@@ -80,7 +80,7 @@
               <TextBlock Text="The included touch controls currently work with the native Direct3D 11 backend." TextWrapping="Wrap" />
               <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration" IsChecked="True" />
               <Button x:Name="BrowseNativeMods" Content="Browse Horizon native mods" Click="BrowseNativeMods_Click" />
-              <TextBlock x:Name="NativeModsStatus" Text="The preview can browse the registry; adding registry mods to a UWP build is not available yet." TextWrapping="Wrap" />
+              <TextBlock x:Name="NativeModsStatus" Text="Browse and select native mods from Horizon's registry. Native mods run code with the player's permissions; select only mods you trust." TextWrapping="Wrap" />
               <TextBox x:Name="NativeModSearch" PlaceholderText="Search native mods" IsEnabled="False" TextChanged="NativeModSearch_TextChanged" />
               <StackPanel x:Name="NativeModsResults" Spacing="12" />
               <TextBlock Text="The client uses Horizon’s public Microsoft sign-in application." TextWrapping="Wrap" />

@@ -1,5 +1,21 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 3 && args[0] == "--apply-native-mod")
+{
+    var workspace = Path.GetFullPath(args[2]);
+    if (Directory.Exists(workspace) || File.Exists(workspace)) throw new IOException("Choose a new test workspace.");
+    Directory.CreateDirectory(workspace);
+    var environment = Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
+        .ToDictionary(entry => (string)entry.Key, entry => (string)entry.Value!, StringComparer.OrdinalIgnoreCase);
+    var cargo = new SystemProbe().FindOnPath("cargo.exe") ?? throw new Exception("Cargo was not found.");
+    var staged = await NativeModBuild.ApplyAsync(Path.GetFullPath(args[1]), workspace, ["zoom"], cargo, environment,
+        new Progress<string>(Console.WriteLine));
+    Require(File.ReadAllText(Path.Combine(staged, "crates", "horizon-client", "src", "game.rs")).Contains("official_zoom"), "registry mod applied to the game");
+    Require(File.ReadAllText(Path.Combine(staged, "crates", "horizon-client", "src", "lib.rs")).Contains("#![recursion_limit = \"256\"]"), "crate recursion setting restored");
+    Console.WriteLine("Verified Horizon registry Zoom mod applied to the UWP source.");
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--verify-local-catalog")
 {
     var candidateCatalog = CatalogSignature.Verify(await File.ReadAllBytesAsync(args[1]), await File.ReadAllBytesAsync(args[2]), CatalogTrust.PublicKey());

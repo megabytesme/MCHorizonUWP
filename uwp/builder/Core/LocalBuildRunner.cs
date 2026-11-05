@@ -85,6 +85,13 @@ public static class LocalBuildRunner
         var cmd = Path.Combine(system, "cmd.exe");
         var powershell = Path.Combine(system, "WindowsPowerShell", "v1.0", "powershell.exe");
 
+        if (selection.RegistryNativeMods is { Count: > 0 } selectedMods)
+        {
+            if (release is null) throw new InvalidOperationException("Native registry mods require an authenticated source release.");
+            var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: true);
+            snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, progress);
+        }
+
         progress?.Report("Preparing a private copy of the Rust standard library.");
         await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", "stable"]);
 
@@ -264,7 +271,7 @@ public static class LocalBuildRunner
         return result;
     }
 
-    private static async Task<string> RunProcess(string executable, string directory, IReadOnlyList<string> args,
+    internal static async Task<string> RunProcess(string executable, string directory, IReadOnlyList<string> args,
         IReadOnlyDictionary<string, string>? environment = null, bool captureOutput = false)
     {
         var start = new ProcessStartInfo(executable) { WorkingDirectory = Path.GetFullPath(directory), UseShellExecute = false,
