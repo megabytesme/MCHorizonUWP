@@ -261,6 +261,17 @@ var catalogJson = $$"""
 }
 """;
 var catalog = CompatibilityCatalog.Parse(catalogJson);
+using (var signingKey = System.Security.Cryptography.ECDsa.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256))
+{
+    var payload = System.Text.Encoding.UTF8.GetBytes(catalogJson);
+    var signature = signingKey.SignData(payload, System.Security.Cryptography.HashAlgorithmName.SHA256,
+        System.Security.Cryptography.DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+    var publicKey = signingKey.ExportSubjectPublicKeyInfo();
+    Require(CatalogSignature.Verify(payload, signature, publicKey).Patches.Length == 2, "signed catalog accepted with trusted key");
+    payload[0] ^= 1;
+    try { _ = CatalogSignature.Verify(payload, signature, publicKey); throw new Exception("tampered catalog accepted"); }
+    catch (InvalidDataException) { }
+}
 var verified = catalog.Check("1.4.0", "2.2.0", "1.3.0", "x64");
 Require(verified.Allowed && verified.BuildVerified && !verified.DeviceVerified, "exact build evidence does not imply a device test");
 var unverified = catalog.Check("1.4.0", "2.2.0", "1.3.0", "arm");
