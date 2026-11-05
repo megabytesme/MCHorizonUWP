@@ -28,6 +28,39 @@ impl ControllerTest {
         })
     }
 
+    /// Navigation for raw controllers. Standard Windows Gamepads already send
+    /// native XAML navigation keys and must not be handled a second time.
+    pub fn navigation(&mut self) -> u32 {
+        while self.gilrs.next_event().is_some() {}
+        let mut keys = 0;
+        for (_, pad) in self.gilrs.gamepads() {
+            if pad.uuid() == [0; 16] {
+                continue;
+            }
+            let x = pad.value(gilrs::Axis::LeftStickX);
+            let y = pad.value(gilrs::Axis::LeftStickY);
+            if pad.is_pressed(gilrs::Button::DPadUp) || y > 0.6 {
+                keys |= 1;
+            }
+            if pad.is_pressed(gilrs::Button::DPadDown) || y < -0.6 {
+                keys |= 2;
+            }
+            if pad.is_pressed(gilrs::Button::DPadLeft) || x < -0.6 {
+                keys |= 4;
+            }
+            if pad.is_pressed(gilrs::Button::DPadRight) || x > 0.6 {
+                keys |= 8;
+            }
+            if pad.is_pressed(gilrs::Button::South) {
+                keys |= 16;
+            }
+            if pad.is_pressed(gilrs::Button::East) {
+                keys |= 32;
+            }
+        }
+        keys
+    }
+
     pub fn read(&mut self) -> String {
         while self.gilrs.next_event().is_some() {}
         let mut output = String::new();

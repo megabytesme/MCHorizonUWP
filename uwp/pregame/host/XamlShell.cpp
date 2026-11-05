@@ -27,6 +27,8 @@
 #include <windows.system.h>
 #include <windows.ui.xaml.h>
 #include <windows.ui.xaml.input.h>
+#include <windows.ui.xaml.automation.peers.h>
+#include <windows.ui.xaml.automation.provider.h>
 #include <windows.ui.xaml.controls.h>
 #include <windows.ui.xaml.controls.primitives.h>
 #include <windows.ui.xaml.documents.h>
@@ -71,6 +73,8 @@ using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
 using namespace Windows::UI::Xaml::Controls::Primitives;
 using namespace Windows::UI::Xaml::Input;
+using namespace Windows::UI::Xaml::Automation::Peers;
+using namespace Windows::UI::Xaml::Automation::Provider;
 using namespace Windows::UI::Xaml::Media;
 using namespace Windows::UI::Xaml::Media::Imaging;
 using namespace Windows::UI::Xaml::Documents;
@@ -88,6 +92,8 @@ extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsi
 #ifndef HORIZON_UWP_SHELL_PROBE
 extern "C" size_t __cdecl horizon_uwp_controller_test_read(unsigned char*, size_t);
 extern "C" void __cdecl horizon_uwp_controller_test_stop();
+extern "C" unsigned __cdecl horizon_uwp_controller_navigation_read();
+extern "C" void __cdecl horizon_uwp_controller_navigation_stop();
 #endif
 extern "C" size_t __cdecl horizon_uwp_release_label(unsigned char*, size_t);
 extern "C" size_t __cdecl horizon_uwp_upstream_release(unsigned char*, size_t);
@@ -208,6 +214,11 @@ muxc::NavigationViewItem^ home_navigation;
 Flyout^ profile_flyout;
 Button^ fallback_profile;
 ContentDialog^ active_dialog;
+#ifndef HORIZON_UWP_SHELL_PROBE
+ContentDialog^ controller_test_dialog;
+ScrollViewer^ controller_test_scroll;
+DispatcherTimer^ controller_navigation_timer;
+#endif
 int dialog_result = -1;
 Platform::String^ profile = L"Profile";
 ImageSource^ profile_skin;
@@ -1165,14 +1176,18 @@ void load_profile_skin(Platform::String^ value, unsigned generation) {
 #ifndef HORIZON_UWP_SHELL_PROBE
 void show_controller_test() {
     auto dialog = ref new ContentDialog();
+    controller_test_dialog = dialog;
     dialog->Title = L"Controller test";
     dialog->PrimaryButtonText = L"Close";
     auto body = ref new StackPanel();
-    body->Children->Append(text(L"Press buttons and move sticks to test their game mappings. South, East, West and North describe button positions.", 14));
+    body->Children->Append(text(L"Press buttons and move sticks to test their game mappings. South, East, West and North describe button positions. Hold East to close this test.", 14));
     auto readings = text(L"Looking for controllers...", 14);
     readings->IsTextSelectionEnabled = true;
     body->Children->Append(readings);
-    dialog->Content = body;
+    auto scroll = ref new ScrollViewer();
+    scroll->MaxHeight = 400; scroll->Content = body;
+    controller_test_scroll = scroll;
+    dialog->Content = scroll;
     auto timer = ref new DispatcherTimer();
     TimeSpan interval; interval.Duration = 1000000; timer->Interval = interval;
     timer->Tick += ref new EventHandler<Platform::Object^>([readings](Platform::Object^, Platform::Object^) {
@@ -1186,10 +1201,97 @@ void show_controller_test() {
         readings->Text = ref new Platform::String(value.c_str());
     });
     dialog->Closed += ref new TypedEventHandler<ContentDialog^, ContentDialogClosedEventArgs^>([timer](ContentDialog^, ContentDialogClosedEventArgs^) {
-        timer->Stop(); horizon_uwp_controller_test_stop();
+        timer->Stop(); horizon_uwp_controller_test_stop(); controller_test_dialog = nullptr; controller_test_scroll = nullptr;
     });
     timer->Start();
     dialog->ShowAsync();
+}
+#endif
+
+#ifndef HORIZON_UWP_SHELL_PROBE
+void controller_activate_focused() {
+    auto element = dynamic_cast<FrameworkElement^>(FocusManager::GetFocusedElement());
+    if (!element) return;
+    if (auto box = dynamic_cast<ComboBox^>(element)) {
+        box->IsDropDownOpen = !box->IsDropDownOpen; return;
+    }
+    if (auto input = dynamic_cast<TextBox^>(element)) {
+        input->Focus(FocusState::Programmatic);
+        Windows::UI::ViewManagement::InputPane::GetForCurrentView()->TryShow();
+        return;
+    }
+    auto peer = FrameworkElementAutomationPeer::CreatePeerForElement(element);
+    if (!peer) return;
+    if (auto toggle = dynamic_cast<IToggleProvider^>(peer->GetPattern(PatternInterface::Toggle))) { toggle->Toggle(); return; }
+    if (auto invoke = dynamic_cast<IInvokeProvider^>(peer->GetPattern(PatternInterface::Invoke))) { invoke->Invoke(); return; }
+    if (auto select = dynamic_cast<ISelectionItemProvider^>(peer->GetPattern(PatternInterface::SelectionItem))) select->Select();
+}
+
+void controller_cancel_focused() {
+    if (controller_test_dialog) { controller_test_dialog->Hide(); return; }
+    auto element = dynamic_cast<DependencyObject^>(FocusManager::GetFocusedElement());
+    while (element) {
+        if (auto dialog = dynamic_cast<ContentDialog^>(element)) { dialog->Hide(); return; }
+        if (auto box = dynamic_cast<ComboBox^>(element)) {
+            if (box->IsDropDownOpen) { box->IsDropDownOpen = false; return; }
+        }
+        element = VisualTreeHelper::GetParent(element);
+    }
+    if (active_dialog) { dialog_result = -1; active_dialog->Hide(); return; }
+    if (navigation && home_navigation) navigation->SelectedItem = home_navigation;
+}
+
+void start_controller_navigation() {
+    if (controller_navigation_timer) return;
+    controller_navigation_timer = ref new DispatcherTimer();
+    TimeSpan interval; interval.Duration = 500000; controller_navigation_timer->Interval = interval;
+    controller_navigation_timer->Tick += ref new EventHandler<Platform::Object^>([](Platform::Object^, Platform::Object^) {
+        static unsigned previous = 0;
+        static ULONGLONG next_repeat = 0;
+        static ULONGLONG test_cancel_at = 0;
+        try {
+#ifdef HORIZON_UWP_NATIVE_D3D11
+            if (launcher_content && launcher_content->Visibility != Visibility::Visible) {
+                previous = 0; horizon_uwp_controller_navigation_stop(); return;
+            }
+#endif
+            const unsigned keys = horizon_uwp_controller_navigation_read();
+            const unsigned pressed = keys & ~previous;
+            const auto now = GetTickCount64();
+            unsigned directions = pressed & 15;
+            if (!(keys & 15)) next_repeat = 0;
+            else if (directions) next_repeat = now + 350;
+            else if (next_repeat && now >= next_repeat) { directions = keys & 15; next_repeat = now + 150; }
+            previous = keys;
+            // Let the controller test observe buttons without activating controls.
+            if (controller_test_dialog) {
+                if (controller_test_scroll && (directions & 3)) {
+                    const double amount = (directions & 1) ? -50.0 : 50.0;
+                    const double offset = (std::max)(0.0, controller_test_scroll->VerticalOffset + amount);
+                    controller_test_scroll->ChangeView(nullptr, ref new Platform::Box<double>(offset), nullptr);
+                }
+                if (!(keys & 32)) test_cancel_at = 0;
+                else if (!test_cancel_at) test_cancel_at = now + 1500;
+                else if (now >= test_cancel_at) { test_cancel_at = 0; controller_cancel_focused(); }
+                return;
+            }
+            test_cancel_at = 0;
+            if (directions) {
+                if (!FocusManager::GetFocusedElement()) {
+                    auto first = dynamic_cast<Control^>(FocusManager::FindFirstFocusableElement(nullptr));
+                    if (first) first->Focus(FocusState::Programmatic);
+                } else {
+                    if (directions & 1) FocusManager::TryMoveFocus(FocusNavigationDirection::Up);
+                    else if (directions & 2) FocusManager::TryMoveFocus(FocusNavigationDirection::Down);
+                    else if (directions & 4) FocusManager::TryMoveFocus(FocusNavigationDirection::Left);
+                    else if (directions & 8) FocusManager::TryMoveFocus(FocusNavigationDirection::Right);
+                }
+            }
+            if (pressed & 16) controller_activate_focused();
+            if (pressed & 32) controller_cancel_focused();
+        } catch (Platform::Exception^) { /* Keep the launcher usable if a control has no automation peer. */ }
+    });
+    controller_navigation_timer->Start();
 }
 #endif
 
@@ -2537,6 +2639,9 @@ protected:
         window->Content = shell_root;
 #endif
         window->Activate();
+#ifndef HORIZON_UWP_SHELL_PROBE
+        start_controller_navigation();
+#endif
         update_live_tile();
         ui_settings->ColorValuesChanged += ref new TypedEventHandler<UISettings^, Platform::Object^>(
             [](UISettings^, Platform::Object^) {

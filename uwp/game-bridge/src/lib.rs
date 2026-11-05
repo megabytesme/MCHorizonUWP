@@ -46,6 +46,41 @@ pub extern "C" fn horizon_uwp_controller_test_stop() {
     CONTROLLER_TEST.with(|slot| *slot.borrow_mut() = None);
 }
 
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    feature = "uwp-controller"
+))]
+thread_local! {
+    static CONTROLLER_NAVIGATION: std::cell::RefCell<Option<horizon_client::uwp_controller::ControllerTest>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_controller_navigation_read() -> u32 {
+    #[cfg(feature = "uwp-controller")]
+    {
+        CONTROLLER_NAVIGATION.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            if slot.is_none() {
+                *slot = horizon_client::uwp_controller::ControllerTest::new().ok();
+            }
+            slot.as_mut().map_or(0, |test| test.navigation())
+        })
+    }
+    #[cfg(not(feature = "uwp-controller"))]
+    {
+        0
+    }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_controller_navigation_stop() {
+    #[cfg(feature = "uwp-controller")]
+    CONTROLLER_NAVIGATION.with(|slot| *slot.borrow_mut() = None);
+}
+
 // The XAML shell and DirectX game view have different UI threads. A successful
 // account session crosses that boundary only through this in-process slot;
 // it is consumed once and is never serialized to the command line or disk.
