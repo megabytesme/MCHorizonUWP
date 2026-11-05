@@ -7,6 +7,21 @@ public enum InstallableTool { Rustup, Git, Python }
 /// <summary>Fixed package-manager operations initiated by the user.</summary>
 public static class WindowsPackageManager
 {
+    public static async Task EnsureBuildBasicsAsync(IProbe probe, Func<InstallableTool, Task> install,
+        Action refreshPath, IProgress<string>? progress = null)
+    {
+        refreshPath();
+        foreach (var (tool, executable) in new[] { (InstallableTool.Git, "git.exe"), (InstallableTool.Python, "python.exe") })
+        {
+            if (probe.FindOnPath(executable) is not null) continue;
+            progress?.Report($"Installing {tool} with Windows Package Manager…");
+            await install(tool);
+            refreshPath();
+            if (probe.FindOnPath(executable) is null)
+                throw new InvalidOperationException($"{tool} was installed but could not be found. Restart the builder and try again.");
+        }
+    }
+
     public static IReadOnlyList<string> Arguments(InstallableTool tool)
     {
         var package = tool switch

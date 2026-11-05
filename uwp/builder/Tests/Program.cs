@@ -652,6 +652,23 @@ Require(WindowsPackageManager.Arguments(InstallableTool.Git)[2] == "Git.Git", "f
 Require(WindowsPackageManager.Arguments(InstallableTool.Python)[2] == "Python.Python.3.13", "fixed Python package");
 Require(WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--silent") && WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--disable-interactivity"), "Git setup is noninteractive");
 Require(WindowsPackageManager.Arguments(InstallableTool.Python).Contains("--silent") && WindowsPackageManager.Arguments(InstallableTool.Python).Contains("--disable-interactivity"), "Python setup is noninteractive");
+var autoProbe = new FakeProbe();
+var autoInstalled = new List<InstallableTool>();
+Task InstallFake(InstallableTool tool)
+{
+    autoInstalled.Add(tool);
+    autoProbe.Executables.Add(tool == InstallableTool.Git ? "git.exe" : "python.exe");
+    return Task.CompletedTask;
+}
+await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { });
+await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { });
+Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python]), "missing Git and Python installed once and then reused");
+try
+{
+    await WindowsPackageManager.EnsureBuildBasicsAsync(new FakeProbe(), _ => Task.CompletedTask, () => { });
+    throw new Exception("missing installed tool was accepted");
+}
+catch (InvalidOperationException) { }
 try { _ = WindowsPackageManager.Arguments((InstallableTool)99); throw new Exception("invalid package accepted"); }
 catch (ArgumentOutOfRangeException) { }
 try { await WindowsPackageManager.InstallAsync(new FakeProbe(), InstallableTool.Rustup); throw new Exception("missing WinGet accepted"); }

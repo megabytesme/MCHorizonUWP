@@ -89,7 +89,7 @@
             </StackPanel>
             <StackPanel x:Name="SetupPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Check your setup" Style="{StaticResource TitleTextBlockStyle}" />
-              <TextBlock Text="The preview can check for required tools. Installing Git or Python accepts their package and source agreements; Windows may request administrator approval. Rustup is still interactive." TextWrapping="Wrap" />
+              <TextBlock Text="The builder installs missing Git and Python when you start a build. This accepts their package and source agreements; Windows may request administrator approval. Rustup is still interactive, and other development tools are not yet installed automatically." TextWrapping="Wrap" />
               <Button Content="Check setup" Click="CheckSetup_Click" />
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button x:Name="InstallRustup" Content="Install Rustup" Click="InstallTool_Click" />

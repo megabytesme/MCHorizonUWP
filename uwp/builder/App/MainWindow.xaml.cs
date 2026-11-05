@@ -239,6 +239,8 @@ public sealed partial class MainWindow : Window
             LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var progress = new Progress<string>(message => RecipeStatus.Text = message);
             var probe = new SystemProbe();
+            await WindowsPackageManager.EnsureBuildBasicsAsync(probe, tool => WindowsPackageManager.InstallAsync(probe, tool),
+                SystemProbe.RefreshProcessPath, progress);
             var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: true);
             if (blockers.Count > 0) throw new InvalidOperationException(string.Join(" ", blockers));
             var git = probe.FindOnPath("git.exe") ?? throw new InvalidOperationException("Git is required to assemble the release.");
