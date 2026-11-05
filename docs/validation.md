@@ -187,5 +187,21 @@ bridge and XAML shell in `%TEMP%\horizon-arm-serviced-sdk-probe-20261105`
 using `cmd /d /c probe.cmd`. The shader compiler also produced the two feature
 level 9_1 shaders. `llvm-readobj --file-headers App.obj XamlShell.obj` reported
 ARMNT objects. The installed SDK on this machine was an older 17763 build;
-the serviced installer was not installed in this test. No full ARM32 link,
-APPX, unsupported-import check or Lumia run was performed with this toolchain.
+the serviced installer was not installed in this test. A subsequent ARM32 Rust
+bridge build completed in 6 minutes 18 seconds using the split candidate under
+`%TEMP%\horizon-arm-sdk-build-20261105\source`, after selecting the 2022
+`x64_arm store 10.0.17763.0` environment and the patched Rust source. The
+command was:
+
+```text
+cargo +stable --config .local/arm32-windows-sys/patches-offline-arm32.toml build --offline --manifest-path uwp/game-bridge/Cargo.toml --features native-d3d11,uwp-dx12-renderer,native-touch-mod,native-device-vibration-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell -Z build-std=std,panic_abort --target thumbv7a-uwp-windows-msvc --release --target-dir .local/builder-target
+```
+
+With temporary host and shell
+scripts selecting that toolchain, `uwp\host\build-game.cmd arm` passed strict
+link and unsupported-import checks. The ARM APPX was packaged against the x64
+proof's neutral resource framework, signed and signature-verified in Sandbox;
+its manifest declares ARM and the matching resource publisher. The Lumia was
+not used. A separate x64 host link also passed with SDK 17763. The split-source
+scripts now select this newer ARM toolchain; automatic provisioning and a
+fresh-PC build are not yet validated.

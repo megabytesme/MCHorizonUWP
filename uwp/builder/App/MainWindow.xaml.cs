@@ -234,7 +234,7 @@ public sealed partial class MainWindow : Window
             LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var probe = new SystemProbe();
             if (release is null) await LocalRecipe.ValidateSourceAsync(source!, probe);
-            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
+            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: release is not null);
             RecipeStatus.Text = blockers.Count == 0
                 ? release is null ? "Pinned source revision and required tool locations were found. The local build will be unsigned."
                     : "The catalog combination and required tool locations were found. Draft release assets must be published before download."
@@ -270,7 +270,7 @@ public sealed partial class MainWindow : Window
             if (release is null) result = await LocalBuildRunner.RunAsync(source!, resources, selection, probe, progress, minecraft);
             else
             {
-                var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
+                var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: true);
                 if (blockers.Count > 0) throw new InvalidOperationException(string.Join(" ", blockers));
                 var git = probe.FindOnPath("git.exe") ?? throw new InvalidOperationException("Git is required to assemble the release.");
                 var baseDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
@@ -366,7 +366,7 @@ public sealed partial class MainWindow : Window
             Text = $"Requested target: {selection.RustTarget} | Features: {string.Join(", ", selection.Features)}",
             TextWrapping = TextWrapping.Wrap
         });
-        foreach (var check in new SetupChecker(new SystemProbe()).Scan(selection.Target))
+        foreach (var check in new SetupChecker(new SystemProbe()).Scan(selection.Target, splitRelease: ReleaseSelection.SelectedItem is ReleaseChoice))
         {
             var panel = new StackPanel { Spacing = 4 };
             panel.Children.Add(new TextBlock { Text = $"{check.Name} — {check.Status}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });

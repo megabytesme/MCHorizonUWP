@@ -15,8 +15,8 @@ if /i "%ARCH%"=="arm64" (
 )
 if /i "%ARCH%"=="arm" (
     set "VCARCH=x64_arm"
-    set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community"
-    set "SDK=10.0.16299.0"
+    set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
+    set "SDK=10.0.17763.0"
     set "WINUI_VERSION=2.7.3"
 )
 if defined HORIZON_UWP_WINUI_VERSION set "WINUI_VERSION=%HORIZON_UWP_WINUI_VERSION%"
@@ -37,7 +37,7 @@ if /i "%HORIZON_UWP_DEFAULT_RENDERER%"=="angle" set "PROBE_DEFINE=%PROBE_DEFINE%
 if /i "%HORIZON_UWP_DEFAULT_RENDERER%"=="dx12" set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_DEFAULT_RENDERER_DX12"
 if defined HORIZON_UWP_TOUCH_MOD set "PROBE_DEFINE=%PROBE_DEFINE% /DHORIZON_UWP_TOUCH_MOD"
 rem The caller may already be in a different Visual Studio environment. Reset
-rem only this child process so the ARM32 compiler and 16299 SDK can be selected.
+rem only this child process so the ARM32 compiler and 17763 SDK can be selected.
 set "VSCMD_VER="
 set "VSCMD_ARG_TGT_ARCH="
 set "VSCMD_ARG_HOST_ARCH="

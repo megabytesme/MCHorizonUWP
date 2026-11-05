@@ -632,7 +632,8 @@ var missing = new SetupChecker(new FakeProbe()).Scan(TargetProfile.WindowsMobile
 Require(missing.Single(c => c.Name == "Git").Status == CheckStatus.Missing, "missing Git");
 Require(missing.Single(c => c.Name == "Git").Instructions?.Host == "git-scm.com", "official Git instructions");
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Instructions?.Host == "learn.microsoft.com", "official SDK instructions");
-Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("15063"), "mobile SDK required");
+Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("15063"), "legacy mobile SDK required");
+Require(new SetupChecker(new FakeProbe()).Scan(TargetProfile.WindowsMobile, splitRelease: true).Single(c => c.Name == "Windows SDK and packaging tools").Detail.Contains("17763"), "split-release mobile SDK required");
 Require(missing.Any(c => c.Status == CheckStatus.Review && c.Name == "Rust UWP standard library"), "unverified UWP std");
 Require(missing.Single(c => c.Name == "Build recipe and signing").Detail.Contains("pinned local build recipe"), "available mobile recipe reported");
 Require(new SetupChecker(new FakeProbe()).Scan(TargetProfile.SurfaceProX).Single(c => c.Name == "Build recipe and signing").Detail.Contains("ARM64 build recipe is available"), "available ARM64 recipe reported");
@@ -642,15 +643,30 @@ var modernKits = Path.Combine(modernOnly.Root, "Windows Kits", "10");
 var modernSdk = Path.Combine(modernKits, "bin", "10.0.26100.0");
 modernOnly.AddDirectory(Path.Combine(modernKits, "bin"), modernSdk);
 modernOnly.Files.UnionWith([Path.Combine(modernSdk, "x64", "makeappx.exe"), Path.Combine(modernSdk, "x64", "signtool.exe"), Path.Combine(modernKits, "Include", "10.0.26100.0", "um", "Windows.h")]);
-Require(new SetupChecker(modernOnly).Scan(TargetProfile.WindowsMobile).Single(c => c.Name == "Windows SDK and packaging tools").Status == CheckStatus.Missing, "modern SDK cannot substitute for 15063");
-Require(new SetupChecker(modernOnly).Scan(TargetProfile.DesktopX64).Single(c => c.Name == "Windows SDK and packaging tools").Status == CheckStatus.Found, "modern SDK detected for desktop");
+Require(new SetupChecker(modernOnly).Scan(TargetProfile.WindowsMobile).Single(c => c.Name == "Windows SDK and packaging tools").Status == CheckStatus.Missing, "modern SDK cannot substitute for the legacy SDK");
+Require(new SetupChecker(modernOnly).Scan(TargetProfile.DesktopX64, splitRelease: true).Single(c => c.Name == "Windows SDK and packaging tools").Status == CheckStatus.Missing, "packaging SDK alone does not satisfy the host SDK");
+var splitProbe = new FakeProbe();
+var splitKits = Path.Combine(splitProbe.Root, "Windows Kits", "10");
+var splitSdk = Path.Combine(splitKits, "bin", "10.0.17763.0");
+splitProbe.AddDirectory(Path.Combine(splitKits, "bin"), splitSdk);
+splitProbe.Files.UnionWith([Path.Combine(splitSdk, "x64", "makeappx.exe"), Path.Combine(splitSdk, "x64", "signtool.exe"),
+    Path.Combine(splitSdk, "x64", "fxc.exe"), Path.Combine(splitKits, "Include", "10.0.17763.0", "um", "Windows.h"),
+    Path.Combine(splitKits, "bin", "10.0.26100.0", "x64", "makeappx.exe"), Path.Combine(splitKits, "bin", "10.0.26100.0", "x64", "signtool.exe"),
+    Path.Combine(splitProbe.Root, "Microsoft Visual Studio", "2022", "BuildTools", "VC", "Auxiliary", "Build", "vcvarsall.bat"),
+    Path.Combine(splitProbe.Root, "LLVM", "bin", "clang.exe")]);
+splitProbe.Executables.UnionWith(["git.exe", "rustup.exe", "cargo.exe", "python.exe"]);
+Require(new SetupChecker(splitProbe).Scan(TargetProfile.WindowsMobile, splitRelease: true).Single(c => c.Name == "Windows SDK and packaging tools").Status == CheckStatus.Found, "split ARM SDK detected");
+Require(LocalRecipe.ToolchainBlockers(selection, splitProbe, new RustToolchainFacts("rustc 1.99.1 (test)", true), splitRelease: true).Count == 0, "split ARM recipe accepts the newer toolchain");
+Require(LocalRecipe.ToolchainBlockers(selection, splitProbe, new RustToolchainFacts("rustc 1.99.1 (test)", true)).Count > 0, "legacy source still requires its original toolchain");
 
 var fake = new FakeProbe();
 fake.Executables.Add("git.exe");
 var kits = Path.Combine(fake.Root, "Windows Kits", "10");
 var sdk = Path.Combine(kits, "bin", "10.0.15063.0");
 fake.AddDirectory(Path.Combine(kits, "bin"), sdk);
-fake.Files.UnionWith([Path.Combine(sdk, "x64", "makeappx.exe"), Path.Combine(sdk, "x64", "signtool.exe"), Path.Combine(kits, "Include", "10.0.15063.0", "um", "Windows.h")]);
+var packageSdk = Path.Combine(kits, "bin", "10.0.26100.0", "x64");
+fake.Files.UnionWith([Path.Combine(sdk, "x64", "fxc.exe"), Path.Combine(packageSdk, "makeappx.exe"), Path.Combine(packageSdk, "signtool.exe"),
+    Path.Combine(kits, "Include", "10.0.15063.0", "um", "Windows.h"), Path.Combine(kits, "Include", "10.0.16299.0", "um", "Windows.h")]);
 var vs = Path.Combine(fake.Root, "Microsoft Visual Studio");
 var year = Path.Combine(vs, "2022"); var edition = Path.Combine(year, "BuildTools"); var versions = Path.Combine(edition, "VC", "Tools", "MSVC"); var toolset = Path.Combine(versions, "14.44");
 fake.AddDirectory(vs, year); fake.AddDirectory(year, edition); fake.AddDirectory(versions, toolset);
@@ -661,7 +677,7 @@ Require(mobile.Single(c => c.Name == "Windows SDK and packaging tools").Status =
 Require(mobile.Single(c => c.Name == "Visual C++ UWP tools").Status == CheckStatus.Found, "ARM tools found");
 var desktop = new SetupChecker(fake).Scan(TargetProfile.DesktopX64);
 Require(desktop.Single(c => c.Name == "Visual C++ UWP tools").Status == CheckStatus.Missing, "ARM tools do not satisfy x64");
-fake.Files.Remove(Path.Combine(sdk, "x64", "signtool.exe"));
+fake.Files.Remove(Path.Combine(packageSdk, "signtool.exe"));
 Require(new SetupChecker(fake).Scan(TargetProfile.WindowsMobile).Single(c => c.Name == "Windows SDK and packaging tools").Status == CheckStatus.Missing, "incomplete SDK rejected");
 Console.WriteLine("Setup checker tests passed.");
 

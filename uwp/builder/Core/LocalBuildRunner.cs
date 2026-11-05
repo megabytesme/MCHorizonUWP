@@ -70,7 +70,7 @@ public static class LocalBuildRunner
             else if (selection.ValidatedRenderer == "angle")
                 throw new FileNotFoundException($"ANGLE was selected, but its UWP runtime DLLs are missing. Install/build ANGLE for the {triplet} vcpkg triplet, then retry.", candidate);
         }
-        var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe));
+        var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe), splitRelease: release is not null);
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
         var profileRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             ?? throw new InvalidOperationException("Could not determine the builder workspace drive.");
@@ -98,7 +98,7 @@ public static class LocalBuildRunner
         }
 
         progress?.Report("Preparing the Visual C++ environment.");
-        var vcEnvironment = await VisualCppEnvironment(cmd, selection.Target, probe);
+        var vcEnvironment = await VisualCppEnvironment(cmd, selection.Target, probe, splitRelease: release is not null);
         // Never inherit an unrelated client ID from the parent environment.
         vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
         vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
@@ -238,17 +238,17 @@ public static class LocalBuildRunner
         return root;
     }
 
-    private static async Task<Dictionary<string, string>> VisualCppEnvironment(string cmd, TargetProfile profile, IProbe probe)
+    private static async Task<Dictionary<string, string>> VisualCppEnvironment(string cmd, TargetProfile profile, IProbe probe, bool splitRelease)
     {
         var arm = profile == TargetProfile.WindowsMobile;
         var arm64 = profile == TargetProfile.SurfaceProX;
         var x86 = profile == TargetProfile.DesktopX86;
         var root = arm ? probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)" : probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files";
         var vcvars = arm
-            ? Path.Combine(root, "Microsoft Visual Studio", "2017", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
+            ? Path.Combine(root, "Microsoft Visual Studio", splitRelease ? "2022" : "2017", splitRelease ? "BuildTools" : "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
             : Path.Combine(root, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");
         IReadOnlyList<string> args = arm
-            ? ["/d", "/c", "call", vcvars, "x64_arm", "store", "10.0.15063.0", "&&", "set"]
+            ? ["/d", "/c", "call", vcvars, "x64_arm", "store", splitRelease ? "10.0.17763.0" : "10.0.15063.0", "&&", "set"]
             : arm64
                 ? ["/d", "/c", "call", vcvars, "x64_arm64", "store", "10.0.26100.0", "&&", "set"]
                 : x86
@@ -314,7 +314,7 @@ public static class LocalBuildRunner
         await Task.Run(() => StageResources(resources, destination));
         var cargo = probe.FindOnPath("cargo.exe") ?? throw new InvalidOperationException("Cargo is required to prepare sounds.");
         var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
-        var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe);
+        var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: false);
         hostEnvironment["CARGO_BUILD_JOBS"] = Environment.ProcessorCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var plan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
         progress?.Report("Building Horizon's resource preparation tool.");

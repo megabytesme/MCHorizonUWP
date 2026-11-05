@@ -171,7 +171,7 @@ public static class LocalRecipe
             throw new InvalidDataException("Selected resources already contain some sound data. Use complete resources without sound preparation, or choose a sound-free copy.");
     }
 
-    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust)
+    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust, bool splitRelease = false)
     {
         var blockers = new List<string>();
         foreach (var tool in new[] { "git.exe", "rustup.exe", "cargo.exe", "python.exe" })
@@ -190,7 +190,7 @@ public static class LocalRecipe
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
         };
         var vc = arch == "arm"
-            ? Path.Combine(pfx86, "Microsoft Visual Studio", "2017", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
+            ? Path.Combine(pfx86, "Microsoft Visual Studio", splitRelease ? "2022" : "2017", splitRelease ? "BuildTools" : "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
             : Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat");
         if (!probe.FileExists(vc)) blockers.Add($"The checked-in {arch} host script's Visual Studio installation was not found.");
         if (arch == "arm" && selection.PrepareSounds && !probe.FileExists(Path.Combine(pf, "Microsoft Visual Studio", "18", "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")))
@@ -198,8 +198,14 @@ public static class LocalRecipe
         if ((arch is "arm" or "arm64") && !probe.FileExists(Path.Combine(pf, "LLVM", "bin", "clang.exe")))
             blockers.Add($"The {arch.ToUpperInvariant()} recipe requires clang.exe in the standard LLVM installation.");
         var sdk = Path.Combine(pfx86, "Windows Kits", "10", "bin");
-        if (!probe.FileExists(Path.Combine(sdk, "10.0.15063.0", "x64", "fxc.exe")))
-            blockers.Add("The host script requires Windows SDK 10.0.15063.0 fxc.exe.");
+        var hostSdk = arch == "arm64" ? "10.0.26100.0" : splitRelease ? "10.0.17763.0" : "10.0.15063.0";
+        if (!probe.FileExists(Path.Combine(sdk, hostSdk, "x64", "fxc.exe")))
+            blockers.Add($"The host script requires Windows SDK {hostSdk} fxc.exe.");
+        var kitRoot = Path.Combine(pfx86, "Windows Kits", "10");
+        if (!probe.FileExists(Path.Combine(kitRoot, "Include", hostSdk, "um", "Windows.h")))
+            blockers.Add($"The host script requires Windows SDK {hostSdk} headers.");
+        if (arch == "arm" && !splitRelease && !probe.FileExists(Path.Combine(kitRoot, "Include", "10.0.16299.0", "um", "Windows.h")))
+            blockers.Add("The legacy mobile shell requires Windows SDK 10.0.16299.0 headers.");
         if (!probe.FileExists(Path.Combine(sdk, "10.0.26100.0", "x64", "makeappx.exe")))
             blockers.Add("The package script requires Windows SDK 10.0.26100.0 MakeAppx.exe.");
         return blockers.AsReadOnly();

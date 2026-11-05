@@ -15,7 +15,7 @@ public interface IProbe
 
 public sealed class SetupChecker(IProbe probe)
 {
-    public IReadOnlyList<SetupCheck> Scan(TargetProfile profile)
+    public IReadOnlyList<SetupCheck> Scan(TargetProfile profile, bool splitRelease = false)
     {
         var checks = new List<SetupCheck>();
         CheckPath(checks, "Git", "git.exe", "Install Git for Windows from its official publisher.", "https://git-scm.com/install/windows");
@@ -24,19 +24,20 @@ public sealed class SetupChecker(IProbe probe)
         CheckPath(checks, "Python", "python.exe", "Install Python from its official publisher.", "https://www.python.org/downloads/windows/");
 
         var kitsRoot = Path.Combine(probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)", "Windows Kits", "10");
-        var sdkVersion = profile == TargetProfile.WindowsMobile ? "10.0.15063.0" : null;
-        var sdkBins = probe.Directories(Path.Combine(kitsRoot, "bin"))
-            .Where(path => Version.TryParse(Path.GetFileName(path), out _))
-            .Where(path => sdkVersion is null || Path.GetFileName(path) == sdkVersion)
-            .OrderByDescending(path => Version.Parse(Path.GetFileName(path)));
-        var sdk = sdkBins.FirstOrDefault(path => probe.FileExists(Path.Combine(path, "x64", "makeappx.exe"))
-            && probe.FileExists(Path.Combine(path, "x64", "signtool.exe"))
-            && probe.FileExists(Path.Combine(kitsRoot, "Include", Path.GetFileName(path), "um", "Windows.h")));
-        checks.Add(sdk is null
+        var hostSdk = profile == TargetProfile.SurfaceProX ? "10.0.26100.0" : splitRelease ? "10.0.17763.0" : "10.0.15063.0";
+        var hostBin = Path.Combine(kitsRoot, "bin", hostSdk, "x64");
+        var packageBin = Path.Combine(kitsRoot, "bin", "10.0.26100.0", "x64");
+        var hasSdk = probe.FileExists(Path.Combine(hostBin, "fxc.exe"))
+            && probe.FileExists(Path.Combine(kitsRoot, "Include", hostSdk, "um", "Windows.h"))
+            && probe.FileExists(Path.Combine(packageBin, "makeappx.exe")) && probe.FileExists(Path.Combine(packageBin, "signtool.exe"))
+            && (profile != TargetProfile.WindowsMobile || splitRelease
+                || probe.FileExists(Path.Combine(kitsRoot, "Include", "10.0.16299.0", "um", "Windows.h")));
+        checks.Add(!hasSdk
             ? new("Windows SDK and packaging tools", CheckStatus.Missing,
-                sdkVersion is null ? "No SDK with headers, MakeAppx and SignTool was found in Windows Kits/10. Install a compatible Windows SDK." : $"Windows SDK {sdkVersion} with headers, MakeAppx and SignTool was not found. Its availability and licensing still require verification.",
+                $"The recipe needs SDK {hostSdk} headers and shader compiler, plus SDK 10.0.26100.0 packaging tools." +
+                (profile == TargetProfile.WindowsMobile && !splitRelease ? " The legacy mobile shell also needs SDK 10.0.16299.0." : ""),
                 new Uri("https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads"))
-            : new("Windows SDK and packaging tools", CheckStatus.Found, $"Found headers and packaging tools for {Path.GetFileName(sdk)}. Compatibility with the selected recipe is not yet verified."));
+            : new("Windows SDK and packaging tools", CheckStatus.Found, $"Found SDK {hostSdk} headers and shader compiler and SDK 10.0.26100.0 packaging tools. Target compatibility still needs validation."));
 
         var vsRoots = new[] { probe.EnvironmentValue("ProgramFiles(x86)"), probe.EnvironmentValue("ProgramFiles") }
             .Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase)

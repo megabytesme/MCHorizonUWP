@@ -4,7 +4,7 @@ set "ARCH=%~1"
 if "%ARCH%"=="" set "ARCH=x64"
 set "VCARCH=x64"
 set "GAME_MACHINE=X64"
-set "SDK=10.0.15063.0"
+set "SDK=10.0.17763.0"
 if /i "%ARCH%"=="x86" (
     set "VCARCH=x64_x86"
     set "GAME_MACHINE=X86"
@@ -17,7 +17,7 @@ if /i "%ARCH%"=="arm64" (
 if /i "%ARCH%"=="arm" (
     set "VCARCH=x64_arm"
     set "GAME_MACHINE=ARM"
-    set "SDK=10.0.15063.0"
+    set "SDK=10.0.17763.0"
 )
 if /i not "%ARCH%"=="x86" if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="arm" exit /b 1
 
@@ -31,7 +31,7 @@ if defined HORIZON_UWP_XAML_SHELL if not defined HORIZON_UWP_ACCOUNT (
 )
 if not exist "%HORIZON_UWP_GAME_LIB%" exit /b 1
 set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
-if /i "%ARCH%"=="arm" set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community"
+if /i "%ARCH%"=="arm" set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
 call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
 if errorlevel 1 exit /b %errorlevel%
 set "OUTDIR=%~dp0build\game-%ARCH%"
