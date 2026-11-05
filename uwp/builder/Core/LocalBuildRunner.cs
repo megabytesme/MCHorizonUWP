@@ -90,6 +90,7 @@ public static class LocalBuildRunner
         IReadOnlyList<string>? dependencies = null;
         if (release is not null)
         {
+            await WinUiBootstrap.EnsureAsync(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), root, targetArchitecture, progress);
             progress?.Report("Checking the Microsoft frameworks needed to install on the target.");
             dependencies = await FrameworkDependencies.FindAsync(targetArchitecture,
                 probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)",

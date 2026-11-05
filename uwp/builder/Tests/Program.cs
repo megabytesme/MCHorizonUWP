@@ -1,5 +1,20 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 3 && args[0] == "--bootstrap-xaml")
+{
+    var profile = Path.GetFullPath(args[1]);
+    var workspace = Path.GetFullPath(args[2]);
+    if (Directory.Exists(profile) || Directory.Exists(workspace)) throw new IOException("Choose new proof directories.");
+    Directory.CreateDirectory(profile);
+    Directory.CreateDirectory(workspace);
+    await WinUiBootstrap.EnsureAsync(profile, workspace, "x64", new Progress<string>(Console.WriteLine));
+    await WinUiBootstrap.EnsureAsync(profile, workspace, "x64");
+    Require(File.Exists(Path.Combine(profile, ".nuget", "packages", "microsoft.ui.xaml", "2.7.3", "lib", "uap10.0", "Microsoft.UI.Xaml.winmd")), "WinUI headers restored");
+    Require(File.Exists(Path.Combine(profile, ".nuget", "packages", "microsoft.ui.xaml", "2.7.3", "tools", "AppX", "x64", "Release", "Microsoft.UI.Xaml.2.7.appx")), "WinUI target framework restored");
+    Console.WriteLine("Restored the pinned WinUI package and reused the complete cache.");
+    return;
+}
+
 if (args.Length == 2 && args[0] == "--check-frameworks")
 {
     var programFiles = Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? throw new Exception("Windows SDK directory not found.");

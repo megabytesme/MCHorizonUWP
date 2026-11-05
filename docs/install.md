@@ -8,7 +8,8 @@ framework together. The resource framework contains your Minecraft resources;
 keep it private. The public certificate does not contain your private signing
 key. The client also depends on Microsoft.UI.Xaml 2.7 and Microsoft.VCLibs
 140.00; their Microsoft-signed packages are included in the `Dependencies`
-folder when they are available in the builder's SDK and NuGet cache.
+folder. The builder restores the pinned WinUI package when needed; the Visual C++
+runtime package must currently be available in the installed UWP SDK.
 
 ## Windows 10 or Windows 11 PC
 
