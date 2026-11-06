@@ -475,10 +475,10 @@ index 000000000..0acf95c0b
 +the existing desktop protocol and store behavior separately.
 diff --git a/crates/horizon-account-core/src/lib.rs b/crates/horizon-account-core/src/lib.rs
 new file mode 100644
-index 000000000..68a08b4c9
+index 000000000..0396335de
 --- /dev/null
 +++ b/crates/horizon-account-core/src/lib.rs
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,252 @@
 +//! Shared Horizon account protocol. Transport is supplied by each platform.
 +//! Tokens are kept out of Debug output and transport errors.
 +pub mod profiles;
@@ -573,6 +573,7 @@ index 000000000..68a08b4c9
 +    let response = horizon_uwp_https_bridge::request(
 +        &request.url,
 +        payload.as_deref().map(str::as_bytes),
++        false,
 +        content_type,
 +        request.authorization.as_deref(),
 +        1024 * 1024,
@@ -3376,7 +3377,7 @@ index 000000000..cf94cc57e
 +    }
 +}
 diff --git a/crates/horizon-client-render/src/auth.rs b/crates/horizon-client-render/src/auth.rs
-index 36be019c2..8d2584814 100644
+index 36be019c2..aa6f15043 100644
 --- a/crates/horizon-client-render/src/auth.rs
 +++ b/crates/horizon-client-render/src/auth.rs
 @@ -5,7 +5,7 @@
@@ -3456,7 +3457,7 @@ index 36be019c2..8d2584814 100644
  pub(crate) fn discovery() -> Result<Arc<serde_json::Value>, JoinError> {
      static CACHE: Mutex<Option<Arc<serde_json::Value>>> = Mutex::new(None);
      if let Some(d) = CACHE.lock().unwrap().clone() {
-@@ -197,6 +233,43 @@ pub(crate) fn discovery() -> Result<Arc<serde_json::Value>, JoinError> {
+@@ -197,6 +233,44 @@ pub(crate) fn discovery() -> Result<Arc<serde_json::Value>, JoinError> {
      Ok(doc)
  }
  
@@ -3469,6 +3470,7 @@ index 36be019c2..8d2584814 100644
 +    let response = horizon_uwp_https_bridge::request(
 +        url,
 +        body.map(str::as_bytes),
++        false,
 +        body.map(|_| "application/json; charset=utf-8"),
 +        authorization,
 +        1024 * 1024,
@@ -3500,7 +3502,7 @@ index 36be019c2..8d2584814 100644
  /// MinecraftServicesDiscoveryService.getUrl(service, endpoint).
  pub fn endpoint(doc: &serde_json::Value, service: &str, name: &str) -> Option<String> {
      doc.pointer(&format!("/discovery/{service}/endpoints/{name}/uri"))
-@@ -209,6 +282,7 @@ pub fn endpoint(doc: &serde_json::Value, service: &str, name: &str) -> Option<St
+@@ -209,6 +283,7 @@ pub fn endpoint(doc: &serde_json::Value, service: &str, name: &str) -> Option<St
  /// `SessionService.fetchProfile(uuid, true)` (`getProfileById`). A failed
  /// attributes call falls back to the offline properties, a failed profile call
  /// to no actions, as vanilla does. Blocks: call it off the main thread.
@@ -3508,7 +3510,7 @@ index 36be019c2..8d2584814 100644
  pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::AccountStatus {
      use crate::ban_notice::{AccountStatus, parse_profile_actions, parse_properties};
      let Ok(doc) = discovery() else {
-@@ -244,6 +318,36 @@ pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::Account
+@@ -244,6 +319,36 @@ pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::Account
      }
  }
  
@@ -3545,7 +3547,7 @@ index 36be019c2..8d2584814 100644
  /// The JoinMinecraftServerRequest body; `selectedProfile` is the undashed UUID.
  pub fn join_request(session: &AuthSession, server_hash: &str) -> String {
      serde_json::json!({
-@@ -271,8 +375,10 @@ fn with_one_retry(
+@@ -271,8 +376,10 @@ fn with_one_retry(
  }
  
  /// MinecraftServicesSessionService.joinServer: tell the session service this
@@ -3556,7 +3558,7 @@ index 36be019c2..8d2584814 100644
  pub fn join_server(session: &AuthSession, server_hash: &str) -> Result<(), JoinError> {
      with_one_retry(
          || join_server_once(session, server_hash),
-@@ -280,6 +386,7 @@ pub fn join_server(session: &AuthSession, server_hash: &str) -> Result<(), JoinE
+@@ -280,6 +387,7 @@ pub fn join_server(session: &AuthSession, server_hash: &str) -> Result<(), JoinE
      )
  }
  
@@ -3564,7 +3566,7 @@ index 36be019c2..8d2584814 100644
  fn join_server_once(session: &AuthSession, server_hash: &str) -> Result<(), JoinError> {
      let doc = discovery()?;
      let url = endpoint(&doc, "session", "join").ok_or(JoinError::Unavailable)?;
-@@ -305,6 +412,14 @@ fn join_server_once(session: &AuthSession, server_hash: &str) -> Result<(), Join
+@@ -305,6 +413,14 @@ fn join_server_once(session: &AuthSession, server_hash: &str) -> Result<(), Join
      }
  }
  
@@ -3579,7 +3581,7 @@ index 36be019c2..8d2584814 100644
  /// The account's chat key pair (ProfileKeyPair): the private key that signs
  /// its chat, the public key with the services' signature over it, and when
  /// to fetch a new one (refreshedAfter, epoch milliseconds). Like the access
-@@ -405,6 +520,7 @@ pub fn parse_certificates(body: &str) -> Option<ChatKeyPair> {
+@@ -405,6 +521,7 @@ pub fn parse_certificates(body: &str) -> Option<ChatKeyPair> {
  pub fn fetch_chat_keys(session: &AuthSession) -> Result<ChatKeyPair, JoinError> {
      let doc = discovery()?;
      let url = endpoint(&doc, "player", "getCertificates").ok_or(JoinError::Unavailable)?;
@@ -3587,7 +3589,7 @@ index 36be019c2..8d2584814 100644
      let body = match agent()
          .post(&url)
          .set("Authorization", &format!("Bearer {}", session.access_token))
-@@ -420,6 +536,18 @@ pub fn fetch_chat_keys(session: &AuthSession) -> Result<ChatKeyPair, JoinError>
+@@ -420,6 +537,18 @@ pub fn fetch_chat_keys(session: &AuthSession) -> Result<ChatKeyPair, JoinError>
          }
          Err(ureq::Error::Transport(_)) => return Err(JoinError::Unavailable),
      };
@@ -3606,7 +3608,7 @@ index 36be019c2..8d2584814 100644
      parse_certificates(&body)
          .ok_or_else(|| JoinError::Other("Malformed profile key pair response".to_owned()))
  }
-@@ -497,15 +625,31 @@ const MINECRAFT_PROFILE: &str = "https://api.minecraftservices.com/minecraft/pro
+@@ -497,15 +626,31 @@ const MINECRAFT_PROFILE: &str = "https://api.minecraftservices.com/minecraft/pro
  /// Single-player and integrated servers often send no `textures` property, or
  /// one without the equipped cape; the client asks the profile endpoint once.
  pub fn own_textures(session: &AuthSession) -> Option<crate::skins::Textures> {
@@ -3646,7 +3648,7 @@ index 36be019c2..8d2584814 100644
      let profile: serde_json::Value = serde_json::from_str(&body).ok()?;
      Some(crate::skins::services_profile_textures(&profile))
  }
-@@ -537,6 +681,7 @@ fn url_encode(text: &str) -> String {
+@@ -537,6 +682,7 @@ fn url_encode(text: &str) -> String {
  /// whether `name` joined with `server_hash` (and from `ip`, when the server
  /// prevents proxy connections). `Ok(None)`: it didn't, or the service said
  /// no; `Err(Unavailable)`: no answer.
@@ -3654,7 +3656,7 @@ index 36be019c2..8d2584814 100644
  pub fn has_joined(
      name: &str,
      server_hash: &str,
-@@ -568,6 +713,52 @@ pub fn has_joined(
+@@ -568,6 +714,52 @@ pub fn has_joined(
      Ok(parse_joined(&body))
  }
  
@@ -3707,7 +3709,7 @@ index 36be019c2..8d2584814 100644
  /// HasJoinedMinecraftServerResponse: `id` and `properties`; no id is no profile.
  pub fn parse_joined(body: &str) -> Option<JoinedProfile> {
      let v: serde_json::Value = serde_json::from_str(body).ok()?;
-@@ -593,10 +784,51 @@ pub fn parse_joined(body: &str) -> Option<JoinedProfile> {
+@@ -593,10 +785,51 @@ pub fn parse_joined(body: &str) -> Option<JoinedProfile> {
  
  #[cfg(test)]
  mod tests {
@@ -130296,10 +130298,10 @@ index 000000000..567609b12
 +build/
 diff --git a/uwp/host/App.cpp b/uwp/host/App.cpp
 new file mode 100644
-index 000000000..89345d3dd
+index 000000000..c0f2d10bb
 --- /dev/null
 +++ b/uwp/host/App.cpp
-@@ -0,0 +1,1143 @@
+@@ -0,0 +1,1146 @@
 +#if defined(_MSC_VER) && _MSC_VER >= 1940 && defined(WINAPI_FAMILY)
 +extern "C" __declspec(dllimport) char* __cdecl getenv(const char*);
 +extern "C" __declspec(dllimport) int __cdecl system(const char*);
@@ -131104,10 +131106,14 @@ index 000000000..89345d3dd
 +    bool visible_;
 +};
 +
-+ref class AppViewSource sealed : IFrameworkViewSource {
++#ifndef HORIZON_UWP_XAML_SHELL
++namespace HorizonUWP {
++public ref class App sealed : IFrameworkViewSource {
 +public:
 +    virtual IFrameworkView^ CreateView() { return ref new AppView(); }
 +};
++}
++#endif
 +
 +#ifdef HORIZON_UWP_XAML_SHELL
 +static void prepare_next_game_session() {
@@ -131426,7 +131432,7 @@ index 000000000..89345d3dd
 +#ifdef HORIZON_UWP_XAML_SHELL
 +    horizon_uwp_xaml_start();
 +#else
-+    CoreApplication::Run(ref new AppViewSource());
++    CoreApplication::Run(ref new HorizonUWP::App());
 +#endif
 +#ifdef HORIZON_UWP_GAME_BRIDGE
 +    } catch (Platform::Exception^ error) {
@@ -131442,7 +131448,6 @@ index 000000000..89345d3dd
 +#endif
 +    return 0;
 +}
-+
 diff --git a/uwp/host/AppxManifest.xml b/uwp/host/AppxManifest.xml
 new file mode 100644
 index 000000000..dcfa13a52
@@ -146570,10 +146575,10 @@ index 000000000..8060ded05
 +}
 diff --git a/uwp/pregame/host/XamlShell.cpp b/uwp/pregame/host/XamlShell.cpp
 new file mode 100644
-index 000000000..cb8fa665c
+index 000000000..e69736d0d
 --- /dev/null
 +++ b/uwp/pregame/host/XamlShell.cpp
-@@ -0,0 +1,3909 @@
+@@ -0,0 +1,3911 @@
 +// Native UWP XAML shell. Windows Mobile reuses the primary CoreWindow for the game.
 +#using <Microsoft.UI.Xaml.winmd>
 +#include <windows.h>
@@ -149586,10 +149591,12 @@ index 000000000..cb8fa665c
 +    } else content->Content = scroll;
 +}
 +
-+ref class ShellApp sealed : Application, Windows::UI::Xaml::Markup::IXamlMetadataProvider {
++} // namespace
++namespace HorizonUWP {
++public ref class App sealed : Application, Windows::UI::Xaml::Markup::IXamlMetadataProvider {
 +    Microsoft::UI::Xaml::XamlTypeInfo::XamlControlsXamlMetaDataProvider^ metadata_;
 +public:
-+    ShellApp() {
++    App() {
 +        // WinUI activation is deferred until OnLaunched, after the UWP XAML
 +        // application runtime has initialized.
 +        metadata_ = nullptr;
@@ -149602,8 +149609,8 @@ index 000000000..cb8fa665c
 +    virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Windows::UI::Xaml::Interop::TypeName type) {
 +        return metadata_ ? metadata_->GetXamlType(type) : nullptr;
 +    }
-+    virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Platform::String^ name) {
-+        return metadata_ ? metadata_->GetXamlType(name) : nullptr;
++    virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Platform::String^ fullName) {
++        return metadata_ ? metadata_->GetXamlType(fullName) : nullptr;
 +    }
 +    virtual Platform::Array<Windows::UI::Xaml::Markup::XmlnsDefinition>^ GetXmlnsDefinitions() {
 +        return metadata_ ? metadata_->GetXmlnsDefinitions() : ref new Platform::Array<Windows::UI::Xaml::Markup::XmlnsDefinition>(0);
@@ -149761,7 +149768,7 @@ index 000000000..cb8fa665c
 +            throw ref new Platform::FailureException();
 +#endif
 +            // Activate the provider only after the UWP XAML Application has
-+            // reached OnLaunched; activating it from ShellApp's constructor
++            // reached OnLaunched; activating it from App's constructor
 +            // runs before the framework's package activation context is ready.
 +            PROBE_STAGE(L"Before WinUI metadata provider");
 +            metadata_ = ref new Microsoft::UI::Xaml::XamlTypeInfo::XamlControlsXamlMetaDataProvider();
@@ -150480,7 +150487,7 @@ index 000000000..cb8fa665c
 +extern "C" void __cdecl horizon_uwp_page_event(const void*) {}
 +extern "C" void __cdecl horizon_uwp_page_shutdown() {}
 +extern "C" int __cdecl horizon_uwp_xaml_start() {
-+    Application::Start(ref new ApplicationInitializationCallback([](ApplicationInitializationCallbackParams^) { ref new ShellApp(); }));
++    Application::Start(ref new ApplicationInitializationCallback([](ApplicationInitializationCallbackParams^) { ref new HorizonUWP::App(); }));
 +    return 0;
 +}
 diff --git a/uwp/pregame/host/build-shell.cmd b/uwp/pregame/host/build-shell.cmd

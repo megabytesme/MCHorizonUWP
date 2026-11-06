@@ -6,7 +6,7 @@ use horizon_account_core::{
 };
 use horizon_client::auth::AuthSession;
 use std::path::Path;
-use std::{sync::Arc, time::Duration};
+use std::{sync::{Arc, mpsc::TryRecvError}, time::Duration};
 
 unsafe extern "C" {
     fn horizon_uwp_dialog_show(text: *const u8, len: usize, kind: u32) -> i32;
