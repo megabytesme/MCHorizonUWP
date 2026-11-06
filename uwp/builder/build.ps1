@@ -25,10 +25,11 @@ $tools = $tools | Select-Object -First 1
 if (-not $tools) {
     throw "Visual Studio AppxPackage build tasks were not found in standard locations. Install the Windows application development build tools, or pass AppxMSBuildToolsPath to dotnet build for a custom installation."
 }
+$msbuildExtensions = [IO.Path]::GetFullPath((Join-Path $tools "..\..\..\.."))
 $project = Join-Path $PSScriptRoot "App\Horizon.Builder.App.csproj"
 if ($Publish) {
-    dotnet publish $project -c $Configuration -p:Platform=x64 -p:SelfContained=true "-p:AppxMSBuildToolsPath=$tools/" -m
+    dotnet publish $project -c $Configuration -p:Platform=x64 -p:SelfContained=true "-p:AppxMSBuildToolsPath=$tools/" "-p:MSBuildExtensionsPath=$msbuildExtensions" "-p:MSBuildExtensionsPath32=$msbuildExtensions" -m
 } else {
-    dotnet build $project -c $Configuration -p:Platform=x64 "-p:AppxMSBuildToolsPath=$tools/" -m
+    dotnet build $project -c $Configuration -p:Platform=x64 "-p:AppxMSBuildToolsPath=$tools/" "-p:MSBuildExtensionsPath=$msbuildExtensions" "-p:MSBuildExtensionsPath32=$msbuildExtensions" -m
 }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
