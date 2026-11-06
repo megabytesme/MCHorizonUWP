@@ -14,7 +14,8 @@ param(
     [string]$Publisher,
     [ValidateSet('2.7', '2.8')][string]$WinUIFramework,
     [string]$PackageVersion,
-    [string]$ReleaseNotes
+    [string]$ReleaseNotes,
+    [string]$ReleaseMetadataPath
 )
 $ErrorActionPreference = 'Stop'
 if (-not $WinUIFramework) { $WinUIFramework = if ($Architecture -eq 'arm') { '2.7' } else { '2.8' } }
@@ -95,6 +96,21 @@ if ($ReleaseNotes) {
     $notes = Get-Item -LiteralPath $ReleaseNotes -ErrorAction Stop
     if ($notes.PSIsContainer -or $notes.Length -gt 1MB) { throw 'Release notes must be a text file no larger than 1 MiB.' }
     Copy-Item -LiteralPath $notes.FullName -Destination $notesStage
+}
+$releaseMetadataStage = Join-Path $stage 'HorizonRelease.json'
+if (Test-Path -LiteralPath $releaseMetadataStage) { Remove-Item -LiteralPath $releaseMetadataStage -Force }
+if ($ReleaseMetadataPath) {
+    $metadata = Get-Item -LiteralPath $ReleaseMetadataPath -ErrorAction Stop
+    if ($metadata.PSIsContainer -or $metadata.Length -gt 4096) { throw 'Release metadata must be a JSON file no larger than 4 KiB.' }
+    try { $release = Get-Content -LiteralPath $metadata.FullName -Raw | ConvertFrom-Json -ErrorAction Stop }
+    catch { throw 'Release metadata is not valid JSON.' }
+    if ($release.schema_version -ne 1 -or
+        $release.patch_version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' -or
+        $release.client_version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' -or
+        $release.upstream_commit -cnotmatch '^[0-9a-fA-F]{40}$') {
+        throw 'Release metadata does not contain a supported patch, client and upstream identity.'
+    }
+    Copy-Item -LiteralPath $metadata.FullName -Destination $releaseMetadataStage
 }
 # Staging persists between builds; remove stale DLLs before copying validated inputs.
 foreach ($name in @('libEGL.dll', 'libGLESv2.dll', 'z.dll')) {

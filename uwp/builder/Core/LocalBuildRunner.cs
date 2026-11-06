@@ -292,6 +292,13 @@ public static class LocalBuildRunner
         packageArguments.AddRange(LocalRecipe.ResourceArguments(selection, packageResources, framework?.Name));
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
         packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath);
+        if (release is not null)
+        {
+            var metadataPath = Path.Combine(root, "HorizonRelease.json");
+            await File.WriteAllBytesAsync(metadataPath, ReleaseMetadata.Serialize(release.Patch, release.Client));
+            packageArguments.Add("-ReleaseMetadataPath");
+            packageArguments.Add(metadataPath);
+        }
         await RunProcess(powershell, snapshot, packageArguments, compact is null ? null : hostBuildEnvironment);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");

@@ -603,6 +603,11 @@ Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm64) == TargetProfile.SurfaceProX, "ARM64 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm) == TargetProfile.WindowsMobile, "ARM32 default target");
 Require(Guid.TryParse(HorizonIdentity.ClientId, out _), "Horizon public client ID has the expected format");
+var metadataProof = ReleaseMetadata.Create("0.1.0", "0.1.1", new string('A', 40));
+Require(metadataProof.SchemaVersion == 1 && metadataProof.UpstreamCommit == new string('a', 40), "release metadata normalizes catalog identity");
+Require(ReleaseMetadata.IsVersion("0.1.1") && !ReleaseMetadata.IsVersion("0.1"), "release metadata accepts three-part versions only");
+try { ReleaseMetadata.Create("0.1.0", "0.1.1", "bad"); throw new Exception("invalid release commit accepted"); }
+catch (ArgumentException) { }
 using (var catalogKey = System.Security.Cryptography.ECDsa.Create())
 {
     catalogKey.ImportSubjectPublicKeyInfo(CatalogTrust.PublicKey(), out var consumed);
@@ -635,11 +640,15 @@ if (args.Length == 2 && args[0] == "--framework-client-probe")
     File.WriteAllText(Path.Combine(resources, "horizon-resources.json"), "{\"minecraft\":\"26.3\"}");
     File.WriteAllText(Path.Combine(resources, "fixture.txt"), "synthetic fixture");
     const string publisher = "CN=MCHorizonUWP-proof";
+    var metadataPath = Path.Combine(root, "release-metadata.json");
+    var metadata = ReleaseMetadata.Create("0.1.0", "0.1.1", new string('a', 40));
+    await File.WriteAllBytesAsync(metadataPath, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(metadata));
     var framework = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "framework-output"), publisher: publisher);
     var output = Path.Combine(root, "client-output");
     var start = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true };
     foreach (var arg in new[] { "-NoProfile", "-File", Path.GetFullPath("uwp/host/package.ps1"), "-Architecture", "x64",
-        "-Executable", Path.GetFullPath(args[1]), "-OutputDirectory", output, "-ResourceFrameworkName", framework.Name, "-Publisher", publisher })
+        "-Executable", Path.GetFullPath(args[1]), "-OutputDirectory", output, "-ResourceFrameworkName", framework.Name, "-Publisher", publisher,
+        "-ReleaseMetadataPath", metadataPath })
         start.ArgumentList.Add(arg);
     using (var process = System.Diagnostics.Process.Start(start) ?? throw new Exception("package script did not start"))
     {
@@ -647,6 +656,16 @@ if (args.Length == 2 && args[0] == "--framework-client-probe")
         Require(process.ExitCode == 0, "client packaging succeeded");
     }
     using var zip = System.IO.Compression.ZipFile.OpenRead(Path.Combine(output, "HorizonUWP-x64.appx"));
+    using (var metadataEntry = (zip.GetEntry("HorizonRelease.json") ?? throw new Exception("release metadata missing from catalog package")).Open())
+    using (var metadataDocument = await System.Text.Json.JsonDocument.ParseAsync(metadataEntry))
+    {
+        var json = metadataDocument.RootElement;
+        Require(json.GetProperty("schema_version").GetInt32() == 1
+            && json.GetProperty("patch_version").GetString() == "0.1.0"
+            && json.GetProperty("client_version").GetString() == "0.1.1"
+            && json.GetProperty("upstream_commit").GetString() == new string('a', 40),
+            "selected catalog identity survives into APPX metadata");
+    }
     using var manifestStream = (zip.GetEntry("AppxManifest.xml") ?? throw new Exception("client manifest missing")).Open();
     var manifest = System.Xml.Linq.XDocument.Load(manifestStream);
     var ns = manifest.Root!.Name.Namespace;
