@@ -205,3 +205,31 @@ its manifest declares ARM and the matching resource publisher. The Lumia was
 not used. A separate x64 host link also passed with SDK 17763. The split-source
 scripts now select this newer ARM toolchain; automatic provisioning and a
 fresh-PC build are not yet validated.
+
+## 2026-11-06: telemetry, updates and four-architecture hosts
+
+On Ben-Desktop, `uwp/builder/build.ps1 -Configuration Release -Publish` produced the
+self-contained WinUI builder. The script supplies the installed Visual Studio AppxPackage MSBuild
+paths when invoking `dotnet`; plain `dotnet build` selected the .NET SDK's missing PRI task path.
+The builder setup tests passed, and `python tools/check_public_tree.py` passed. The publish emitted
+two non-fatal ruleset warnings.
+
+The source patch at `patches/nightly-2026-11-03/horizon-uwp-0.1.1.patch` passed `git apply --check`
+against Horizon commit `f42ef42ef6ceccb3c6a20bea2481d87949a51c81`. After overlaying the UWP client
+tree, `tools/build_host_artifact_kit.ps1` built and strictly linked the x86, x64, ARM64 and ARM32
+hosts on Ben-Desktop. The output kit is `E:\Temp\MCHorizonHostKit-2026-11-06-client-fixed5` (4.9
+MiB). It used SDK 10.0.19041.0 for x86, x64 and ARM32, and 10.0.26100.0 for ARM64. This validates
+the native hosts and their import checks; it does not build the Rust game bridge or the four real
+game APPXs.
+
+A synthetic x64 packaging probe used `notepad.exe` only to check packaging. MakeAppx unpacked the
+unsigned APPX and confirmed `HorizonRelease.json` carries the selected patch, client and upstream
+identity. It is not a playable Horizon package. In WSL, telemetry payload and consent tests passed
+(46 tests and 7 consent integration tests; one telemetry test was ignored), focused bug-report tests
+passed 3/3, and release-check archive-layout tests passed 8/8.
+
+The Oracle receiver returned `ok` from `https://horizontelemetry.bytesdirect.com/healthz` over both
+IPv4 and IPv6. No test telemetry was submitted. Local patch 0.1.1, client 0.1.2, builder 0.1.3 and
+a signed candidate catalog are staged under `E:\Temp\MCHorizonReleaseCandidate-2026-11-06`; no
+new GitHub release was published, and the repository catalog remains on its existing published
+versions until the release assets are uploaded.

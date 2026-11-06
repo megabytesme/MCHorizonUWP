@@ -13,7 +13,10 @@ import zipfile
 
 
 UPSTREAM = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81"
-PATCH_PATH = "patches/nightly-2026-11-03/horizon-uwp.patch"
+PATCH_PATHS = {
+    "0.1.0": "patches/nightly-2026-11-03/horizon-uwp.patch",
+    "0.1.1": "patches/nightly-2026-11-03/horizon-uwp-0.1.1.patch",
+}
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
 
@@ -108,6 +111,8 @@ def client_archive(revision, host_artifacts=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", default="HEAD", help="Committed repository revision")
+    parser.add_argument("--patch-version", default="0.1.0", help="Patch release version (three numeric components)")
+    parser.add_argument("--patch-path", help="Committed patch path under patches/ (defaults to the known path for this version)")
     parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
     parser.add_argument("--builder-version", default="0.1.0", help="Builder version for the candidate compatibility rule")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared four-architecture host kit to include in the client archive")
@@ -124,27 +129,34 @@ def main():
         if max(major, minor) > 2_147_483_647 or patch_number >= 2_147_483_647:
             raise ValueError("Version exceeds catalog numeric limits")
         return f"{major}.{minor}.{patch_number + 1}"
+    patch_upper = upper_version(args.patch_version)
     client_upper = upper_version(args.client_version)
     builder_upper = upper_version(args.builder_version)
+    patch_path = args.patch_path or PATCH_PATHS.get(args.patch_version)
+    if (not patch_path or not patch_path.startswith("patches/") or "\\" in patch_path
+            or ".." in Path(patch_path).parts or "." in Path(patch_path).parts):
+        raise ValueError("Provide a supported patch version or a safe committed patch path under patches/.")
     revision = git("rev-parse", "--verify", args.revision + "^{commit}").decode().strip()
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Invalid Git commit")
-    patch = git("show", f"{revision}:{PATCH_PATH}")
+    patch = git("show", f"{revision}:{patch_path}")
     if args.client_version == "0.1.2" and args.host_artifacts is None:
         raise ValueError("Client 0.1.2 requires --host-artifacts for the four prebuilt host kits")
     client = client_archive(revision, args.host_artifacts)
     verify_upstream(args.upstream_archive, args.upstream_repo)
-    args.output.mkdir(parents=True, exist_ok=False)
-    (args.output / "horizon-uwp-0.1.0.patch").write_bytes(patch)
-    (args.output / f"uwp-client-{args.client_version}.zip").write_bytes(client)
     upstream_hash = digest(args.upstream_archive.read_bytes())
     catalog = json.loads(args.catalog_input.read_text(encoding="utf-8"))
     if catalog.get("schema_version") != 1:
         raise ValueError("The existing compatibility catalog has an unsupported schema")
-    patch_entry = {"version": "0.1.0", "upstream_commit": UPSTREAM, "bridge": 1,
-                   "upstream": {"url": f"https://github.com/horizon-rust/horizon/archive/{UPSTREAM}.zip", "sha256": upstream_hash},
-                   "artifact": {"url": f"{REPOSITORY}/releases/download/patch-v0.1.0/horizon-uwp-0.1.0.patch", "sha256": digest(patch)}}
-    matching_patch = [item for item in catalog["patches"] if item["version"] == "0.1.0"]
+    base = next((item for item in catalog["patches"] if item["upstream_commit"] == UPSTREAM), None)
+    upstream = base["upstream"] if base else {
+        "url": f"https://github.com/horizon-rust/horizon/archive/{UPSTREAM}.zip", "sha256": upstream_hash
+    }
+    patch_entry = {"version": args.patch_version, "upstream_commit": UPSTREAM, "bridge": 1,
+                   "upstream": upstream,
+                   "artifact": {"url": f"{REPOSITORY}/releases/download/patch-v{args.patch_version}/horizon-uwp-{args.patch_version}.patch",
+                                "sha256": digest(patch)}}
+    matching_patch = [item for item in catalog["patches"] if item["version"] == args.patch_version]
     if matching_patch:
         if matching_patch[0] != patch_entry:
             raise ValueError("The candidate patch or upstream archive differs from the retained catalog entry")
@@ -155,10 +167,13 @@ def main():
     catalog["clients"].append({"version": args.client_version, "bridge": 1,
                                "artifact": {"url": f"{REPOSITORY}/releases/download/client-v{args.client_version}/uwp-client-{args.client_version}.zip",
                                             "sha256": digest(client)}})
-    catalog["rules"].append({"patch": {"min_inclusive": "0.1.0", "max_exclusive": "0.1.1"},
+    catalog["rules"].append({"patch": {"min_inclusive": args.patch_version, "max_exclusive": patch_upper},
                              "client": {"min_inclusive": args.client_version, "max_exclusive": client_upper},
                              "builder": {"min_inclusive": args.builder_version, "max_exclusive": builder_upper},
                              "architectures": ["x86", "x64", "arm", "arm64"]})
+    args.output.mkdir(parents=True, exist_ok=False)
+    (args.output / f"horizon-uwp-{args.patch_version}.patch").write_bytes(patch)
+    (args.output / f"uwp-client-{args.client_version}.zip").write_bytes(client)
     (args.output / "catalog.UNSIGNED.json").write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
     print(f"Prepared unsigned development artifacts from {revision} in {args.output}")
     print("No release or test evidence was published; authenticate the catalog before use.")
