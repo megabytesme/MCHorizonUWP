@@ -5,8 +5,17 @@ namespace Horizon.Builder.Core;
 /// <summary>Builds Horizon's pinned downloader and preparer in a private authenticated release workspace.</summary>
 public static class MinecraftAssetPreparation
 {
+    public sealed record PrefetchResult(string MinecraftDirectory, int LocalFilesReused, int NetworkFilesFetched, long BytesFetched);
+
+    public static async Task<PrefetchResult> PrefetchAsync(string source, bool ownershipVerified, string? minecraftDirectory,
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var result = await MinecraftAssetPrefetcher.PrefetchAsync(source, ownershipVerified, minecraftDirectory, progress, cancellationToken);
+        return new(result.MinecraftDirectory, result.LocalFilesReused, result.NetworkFilesFetched, result.BytesFetched);
+    }
+
     public static async Task<string> PrepareAsync(PreparedRelease release, BuildSelection selection, bool ownershipVerified,
-        IProbe probe, IProgress<string>? progress = null)
+        IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null, CancellationToken cancellationToken = default)
     {
         if (!ownershipVerified) throw new InvalidOperationException("Sign in with an account that owns Minecraft: Java Edition first.");
         LocalBuildRunner.ValidatePreparedRelease(release, selection);
@@ -15,16 +24,16 @@ public static class MinecraftAssetPreparation
         var drive = Path.GetPathRoot(workspace) ?? throw new InvalidOperationException("The release drive is invalid.");
         if (new DriveInfo(drive).AvailableFreeSpace < 20L * 1024 * 1024 * 1024)
             throw new IOException("At least 20 GiB of free space is required to download and prepare Minecraft resources and build the client.");
-        var privateData = Path.Combine(workspace, "minecraft-download");
-        if (Directory.Exists(privateData) || File.Exists(privateData))
-            throw new IOException("The resource preparation workspace already exists.");
+        var privateData = MinecraftAssetPrefetcher.CacheRoot;
+        await MinecraftAssetPrefetcher.PrefetchAsync(source, ownershipVerified, minecraftDirectory, progress, cancellationToken);
         var tool = await StageHelperAsync(source, workspace);
         var cargo = probe.FindOnPath("cargo.exe") ?? throw new InvalidOperationException("Cargo is required to prepare Minecraft resources.");
-        var unifiedRoot = release.Client.Version == "0.1.1" ? VisualCppInstallation.FindForTarget(probe, selection.Target) : null;
-        if (release.Client.Version == "0.1.1" && unifiedRoot is null) throw new InvalidOperationException("The Visual C++ toolchain is missing.");
-        var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        var cmd = Path.Combine(system, "cmd.exe");
-        var environment = await LocalBuildRunner.VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: true, unifiedRoot: unifiedRoot);
+        var sdk = PrivateWindowsSdk.FindReady(probe, ["x64"]) ?? throw new InvalidOperationException("The x64 Windows SDK is missing.");
+        var msvc = VisualCppInstallation.FindLinkToolset(probe, "x64")?.Toolset ?? throw new InvalidOperationException("The Microsoft link libraries are missing.");
+        var clang = ClangFinder.Find(probe) ?? throw new InvalidOperationException("The compact LLVM C compiler is missing.");
+        var rustLld = await LocalRecipe.FindRustLinkerAsync(probe);
+        var compact = PrebuiltToolchain.Create(source, sdk, "x64", clang, rustLld, msvc, Path.Combine(workspace, "asset-toolchain"));
+        var environment = new Dictionary<string, string>(compact.Cargo, StringComparer.OrdinalIgnoreCase);
         environment["CARGO_BUILD_JOBS"] = LocalBuildRunner.CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
         progress?.Report("Building Horizon's Minecraft resource preparation helper.");
         await LocalBuildRunner.RunProcess(cargo, tool, ["+" + LocalRecipe.RustToolchain, "build", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
@@ -40,7 +49,7 @@ public static class MinecraftAssetPreparation
             start.Environment[name] = Path.Combine(workspace, "isolated", folder);
         start.Environment["HORIZON_LAUNCHER_NO_SELF_UPDATE"] = "1";
         start.Environment["HORIZON_NO_AUDIO"] = "1";
-        progress?.Report("Downloading and preparing your Minecraft resources. This can take a while.");
+        progress?.Report("Preparing your prefetched Minecraft resources with Horizon.");
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start Minecraft resource preparation.");
         var errors = process.StandardError.ReadToEndAsync();
         var lastUpdate = Stopwatch.StartNew();

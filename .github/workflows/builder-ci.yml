@@ -1,0 +1,50 @@
+name: Builder CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: builder-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  builder:
+    name: Build and validate the builder
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 8.0.x
+      - name: Check the public repository history
+        run: python tools/check_public_tree.py --history
+      - name: Run builder tests
+        run: dotnet run --project uwp/builder/Tests/Horizon.Builder.Tests.csproj -c Release
+      - name: Verify the catalog and test signature validation
+        shell: pwsh
+        run: |
+          dotnet run --project tools/catalog-signer/CatalogSigner.csproj -c Release -- verify catalog/catalog-v1.json catalog/catalog-v1.sig uwp/builder/Core/Assets/catalog-public.der
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/catalog-signer/CatalogSigner.csproj -c Release -- self-test catalog/catalog-v1.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and publish the WinUI builder
+        shell: pwsh
+        run: ./uwp/builder/build.ps1 -Configuration Release -Publish
+      - name: Upload the builder for review
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: horizon-uwp-builder-ci
+          path: uwp/builder/App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/publish/
+          if-no-files-found: error
+          retention-days: 7

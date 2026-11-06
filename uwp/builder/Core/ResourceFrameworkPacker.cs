@@ -15,7 +15,7 @@ public static class ResourceFrameworkPacker
 {
     public const string Publisher = "CN=HorizonUWPPrototype";
 
-    public static async Task<ResourceFramework> PackAsync(string resources, string newOutputDirectory, IProgress<string>? progress = null, string? publisher = null)
+    public static async Task<ResourceFramework> PackAsync(string resources, string newOutputDirectory, IProgress<string>? progress = null, string? publisher = null, string? sdkRoot = null)
     {
         publisher ??= Publisher;
         _ = new X500DistinguishedName(publisher);
@@ -25,7 +25,9 @@ public static class ResourceFrameworkPacker
         if (!Directory.Exists(Path.GetDirectoryName(output))) throw new DirectoryNotFoundException("The framework output parent does not exist.");
         if (LocalBuildRunner.ResourcesContainWorkspace(resources, output))
             throw new InvalidDataException("Framework output cannot be inside the selected resources.");
-        var makeAppx = SyntheticFrameworkPacker.FindMakeAppx();
+        var makeAppx = sdkRoot is null ? SyntheticFrameworkPacker.FindMakeAppx()
+            : Path.Combine(sdkRoot, "bin", PrivateWindowsSdk.Version, "x64", "makeappx.exe");
+        if (!File.Exists(makeAppx)) throw new FileNotFoundException("The SDK packaging tool is missing.", makeAppx);
         var stage = Path.Combine(output, "framework");
         Directory.CreateDirectory(Path.Combine(stage, "Assets"));
         var stagedResources = Path.Combine(stage, "resources");

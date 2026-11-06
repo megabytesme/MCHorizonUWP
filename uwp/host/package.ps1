@@ -6,6 +6,7 @@ param(
     [switch]$RequireAngle,
     [switch]$Game,
     [string]$Executable,
+    [string]$GameBridge,
     [string]$OutputDirectory,
     [string]$Resources,
     [ValidatePattern('^Horizon\.Asset\.[0-9-]+\.[0-9a-f]{20,30}$')][string]$ResourceFrameworkName,
@@ -84,6 +85,10 @@ if ($AngleBin) {
 }
 New-Item -ItemType Directory -Force -Path $stage,(Join-Path $stage 'Assets') | Out-Null
 Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage 'HorizonUWP.exe') -Force
+if ($GameBridge) {
+    Assert-PEArchitecture $GameBridge $Architecture
+    Copy-Item -LiteralPath $GameBridge -Destination (Join-Path $stage 'horizon_uwp_game_bridge.dll') -Force
+}
 $notesStage = Join-Path $stage 'horizon-release-notes.txt'
 if (Test-Path -LiteralPath $notesStage) { throw 'Release-note staging already exists; use a fresh OutputDirectory.' }
 if ($ReleaseNotes) {
@@ -182,8 +187,15 @@ foreach ($name in @('StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.p
     $sourceLogo = Join-Path $brandAssets $name
     if (-not (Test-Path -LiteralPath $sourceLogo -PathType Leaf)) { throw "Missing Horizon logo asset: $sourceLogo" }
     Copy-Item -LiteralPath $sourceLogo -Destination (Join-Path $stage (Join-Path 'Assets' $name)) -Force
-}$makeAppx = '${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe'
-$makeAppx = [Environment]::ExpandEnvironmentVariables($makeAppx.Replace('${env:ProgramFiles(x86)}', '%ProgramFiles(x86)%'))
+}
+if ($env:HORIZON_UWP_PREPARED_ENV) {
+    if (-not $env:WindowsSdkDir -or -not $env:WindowsSDKVersion) { throw 'The prepared SDK environment is incomplete.' }
+    $sdkVersion = $env:WindowsSDKVersion.TrimEnd('\', '/')
+    $makeAppx = Join-Path $env:WindowsSdkDir "bin\$sdkVersion\x64\makeappx.exe"
+} else {
+    $makeAppx = '${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe'
+    $makeAppx = [Environment]::ExpandEnvironmentVariables($makeAppx.Replace('${env:ProgramFiles(x86)}', '%ProgramFiles(x86)%'))
+}
 $package = Join-Path $build "HorizonUWP-$Architecture.appx"
 $makeLog = Join-Path $build "makeappx-$Architecture.log"
 & $makeAppx pack /d $stage /p $package /o *> $makeLog

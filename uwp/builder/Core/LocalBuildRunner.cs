@@ -55,7 +55,7 @@ public static class LocalBuildRunner
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
         if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || release.Patch.Version != "0.1.0" || release.Client.Version is not ("0.1.0" or "0.1.1")
+            || release.Patch.Version != "0.1.0" || release.Client.Version != "0.1.2"
             || !release.Patch.UpstreamCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
     }
@@ -77,8 +77,13 @@ public static class LocalBuildRunner
                 throw new InvalidOperationException("Choose a resource directory that does not contain the release workspace.");
             ValidateResourceTree(resources!);
         }
-        var signTool = Path.Combine(probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)",
-            "Windows Kits", "10", "bin", "10.0.26100.0", "x64", "signtool.exe");
+        var targetArchitecture = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
+            TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => throw new ArgumentOutOfRangeException(nameof(selection)) };
+        var compactSdk = release is null ? null : PrivateWindowsSdk.FindReady(probe, [targetArchitecture, "x64"]);
+        var msvcToolset = release is null ? null : VisualCppInstallation.FindLinkToolset(probe, targetArchitecture)?.Toolset;
+        var signTool = release is null ? Path.Combine(probe.EnvironmentValue("ProgramFiles(x86)") ?? @"C:\Program Files (x86)",
+            "Windows Kits", "10", "bin", "10.0.26100.0", "x64", "signtool.exe")
+            : Path.Combine(compactSdk ?? throw new InvalidOperationException("The compact Windows SDK is missing."), "bin", PrivateWindowsSdk.Version, "x64", "signtool.exe");
         if (release is not null && !probe.FileExists(signTool))
             throw new FileNotFoundException("The signing tool for this recipe is missing.", signTool);
         string? angleBin = null;
@@ -89,12 +94,12 @@ public static class LocalBuildRunner
             if (new[] { "libEGL.dll", "libGLESv2.dll" }.All(name => File.Exists(Path.Combine(candidate, name))))
                 angleBin = candidate;
         }
-        var unifiedToolchain = release?.Client.Version == "0.1.1";
-        var toolchainRoot = unifiedToolchain ? VisualCppInstallation.FindForTarget(probe, selection.Target) : null;
+        var unifiedToolchain = release is not null;
+        string? toolchainRoot = null;
         var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
-            splitRelease: release is not null, unifiedToolchain: unifiedToolchain);
+            splitRelease: release is not null, unifiedToolchain: unifiedToolchain, compactToolchain: release is not null);
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
-        if (unifiedToolchain && toolchainRoot is null) throw new InvalidOperationException("The selected Visual Studio toolchain is no longer available. Check setup again.");
+        var hostExecutable = release is null ? null : RequirePrebuiltHost(source, targetArchitecture);
         var workspaceDrive = Path.GetPathRoot(release is null ? workspaceBase : Path.GetFullPath(source))
             ?? throw new InvalidOperationException("Could not determine the builder workspace drive.");
         if (new DriveInfo(workspaceDrive).AvailableFreeSpace < MinimumFreeBytes)
@@ -104,6 +109,8 @@ public static class LocalBuildRunner
         var root = release is null ? await CreateSnapshotAsync(source, probe)
             : Directory.GetParent(Path.GetFullPath(source))?.FullName ?? throw new InvalidOperationException("Invalid release workspace.");
         var snapshot = release is null ? Path.Combine(root, "source") : Path.GetFullPath(source);
+        if (release is not null && release.Client.Version is "0.1.0" or "0.1.1")
+            ClientToolchainBackport.Apply(snapshot, release.Client.Version);
         var cargo = probe.FindOnPath("cargo.exe")!;
         var python = probe.FindOnPath("python.exe")!;
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
@@ -111,8 +118,14 @@ public static class LocalBuildRunner
         var powershell = Path.Combine(system, "WindowsPowerShell", "v1.0", "powershell.exe");
         var jobs = CurrentCargoJobCount();
 
-        var targetArchitecture = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
-            TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => throw new ArgumentOutOfRangeException(nameof(selection)) };
+        CompactEnvironment? compact = null;
+        if (release is not null)
+        {
+            var clang = ClangFinder.Find(probe) ?? throw new InvalidOperationException("The compact LLVM C compiler is missing. Check setup again.");
+            var rustLld = await LocalRecipe.FindRustLinkerAsync(probe);
+            compact = PrebuiltToolchain.Create(snapshot, compactSdk!, targetArchitecture, clang, rustLld, msvcToolset!,
+                Path.Combine(root, "prebuilt-linker"));
+        }
         IReadOnlyList<string>? dependencies = null;
         if (release is not null)
         {
@@ -126,7 +139,7 @@ public static class LocalBuildRunner
         if (selection.RegistryNativeMods is { Count: > 0 } selectedMods)
         {
             if (release is null) throw new InvalidOperationException("Native registry mods require an authenticated source release.");
-            var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: true, unifiedRoot: toolchainRoot);
+            var hostEnvironment = new Dictionary<string, string>(compact!.Cargo, StringComparer.OrdinalIgnoreCase);
             hostEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
             snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, progress);
         }
@@ -142,9 +155,11 @@ public static class LocalBuildRunner
                 new Dictionary<string, string> { ["RUSTUP_TOOLCHAIN"] = LocalRecipe.RustToolchain });
         }
 
-        progress?.Report("Preparing the Visual C++ environment.");
-        var vcEnvironment = await VisualCppEnvironment(cmd, selection.Target, probe, splitRelease: release is not null, unifiedRoot: toolchainRoot);
-        if (toolchainRoot is not null) vcEnvironment["HORIZON_UWP_VSROOT"] = toolchainRoot;
+        progress?.Report(release is null ? "Preparing the Visual C++ environment." : "Preparing the compact Rust and Clang environment.");
+        var vcEnvironment = compact is null ? await VisualCppEnvironment(cmd, selection.Target, probe, splitRelease: false, unifiedRoot: null)
+            : new Dictionary<string, string>(compact.Cargo, StringComparer.OrdinalIgnoreCase);
+        if (release is not null)
+            vcEnvironment["HORIZON_UWP_RUST_LLD"] = await LocalRecipe.FindRustLinkerAsync(probe);
         // Never inherit an unrelated client ID from the parent environment.
         vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
         vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
@@ -160,12 +175,11 @@ public static class LocalBuildRunner
         progress?.Report($"Using {jobs} parallel Cargo jobs based on available processors and memory.");
         if (selection.Target == TargetProfile.SurfaceProX)
         {
-            vcEnvironment["CC_aarch64_uwp_windows_msvc"] = Path.Combine(
-                probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
+            vcEnvironment["CC_aarch64_uwp_windows_msvc"] = ClangFinder.Find(probe) ?? throw new InvalidOperationException("Clang is missing.");
         }
         if (arm)
         {
-            vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
+            vcEnvironment["CC_thumbv7a_uwp_windows_msvc"] = ClangFinder.Find(probe) ?? throw new InvalidOperationException("Clang is missing.");
             vcEnvironment["CFLAGS_thumbv7a_uwp_windows_msvc"] = "-DWINAPI_FAMILY=WINAPI_FAMILY_APP";
         }
         progress?.Report("Fetching missing Cargo dependencies from configured registries.");
@@ -179,7 +193,7 @@ public static class LocalBuildRunner
         }
 
         var packageResources = existingFramework is not null ? null : selection.PrepareSounds
-            ? await PrepareSoundResourcesAsync(snapshot, resources!, minecraftDirectory!, probe, progress, toolchainRoot)
+            ? await PrepareSoundResourcesAsync(snapshot, resources!, minecraftDirectory!, probe, progress, toolchainRoot, compact?.Cargo)
             : Path.GetFullPath(resources!);
 
         progress?.Report("Building the game bridge. This may take several minutes.");
@@ -214,14 +228,34 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
         var hostOutput = Path.Combine(root, "native-host", "game-" + arch);
         vcEnvironment["HORIZON_UWP_BUILD_DIR"] = hostOutput;
-        progress?.Report("Strict-linking the UWP host.");
-        // cmd.exe is required for the checked-in .cmd file. Its command is fixed;
-        // selected paths are passed in the working directory or environment only.
         var hostBuildEnvironment = new Dictionary<string, string>(vcEnvironment, StringComparer.OrdinalIgnoreCase);
+        if (compact is not null) foreach (var (key, value) in compact.Host) hostBuildEnvironment[key] = value;
         if (release is not null) hostBuildEnvironment["USERPROFILE"] = WinUiBootstrap.PrivateProfile;
-        await RunProcess(cmd, snapshot, ["/d", "/c", "uwp\\host\\build-game.cmd", arch], hostBuildEnvironment);
-
-        var executable = Path.Combine(hostOutput, "HorizonUWP.exe");
+        string executable;
+        string? gameBridge = null;
+        if (release is null)
+        {
+            progress?.Report("Strict-linking the UWP host.");
+            // cmd.exe is required for the checked-in .cmd file. Its command is fixed;
+            // selected paths are passed in the working directory or environment only.
+            await RunProcess(cmd, snapshot, ["/d", "/c", "uwp\\host\\build-game.cmd", arch], hostBuildEnvironment);
+            executable = Path.Combine(hostOutput, "HorizonUWP.exe");
+        }
+        else
+        {
+            gameBridge = Path.Combine(hostOutput, "horizon_uwp_game_bridge.dll");
+            progress?.Report("Linking the selected Horizon game bridge with Rust's bundled linker.");
+            await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/strict-bridge-link.ps1",
+                "-Architecture", arch,
+                "-RustLibrary", Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib"),
+                "-HostKit", Path.Combine(snapshot, "uwp", "host", "prebuilt", arch),
+                "-MsvcToolsetRoot", msvcToolset!,
+                "-SdkRoot", compactSdk!,
+                "-RustLld", vcEnvironment["HORIZON_UWP_RUST_LLD"],
+                "-SentinelObject", Path.Combine(snapshot, "uwp", "host", "prebuilt", arch, "dead-import-sentinels.obj"),
+                "-Output", gameBridge], hostBuildEnvironment);
+            executable = hostExecutable!;
+        }
         var packageDir = Path.Combine(root, "package");
         var manifestPath = Path.Combine(snapshot, "uwp", "host", "AppxManifest.xml");
         var manifest = XDocument.Load(manifestPath);
@@ -232,7 +266,7 @@ public static class LocalBuildRunner
         if (selection.UseResourceFramework)
         {
             progress?.Report("Packaging a reusable resource framework from a private snapshot.");
-            framework = await ResourceFrameworkPacker.PackAsync(packageResources!, Path.Combine(root, "resource-framework"), progress, identity?.Publisher);
+            framework = await ResourceFrameworkPacker.PackAsync(packageResources!, Path.Combine(root, "resource-framework"), progress, identity?.Publisher, compactSdk);
         }
         string? releaseNotes = null;
         try { releaseNotes = await NightlyRelease.FetchPinnedNotesAsync(LocalRecipe.UpstreamNightlyDate, LocalRecipe.UpstreamNightlyCommit); }
@@ -254,10 +288,11 @@ public static class LocalBuildRunner
         var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
             "-IdentityName", identity is null ? "HorizonUWPPrototype" : "MCHorizonUWP", "-WinUIFramework", "2.7" };
+        if (gameBridge is not null) { packageArguments.Add("-GameBridge"); packageArguments.Add(gameBridge); }
         packageArguments.AddRange(LocalRecipe.ResourceArguments(selection, packageResources, framework?.Name));
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
         packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath);
-        await RunProcess(powershell, snapshot, packageArguments);
+        await RunProcess(powershell, snapshot, packageArguments, compact is null ? null : hostBuildEnvironment);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
         SignedPackageOutput? signed = null;
@@ -267,6 +302,27 @@ public static class LocalBuildRunner
             signed = await PackageOutput.CreateAsync(package, framework?.Package, identity, signTool, Path.Combine(root, "signed-output"), dependencies);
         }
         return new(root, package, packageResources is null ? null : LocalRecipe.SoundWarning(packageResources), framework?.Package, signed);
+    }
+
+    private static string RequirePrebuiltHost(string source, string architecture)
+    {
+        var hostRoot = Path.Combine(Path.GetFullPath(source), "uwp", "host", "prebuilt", architecture);
+        var executable = Path.Combine(hostRoot, "HorizonUWP.exe");
+        foreach (var path in new[] { executable, Path.Combine(hostRoot, "HorizonUWPHost.lib"),
+                     Path.Combine(hostRoot, "dead-import-sentinels.obj") })
+            if (!File.Exists(path)) throw new FileNotFoundException($"The authenticated client release is missing its prebuilt {architecture} host kit.", path);
+        var expected = architecture switch { "x86" => (ushort)0x014c, "x64" => (ushort)0x8664,
+            "arm" => (ushort)0x01c4, "arm64" => (ushort)0xaa64, _ => (ushort)0 };
+        using var stream = File.OpenRead(executable);
+        using var reader = new BinaryReader(stream);
+        if (reader.ReadUInt16() != 0x5a4d) throw new InvalidDataException("The prebuilt host is not a PE executable.");
+        stream.Position = 0x3c;
+        var peOffset = reader.ReadInt32();
+        if (peOffset < 0 || peOffset + 6 > stream.Length) throw new InvalidDataException("The prebuilt host has an invalid PE header.");
+        stream.Position = peOffset;
+        if (reader.ReadUInt32() != 0x4550 || reader.ReadUInt16() != expected)
+            throw new InvalidDataException($"The prebuilt host does not match the selected {architecture} architecture.");
+        return executable;
     }
 
     public static async Task<string> CreateSnapshotAsync(string source, IProbe probe)
@@ -353,7 +409,7 @@ public static class LocalBuildRunner
 
     /// Prepares sounds only in a new resource tree under the selected build snapshot.
     internal static async Task<string> PrepareSoundResourcesAsync(string snapshot, string resources, string minecraftDirectory,
-        IProbe probe, IProgress<string>? progress = null, string? unifiedRoot = null)
+        IProbe probe, IProgress<string>? progress = null, string? unifiedRoot = null, IReadOnlyDictionary<string, string>? compactEnvironment = null)
     {
         LocalRecipe.ValidateResources(resources);
         LocalRecipe.ValidateSoundPreparation(resources, minecraftDirectory);
@@ -363,7 +419,9 @@ public static class LocalBuildRunner
         await Task.Run(() => StageResources(resources, destination));
         var cargo = probe.FindOnPath("cargo.exe") ?? throw new InvalidOperationException("Cargo is required to prepare sounds.");
         var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
-        var hostEnvironment = await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: false, unifiedRoot: unifiedRoot);
+        var hostEnvironment = compactEnvironment is null
+            ? await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: false, unifiedRoot: unifiedRoot)
+            : new Dictionary<string, string>(compactEnvironment, StringComparer.OrdinalIgnoreCase);
         hostEnvironment["CARGO_BUILD_JOBS"] = CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var plan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
         progress?.Report("Building Horizon's resource preparation tool.");

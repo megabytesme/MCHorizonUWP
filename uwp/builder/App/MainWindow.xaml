@@ -1,48 +1,81 @@
 <Window x:Class="Horizon.Builder.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Horizon UWP Builder — Current preview">
+    Title="MCHorizonUWP Builder">
   <Window.SystemBackdrop>
     <MicaBackdrop />
   </Window.SystemBackdrop>
-  <Grid>
-    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1" CornerRadius="18" Padding="32" Margin="24"
-            MaxWidth="840" MaxHeight="860" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+  <Grid x:Name="WindowRoot">
+    <Grid.RowDefinitions><RowDefinition x:Name="TitleBarRow" Height="48" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+    <Grid x:Name="AppTitleBar" Background="Transparent" Height="48" Padding="18,0,150,0">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Image Source="Assets/Square44x44Logo.png" Width="20" Height="20" />
+        <TextBlock Text="MCHorizonUWP Builder" VerticalAlignment="Center" FontWeight="SemiBold" />
+      </StackPanel>
+    </Grid>
+    <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1" CornerRadius="18" Padding="24" Margin="24,0,24,24"
+            MaxWidth="1100" MaxHeight="860" HorizontalAlignment="Stretch" VerticalAlignment="Center">
       <Grid RowSpacing="20">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
         <StackPanel Spacing="5">
-          <TextBlock Text="HORIZON UWP BUILDER" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+          <TextBlock Text="MCHORIZONUWP BUILDER" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
           <TextBlock x:Name="StepLabel" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-          <PipsPager x:Name="WizardPips" NumberOfPages="6" MaxVisiblePips="6" HorizontalAlignment="Center" />
-          <ProgressBar x:Name="PageProgress" Minimum="0" Maximum="6" Value="0" AutomationProperties.Name="Wizard pages completed" />
-          <Expander x:Name="DependencyExpander" Header="Dependencies" HorizontalAlignment="Stretch">
+          <PipsPager x:Name="WizardPips" NumberOfPages="9" MaxVisiblePips="9" HorizontalAlignment="Center" />
+          <ProgressBar x:Name="PageProgress" Minimum="0" Maximum="8" Value="0" AutomationProperties.Name="Wizard pages completed" />
+        </StackPanel>
+        <Grid x:Name="WizardBody" Grid.Row="1" ColumnSpacing="20" RowSpacing="16" SizeChanged="WizardBody_SizeChanged">
+          <Grid.ColumnDefinitions><ColumnDefinition x:Name="SummaryColumn" Width="*" /><ColumnDefinition x:Name="ContentColumn" Width="0" /></Grid.ColumnDefinitions>
+          <Grid.RowDefinitions><RowDefinition x:Name="SummaryRow" Height="Auto" /><RowDefinition x:Name="ContentRow" Height="*" /></Grid.RowDefinitions>
+          <Border x:Name="SummaryCard" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                  BorderThickness="1" CornerRadius="12" Padding="16" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="12">
+                <TextBlock x:Name="SummaryTitle" Style="{StaticResource SubtitleTextBlockStyle}" TextWrapping="Wrap" />
+                <TextBlock x:Name="SummaryDetail" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+          <Expander x:Name="DependencyExpander" HorizontalAlignment="Stretch">
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ProgressRing x:Name="DependencyRing" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="DependencyHeader" Text="Dependencies · 0/10 ready" />
+              </StackPanel>
+            </Expander.Header>
             <StackPanel Spacing="7">
               <TextBlock x:Name="DependencySummary" Text="Setup will be checked when you continue." TextWrapping="Wrap" />
               <Grid ColumnSpacing="8" RowSpacing="5">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /><ColumnDefinition Width="170" /></Grid.ColumnDefinitions>
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="80" /><ColumnDefinition Width="*" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="Git" /><ProgressBar x:Name="GitProgress" Grid.Row="0" Grid.Column="1" Maximum="100" AutomationProperties.Name="Git setup" /><TextBlock x:Name="GitState" Grid.Row="0" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Row="1" Text="Python" /><ProgressBar x:Name="PythonProgress" Grid.Row="1" Grid.Column="1" Maximum="100" AutomationProperties.Name="Python setup" /><TextBlock x:Name="PythonState" Grid.Row="1" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Row="2" Text="Rustup" /><ProgressBar x:Name="RustupProgress" Grid.Row="2" Grid.Column="1" Maximum="100" AutomationProperties.Name="Rustup setup" /><TextBlock x:Name="RustupState" Grid.Row="2" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Row="3" Text="Rust compiler" /><ProgressBar x:Name="RustProgress" Grid.Row="3" Grid.Column="1" Maximum="100" AutomationProperties.Name="Rust compiler setup" /><TextBlock x:Name="RustState" Grid.Row="3" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Row="4" Text="C++ and SDKs" /><ProgressBar x:Name="VsProgress" Grid.Row="4" Grid.Column="1" Maximum="100" AutomationProperties.Name="Visual C++ and SDK setup" /><TextBlock x:Name="VsState" Grid.Row="4" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Row="5" Text="LLVM" /><ProgressBar x:Name="LlvmProgress" Grid.Row="5" Grid.Column="1" Maximum="100" AutomationProperties.Name="LLVM setup" /><TextBlock x:Name="LlvmState" Grid.Row="5" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Row="6" Text="Microsoft UI" /><ProgressBar x:Name="UiProgress" Grid.Row="6" Grid.Column="1" Maximum="100" AutomationProperties.Name="Microsoft UI framework setup" /><TextBlock x:Name="UiState" Grid.Row="6" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Row="7" Text="VC runtimes" /><ProgressBar x:Name="VcProgress" Grid.Row="7" Grid.Column="1" Maximum="100" AutomationProperties.Name="Microsoft VC runtime setup" /><TextBlock x:Name="VcState" Grid.Row="7" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="4" Text="Microsoft C++ link libraries" /><ProgressBar x:Name="MsvcProgress" Grid.Row="4" Grid.Column="1" Maximum="100" AutomationProperties.Name="Microsoft C++ link library setup" /><TextBlock x:Name="MsvcState" Grid.Row="4" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="5" Text="Windows SDK" /><ProgressBar x:Name="SdkProgress" Grid.Row="5" Grid.Column="1" Maximum="100" AutomationProperties.Name="Windows SDK setup" /><TextBlock x:Name="SdkState" Grid.Row="5" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="6" Text="LLVM" /><ProgressBar x:Name="LlvmProgress" Grid.Row="6" Grid.Column="1" Maximum="100" AutomationProperties.Name="LLVM setup" /><TextBlock x:Name="LlvmState" Grid.Row="6" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="7" Text="Microsoft UI" /><ProgressBar x:Name="UiProgress" Grid.Row="7" Grid.Column="1" Maximum="100" AutomationProperties.Name="Microsoft UI framework setup" /><TextBlock x:Name="UiState" Grid.Row="7" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="8" Text="VC runtimes" /><ProgressBar x:Name="VcProgress" Grid.Row="8" Grid.Column="1" Maximum="100" AutomationProperties.Name="Microsoft VC runtime setup" /><TextBlock x:Name="VcState" Grid.Row="8" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="9" Text="Minecraft assets" /><ProgressBar x:Name="AssetProgress" Grid.Row="9" Grid.Column="1" Maximum="100" AutomationProperties.Name="Minecraft assets setup" /><TextBlock x:Name="AssetState" Grid.Row="9" Grid.Column="2" Text="Waiting" TextTrimming="CharacterEllipsis" />
               </Grid>
+              <TextBlock x:Name="AssetPrefetchStatus" Text="Sign in to confirm ownership. Minecraft 26.3 assets will then be prepared automatically." TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="CancelAssetPrefetch" Content="Cancel asset preparation" Click="CancelAssetPrefetch_Click" Visibility="Collapsed" />
+                <Button x:Name="RetryAssetPrefetch" Content="Retry asset preparation" Click="RetryAssetPrefetch_Click" Visibility="Collapsed" />
+              </StackPanel>
               <Button x:Name="RetryDependencies" Content="Retry dependency setup" Click="RetryDependencies_Click" Visibility="Collapsed" />
             </StackPanel>
           </Expander>
-        </StackPanel>
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <Button x:Name="ViewActivityLog" Content="View setup and build log" HorizontalAlignment="Stretch" Click="ViewActivityLog_Click" />
+              </StackPanel>
+            </ScrollViewer>
+          </Border>
+        <ScrollViewer x:Name="PageScroller" Grid.Row="1" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="16">
             <StackPanel x:Name="WelcomePage" Spacing="14">
               <TextBlock Text="Welcome to Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="Create a Horizon package for a Windows PC or a Windows 10 Mobile device." TextWrapping="Wrap" />
-              <TextBlock Text="You need Windows Package Manager (WinGet), an internet connection and enough free disk space. The builder can install the compiler, Windows SDKs, Rust, frameworks and other tools for every supported target." TextWrapping="Wrap" />
-              <TextBlock Text="Setup can download several gigabytes. Windows may ask an administrator to approve tool installation. You can continue through the wizard while setup runs." TextWrapping="Wrap" />
-              <TextBlock Text="This is a preview; a complete clean-PC build has not yet been validated." TextWrapping="Wrap" />
+              <TextBlock Text="You need an internet connection. The builder checks for existing tools and prepares any missing ones. Allow at least 20 GiB free for Minecraft resources and a build, plus space for the compact SDK and compiler tools." TextWrapping="Wrap" />
+              <TextBlock Text="The builder compiles the Rust client and links a prebuilt Windows host, so it does not compile the C++/CX app. It prepares the pinned Rust, LLVM and Windows SDK pieces, plus the selected architecture’s Microsoft link libraries and app frameworks." TextWrapping="Wrap" />
+              <TextBlock Text="The setup reuses tools already available on this PC and downloads only the selected architecture’s missing pieces. Windows may ask for administrator approval for Microsoft build tools or app frameworks. You can continue through the wizard while setup runs." TextWrapping="Wrap" />
               <TextBlock Text="The builder retrieves compatible releases from the MCHorizonUWP repository." TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel x:Name="TargetPage" Spacing="14" Visibility="Collapsed">
@@ -67,67 +100,76 @@
               <TextBlock Text="These are architecture examples, not tested device compatibility. Surface Duo normally runs Android and requires a Windows installation to run UWP apps; Surface Neo was a prototype." TextWrapping="Wrap" />
               <TextBlock Text="The client checks graphics support and selects an available renderer on the target device." TextWrapping="Wrap" />
             </StackPanel>
-            <StackPanel x:Name="SourcePage" Spacing="14" Visibility="Collapsed">
-              <TextBlock Text="Choose your source and resources" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
-              <TextBlock Text="Horizon UWP release" Style="{StaticResource BodyStrongTextBlockStyle}" />
-              <ComboBox x:Name="ReleaseSelection" PlaceholderText="No compatible release loaded" HorizontalAlignment="Stretch" />
-              <TextBlock x:Name="ReleaseStatus" Text="Checking the signed release catalog…" TextWrapping="Wrap" />
-              <Button x:Name="RefreshReleases" Content="Refresh releases" Click="RefreshReleases_Click" />
-              <TextBlock Text="Minecraft resources" Style="{StaticResource BodyStrongTextBlockStyle}" />
-              <TextBlock Text="Sign in with a Microsoft account that owns Minecraft: Java Edition. The builder can download and prepare your resources privately from Mojang." TextWrapping="Wrap" />
+            <StackPanel x:Name="AccountPage" Spacing="14" Visibility="Collapsed">
+              <TextBlock Text="Sign in to Microsoft" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="Sign in with the Microsoft account that owns Minecraft: Java Edition. The builder checks ownership before preparing your private Minecraft resources." TextWrapping="Wrap" />
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button x:Name="StartMinecraftSignIn" Content="Sign in to Microsoft" Click="StartMinecraftSignIn_Click" />
-                <Button x:Name="CancelMinecraftSignIn" Content="Cancel sign-in" Click="CancelMinecraftSignIn_Click" IsEnabled="False" />
+                <Button x:Name="UseSavedMinecraftSignIn" Content="Use saved sign-in" Click="UseSavedMinecraftSignIn_Click" Visibility="Collapsed" />
+                <Button x:Name="ForgetSavedMinecraft" Content="Forget saved sign-in" Click="SignOutMinecraft_Click" Visibility="Collapsed" />
+                <Button x:Name="SignOutMinecraft" Content="Sign out" Click="SignOutMinecraft_Click" Visibility="Collapsed" />
+                <Button x:Name="CancelMinecraftSignIn" Content="Cancel sign-in" Click="CancelMinecraftSignIn_Click" IsEnabled="False" Visibility="Collapsed" />
               </StackPanel>
+              <TextBlock Text="A saved sign-in is encrypted for this Windows account on this PC. It stores a Microsoft refresh token, not your password." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
               <TextBlock x:Name="MinecraftSignInStatus" TextWrapping="Wrap" />
               <HyperlinkButton x:Name="MinecraftSignInLink" Content="Open the Microsoft sign-in page" Visibility="Collapsed" />
-              <ComboBox x:Name="ResourceMode" SelectedIndex="0" HorizontalAlignment="Stretch">
-                <ComboBoxItem Content="Build a separate reusable resource framework" />
-                <ComboBoxItem Content="Use a resource framework already installed on the target" />
-                <ComboBoxItem Content="Include resources in the client package" />
-              </ComboBox>
-              <TextBlock Text="A separate framework can be reused by compatible client packages. Bundled resources travel with each client package." TextWrapping="Wrap" />
-              <CheckBox x:Name="DownloadMinecraft" Content="Download and prepare my Minecraft resources automatically" IsChecked="True" Click="DownloadMinecraft_Click" />
-              <TextBlock Text="Downloaded Minecraft files and generated resources remain in your private build workspace. Do not share packages containing those resources." TextWrapping="Wrap" />
-              <TextBlock Text="For an existing framework, enter its exact package name and ensure it is installed on the target." TextWrapping="Wrap" />
-              <TextBox x:Name="ExistingFrameworkName" PlaceholderText="Horizon.Asset.26-3.…" IsEnabled="False" />
-              <Button x:Name="ChooseResources" Content="Choose prepared resources" Click="ChooseResources_Click" />
-              <TextBlock x:Name="ResourcesPath" Text="No resources selected" TextWrapping="Wrap" />
-              <Button x:Name="ChooseMinecraft" Content="Choose Minecraft installation (for missing sounds)" Click="ChooseMinecraft_Click" />
-              <TextBlock x:Name="MinecraftPath" Text="No Minecraft installation selected" TextWrapping="Wrap" />
-              <CheckBox x:Name="PrepareSounds" Content="Prepare missing sounds in the build workspace" />
             </StackPanel>
-            <StackPanel x:Name="OptionsPage" Spacing="14" Visibility="Collapsed">
-              <TextBlock Text="Choose options" Style="{StaticResource TitleTextBlockStyle}" />
-              <TextBlock Text="Native mods" Style="{StaticResource BodyStrongTextBlockStyle}" />
+            <StackPanel x:Name="ReleasePage" Spacing="14" Visibility="Collapsed">
+              <TextBlock Text="Choose a Horizon release" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="Choose a compatible patch and UWP client from the signed MCHorizonUWP release catalog. The newest compatible choice is selected for you." TextWrapping="Wrap" />
+              <ComboBox x:Name="ReleaseSelection" PlaceholderText="No compatible release loaded" HorizontalAlignment="Stretch" />
+              <TextBlock x:Name="ReleaseStatus" Text="Checking the signed release catalog…" TextWrapping="Wrap" />
+              <Button x:Name="RefreshReleases" Content="Refresh releases" Click="RefreshReleases_Click" HorizontalAlignment="Left" />
+            </StackPanel>
+            <StackPanel x:Name="FrameworkPage" Spacing="14" Visibility="Collapsed">
+              <TextBlock Text="Choose how Minecraft resources are installed" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="The builder prepares Minecraft 26.3 automatically after sign-in. Choose whether the resources install separately or travel inside the client package." TextWrapping="Wrap" />
+              <ComboBox x:Name="ResourceMode" SelectedIndex="0" HorizontalAlignment="Stretch">
+                <ComboBoxItem Content="Create a separate reusable resource framework (recommended)" />
+                <ComboBoxItem Content="Use a resource framework already installed on the target" />
+                <ComboBoxItem Content="Bundle resources in the client package (larger download)" />
+              </ComboBox>
+              <TextBlock x:Name="ResourceModeDescription" TextWrapping="Wrap" />
+              <TextBox x:Name="ExistingFrameworkName" Header="Exact installed framework package name" PlaceholderText="Horizon.Asset.26-3.…" IsEnabled="False" />
+              <TextBlock Text="The assets are checked and cached privately on this PC. Use the Dependencies section to see progress or retry preparation." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel x:Name="ModsPage" Spacing="14" Visibility="Collapsed">
+              <TextBlock Text="Choose native mods" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="Native mods add features to the client. Choose trusted mods from Horizon’s signed native mod repository; compatibility is checked during the build." TextWrapping="Wrap" />
               <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls" IsChecked="True" />
               <TextBlock Text="The included touch controls currently work with the native Direct3D 11 backend." TextWrapping="Wrap" />
               <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration" IsChecked="True" />
-              <Button x:Name="BrowseNativeMods" Content="Browse Horizon native mods" Click="BrowseNativeMods_Click" />
-              <TextBlock x:Name="NativeModsStatus" Text="Browse and select native mods from Horizon's registry. Native mods run code with the player's permissions; select only mods you trust." TextWrapping="Wrap" />
-              <TextBox x:Name="NativeModSearch" PlaceholderText="Search native mods" IsEnabled="False" TextChanged="NativeModSearch_TextChanged" />
-              <StackPanel x:Name="NativeModsResults" Spacing="12" />
-              <TextBlock Text="The client uses Horizon’s public Microsoft sign-in application." TextWrapping="Wrap" />
-              <TextBlock Text="Package version" TextWrapping="Wrap" />
-              <TextBox x:Name="PackageVersion" />
+              <Button x:Name="BrowseNativeMods" Content="Browse Horizon native mods…" Click="BrowseNativeMods_Click" />
+              <TextBlock x:Name="NativeModsStatus" Text="No Horizon repository mods selected." TextWrapping="Wrap" />
+              <Button x:Name="ClearNativeMods" Content="Clear selected repository mods" Click="ClearNativeMods_Click" Visibility="Collapsed" HorizontalAlignment="Left" />
             </StackPanel>
-            <StackPanel x:Name="SetupPage" Spacing="14" Visibility="Collapsed">
-              <TextBlock Text="Check your setup" Style="{StaticResource TitleTextBlockStyle}" />
-              <TextBlock Text="Dependencies are checked when you leave the welcome page. Open Dependencies above to follow setup or retry a failed installation." TextWrapping="Wrap" />
-              <Button Content="Check setup" Click="CheckSetup_Click" />
-              <StackPanel x:Name="Results" Spacing="12" />
+            <StackPanel x:Name="PackageVersionPage" Spacing="14" Visibility="Collapsed">
+              <TextBlock Text="Set the package version" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="This four-part number identifies this installed app release. Keep the suggested value unless you are preparing your own update; a newer package must use a higher version." TextWrapping="Wrap" />
+              <TextBox x:Name="PackageVersion" Header="Package version" PlaceholderText="2026.1105.14.0" />
+              <TextBlock Text="Windows expects four numeric parts, such as 1.2.3.0. This is separate from the Horizon patch and UWP client versions selected earlier." TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel x:Name="ReviewPage" Spacing="14" Visibility="Collapsed">
+              <TextBlock Text="Review your build" Style="{StaticResource TitleTextBlockStyle}" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ProgressRing x:Name="ReadinessRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="ReadinessStatus" Text="Checking your setup…" TextWrapping="Wrap" Style="{StaticResource BodyStrongTextBlockStyle}" />
+              </StackPanel>
+              <TextBlock x:Name="BuildSummary" TextWrapping="Wrap" />
+              <CheckBox x:Name="AutoBuild" Content="Start building automatically when ready" IsChecked="True" />
+              <Expander Header="Check your setup" HorizontalAlignment="Stretch"><StackPanel x:Name="Results" Spacing="12" /></Expander>
+              <Expander Header="Local build plan" HorizontalAlignment="Stretch"><StackPanel x:Name="RecipeSteps" Spacing="6" /></Expander>
+              <Button x:Name="RunRecipe" Content="Build now" Click="RunRecipe_Click" />
             </StackPanel>
             <StackPanel x:Name="BuildPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Build your package" Style="{StaticResource TitleTextBlockStyle}" />
-              <TextBlock Text="Sign in with an account that owns Minecraft: Java Edition, validate the plan, then build. The client package and its reusable resources are signed with your local certificate." TextWrapping="Wrap" />
-              <Button x:Name="CheckRecipe" Content="Validate local build plan" Click="CheckRecipe_Click" />
-              <Button x:Name="RunRecipe" Content="Build client" Click="RunRecipe_Click" />
+              <TextBlock Text="The client package and any new resource framework are signed with your local certificate." TextWrapping="Wrap" />
               <Button x:Name="InstallLocal" Content="Install on this PC" Click="InstallLocal_Click" Visibility="Collapsed" />
               <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
-              <StackPanel x:Name="RecipeSteps" Spacing="6" />
             </StackPanel>
           </StackPanel>
         </ScrollViewer>
+        </Grid>
         <Grid Grid.Row="2" ColumnSpacing="10">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
           <Button x:Name="BackButton" Grid.Column="1" Content="Back" Click="Back_Click" />

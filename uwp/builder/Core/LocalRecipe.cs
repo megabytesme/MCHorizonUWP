@@ -172,7 +172,7 @@ public static class LocalRecipe
             throw new InvalidDataException("Selected resources already contain some sound data. Use complete resources without sound preparation, or choose a sound-free copy.");
     }
 
-    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust, bool splitRelease = false, bool unifiedToolchain = false)
+    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust, bool splitRelease = false, bool unifiedToolchain = false, bool compactToolchain = false)
     {
         var blockers = new List<string>();
         foreach (var tool in new[] { "git.exe", "rustup.exe", "cargo.exe", "python.exe" })
@@ -190,6 +190,13 @@ public static class LocalRecipe
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
         };
+        if (compactToolchain)
+        {
+            if (PrivateWindowsSdk.FindReady(probe, [arch, "x64"]) is null) blockers.Add($"Windows SDK 19041 is missing files for the x64 host or {arch} target.");
+            if (ClangFinder.Find(probe) is null) blockers.Add("The Rust build requires Clang for its native dependencies.");
+            if (VisualCppInstallation.FindLinkToolset(probe, arch) is null) blockers.Add($"The Microsoft link libraries for the x64 host and {arch} target are missing.");
+            return blockers.AsReadOnly();
+        }
         var unifiedRoot = unifiedToolchain ? VisualCppInstallation.FindForTarget(probe, selection.Target) : null;
         var vc = unifiedToolchain ? (unifiedRoot is null ? "" : Path.Combine(unifiedRoot, "VC", "Auxiliary", "Build", "vcvarsall.bat")) : arch == "arm"
             ? Path.Combine(pfx86, "Microsoft Visual Studio", splitRelease ? "2022" : "2017", splitRelease ? "BuildTools" : "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
@@ -233,5 +240,24 @@ public static class LocalRecipe
         var version = await Run("run", RustToolchain, "rustc", "--version");
         var sysroot = await Run("run", RustToolchain, "rustc", "--print", "sysroot");
         return new(version, !string.IsNullOrWhiteSpace(sysroot) && probe.FileExists(Path.Combine(sysroot, "lib", "rustlib", "src", "rust", "library", "Cargo.toml")));
+    }
+
+    public static async Task<string> FindRustLinkerAsync(IProbe probe)
+    {
+        var rustup = probe.FindOnPath("rustup.exe") ?? throw new InvalidOperationException("Rustup is missing.");
+        var start = new ProcessStartInfo(rustup) { UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var arg in new[] { "run", RustToolchain, "rustc", "--print", "sysroot" }) start.ArgumentList.Add(arg);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not locate Rust's linker.");
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        await Task.WhenAll(output, error);
+        if (process.ExitCode != 0) throw new InvalidOperationException("Could not locate the pinned Rust toolchain linker.");
+        var sysroot = (await output).Trim();
+        if (sysroot.Length == 0) throw new InvalidOperationException("Rust did not report its toolchain directory.");
+        var linker = Path.GetFullPath(Path.Combine(sysroot, "lib", "rustlib", "x86_64-pc-windows-msvc", "bin", "rust-lld.exe"));
+        if (!probe.FileExists(linker)) throw new FileNotFoundException("The pinned Rust toolchain does not include rust-lld.", linker);
+        return linker;
     }
 }

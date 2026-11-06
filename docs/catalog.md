@@ -14,6 +14,11 @@ explicit list of `x86`, `x64`, `arm` and/or `arm64` targets. Each patch pins
 an exact 40-hex upstream Horizon commit and a numbered bridge interface; each
 client declares its bridge interface. A combination is allowed only when
 both bridge numbers match and one rule matches all four dimensions.
+The current builder recipe requires client 0.1.2, which contains the prebuilt
+host files for all four architectures. The newest published client is 0.1.1,
+so the signed catalog currently has no rule for builder 0.1.3. The builder
+blocks that pair until a matching client release and compatibility rule are
+available. This prevents an unsupported release from appearing selectable.
 
 Artifacts have HTTPS URLs and SHA-256 digests. Catalog authenticity is a
 separate required check: a hash from an unauthenticated catalog does not
@@ -55,3 +60,41 @@ the x64 source release. Development-machine proofs produced signed packages
 for all four targets, and x64 and x86 packages were installed in Sandbox. The
 complete builder flow on a fresh PC and runtime behavior on target devices
 remain unverified.
+
+## Where changes belong
+
+- Builder screens, orchestration and dependency setup belong in `uwp/builder/`.
+- UWP client code belongs in `uwp/`: the native shell is in `uwp/host/`, the
+  Rust client bridge is in `uwp/game-bridge/`, and platform adapters live in
+  their named directories beside them. Client changes are committed normally
+  and published together as a versioned client release archive.
+- Changes to Horizon itself belong in the Horizon source history when they are
+  suitable upstream. UWP-specific changes that must be applied to an upstream
+  nightly are ordinary commits on top of that exact upstream commit, exported
+  as a Git patch, and checked into `patches/<nightly>/`. The matching
+  `patch-vX.Y.Z` release carries the patch file. The builder verifies the
+  upstream commit and artifact hashes, checks the patch applies cleanly, then
+  applies it in a private build workspace; it never edits the user's checkout.
+- `catalog/catalog-v1.json` records each patch/client version, its artifact
+  hashes and the compatible version ranges. The detached signature must be
+  refreshed after catalog edits. A patch release and a client release are
+  separate: updating one does not require copying the other's source into it.
+
+The patch is generated from Git history rather than handwritten. Keep a clean
+checkout of the pinned upstream revision, commit the UWP-specific Horizon
+changes on top, then export that commit with `git format-patch` (or an equivalent
+binary-safe Git patch command). Before release, apply it to a fresh archive of
+the pinned commit and verify the resulting source. Client changes do not go in
+that patch: they stay in this repository's `uwp/` tree and client release.
+
+Client 0.1.2 carries four architecture-specific C++/CX host executables, their
+import libraries and a compact link kit. The builder compiles the selected
+Horizon patch and mods as a Rust static library, then links that library into a
+bridge DLL with Rust's bundled `rust-lld`. The APPX contains the matching host
+executable and bridge DLL. This skips compiling the Windows host on a user's
+PC; the builder still prepares Rust, Clang, the Windows SDK and Microsoft app
+frameworks when they are unavailable. Setup links the component license terms.
+
+The fresh-PC flow and runtime behavior for all four architectures remain under
+validation. Compatibility rules describe which versions a builder recognizes;
+build support and device testing are recorded separately as evidence.

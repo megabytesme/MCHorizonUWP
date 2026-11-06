@@ -1,0 +1,22 @@
+LIBRARY horizon_uwp_game_bridge.dll
+EXPORTS
+    horizon_uwp_controller_face_swap
+    horizon_uwp_controller_navigation_read
+    horizon_uwp_controller_navigation_stop
+    horizon_uwp_controller_test_read
+    horizon_uwp_controller_test_stop
+    horizon_uwp_port_ref
+    horizon_uwp_prepare
+    horizon_uwp_prepare_native_renderer
+    horizon_uwp_probe_renderer
+    horizon_uwp_release_label
+    horizon_uwp_run
+    horizon_uwp_run_prepared
+    horizon_uwp_server_icon_read
+    horizon_uwp_server_list_add
+    horizon_uwp_server_list_read
+    horizon_uwp_server_list_remove
+    horizon_uwp_server_status
+    horizon_uwp_upstream_ref
+    horizon_uwp_upstream_release
+    horizon_uwp_world_summary

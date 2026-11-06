@@ -20,6 +20,11 @@ if /i "%ARCH%"=="arm" (
     set "SDK=10.0.19041.0"
 )
 if /i not "%ARCH%"=="x86" if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="arm64" if /i not "%ARCH%"=="arm" exit /b 1
+if defined HORIZON_UWP_PREPARED_ENV (
+    if not defined WindowsSdkDir exit /b 1
+    if not defined WindowsSDKVersion exit /b 1
+    set "SDK=%WindowsSDKVersion:\=%"
+)
 
 if not defined HORIZON_UWP_GAME_LIB (
     echo Set HORIZON_UWP_GAME_LIB to the Rust game bridge static library.
@@ -33,12 +38,15 @@ if not exist "%HORIZON_UWP_GAME_LIB%" exit /b 1
 set "VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
 if /i "%ARCH%"=="arm" set "VSROOT=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
 if defined HORIZON_UWP_VSROOT set "VSROOT=%HORIZON_UWP_VSROOT%"
-call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
-if errorlevel 1 exit /b %errorlevel%
+if not defined HORIZON_UWP_PREPARED_ENV (
+    call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
+    if errorlevel 1 exit /b 1
+)
 set "OUTDIR=%~dp0build\game-%ARCH%"
 if defined HORIZON_UWP_BUILD_DIR set "OUTDIR=%HORIZON_UWP_BUILD_DIR%"
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 set "FXC=%ProgramFiles(x86)%\Windows Kits\10\bin\%SDK%\x64\fxc.exe"
+if defined HORIZON_UWP_PREPARED_ENV set "FXC=%WindowsSdkDir%bin\%SDK%\x64\fxc.exe"
 if not exist "%FXC%" exit /b 1
 "%FXC%" /nologo /T vs_4_0_level_9_1 /E VSMain /Vn g_phone_probe_vs /Fh "%OUTDIR%\PhoneProbeVS.h" "%~dp0..\dx11\PhoneProbe.hlsl"
 if errorlevel 1 exit /b 1
@@ -88,7 +96,15 @@ if defined HORIZON_UWP_ACCOUNT (
     )
     if errorlevel 1 (popd & exit /b 1)
 )
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0strict-game-link.ps1"
+if defined HORIZON_UWP_DYNAMIC_HOST (
+    cl /nologo /c /MD /O2 /Gy /Gw /Fo"%OUTDIR%\dead-import-sentinels.obj" "%~dp0..\rust-std\dead-import-sentinels.c"
+    if errorlevel 1 (popd & exit /b 1)
+)
+if defined HORIZON_UWP_DYNAMIC_HOST (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0strict-prebuilt-host-link.ps1" -Architecture "%ARCH%" -BridgeImportLibrary "%HORIZON_UWP_GAME_LIB%"
+) else (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0strict-game-link.ps1"
+)
 set "RESULT=%errorlevel%"
 popd
 exit /b %RESULT%
