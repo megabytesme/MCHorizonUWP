@@ -63,6 +63,7 @@ try {
             '@echo off',
             "call `"$vsRoot\VC\Auxiliary\Build\vcvarsall.bat`" $($target.Arch) store $($target.Sdk)",
             'if errorlevel 1 exit /b %ERRORLEVEL%',
+            'set HORIZON_UWP_PREPARED_ENV=1',
             "lib.exe /nologo /def:`"$sourceRoot\uwp\host\game-bridge-exports.def`" /machine:$($target.Machine) /out:`"$buildDirectory\horizon_uwp_game_bridge.lib`"",
             'if errorlevel 1 exit /b %ERRORLEVEL%',
             "set `"HORIZON_UWP_BUILD_DIR=$buildDirectory`"",

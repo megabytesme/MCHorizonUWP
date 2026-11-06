@@ -5,10 +5,8 @@ use horizon_account_core::{
     vault::{CredentialLocker, SecretStore},
 };
 use horizon_client::auth::AuthSession;
-use std::{
-    sync::{Arc, mpsc::TryRecvError},
-    time::Duration,
-};
+use std::path::Path;
+use std::{sync::Arc, time::Duration};
 
 unsafe extern "C" {
     fn horizon_uwp_dialog_show(text: *const u8, len: usize, kind: u32) -> i32;
@@ -22,6 +20,33 @@ unsafe extern "C" {
     fn horizon_uwp_page_skin(text: *const u8, len: usize);
     fn horizon_uwp_page_accounts(text: *const u8, len: usize);
     fn horizon_uwp_dialog_text(buffer: *mut u8, capacity: usize) -> usize;
+    fn horizon_uwp_telemetry_prompt(mask: u32) -> i32;
+    fn horizon_uwp_page_selected_telemetry_mask() -> u32;
+    fn horizon_uwp_page_update_enabled() -> i32;
+    fn horizon_uwp_release_metadata(buffer: *mut u8, capacity: usize) -> usize;
+    fn horizon_uwp_page_update_notice(text: *const u8, len: usize);
+}
+
+fn start_update_check(game_dir: &Path) {
+    let enabled = unsafe { horizon_uwp_page_update_enabled() != 0 };
+    let mut metadata = [0u8; 4096];
+    let length = unsafe { horizon_uwp_release_metadata(metadata.as_mut_ptr(), metadata.len()) };
+    let installed = metadata
+        .get(..length)
+        .filter(|_| length > 0 && length <= metadata.len())
+        .and_then(crate::update_check::InstalledRelease::parse_json);
+    if let Some(receiver) =
+        crate::update_check::spawn(enabled, installed, game_dir.join("update-check.json"))
+    {
+        let _ = std::thread::Builder::new()
+            .name("Horizon update notice".into())
+            .spawn(move || {
+                if let Ok(Some(notice)) = receiver.recv() {
+                    let message = notice.message.as_bytes();
+                    unsafe { horizon_uwp_page_update_notice(message.as_ptr(), message.len()) };
+                }
+            });
+    }
 }
 
 const MENU: u32 = 0;
@@ -252,13 +277,44 @@ fn choose_profile(store: &dyn SecretStore, question: &str) -> Option<Profile> {
 }
 
 /// None means the window was closed. A selection without a session is offline.
-pub fn start() -> Option<Selection> {
+pub fn start(game_dir: &Path) -> Option<Selection> {
+    start_update_check(game_dir);
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     while !closed()
         && unsafe { horizon_uwp_window_visible() == 0 }
         && std::time::Instant::now() < deadline
     {
         pump();
+    }
+    if closed() {
+        return None;
+    }
+    let (mut telemetry_mask, telemetry_confirmed) =
+        horizon_client::telemetry::uwp_consent_mask(game_dir);
+    if !telemetry_confirmed {
+        if unsafe { horizon_uwp_telemetry_prompt(telemetry_mask) } == 0 {
+            while !closed() {
+                match poll() {
+                    1 => {
+                        telemetry_mask = unsafe { horizon_uwp_page_selected_telemetry_mask() };
+                        if horizon_client::telemetry::save_uwp_consent_mask(
+                            game_dir,
+                            telemetry_mask,
+                        )
+                        .is_err()
+                        {
+                            notice(
+                                "Telemetry choices could not be saved. No telemetry will be sent until you confirm them in a later launch.",
+                            );
+                        }
+                        break;
+                    }
+                    2 | -1 => break,
+                    0 => pump(),
+                    _ => break,
+                }
+            }
+        }
     }
     if closed() {
         return None;
@@ -341,9 +397,7 @@ pub fn start() -> Option<Selection> {
                             }
                         }
                         None => {
-                            notice(
-                                "Microsoft sign-in is not configured for this build.",
-                            );
+                            notice("Microsoft sign-in is not configured for this build.");
                             Outcome::Menu
                         }
                     },

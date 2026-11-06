@@ -11,7 +11,7 @@ crate-type = ["staticlib"]
 
 [features]
 native-d3d11 = ["horizon-client/native-d3d11"]
-uwp-https = ["horizon-client/uwp-https"]
+uwp-https = ["horizon-client/uwp-https", "dep:horizon-uwp-https-bridge"]
 native-d3d11-readback = ["horizon-client/native-d3d11-readback"]
 native-touch-mod = ["horizon-client/native-touch-mod"]
 native-device-vibration-mod = ["horizon-client/native-device-vibration-mod"]
@@ -26,10 +26,12 @@ horizon-client = { path = "../../crates/horizon-client", default-features = fals
 pollster = "0.4"
 horizon-protocol = { path = "../../crates/horizon-protocol" }
 serde_json = "1.0.151"
+p256 = { version = "0.13.2", default-features = false, features = ["ecdsa", "pkcs8"] }
 
 [target.'cfg(target_vendor = "uwp")'.dependencies]
 horizon-threads = { path = "../../crates/horizon-threads" }
 horizon-account-core = { path = "../../crates/horizon-account-core", optional = true }
+horizon-uwp-https-bridge = { path = "../https-bridge", optional = true }
 horizon-core = { path = "../../crates/horizon-core" }
 wgpu = { version = "30.0.1", default-features = false, features = ["std", "parking_lot", "gles"] }
 raw-window-handle = "0.6.2"

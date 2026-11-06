@@ -148,7 +148,7 @@ extern "C" int __cdecl horizon_uwp_http_get(const unsigned char *url,
 // Authenticated requests never follow redirects: a bearer token and POST body
 // must not be forwarded to a different endpoint implicitly.
 static int http_request_impl(
-    const unsigned char *url, size_t url_len, int post,
+    const unsigned char *url, size_t url_len, int method,
     const unsigned char *authorization, size_t authorization_len,
     const unsigned char *content_type, size_t content_type_len,
     const unsigned char *body, size_t body_len, size_t limit,
@@ -159,7 +159,7 @@ static int http_request_impl(
       body_len > 1024 * 1024 || limit > 16 * 1024 * 1024 ||
       (authorization_len && !authorization) ||
       (content_type_len && !content_type) || (body_len && !body) ||
-      (post != 0 && post != 1))
+      (method < 0 || method > 2))
     return -1;
   *output = nullptr;
   *output_len = 0;
@@ -200,12 +200,12 @@ static int http_request_impl(
     auto client = ref new HttpClient(filter);
     client->DefaultRequestHeaders->UserAgent->TryParseAdd(L"Horizon");
     auto request = ref new HttpRequestMessage(
-        post ? HttpMethod::Post : HttpMethod::Get, uri);
+        method == 1 ? HttpMethod::Post : method == 2 ? HttpMethod::Delete : HttpMethod::Get, uri);
     if (authorization_len &&
         !request->Headers->TryAppendWithoutValidation(
             L"Authorization", header(authorization, authorization_len)))
       throw ref new Platform::InvalidArgumentException();
-    if (post) {
+    if (method == 1) {
       auto writer = ref new DataWriter();
       if (body_len) {
         auto array = ref new Platform::Array<unsigned char>(
@@ -242,12 +242,12 @@ static int http_request_impl(
 }
 
 extern "C" int __cdecl horizon_uwp_http_request(
-    const unsigned char *url, size_t url_len, int post,
+    const unsigned char *url, size_t url_len, int method,
     const unsigned char *authorization, size_t authorization_len,
     const unsigned char *content_type, size_t content_type_len,
     const unsigned char *body, size_t body_len, size_t limit,
     unsigned int *http_status, unsigned char **output, size_t *output_len) {
-  return http_request_impl(url, url_len, post, authorization, authorization_len,
+  return http_request_impl(url, url_len, method, authorization, authorization_len,
       content_type, content_type_len, body, body_len, limit, http_status, output, output_len, false);
 }
 

@@ -1,6 +1,7 @@
 // Native UWP XAML shell. Windows Mobile reuses the primary CoreWindow for the game.
 #using <Microsoft.UI.Xaml.winmd>
 #include <windows.h>
+#include <fileapifromapp.h>
 #include <d3d11_1.h>
 #include <dxgi1_2.h>
 #include <ppltasks.h>
@@ -26,6 +27,7 @@
 #include <windows.ui.startscreen.h>
 #include <windows.system.h>
 #include <windows.ui.xaml.h>
+#include <windows.ui.xaml.automation.h>
 #include <windows.ui.xaml.input.h>
 #include <windows.ui.xaml.automation.peers.h>
 #include <windows.ui.xaml.automation.provider.h>
@@ -41,6 +43,7 @@
 #include <robuffer.h>
 #include <wrl/client.h>
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -98,6 +101,11 @@ extern "C" int __cdecl horizon_uwp_pick_save_folder(const wchar_t*, size_t, unsi
 extern "C" size_t __cdecl horizon_uwp_controller_test_read(unsigned char*, size_t);
 extern "C" void __cdecl horizon_uwp_controller_test_stop();
 extern "C" int32_t __cdecl horizon_uwp_controller_face_swap(const uint16_t*, size_t, int32_t);
+extern "C" int32_t __cdecl horizon_uwp_telemetry_state(const uint16_t*, size_t, uint32_t*, int32_t*);
+extern "C" int32_t __cdecl horizon_uwp_telemetry_save(const uint16_t*, size_t, uint32_t);
+extern "C" int32_t __cdecl horizon_uwp_telemetry_delete(const uint16_t*, size_t);
+extern "C" int32_t __cdecl horizon_uwp_bug_report_submit(
+    const uint16_t*, size_t, const uint16_t*, size_t, const uint16_t*, size_t, int32_t);
 extern "C" unsigned __cdecl horizon_uwp_controller_navigation_read();
 extern "C" void __cdecl horizon_uwp_controller_navigation_stop();
 #endif
@@ -324,6 +332,8 @@ bool show_news = false;
 bool show_servers = false;
 bool show_saves = false;
 bool has_winui = false;
+std::atomic<bool> update_checks_enabled{true};
+Platform::String^ update_notice_text;
 std::atomic<int> game_exit_behavior{0};
 unsigned profile_kind = 0;
 unsigned live_tile_options = 7;
@@ -342,7 +352,7 @@ std::wstring quick_connect_address;
 std::wstring quick_play_world;
 std::wstring pending_tile_launch;
 bool quick_benchmark = false;
-bool quick_benchmark_contribute = false;
+uint32_t telemetry_dialog_mask = 0;
 UISettings^ ui_settings;
 AccessibilitySettings^ accessibility;
 
@@ -1566,12 +1576,312 @@ void start_controller_navigation() {
 }
 #endif
 
+struct TelemetryDialogContent {
+    ScrollViewer^ scroll;
+    Platform::Array<ToggleSwitch^>^ toggles;
+};
+
+TelemetryDialogContent telemetry_dialog_content(uint32_t mask) {
+    auto panel = ref new StackPanel();
+    panel->Children->Append(text(L"Review the switches before saving. Each choice applies independently to its service. The MCHorizonUWP endpoint is separate from the official Horizon endpoint and uses its own unrelated random ID.", 14));
+    auto toggles = ref new Platform::Array<ToggleSwitch^>(10);
+    auto add_toggle = [panel, toggles, mask](unsigned index, const wchar_t* label, const wchar_t* detail) {
+        auto control = ref new ToggleSwitch();
+        control->Header = ref new Platform::String(label);
+        control->IsOn = (mask & (1u << index)) != 0;
+        control->HorizontalAlignment = HorizontalAlignment::Stretch;
+        toggles[index] = control;
+        panel->Children->Append(control);
+        panel->Children->Append(text(ref new Platform::String(detail), 12));
+    };
+    panel->Children->Append(text(L"Official Horizon service — telemetry.playhorizon.dev", 16));
+    add_toggle(0, L"Performance", L"Frame and tick summaries, settings, memory use and device details. Raw frame timings are not sent.");
+    add_toggle(1, L"Crash reports", L"Scrubbed crash messages, stack traces and graphics details. No log or world data.");
+    add_toggle(2, L"Bug reports", L"Reports you submit include a device summary and your text. A log is included only after preview and a separate attachment choice.");
+    add_toggle(3, L"Benchmark reports", L"Version 1 benchmark results, including hardware and graphics details.");
+    add_toggle(8, L"Live player count", L"A random session ID, game version, platform and whether LAN play is open. No account, install ID or hardware details.");
+    panel->Children->Append(text(L"MCHorizonUWP endpoint — https://horizontelemetry.bytesdirect.com", 16));
+    add_toggle(4, L"Performance", L"Send the same performance summaries and device details to the MCHorizonUWP service.");
+    add_toggle(5, L"Crash reports", L"Send the same scrubbed crash reports to the MCHorizonUWP service.");
+    add_toggle(6, L"Bug reports", L"Send the device summary and your submitted report to the MCHorizonUWP service. A log is included only after preview and a separate choice.");
+    add_toggle(7, L"Benchmark reports", L"Send version 1 benchmark results, including hardware and graphics details, to the MCHorizonUWP service.");
+    add_toggle(9, L"Live player count", L"Send a separate random session ID and live player-count fields to the MCHorizonUWP service.");
+    auto scroll = ref new ScrollViewer();
+    scroll->Content = panel;
+    scroll->MaxHeight = 560;
+    return { scroll, toggles };
+}
+
+uint32_t telemetry_mask_from(Platform::Array<ToggleSwitch^>^ toggles) {
+    uint32_t mask = 0;
+    for (unsigned i = 0; i < 10; ++i)
+        if (toggles[i] && toggles[i]->IsOn) mask |= 1u << i;
+    return mask;
+}
+
+Platform::String^ telemetry_game_path() {
+    return Platform::String::Concat(ApplicationData::Current->LocalFolder->Path, L"\\game");
+}
+
+void show_telemetry_delete_confirmation() {
+#ifndef HORIZON_UWP_SHELL_PROBE
+    auto game_path = telemetry_game_path();
+    auto confirm = ref new ContentDialog();
+    confirm->Title = L"Delete telemetry data?";
+    confirm->Content = text(L"Horizon will clear queued reports on this device and request deletion of reports already sent to each service. If a service cannot be reached, you can retry later.", 14);
+    confirm->PrimaryButtonText = L"Delete data";
+    confirm->SecondaryButtonText = L"Cancel";
+    create_task(confirm->ShowAsync()).then([game_path](ContentDialogResult result) {
+        if (result != ContentDialogResult::Primary) return;
+        ThreadPool::RunAsync(ref new WorkItemHandler([game_path](IAsyncAction^) {
+            const int32_t result = horizon_uwp_telemetry_delete(
+                reinterpret_cast<const uint16_t*>(game_path->Data()), game_path->Length());
+            if (!dispatcher) return;
+            dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([result]() {
+                show_message(L"Data collection", result == 0
+                    ? L"Local reports were cleared and both services confirmed deletion."
+                    : result == 1
+                        ? L"Local reports were cleared. A service could not confirm deletion; choose Delete my telemetry data again to retry."
+                        : L"Horizon could not clear the local telemetry queue.");
+            }));
+        }));
+    });
+#else
+    show_message(L"Data collection", L"Telemetry deletion is unavailable in the UI probe.");
+#endif
+}
+
+void show_telemetry_settings() {
+#ifndef HORIZON_UWP_SHELL_PROBE
+    auto game_path = telemetry_game_path();
+    uint32_t mask = 0;
+    int32_t confirmed = 0;
+    if (horizon_uwp_telemetry_state(reinterpret_cast<const uint16_t*>(game_path->Data()),
+        game_path->Length(), &mask, &confirmed) != 0) {
+        show_message(L"Data collection", L"Horizon could not read the current telemetry choices.");
+        return;
+    }
+    (void)confirmed;
+    auto dialog = ref new ContentDialog();
+    dialog->Title = L"Data collection";
+    dialog->PrimaryButtonText = L"Save choices";
+    dialog->SecondaryButtonText = L"Cancel";
+    const auto content = telemetry_dialog_content(mask);
+    dialog->Content = content.scroll;
+    auto save_failed = std::make_shared<bool>(false);
+    dialog->PrimaryButtonClick += ref new TypedEventHandler<ContentDialog^, ContentDialogButtonClickEventArgs^>(
+        [game_path, toggles = content.toggles, save_failed](ContentDialog^, ContentDialogButtonClickEventArgs^) {
+            if (horizon_uwp_telemetry_save(reinterpret_cast<const uint16_t*>(game_path->Data()),
+                game_path->Length(), telemetry_mask_from(toggles)) != 0) *save_failed = true;
+        });
+    dialog->Closed += ref new TypedEventHandler<ContentDialog^, ContentDialogClosedEventArgs^>(
+        [save_failed](ContentDialog^, ContentDialogClosedEventArgs^) {
+            if (*save_failed) show_message(L"Data collection", L"Horizon could not save these choices.");
+        });
+    dialog->ShowAsync();
+#else
+    show_message(L"Data collection", L"Telemetry settings are unavailable in the UI probe.");
+#endif
+}
+
+#ifndef HORIZON_UWP_SHELL_PROBE
+struct BugReportDraft {
+    Platform::String^ text = L"";
+    Platform::String^ log = L"";
+    bool previewed = false;
+    bool log_available = false;
+    bool opening_preview = false;
+};
+
+Platform::String^ read_bug_report_log(bool* available) {
+    *available = false;
+    const auto path = Platform::String::Concat(
+        ApplicationData::Current->LocalFolder->Path, L"\\game\\logs\\latest.log");
+    HANDLE file = CreateFile2(path->Data(), GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return L"No latest game log is available.";
+
+    constexpr DWORD limit = 65536;
+    LARGE_INTEGER size = {};
+    if (!GetFileSizeEx(file, &size) || size.QuadPart <= 0) {
+        CloseHandle(file);
+        return L"The latest game log is empty or could not be read.";
+    }
+    LARGE_INTEGER offset = {};
+    offset.QuadPart = size.QuadPart > limit ? size.QuadPart - limit : 0;
+    std::string bytes(static_cast<size_t>(std::min<LONGLONG>(size.QuadPart, limit)), '\0');
+    DWORD count = 0;
+    const bool read = SetFilePointerEx(file, offset, nullptr, FILE_BEGIN)
+        && ReadFile(file, &bytes[0], static_cast<DWORD>(bytes.size()), &count, nullptr) != FALSE;
+    CloseHandle(file);
+    if (!read || count == 0) return L"The latest game log could not be read.";
+
+    const int needed = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), count, nullptr, 0);
+    if (needed <= 0) return L"The latest game log is not valid UTF-8 and cannot be attached.";
+    std::wstring wide(needed, L'\0');
+    if (MultiByteToWideChar(CP_UTF8, 0, bytes.data(), count, &wide[0], needed) != needed)
+        return L"The latest game log could not be decoded.";
+    *available = true;
+    return ref new Platform::String(wide.data(), needed);
+}
+
+void show_bug_report_dialog(const std::shared_ptr<BugReportDraft>& draft);
+
+void show_bug_report_log_preview(const std::shared_ptr<BugReportDraft>& draft) {
+    draft->log = read_bug_report_log(&draft->log_available);
+    auto body = ref new StackPanel();
+    body->Children->Append(text(L"Review this latest-log preview. Horizon reads at most the last 64 KiB. The log is not attached unless you later select the separate attachment option.", 14));
+    auto preview = ref new TextBox();
+    preview->IsReadOnly = true;
+    preview->AcceptsReturn = true;
+    preview->TextWrapping = TextWrapping::Wrap;
+    preview->MinHeight = 280;
+    preview->MaxHeight = 480;
+    ScrollViewer::SetVerticalScrollBarVisibility(preview, ScrollBarVisibility::Auto);
+    preview->Text = draft->log;
+    Windows::UI::Xaml::Automation::AutomationProperties::SetName(preview, L"Latest game log preview");
+    body->Children->Append(preview);
+
+    auto dialog = ref new ContentDialog();
+    dialog->Title = L"Review the latest game log";
+    dialog->Content = body;
+    dialog->PrimaryButtonText = draft->log_available ? L"I have reviewed this log" : L"Continue without a log";
+    dialog->CloseButtonText = L"Back to report";
+    create_task(dialog->ShowAsync()).then(
+        [draft](ContentDialogResult result) {
+            draft->previewed = result == ContentDialogResult::Primary;
+            show_bug_report_dialog(draft);
+        }, task_continuation_context::use_current());
+}
+
+void show_bug_report_dialog(const std::shared_ptr<BugReportDraft>& draft) {
+    auto body = ref new StackPanel();
+    body->Children->Append(text(L"Describe what happened. Your report includes a device summary and only the text you enter here. It is queued only for services where Bug reports are enabled. A log is never added automatically.", 14));
+    auto report = ref new TextBox();
+    report->Header = L"What happened?";
+    report->PlaceholderText = L"Describe the problem and what you expected to happen";
+    report->AcceptsReturn = true;
+    report->TextWrapping = TextWrapping::Wrap;
+    report->MinHeight = 120;
+    report->MaxHeight = 320;
+    report->MaxLength = 4000;
+    report->Text = draft->text;
+    Windows::UI::Xaml::Automation::AutomationProperties::SetName(report, L"Bug report text, up to 4000 characters");
+    body->Children->Append(report);
+    body->Children->Append(text(L"Review the latest log first. After reviewing it, you can separately choose whether to attach it.", 13));
+    auto dialog = ref new ContentDialog();
+    auto preview_button = action_button(L"Preview latest game log", ref new RoutedEventHandler(
+        [draft, report, dialog](Platform::Object^, RoutedEventArgs^) {
+            draft->text = report->Text;
+            draft->opening_preview = true;
+            dialog->Hide();
+        }));
+    body->Children->Append(preview_button);
+    auto attach = ref new CheckBox();
+    attach->Content = L"Attach the log I reviewed";
+    attach->IsEnabled = draft->previewed && draft->log_available;
+    attach->IsChecked = false;
+    Windows::UI::Xaml::Automation::AutomationProperties::SetName(attach, L"Attach the log after reviewing it");
+    body->Children->Append(attach);
+
+    dialog->Title = L"Report a problem";
+    dialog->Content = body;
+    dialog->PrimaryButtonText = L"Submit report";
+    dialog->SecondaryButtonText = L"Cancel";
+    create_task(dialog->ShowAsync()).then(
+        [draft, report, attach](ContentDialogResult result) {
+            if (draft->opening_preview) {
+                draft->opening_preview = false;
+                show_bug_report_log_preview(draft);
+                return;
+            }
+            if (result != ContentDialogResult::Primary) return;
+
+            const auto report_text = report->Text;
+            const auto attachment_choice = attach->IsChecked;
+            const bool attach_log = attach->IsEnabled
+                && attachment_choice != nullptr && attachment_choice->Value;
+            auto game_path = telemetry_game_path();
+            const auto code = horizon_uwp_bug_report_submit(
+                reinterpret_cast<const uint16_t*>(game_path->Data()), game_path->Length(),
+                reinterpret_cast<const uint16_t*>(report_text->Data()), report_text->Length(),
+                attach_log ? reinterpret_cast<const uint16_t*>(draft->log->Data()) : nullptr,
+                attach_log ? draft->log->Length() : 0, attach_log ? 1 : 0);
+            if (code == -2) {
+                show_message(L"Bug report consent required", L"Enable Bug reports for at least one service in Data collection settings, then try again.");
+                return;
+            }
+            if (code == -3) {
+                show_message(L"Report not submitted", L"Enter a non-empty report of at most 4000 characters.");
+                return;
+            }
+            if (code == -4) {
+                show_message(L"Log preview required", L"Review the latest game log before choosing to attach it.");
+                return;
+            }
+            if (code < 0) {
+                show_message(L"Report not submitted", L"Horizon could not queue this report. Check the text and try again.");
+                return;
+            }
+
+            const uint32_t outcome = static_cast<uint32_t>(code);
+            const uint32_t queued = outcome & 3u;
+            const uint32_t declined = (outcome >> 8) & 3u;
+            const uint32_t failed = (outcome >> 16) & 3u;
+            if (queued == 0) {
+                show_message(L"Report not submitted", (failed != 0)
+                    ? L"Horizon could not save the report to the selected service queue."
+                    : L"The selected service queue could not accept another report today.");
+                return;
+            }
+            Platform::String^ result_text = queued == 3
+                ? L"Your report was queued for both selected services."
+                : (queued & 1u) ? L"Your report was queued for the official Horizon service."
+                    : L"Your report was queued for the MCHorizonUWP service.";
+            if (declined != 0 || failed != 0)
+                result_text = Platform::String::Concat(result_text, L" A selected service could not queue its copy. The successful queue remains saved on this device.");
+            show_message(L"Report queued", result_text);
+        }, task_continuation_context::use_current());
+}
+
+void show_bug_report_consent_required() {
+    auto dialog = ref new ContentDialog();
+    dialog->Title = L"Bug report consent required";
+    dialog->Content = text(L"Bug reports are not enabled for either service. Choose Bug reports for the official Horizon service or the MCHorizonUWP service before submitting. Your choices remain independent.", 14);
+    dialog->PrimaryButtonText = L"Manage telemetry settings";
+    dialog->CloseButtonText = L"Cancel";
+    create_task(dialog->ShowAsync()).then([](ContentDialogResult result) {
+        if (result == ContentDialogResult::Primary) show_telemetry_settings();
+    }, task_continuation_context::use_current());
+}
+
+void show_bug_report() {
+    auto game_path = telemetry_game_path();
+    uint32_t mask = 0;
+    int32_t confirmed = 0;
+    if (horizon_uwp_telemetry_state(reinterpret_cast<const uint16_t*>(game_path->Data()),
+        game_path->Length(), &mask, &confirmed) != 0) {
+        show_message(L"Report a problem", L"Horizon could not read the current telemetry choices.");
+        return;
+    }
+    if (!confirmed || (mask & ((1u << 2) | (1u << 6))) == 0) {
+        show_bug_report_consent_required();
+        return;
+    }
+    show_bug_report_dialog(std::make_shared<BugReportDraft>());
+}
+#endif
+
 void show_prompt_dialog(Platform::String^ message, Platform::String^ accounts, unsigned kind, unsigned generation) {
     if (profile_flyout && profile_flyout_open) profile_flyout->Hide();
     auto dialog = ref new ContentDialog();
-    dialog->Title = (kind == 1 || kind == 5) ? L"Account Management" : kind == 8 ? L"Add an account" :
+    dialog->Title = kind == 9 ? L"Data collection" : (kind == 1 || kind == 5) ? L"Account Management" : kind == 8 ? L"Add an account" :
         kind == 2 ? L"Microsoft sign-in" : L"Horizon";
     dialog->PrimaryButtonText = kind == 3 ? L"OK" : L"Cancel";
+    if (kind == 9) {
+        dialog->PrimaryButtonText = L"Confirm choices";
+        dialog->SecondaryButtonText = L"Not now";
+    }
     auto body = ref new StackPanel();
     body->Children->Append(text(message, 16));
     auto add_action = [dialog, body, generation](const wchar_t* label, int value) {
@@ -1628,16 +1938,33 @@ void show_prompt_dialog(Platform::String^ message, Platform::String^ accounts, u
         add_action(L"Sign in with Microsoft", 1);
         add_action(L"Add an offline account", 2);
         break;
+    case 9: {
+        const auto content = telemetry_dialog_content(telemetry_dialog_mask);
+        dialog->Content = content.scroll;
+        dialog_result = -1;
+        dialog->PrimaryButtonClick += ref new TypedEventHandler<ContentDialog^, ContentDialogButtonClickEventArgs^>(
+            [toggles = content.toggles](ContentDialog^, ContentDialogButtonClickEventArgs^) {
+                telemetry_dialog_mask = telemetry_mask_from(toggles);
+                dialog_result = 1;
+            });
+        dialog->SecondaryButtonClick += ref new TypedEventHandler<ContentDialog^, ContentDialogButtonClickEventArgs^>(
+            [](ContentDialog^, ContentDialogButtonClickEventArgs^) { dialog_result = 2; });
+        break;
+    }
     default: choose(-2, generation); return;
     }
-    dialog->Content = body;
-    dialog_result = kind == 3 ? 1 : -1;
+    if (kind != 9) dialog->Content = body;
+    if (kind != 9) dialog_result = kind == 3 ? 1 : -1;
     active_dialog = dialog;
     dialog->Closed += ref new TypedEventHandler<ContentDialog^, ContentDialogClosedEventArgs^>(
-        [generation](ContentDialog^, ContentDialogClosedEventArgs^) {
+        [generation, kind](ContentDialog^, ContentDialogClosedEventArgs^) {
             const int result = dialog_result;
             active_dialog = nullptr;
             offline_name_box = nullptr;
+            if (generation == prompt_generation.load() && prompt_kind == kind) {
+                prompt_kind = 0;
+                refresh();
+            }
             choose(result, generation);
         });
     dialog->ShowAsync();
@@ -2302,18 +2629,43 @@ void refresh() {
         controller_card->Children->Append(controller_sounds);
         panel->Children->Append(card(controller_card));
 #endif
+        auto telemetry_card = ref new StackPanel();
+        telemetry_card->Children->Append(text(L"Data collection", 18));
+        telemetry_card->Children->Append(text(L"Choose separately what the official Horizon service and the MCHorizonUWP service may receive. Bug reports are written by you, and a log is attached only after you preview it and separately choose to include it.", 14));
+        telemetry_card->Children->Append(action_button(L"Manage telemetry settings", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
+            show_telemetry_settings();
+        })));
+        telemetry_card->Children->Append(action_button(L"Report a problem", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
+#ifndef HORIZON_UWP_SHELL_PROBE
+            show_bug_report();
+#else
+            show_message(L"Report a problem", L"Bug reports are unavailable in the UI probe.");
+#endif
+        })));
+        telemetry_card->Children->Append(action_button(L"Delete my telemetry data", ref new RoutedEventHandler([](Platform::Object^, RoutedEventArgs^) {
+            show_telemetry_delete_confirmation();
+        })));
+        panel->Children->Append(card(telemetry_card));
+        auto updates_card = ref new StackPanel();
+        updates_card->Children->Append(text(L"Updates", 18));
+        auto update_toggle = ref new ToggleSwitch();
+        update_toggle->Header = L"Check for updates at startup";
+        update_toggle->IsOn = update_checks_enabled.load(std::memory_order_acquire);
+        update_toggle->Toggled += ref new RoutedEventHandler([update_toggle](Platform::Object^, RoutedEventArgs^) {
+            update_checks_enabled.store(update_toggle->IsOn, std::memory_order_release);
+            ApplicationData::Current->LocalSettings->Values->Insert(
+                L"update-check-enabled", PropertyValue::CreateBoolean(update_checks_enabled.load(std::memory_order_acquire)));
+        });
+        updates_card->Children->Append(update_toggle);
+        updates_card->Children->Append(text(L"Checks Horizon stable and nightly game releases and MCHorizonUWP client releases. The next startup uses this setting.", 14));
+        panel->Children->Append(card(updates_card));
         auto benchmark_card = ref new StackPanel();
         benchmark_card->Children->Append(text(L"Rendering benchmark", 18));
         benchmark_card->Children->Append(text(L"Run Horizon's standard game benchmark. It creates or replaces its own benchmark world and saves the report in the game's benchmarks folder.", 14));
-        auto contribute = ref new CheckBox();
-        contribute->Content = L"Contribute this benchmark to Horizon";
-        contribute->IsChecked = false;
-        benchmark_card->Children->Append(contribute);
-        benchmark_card->Children->Append(text(L"If selected, the results and hardware details are sent to Horizon. The upload excludes local paths and your report label.", 14));
+        benchmark_card->Children->Append(text(L"If benchmark reporting is enabled in Data collection settings, the version 1 report is queued for each service you selected.", 14));
         const auto benchmark_generation = displayed_generation;
-        auto benchmark_button = action_button(L"Start benchmark", ref new RoutedEventHandler([benchmark_generation, contribute](Platform::Object^, RoutedEventArgs^) {
+        auto benchmark_button = action_button(L"Start benchmark", ref new RoutedEventHandler([benchmark_generation](Platform::Object^, RoutedEventArgs^) {
             quick_connect_address.clear(); quick_play_world.clear(); quick_benchmark = true;
-            quick_benchmark_contribute = contribute->IsChecked && contribute->IsChecked->Value;
             choose(1, benchmark_generation);
         }));
         benchmark_button->IsEnabled = !renderer_known || renderer_available;
@@ -2618,6 +2970,12 @@ void refresh() {
         panel->Children->Append(logo);
         panel->Children->Append(text(L"Horizon", 32));
         panel->Children->Append(text(prompt_text, 16));
+        if (update_notice_text && update_notice_text->Length() > 0) {
+            auto updates = ref new StackPanel();
+            updates->Children->Append(text(L"Updates available", 18));
+            updates->Children->Append(text(update_notice_text, 14));
+            panel->Children->Append(card(updates));
+        }
         panel->Children->Append(text(renderer_known
             ? (renderer_available ? Platform::String::Concat(renderer_label(selected_renderer.load()), L" is ready.")
                 : (renderer_failure ? renderer_failure : L"No compatible renderer was detected."))
@@ -2698,6 +3056,10 @@ protected:
         ui_settings = ref new UISettings();
         accessibility = ref new AccessibilitySettings();
         auto values = ApplicationData::Current->LocalSettings->Values;
+        if (values->HasKey(L"update-check-enabled")) {
+            try { update_checks_enabled.store(safe_cast<IPropertyValue^>(values->Lookup(L"update-check-enabled"))->GetBoolean(), std::memory_order_release); }
+            catch (Platform::Exception^) { update_checks_enabled.store(true, std::memory_order_release); }
+        }
 #ifndef HORIZON_UWP_SHELL_PROBE
         if (values->HasKey(L"controller-navigation-sounds")) {
             try { controller_navigation_sounds = safe_cast<IPropertyValue^>(values->Lookup(L"controller-navigation-sounds"))->GetBoolean(); }
@@ -3214,7 +3576,7 @@ extern "C" int __cdecl horizon_uwp_touch_settings(
 extern "C" int __cdecl horizon_uwp_dialog_show(const unsigned char* bytes, size_t length, unsigned kind) {
     try {
         auto value = decode(bytes, length);
-        if (!dispatcher || !value || kind > 8) return -1;
+        if (!dispatcher || !value || kind > 9) return -1;
         auto accounts = kind == 5 ? account_labels : nullptr;
         const unsigned generation = ++prompt_generation;
         choice.store(0);
@@ -3230,6 +3592,42 @@ extern "C" int __cdecl horizon_uwp_dialog_show(const unsigned char* bytes, size_
         }));
         return 0;
     } catch (...) { return -1; }
+}
+extern "C" int __cdecl horizon_uwp_telemetry_prompt(uint32_t mask) {
+    telemetry_dialog_mask = mask & ((1u << 10) - 1);
+    static const unsigned char message[] = "Choose optional data collection settings.";
+    return horizon_uwp_dialog_show(message, sizeof(message) - 1, 9);
+}
+extern "C" uint32_t __cdecl horizon_uwp_page_selected_telemetry_mask() {
+    return telemetry_dialog_mask & ((1u << 10) - 1);
+}
+extern "C" int __cdecl horizon_uwp_page_update_enabled() {
+    return update_checks_enabled.load(std::memory_order_acquire) ? 1 : 0;
+}
+extern "C" size_t __cdecl horizon_uwp_release_metadata(unsigned char* buffer, size_t capacity) {
+#ifdef HORIZON_UWP_SHELL_PROBE
+    (void)buffer; (void)capacity; return 0;
+#else
+    if (!buffer || !capacity) return 0;
+    try {
+        auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
+        std::wstring path(installed->Data(), installed->Length());
+        path += L"\\HorizonRelease.json";
+        HANDLE file = CreateFileFromAppW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+        if (file == INVALID_HANDLE_VALUE) return 0;
+        LARGE_INTEGER size = {};
+        if (!GetFileSizeEx(file, &size) || size.QuadPart <= 0 ||
+            static_cast<unsigned long long>(size.QuadPart) > capacity || size.QuadPart > 8192) {
+            CloseHandle(file); return 0;
+        }
+        DWORD read = 0;
+        const bool ok = ReadFile(file, buffer, static_cast<DWORD>(size.QuadPart), &read, nullptr) != FALSE
+            && read == static_cast<DWORD>(size.QuadPart);
+        CloseHandle(file);
+        return ok ? read : 0;
+    } catch (...) { return 0; }
+#endif
 }
 extern "C" int __cdecl horizon_uwp_dialog_poll() { return choice.load(); }
 extern "C" void __cdecl horizon_uwp_dialog_cancel() {
@@ -3254,6 +3652,16 @@ extern "C" void __cdecl horizon_uwp_page_profile(const unsigned char* bytes, siz
                 else { tile_skin_available = false; update_live_tile(); }
                 if (prompt_kind == 0) refresh();
             }));
+    } catch (...) {}
+}
+extern "C" void __cdecl horizon_uwp_page_update_notice(const unsigned char* bytes, size_t length) {
+    try {
+        auto value = decode(bytes, length);
+        if (!value || !dispatcher) return;
+        dispatcher->RunAsync(CoreDispatcherPriority::Normal, ref new DispatchedHandler([value]() {
+            update_notice_text = value;
+            if (prompt_kind == 0) refresh();
+        }));
     } catch (...) {}
 }
 extern "C" void __cdecl horizon_uwp_page_skin(const unsigned char* bytes, size_t length) {
@@ -3320,9 +3728,6 @@ extern "C" size_t __cdecl horizon_uwp_page_selected_world(unsigned char* buffer,
 }
 extern "C" int __cdecl horizon_uwp_page_selected_benchmark() {
     const bool run = quick_benchmark; quick_benchmark = false; return run ? 1 : 0;
-}
-extern "C" int __cdecl horizon_uwp_page_selected_benchmark_contribution() {
-    const bool contribute = quick_benchmark_contribute; quick_benchmark_contribute = false; return contribute ? 1 : 0;
 }
 #ifdef HORIZON_UWP_NATIVE_D3D11
 extern "C" void* __cdecl horizon_uwp_acquire_game_swapchain_panel() {

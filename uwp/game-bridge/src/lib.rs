@@ -11,6 +11,8 @@ static ALLOCATOR: horizon_threads::Allocator = horizon_threads::ALLOCATOR;
 mod pregame;
 #[cfg(any(test, all(target_vendor = "uwp", feature = "xaml-shell")))]
 mod server_status;
+#[cfg(any(test, all(target_vendor = "uwp", feature = "xaml-shell")))]
+mod update_check;
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 mod xaml_pregame;
 
@@ -80,6 +82,142 @@ pub unsafe extern "C" fn horizon_uwp_controller_face_swap(
         }
     }
     i32::from(settings.swap_face_buttons)
+}
+
+/// Read the app-local telemetry consent state for the WinUI settings page.
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_telemetry_state(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    mask: *mut u32,
+    confirmed: *mut i32,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null() || mask.is_null() || confirmed.is_null() || game_dir_len > 32767 {
+        return -1;
+    }
+    let wide = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
+    let dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(wide));
+    let (saved_mask, is_confirmed) = horizon_client::telemetry::uwp_consent_mask(&dir);
+    unsafe {
+        *mask = saved_mask;
+        *confirmed = i32::from(is_confirmed);
+    }
+    0
+}
+
+/// Persist explicit per-kind and per-destination consent. Unknown bits are rejected.
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_telemetry_save(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    mask: u32,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null() || game_dir_len > 32767 {
+        return -1;
+    }
+    let wide = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
+    let dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(wide));
+    match horizon_client::telemetry::save_uwp_consent_mask(&dir, mask) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+/// Clear local queues and request deletion from every endpoint that has an install ID.
+/// 0 means complete, 1 means local deletion completed but remote deletion needs retry,
+/// and -1 means local deletion could not complete.
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_telemetry_delete(
+    game_dir: *const u16,
+    game_dir_len: usize,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null() || game_dir_len > 32767 {
+        return -1;
+    }
+    let wide = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
+    let dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(wide));
+    match horizon_client::telemetry::delete_uwp_data(&dir) {
+        Ok(()) => 0,
+        Err(message) if message.starts_with("Local telemetry was cleared") => 1,
+        Err(_) => -1,
+    }
+}
+
+/// Queue a user-authored bug report through the existing consent-aware telemetry outboxes.
+/// The caller passes the log only after showing its preview and obtaining a separate choice.
+/// Success is a bitfield: bits 0..1 were queued (official, MCHorizonUWP), bits 8..9 declined
+/// (for example, a daily cap), and bits 16..17 failed to write. Negative values are input,
+/// consent, validation, or queue failures.
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn horizon_uwp_bug_report_submit(
+    game_dir: *const u16,
+    game_dir_len: usize,
+    report: *const u16,
+    report_len: usize,
+    previewed_log: *const u16,
+    previewed_log_len: usize,
+    attach_log: i32,
+) -> i32 {
+    use std::os::windows::ffi::OsStringExt;
+
+    if game_dir.is_null()
+        || report.is_null()
+        || game_dir_len > 32767
+        || report_len > 16384
+        || previewed_log_len > 131072
+        || !matches!(attach_log, 0 | 1)
+        || (previewed_log_len != 0 && previewed_log.is_null())
+    {
+        return -1;
+    }
+    if attach_log == 1 && (previewed_log.is_null() || previewed_log_len == 0) {
+        return -4;
+    }
+
+    let dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(unsafe {
+        std::slice::from_raw_parts(game_dir, game_dir_len)
+    }));
+    let Ok(report) = String::from_utf16(unsafe { std::slice::from_raw_parts(report, report_len) })
+    else {
+        return -1;
+    };
+    let log = if previewed_log_len == 0 {
+        None
+    } else {
+        match String::from_utf16(unsafe {
+            std::slice::from_raw_parts(previewed_log, previewed_log_len)
+        }) {
+            Ok(log) => Some(log),
+            Err(_) => return -1,
+        }
+    };
+
+    match horizon_client::telemetry::queue_uwp_bug_report(
+        &dir,
+        &report,
+        log.as_deref(),
+        attach_log == 1,
+    ) {
+        Ok(result) => (result.queued | (result.declined << 8) | (result.failed << 16)) as i32,
+        Err(message)
+            if message.contains("Confirm telemetry") || message.contains("Enable Bug reports") =>
+        {
+            -2
+        }
+        Err(message) if message.contains("Review the latest log") => -4,
+        Err(message) if message.starts_with("Write") || message.contains("at most") => -3,
+        Err(_) => -1,
+    }
 }
 
 #[cfg(all(
@@ -190,8 +328,6 @@ unsafe extern "C" {
     fn horizon_uwp_page_selected_world(buffer: *mut u8, capacity: usize) -> usize;
     #[cfg(feature = "xaml-shell")]
     fn horizon_uwp_page_selected_benchmark() -> i32;
-    #[cfg(feature = "xaml-shell")]
-    fn horizon_uwp_page_selected_benchmark_contribution() -> i32;
 }
 
 #[cfg(all(
@@ -698,7 +834,7 @@ pub unsafe extern "C" fn horizon_uwp_prepare(game_dir: *const u16, game_dir_len:
     let game_dir = unsafe { std::slice::from_raw_parts(game_dir, game_dir_len) };
     let game_dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(game_dir));
     configure_isolated_test(&game_dir);
-    match xaml_pregame::start() {
+    match xaml_pregame::start(&game_dir) {
         Some(session) => {
             #[cfg(feature = "native-touch-mod")]
             if save_touch_settings(&game_dir).is_err() {
@@ -762,14 +898,9 @@ pub unsafe extern "C" fn horizon_uwp_run_prepared(
             .unwrap_or("");
         std::env::set_var("HORIZON_UWP_QUICK_WORLD", name);
         let benchmark = horizon_uwp_page_selected_benchmark() != 0;
-        let contribute = horizon_uwp_page_selected_benchmark_contribution() != 0;
         std::env::set_var(
             "HORIZON_UWP_BENCHMARK",
             if benchmark { "standard" } else { "" },
-        );
-        std::env::set_var(
-            "HORIZON_UWP_BENCHMARK_CONTRIBUTE",
-            if benchmark && contribute { "1" } else { "0" },
         );
     }
     unsafe { run(resources, resources_len, game_dir, game_dir_len, true) }

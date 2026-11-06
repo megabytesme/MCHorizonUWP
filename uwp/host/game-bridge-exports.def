@@ -5,6 +5,10 @@ EXPORTS
     horizon_uwp_controller_navigation_stop
     horizon_uwp_controller_test_read
     horizon_uwp_controller_test_stop
+    horizon_uwp_telemetry_state
+    horizon_uwp_telemetry_save
+    horizon_uwp_telemetry_delete
+    horizon_uwp_bug_report_submit
     horizon_uwp_port_ref
     horizon_uwp_prepare
     horizon_uwp_prepare_native_renderer

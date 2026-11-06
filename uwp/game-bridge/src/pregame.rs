@@ -222,9 +222,7 @@ pub fn start() -> Option<Option<AuthSession>> {
                             }
                         }
                         None => {
-                            notice(
-                                "Microsoft sign-in is not configured for this build.",
-                            );
+                            notice("Microsoft sign-in is not configured for this build.");
                             Outcome::Menu
                         }
                     },

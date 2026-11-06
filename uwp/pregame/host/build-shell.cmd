@@ -61,5 +61,5 @@ if not defined HORIZON_UWP_PREPARED_ENV (
     call "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" %VCARCH% store %SDK%
     if errorlevel 1 exit /b 1
 )
-cl /nologo /MP /c /EHsc /ZW /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 %PROBE_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /AI"%WINUI%" /Fo"%OUTPUT%\XamlShell.obj" "%~dp0XamlShell.cpp"
+cl /nologo /MP /c /EHsc /ZW /bigobj /std:c++17 /O2 /MD /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D_WIN32_WINNT=0x0A00 %PROBE_DEFINE% /AI"%WindowsSdkDir%UnionMetadata\%SDK%" /AI"%WINUI%" /Fo"%OUTPUT%\XamlShell.obj" "%~dp0XamlShell.cpp"
 exit /b %errorlevel%

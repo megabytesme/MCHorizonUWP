@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "patches": [
+    {
+      "version": "0.1.0",
+      "upstream_commit": "f42ef42ef6ceccb3c6a20bea2481d87949a51c81",
+      "bridge": 1,
+      "upstream": {
+        "url": "https://github.com/horizon-rust/horizon/archive/f42ef42ef6ceccb3c6a20bea2481d87949a51c81.zip",
+        "sha256": "97205ce67c81d1bbfb754aed11185d779dbfa114cdb9898c0ad0b8adf9851467"
+      },
+      "artifact": {
+        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/patch-v0.1.0/horizon-uwp-0.1.0.patch",
+        "sha256": "b9a9e882060095eca2f92e24940065ee89c63e420c1bb0a3e4110224962c37ea"
+      }
+    }
+  ],
+  "clients": [
+    {
+      "version": "0.1.0",
+      "bridge": 1,
+      "artifact": {
+        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/client-v0.1.0/uwp-client-0.1.0.zip",
+        "sha256": "261dc651c39e641a5ec0a0aca5eb75a7eae3c28ceb08d29bd112f2bd49cddce8"
+      }
+    },
+    {
+      "version": "0.1.1",
+      "bridge": 1,
+      "artifact": {
+        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/client-v0.1.1/uwp-client-0.1.1.zip",
+        "sha256": "d827b1ea9a812a58a657c11d6758252eea8af175e891d347f8ea303f41d9f58d"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "patch": {
+        "min_inclusive": "0.1.0",
+        "max_exclusive": "0.1.1"
+      },
+      "client": {
+        "min_inclusive": "0.1.0",
+        "max_exclusive": "0.1.1"
+      },
+      "builder": {
+        "min_inclusive": "0.1.0",
+        "max_exclusive": "0.1.2"
+      },
+      "architectures": [
+        "x86",
+        "x64",
+        "arm",
+        "arm64"
+      ]
+    },
+    {
+      "patch": {
+        "min_inclusive": "0.1.0",
+        "max_exclusive": "0.1.1"
+      },
+      "client": {
+        "min_inclusive": "0.1.1",
+        "max_exclusive": "0.1.2"
+      },
+      "builder": {
+        "min_inclusive": "0.1.1",
+        "max_exclusive": "0.1.3"
+      },
+      "architectures": [
+        "x86",
+        "x64",
+        "arm",
+        "arm64"
+      ]
+    }
+  ],
+  "evidence": []
+}

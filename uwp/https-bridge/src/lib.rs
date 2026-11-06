@@ -90,19 +90,23 @@ pub fn post_zstd(url: &str, body: &[u8], limit: usize) -> Option<Response> {
     Some(Response { status, body })
 }
 
-/// Perform an HTTPS GET or POST without automatic redirects.
+/// Perform an HTTPS GET, POST, or DELETE without automatic redirects.
 /// This blocks and must run on a background worker. The caller controls the
 /// response size limit; requests are capped at 1 MiB by the native bridge.
 pub fn request(
     url: &str,
     post_body: Option<&[u8]>,
+    delete: bool,
     content_type: Option<&str>,
     authorization: Option<&str>,
     limit: usize,
 ) -> Option<Response> {
     let body = post_body.unwrap_or_default();
     let auth = authorization.unwrap_or_default();
-    if post_body.is_none() && content_type.is_some() {
+    if (post_body.is_none() || delete) && content_type.is_some() {
+        return None;
+    }
+    if delete && post_body.is_some() {
         return None;
     }
     let content_type = content_type.unwrap_or_default();
@@ -113,7 +117,11 @@ pub fn request(
         horizon_uwp_http_request(
             url.as_ptr(),
             url.len(),
-            i32::from(post_body.is_some()),
+            if delete {
+                2
+            } else {
+                i32::from(post_body.is_some())
+            },
             auth.as_ptr(),
             auth.len(),
             content_type.as_ptr(),
@@ -138,4 +146,9 @@ pub fn request(
         status: http_status,
         body,
     })
+}
+
+/// Delete a server-side installation using the endpoint's opaque random ID.
+pub fn delete(url: &str, limit: usize) -> Option<Response> {
+    request(url, None, true, None, None, limit)
 }
