@@ -45,8 +45,8 @@ if (args.Length == 4 && args[0] == "--compact-integrated-proof")
     var profile = Enum.Parse<TargetProfile>(args[2]);
     var arch = profile switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86", TargetProfile.SurfaceProX => "arm64", _ => "arm" };
     var artifact = new CatalogArtifact("https://example.test/proof", new string('a', 64));
-    var release = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, artifact, artifact),
-        new CatalogClient("0.1.2", 1, artifact), new CompatibilityResult(true, false, false, "Synthetic local proof"), CatalogTrust.BuilderVersion, arch);
+    var release = new PreparedRelease(source, new CatalogPatch(LocalRecipe.PatchVersion, LocalRecipe.UpstreamNightlyCommit, 1, artifact, artifact),
+        new CatalogClient(LocalRecipe.ClientVersion, 1, artifact), new CompatibilityResult(true, false, false, "Synthetic local proof"), CatalogTrust.BuilderVersion, arch);
     var proofSelection = new BuildSelection(profile, true, UseResourceFramework: true, NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId);
     var result = await LocalBuildRunner.RunPreparedAsync(release, Path.GetFullPath(args[3]), proofSelection, new SystemProbe(), new ConsoleProgress());
     Require(result.SignedOutput is { } signed && File.Exists(signed.Client) && File.Exists(signed.Certificate)
@@ -256,8 +256,8 @@ if (args.Length == 5 && args[0] == "--prepare-assets-candidate")
     var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
     var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
     await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
-    var release = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
-        new CatalogClient("0.1.2", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+    var release = new PreparedRelease(source, new CatalogPatch(LocalRecipe.PatchVersion, LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
+        new CatalogClient(LocalRecipe.ClientVersion, 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
     var resources = await MinecraftAssetPreparation.PrepareAsync(release, new BuildSelection(TargetProfile.DesktopX64, false), true,
         new SystemProbe(), new ConsoleProgress());
     Require(File.Exists(Path.Combine(resources, "horizon-resources.json")), "automatic resource preparation produced its manifest");
@@ -415,7 +415,7 @@ if (args.Length == 3 && args[0] == "--apply-native-mod")
 if (args.Length == 3 && args[0] == "--verify-local-catalog")
 {
     var candidateCatalog = CatalogSignature.Verify(await File.ReadAllBytesAsync(args[1]), await File.ReadAllBytesAsync(args[2]), CatalogTrust.PublicKey());
-    Require(candidateCatalog.Check("0.1.0", "0.1.0", CatalogTrust.BuilderVersion, "x64").Allowed, "signed candidate catalog is readable");
+    Require(candidateCatalog.Check(LocalRecipe.PatchVersion, LocalRecipe.ClientVersion, CatalogTrust.BuilderVersion, "x64").Allowed, "signed candidate catalog is readable");
     Console.WriteLine("The embedded key verified the candidate catalog.");
     return;
 }
@@ -471,8 +471,8 @@ if ((args.Length == 4 || args.Length == 5) && args[0] == "--build-unified-candid
     var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
     var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
     await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
-    var prepared = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
-        new CatalogClient("0.1.2", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+    var prepared = new PreparedRelease(source, new CatalogPatch(LocalRecipe.PatchVersion, LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
+        new CatalogClient(LocalRecipe.ClientVersion, 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
     var hasResources = args.Length == 5;
     var candidateSelection = new BuildSelection(TargetProfile.DesktopX64, true, UseResourceFramework: hasResources,
         NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId, ReuseResourceFramework: !hasResources,
@@ -496,8 +496,8 @@ if (args.Length == 5 && args[0] == "--build-split-candidate")
     var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
     var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
     await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
-    var prepared = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
-        new CatalogClient("0.1.0", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+    var prepared = new PreparedRelease(source, new CatalogPatch(LocalRecipe.PatchVersion, LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
+        new CatalogClient(LocalRecipe.ClientVersion, 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
     var result = await LocalBuildRunner.RunPreparedAsync(prepared, args[4], new BuildSelection(TargetProfile.DesktopX64, true,
         UseResourceFramework: true, NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId), new SystemProbe(), new ConsoleProgress());
     var signed = result.SignedOutput ?? throw new Exception("The candidate package was not signed.");
@@ -1525,8 +1525,8 @@ static async Task TestReleaseSource()
         var prepared = await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", destination, git);
         Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
         Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
-        var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = "0.1.0", UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
-            prepared.Client with { Version = "0.1.2" }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
+        var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = LocalRecipe.PatchVersion, UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
+            prepared.Client with { Version = LocalRecipe.ClientVersion }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.DesktopX64, true));
         try { LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.WindowsMobile, true)); throw new Exception("wrong build architecture accepted"); }
         catch (InvalidOperationException) { }

@@ -81,8 +81,16 @@ public static class SourceAssembler
             if (entry.Length > MaxExpandedBytes - total) throw new InvalidDataException("The archive expands beyond the allowed size.");
             total += entry.Length;
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            var mode = FileMode.CreateNew;
+            if (!upstream && (File.Exists(target) || Directory.Exists(target)))
+            {
+                var attributes = File.GetAttributes(target);
+                if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                    throw new InvalidDataException("The client archive cannot replace a directory or link in the source tree.");
+                mode = FileMode.Create;
+            }
             using var input = entry.Open();
-            using var file = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            using var file = new FileStream(target, mode, FileAccess.Write, FileShare.None);
             input.CopyTo(file);
         }
     }

@@ -42,6 +42,8 @@ internal static class PrebuiltToolchain
         var hostUm = Sdk("Lib", "um\\x64");
         var targetUcrt = Sdk("Lib", "ucrt\\" + architecture);
         var targetUm = Sdk("Lib", "um\\" + architecture);
+        var vcRoot = Path.GetFullPath(Path.Combine(msvc, "..", "..", ".."));
+        var sdkVersionBin = Path.Combine(sdk, "bin", PrivateWindowsSdk.Version);
         var wrappers = Path.GetFullPath(wrapperDirectory);
         Directory.CreateDirectory(wrappers);
         var hostLinker = WriteLinker(wrappers, "rust-host-link.cmd", linker, [
@@ -54,6 +56,14 @@ internal static class PrebuiltToolchain
         {
             ["INCLUDE"] = include,
             ["PATH"] = string.Join(';', Path.GetDirectoryName(compiler)!, Path.Combine(sdk, "bin", PrivateWindowsSdk.Version, "x64"), Environment.GetEnvironmentVariable("PATH") ?? ""),
+            ["VCToolsInstallDir"] = msvc.TrimEnd('\\') + "\\",
+            ["VCINSTALLDIR"] = vcRoot.TrimEnd('\\') + "\\",
+            ["WindowsSdkDir"] = sdk.TrimEnd('\\') + "\\",
+            ["WindowsSDKVersion"] = PrivateWindowsSdk.Version + "\\",
+            ["UniversalCRTSdkDir"] = sdk.TrimEnd('\\') + "\\",
+            ["UCRTVersion"] = PrivateWindowsSdk.Version,
+            ["WindowsSdkBinPath"] = Path.Combine(sdk, "bin") + "\\",
+            ["WindowsSdkVerBinPath"] = sdkVersionBin + "\\",
             ["CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"] = hostLinker,
         };
         var triple = architecture switch { "x86" => "I686_UWP_WINDOWS_MSVC", "x64" => "X86_64_UWP_WINDOWS_MSVC",

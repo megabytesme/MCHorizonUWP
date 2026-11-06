@@ -55,7 +55,7 @@ public static class LocalBuildRunner
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
         if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || release.Patch.Version != "0.1.0" || release.Client.Version != "0.1.2"
+            || release.Patch.Version != LocalRecipe.PatchVersion || release.Client.Version != LocalRecipe.ClientVersion
             || !release.Patch.UpstreamCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
     }
@@ -144,8 +144,21 @@ public static class LocalBuildRunner
             snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, progress);
         }
 
-        progress?.Report("Preparing a private copy of the Rust standard library.");
-        await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", LocalRecipe.RustToolchain]);
+        var rustSource = Path.Combine(snapshot, ".local", "builder-rust-std");
+        var rustLibrary = Path.Combine(rustSource, "library");
+        var rustPatches = new[] { "stdio", "file-open", "module", "runtime" }
+            .Select(name => Path.Combine(rustSource, "horizon-" + name + "-uwp.patch"));
+        if (Directory.Exists(rustSource))
+        {
+            if (!Directory.Exists(rustLibrary) || rustPatches.Any(path => !File.Exists(path)))
+                throw new InvalidDataException("The existing private Rust source copy is incomplete. Preserve it and choose a new prepared release workspace.");
+            progress?.Report("Reusing the prepared private Rust standard-library source.");
+        }
+        else
+        {
+            progress?.Report("Preparing a private copy of the Rust standard library.");
+            await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", LocalRecipe.RustToolchain]);
+        }
 
         var arm = selection.Target == TargetProfile.WindowsMobile;
         if (arm)
