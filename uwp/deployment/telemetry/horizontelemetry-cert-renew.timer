@@ -1,0 +1,11 @@
+[Unit]
+Description=Twice-daily renewal check for horizontelemetry.bytesdirect.com
+
+[Timer]
+OnCalendar=*-*-* 03,15:00:00
+RandomizedDelaySec=30min
+Persistent=true
+Unit=horizontelemetry-cert-renew.service
+
+[Install]
+WantedBy=timers.target

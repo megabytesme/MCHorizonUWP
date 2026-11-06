@@ -1,0 +1,42 @@
+name: horizon-telemetry-cert-renew
+
+services:
+  certbot:
+    image: local/certbot:5.8.0-security-20261026
+    user: "101:101"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 64
+    cpus: 0.5
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m,uid=101,gid=101
+      - /var/lib/letsencrypt:rw,nosuid,nodev,size=32m,uid=101,gid=101
+      - /var/log/letsencrypt:rw,nosuid,nodev,size=16m,uid=101,gid=101
+    volumes:
+      - certificates:/etc/letsencrypt
+      - webroot:/var/www/certbot
+    command:
+      - renew
+      - --cert-name
+      - horizontelemetry.bytesdirect.com
+      - --webroot
+      - -w
+      - /var/www/certbot
+      - --no-random-sleep-on-renew
+      - --quiet
+    logging:
+      driver: json-file
+      options:
+        max-size: 2m
+        max-file: "2"
+
+volumes:
+  certificates:
+    external: true
+    name: reverse-proxy_letsencrypt_certs_vol
+  webroot:
+    external: true
+    name: reverse-proxy_certbot_webroot_vol

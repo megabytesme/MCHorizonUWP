@@ -1,0 +1,54 @@
+name: horizon-telemetry
+
+services:
+  server:
+    image: local/horizon-telemetry-server:f42ef42ef6ceccb3c6a20bea2481d87949a51c81
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        HORIZON_REVISION: f42ef42ef6ceccb3c6a20bea2481d87949a51c81
+    platform: linux/arm64
+    container_name: horizontelemetry_server
+    user: "10001:10001"
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 20s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,uid=10001,gid=10001
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    environment:
+      PORT: "8080"
+      HORIZON_TELEMETRY_DB: /data/telemetry.sqlite3
+      HORIZON_TELEMETRY_TRUST_PROXY: "1"
+      HORIZON_TELEMETRY_RETENTION_DAYS: "180"
+      HORIZON_TELEMETRY_ALLOW_ORIGIN: https://playhorizon.dev
+    volumes:
+      - type: bind
+        source: /srv/horizontelemetry/data
+        target: /data
+        bind:
+          create_host_path: false
+    networks:
+      proxy:
+        aliases:
+          - horizontelemetry-backend
+    logging:
+      driver: json-file
+      options:
+        max-size: 2m
+        max-file: "3"
+    labels:
+      org.opencontainers.image.source: https://github.com/horizon-rust/horizon
+      org.opencontainers.image.revision: f42ef42ef6ceccb3c6a20bea2481d87949a51c81
+
+networks:
+  proxy:
+    external: true
+    name: bytesdirect_proxy_public
