@@ -24,10 +24,13 @@ def prohibited(path: str) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--history", action="store_true", help="check paths in all fetched Git history")
+    parser.add_argument("--history", action="store_true", help="check paths in the checked-out branch's history")
     args = parser.parse_args()
     command = ["git", "--no-replace-objects"]
-    command += (["log", "--all", "--format=", "--name-only", "-z", "-m"] if args.history else ["ls-files", "-z"])
+    # Check the checked-out branch's history. This repository retains imported
+    # Horizon refs for release provenance; those refs can contain upstream-only
+    # paths that are not present in this repository's public release history.
+    command += (["log", "HEAD", "--format=", "--name-only", "-z", "-m"] if args.history else ["ls-files", "-z"])
     output = subprocess.check_output(command)
     paths = {path.lstrip("\n") for path in output.decode("utf-8").split("\0") if path}
     invalid = sorted(path for path in paths if prohibited(path))
