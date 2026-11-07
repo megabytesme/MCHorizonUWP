@@ -58,7 +58,7 @@ def verify_upstream(archive_path, repository):
         raise ValueError("Upstream ZIP contents do not match the pinned Git commit")
 
 
-def client_archive(revision):
+def client_archive(revision, host_artifacts=None):
     archive = git("archive", "--format=tar", revision, "uwp", "LICENSE", "THIRD_PARTY_NOTICES.md")
     output = io.BytesIO()
     with tarfile.open(fileobj=io.BytesIO(archive)) as source, zipfile.ZipFile(
@@ -76,6 +76,32 @@ def client_archive(revision):
             item.compress_type = zipfile.ZIP_DEFLATED
             item.external_attr = 0o100644 << 16
             result.writestr(item, source.extractfile(entry).read())
+        if host_artifacts is not None:
+            root = Path(host_artifacts).resolve(strict=True)
+            expected = ["README.txt"]
+            for architecture in ("arm", "arm64", "x86", "x64"):
+                expected.extend([
+                    f"{architecture}/HorizonUWP.exe",
+                    f"{architecture}/HorizonUWPHost.lib",
+                    f"{architecture}/dead-import-sentinels.obj",
+                    *(f"{architecture}/link/{name}" for name in ("libcmt.lib", "atexit.lib", "tls_index.obj")),
+                ])
+            for relative in expected:
+                if not (root / relative).is_file():
+                    raise ValueError(f"Prebuilt host kit is incomplete: {relative}")
+            for path in sorted(root.rglob("*")):
+                if path.is_symlink():
+                    raise ValueError("Prebuilt host kit cannot contain symbolic links")
+                if not path.is_file():
+                    continue
+                relative = path.relative_to(root).as_posix()
+                if relative.startswith("/") or ".." in Path(relative).parts or "\\" in relative:
+                    raise ValueError(f"Invalid prebuilt host kit path: {relative}")
+                name = f"uwp/host/prebuilt/{relative}"
+                item = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+                item.compress_type = zipfile.ZIP_DEFLATED
+                item.external_attr = 0o100644 << 16
+                result.writestr(item, path.read_bytes())
     return output.getvalue()
 
 
@@ -84,6 +110,9 @@ def main():
     parser.add_argument("--revision", default="HEAD", help="Committed repository revision")
     parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
     parser.add_argument("--builder-version", default="0.1.0", help="Builder version for the candidate compatibility rule")
+    parser.add_argument("--host-artifacts", type=Path, help="Prepared four-architecture host kit to include in the client archive")
+    parser.add_argument("--catalog-input", type=Path, default=Path("catalog/catalog-v1.json"),
+                        help="Existing signed catalog whose older entries and rules must be retained")
     parser.add_argument("--output", required=True, type=Path, help="New output directory")
     parser.add_argument("--upstream-archive", required=True, type=Path, help="Verified source ZIP for the pinned upstream commit")
     parser.add_argument("--upstream-repo", required=True, type=Path, help="Git repository containing the pinned upstream commit")
@@ -101,25 +130,35 @@ def main():
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Invalid Git commit")
     patch = git("show", f"{revision}:{PATCH_PATH}")
-    client = client_archive(revision)
+    if args.client_version == "0.1.2" and args.host_artifacts is None:
+        raise ValueError("Client 0.1.2 requires --host-artifacts for the four prebuilt host kits")
+    client = client_archive(revision, args.host_artifacts)
     verify_upstream(args.upstream_archive, args.upstream_repo)
     args.output.mkdir(parents=True, exist_ok=False)
     (args.output / "horizon-uwp-0.1.0.patch").write_bytes(patch)
     (args.output / f"uwp-client-{args.client_version}.zip").write_bytes(client)
     upstream_hash = digest(args.upstream_archive.read_bytes())
-    catalog = {
-        "schema_version": 1,
-        "patches": [{"version": "0.1.0", "upstream_commit": UPSTREAM, "bridge": 1,
-                     "upstream": {"url": f"https://github.com/horizon-rust/horizon/archive/{UPSTREAM}.zip", "sha256": upstream_hash},
-                     "artifact": {"url": f"{REPOSITORY}/releases/download/patch-v0.1.0/horizon-uwp-0.1.0.patch", "sha256": digest(patch)}}],
-        "clients": [{"version": args.client_version, "bridge": 1,
-                     "artifact": {"url": f"{REPOSITORY}/releases/download/client-v{args.client_version}/uwp-client-{args.client_version}.zip", "sha256": digest(client)}}],
-        "rules": [{"patch": {"min_inclusive": "0.1.0", "max_exclusive": "0.1.1"},
-                   "client": {"min_inclusive": args.client_version, "max_exclusive": client_upper},
-                   "builder": {"min_inclusive": args.builder_version, "max_exclusive": builder_upper},
-                   "architectures": ["x86", "x64", "arm", "arm64"]}],
-        "evidence": [],
-    }
+    catalog = json.loads(args.catalog_input.read_text(encoding="utf-8"))
+    if catalog.get("schema_version") != 1:
+        raise ValueError("The existing compatibility catalog has an unsupported schema")
+    patch_entry = {"version": "0.1.0", "upstream_commit": UPSTREAM, "bridge": 1,
+                   "upstream": {"url": f"https://github.com/horizon-rust/horizon/archive/{UPSTREAM}.zip", "sha256": upstream_hash},
+                   "artifact": {"url": f"{REPOSITORY}/releases/download/patch-v0.1.0/horizon-uwp-0.1.0.patch", "sha256": digest(patch)}}
+    matching_patch = [item for item in catalog["patches"] if item["version"] == "0.1.0"]
+    if matching_patch:
+        if matching_patch[0] != patch_entry:
+            raise ValueError("The candidate patch or upstream archive differs from the retained catalog entry")
+    else:
+        catalog["patches"].append(patch_entry)
+    if any(item["version"] == args.client_version for item in catalog["clients"]):
+        raise ValueError(f"Client {args.client_version} already exists in the input catalog")
+    catalog["clients"].append({"version": args.client_version, "bridge": 1,
+                               "artifact": {"url": f"{REPOSITORY}/releases/download/client-v{args.client_version}/uwp-client-{args.client_version}.zip",
+                                            "sha256": digest(client)}})
+    catalog["rules"].append({"patch": {"min_inclusive": "0.1.0", "max_exclusive": "0.1.1"},
+                             "client": {"min_inclusive": args.client_version, "max_exclusive": client_upper},
+                             "builder": {"min_inclusive": args.builder_version, "max_exclusive": builder_upper},
+                             "architectures": ["x86", "x64", "arm", "arm64"]})
     (args.output / "catalog.UNSIGNED.json").write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
     print(f"Prepared unsigned development artifacts from {revision} in {args.output}")
     print("No release or test evidence was published; authenticate the catalog before use.")

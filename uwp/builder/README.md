@@ -44,13 +44,22 @@ frameworks contain private Minecraft files and should not be published.
 
 When you continue from Welcome, the development builder checks its requirements
 and offers to install missing components in the background. The Dependencies
-panel shows setup progress while you continue through the wizard. The builder
-uses WinGet for Git, Python, Rustup, Clang and Visual Studio 2022 Build Tools;
-it also prepares the UWP SDKs and Microsoft framework packages for all four
-targets. A new Rustup installation uses a private builder-owned home; the pinned
+panel shows the number ready and individual setup progress while you continue
+through the wizard. The review page checks the local setup and build plan
+automatically, summarizes the selected build, and starts when ready by default;
+clear the automatic-start checkbox to launch the build yourself. The builder
+reuses compatible Git, Python, Rustup, Clang and Windows SDK files when
+available. Otherwise it prepares private copies of Git, Python, Rustup, LLVM
+and SDK packages, and it resolves the Microsoft frameworks for the selected
+target. The client release includes the four prebuilt C++/CX hosts and their
+compact link inputs, so a user's PC does not compile the host or install
+Visual Studio. Rust and native C dependencies are compiled for the selected
+Horizon release and mods. A new Rustup installation uses a private
+builder-owned home; the pinned
 compiler and rust-src are selected without changing an existing default
-toolchain. This setup is under Sandbox validation. Administrator approval may be needed when
-installing development tools or trusting the locally generated certificate.
+toolchain. The setup dialog links the SDK, C++ component, LLVM, Git, Python,
+Rust and WinUI terms. Administrator approval may be needed when installing
+Microsoft frameworks or trusting the locally generated certificate.
 A complete build from a clean PC has not passed. See
 [CLEAN-PC-VALIDATION.md](CLEAN-PC-VALIDATION.md) for tested paths and limitations.
 
