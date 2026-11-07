@@ -1,12 +1,13 @@
 diff --git a/.gitattributes b/.gitattributes
-index f9e1922d7..b0760b4e2 100644
+index f9e1922d7..2b4b238a7 100644
 --- a/.gitattributes
 +++ b/.gitattributes
-@@ -4,3 +4,4 @@ docs/launcher-commands.md text eol=lf
+@@ -4,3 +4,5 @@ docs/launcher-commands.md text eol=lf
  docs/horizon-ctl-commands.md text eol=lf
  crates/horizon-theme/tokens.css text eol=lf
  docs/api/*-reference.md text eol=lf
 +uwp/angle-arm32/*.patch text eol=lf
++uwp/game-bridge/tests/fixtures/*.json text eol=lf
 diff --git a/.gitignore b/.gitignore
 index 469760ca6..4ecb008ec 100644
 --- a/.gitignore

@@ -2,3 +2,4 @@
 *.sig binary
 *.der binary
 catalog/*.json text eol=lf
+uwp/game-bridge/tests/fixtures/*.json text eol=lf
