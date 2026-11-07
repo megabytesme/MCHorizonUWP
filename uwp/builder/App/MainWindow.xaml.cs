@@ -492,15 +492,26 @@ public sealed partial class MainWindow : Window
         var architectures = SelectedArchitectures;
         if (catalog is not null && architectures.Count > 0)
         {
+            var catalogCompatiblePairFound = false;
+            var recipeBlockers = new List<string>();
             foreach (var patch in catalog.Patches.OrderByDescending(item => new Version(item.Version)))
                 foreach (var client in catalog.Clients.OrderByDescending(item => new Version(item.Version)))
                 {
                     var checks = architectures.Select(arch => catalog.Check(patch.Version, client.Version, CatalogTrust.BuilderVersion, arch)).ToArray();
-                    if (checks.All(check => check.Allowed))
-                        ReleaseSelection.Items.Add(new ReleaseChoice(patch.Version, client.Version, architectures[0], checks[0], architectures));
+                    if (!checks.All(check => check.Allowed)) continue;
+                    catalogCompatiblePairFound = true;
+                    if (LocalBuildRunner.RecipeBlocker(patch, client) is { } blocker)
+                    {
+                        recipeBlockers.Add(blocker);
+                        continue;
+                    }
+                    ReleaseSelection.Items.Add(new ReleaseChoice(patch.Version, client.Version, architectures[0], checks[0], architectures));
                 }
             ReleaseStatus.Text = ReleaseSelection.Items.Count == 0
-                ? "No catalog release is declared compatible with every selected architecture and this builder."
+                ? catalogCompatiblePairFound
+                    ? "The signed catalog lists compatible releases, but this builder cannot build them yet. "
+                        + (recipeBlockers.Distinct().FirstOrDefault() ?? "The available release pair is not supported by this build recipe.")
+                    : "No catalog release is declared compatible with every selected architecture and this builder."
                 : $"The signed catalog was verified. These choices support {string.Join(", ", architectures)}.";
         }
         else if (architectures.Count == 0) ReleaseStatus.Text = "Select at least one target architecture.";

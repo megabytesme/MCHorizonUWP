@@ -63,10 +63,23 @@ public static class LocalBuildRunner
         ArgumentNullException.ThrowIfNull(release);
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
-        if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || release.Patch.Version != "0.1.0" || release.Client.Version != "0.1.2"
-            || !release.Patch.UpstreamCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
+        var reason = !release.Compatibility.Allowed ? release.Compatibility.Reason
+            : release.Architecture != arch ? $"It was prepared for {release.Architecture}, but the selected target is {arch}."
+            : release.BuilderVersion != CatalogTrust.BuilderVersion ? $"It was prepared for builder {release.BuilderVersion}, but this builder is {CatalogTrust.BuilderVersion}."
+            : RecipeBlocker(release.Patch, release.Client);
+        if (reason is not null) throw new InvalidOperationException("This release cannot be built by the current recipe. " + reason);
+    }
+
+    /// <summary>Returns why a signed catalog pair cannot run through this builder's pinned build recipe.</summary>
+    public static string? RecipeBlocker(CatalogPatch patch, CatalogClient client)
+    {
+        if (patch.Version != "0.1.0")
+            return $"This builder currently supports Horizon patch 0.1.0 only; the selected patch is {patch.Version}.";
+        if (!patch.UpstreamCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
+            return "This builder's patch recipe is pinned to a different Horizon source revision.";
+        if (client.Version != "0.1.2")
+            return $"This build requires UWP client 0.1.2, which contains the four prebuilt Windows hosts. The selected client is {client.Version}.";
+        return null;
     }
 
     private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,
