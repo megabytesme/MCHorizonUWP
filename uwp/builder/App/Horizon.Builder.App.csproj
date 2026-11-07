@@ -11,11 +11,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Horizon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250909003" />
     <ProjectReference Include="..\Core\Horizon.Builder.Core.csproj" />
     <Content Include="..\..\host\Assets\Square150x150Logo.png" Link="Assets\Square150x150Logo.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\host\Assets\Square44x44Logo.png" Link="Assets\Square44x44Logo.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Horizon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\THIRD_PARTY_NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- Unpackaged WinUI embeds XAML in this PRI, which dotnet publish omits. -->
   <Target Name="PublishAppPri" AfterTargets="Publish">

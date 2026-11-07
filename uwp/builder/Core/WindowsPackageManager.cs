@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Horizon.Builder.Core;
 
-public enum InstallableTool { Rustup, Git, Python, Llvm }
+public enum InstallableTool { Rustup, Git, Python }
 
 /// <summary>Fixed package-manager operations initiated by the user.</summary>
 public static class WindowsPackageManager
@@ -42,17 +42,6 @@ public static class WindowsPackageManager
         }
     }
 
-    public static async Task EnsureClangAsync(IProbe probe, TargetProfile target, Func<InstallableTool, Task> install,
-        IProgress<string>? progress = null)
-    {
-        if (target is not (TargetProfile.WindowsMobile or TargetProfile.SurfaceProX)) return;
-        var clang = Path.Combine(probe.EnvironmentValue("ProgramFiles") ?? @"C:\Program Files", "LLVM", "bin", "clang.exe");
-        if (probe.FileExists(clang)) return;
-        progress?.Report("Installing LLVM for the ARM target with Windows Package Manager…");
-        await install(InstallableTool.Llvm);
-        if (!probe.FileExists(clang)) throw new InvalidOperationException("LLVM was installed but clang.exe was not found in its standard location.");
-    }
-
     public static IReadOnlyList<string> Arguments(InstallableTool tool)
     {
         var package = tool switch
@@ -60,11 +49,13 @@ public static class WindowsPackageManager
             InstallableTool.Rustup => "Rustlang.Rustup",
             InstallableTool.Git => "Git.Git",
             InstallableTool.Python => "Python.Python.3.13",
-            InstallableTool.Llvm => "LLVM.LLVM",
             _ => throw new ArgumentOutOfRangeException(nameof(tool)),
         };
         var args = new List<string> { "install", "--id", package, "--exact", "--source", "winget" };
-        if (tool == InstallableTool.Llvm) args.AddRange(["--version", "23.1.4"]);
+        if (tool == InstallableTool.Python)
+            // The builder needs the interpreter and standard library, not the
+            // interactive Python UI, documentation or standard-library tests.
+            args.AddRange(["--override", "/quiet /norestart InstallAllUsers=0 PrependPath=1 Include_doc=0 Include_test=0 Include_tcltk=0"]);
         if (tool == InstallableTool.Rustup)
             args.AddRange(["--version", "1.29.3", "--override", "-y --no-modify-path --default-toolchain none --profile minimal --no-update-default-toolchain"]);
         args.AddRange(["--silent", "--disable-interactivity", "--accept-package-agreements", "--accept-source-agreements"]);

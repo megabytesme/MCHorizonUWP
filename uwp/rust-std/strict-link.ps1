@@ -15,10 +15,18 @@ $ErrorActionPreference = 'Stop'
 $outputPath = [IO.Path]::GetFullPath($Output)
 $outputDir = [IO.Path]::GetDirectoryName($outputPath)
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-$stubObj = Join-Path $outputDir 'dead-import-sentinels.obj'
+$stubObj = if ($env:HORIZON_UWP_SENTINEL_OBJECT) {
+    [IO.Path]::GetFullPath($env:HORIZON_UWP_SENTINEL_OBJECT)
+} else {
+    Join-Path $outputDir 'dead-import-sentinels.obj'
+}
 $mapPath = "$outputPath.map"
-& cl /nologo /c /MD /O2 /Gy /Gw "/Fo$stubObj" (Join-Path $PSScriptRoot 'dead-import-sentinels.c')
-if ($LASTEXITCODE -ne 0) { throw "Compiling link sentinels failed: $LASTEXITCODE" }
+if (-not $env:HORIZON_UWP_SENTINEL_OBJECT) {
+    & cl /nologo /c /MD /O2 /Gy /Gw "/Fo$stubObj" (Join-Path $PSScriptRoot 'dead-import-sentinels.c')
+    if ($LASTEXITCODE -ne 0) { throw "Compiling link sentinels failed: $LASTEXITCODE" }
+} elseif (-not (Test-Path -LiteralPath $stubObj -PathType Leaf)) {
+    throw 'The precompiled UWP link sentinel object is missing.'
+}
 
 $linkArgs = @('/nologo', '/APPCONTAINER', '/SUBSYSTEM:WINDOWS', "/MACHINE:$Machine", '/OPT:REF',
     '/NODEFAULTLIB:kernel32.lib', "/MAP:$mapPath", "/OUT:$outputPath") +
@@ -41,7 +49,13 @@ if ($runtimeRelativePath -and $env:VCToolsInstallDir) {
 }
 if ($StackReserve -gt 0) { $linkArgs += "/STACK:$StackReserve" }
 if ($LargeAddressAware) { $linkArgs += '/LARGEADDRESSAWARE' }
-& link @linkArgs
+$rustLld = $env:HORIZON_UWP_RUST_LLD
+if ($rustLld) {
+    if (-not (Test-Path -LiteralPath $rustLld -PathType Leaf)) { throw 'Rust LLD is missing.' }
+    & $rustLld -flavor link @linkArgs
+} else {
+    & link @linkArgs
+}
 if ($LASTEXITCODE -ne 0) { throw "Strict UWP link failed: $LASTEXITCODE" }
 if (Select-String -Path $mapPath -Pattern 'dead-import-sentinels\.obj|forbidden_api' -Quiet) {
     # Make it impossible to mistake this artifact for a safe strict link.

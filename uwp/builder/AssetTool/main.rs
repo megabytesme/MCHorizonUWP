@@ -23,7 +23,9 @@ fn run() -> Result<(), String> {
     let mut args = std::env::args_os().skip(1);
     let source = PathBuf::from(args.next().ok_or("Missing authenticated source directory")?);
     let private = PathBuf::from(args.next().ok_or("Missing private download directory")?);
-    if args.next().is_some() || !source.join("research-lock.json").is_file() || private.exists() { return Err("Invalid source or private workspace".into()); }
+    if args.next().is_some() || !source.join("research-lock.json").is_file()
+        || (private.exists() && (!private.is_dir() || fs::symlink_metadata(&private).map(|m| m.file_type().is_symlink()).unwrap_or(true)))
+    { return Err("Invalid source or private workspace".into()); }
     fs::create_dir_all(&private).map_err(|e| e.to_string())?;
     let lock: Value = serde_json::from_slice(&fs::read(source.join("research-lock.json")).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let pins = sources::Pins::read(&lock).ok_or("The release has no Minecraft pins")?;
@@ -69,10 +71,14 @@ fn run() -> Result<(), String> {
     let server = &manifest["downloads"]["server"];
     let sha = checked_text(&lock["minecraft"], "server_sha1")?;
     if checked_text(server,"sha1")? != sha { return Err("The Minecraft server does not match the release pin".into()); }
-    println!("Downloading the Minecraft server data");
-    let server_bytes = sources::fetch_checked(&fetch, &checked_text(server,"url")?, &sha)?;
     let server_path = private.join("server.jar");
-    sources::write_file(&server_path, &server_bytes)?;
+    if sources::sha1_file(&server_path).as_deref() != Some(sha.as_str()) {
+        println!("Downloading the Minecraft server data");
+        let server_bytes = sources::fetch_checked(&fetch, &checked_text(server,"url")?, &sha)?;
+        sources::write_file(&server_path, &server_bytes)?;
+    } else {
+        println!("Reusing verified Minecraft server data");
+    }
     let component = checked_text(&manifest["javaVersion"],"component")?;
     let java = mojang::java_runtime(&component, &private.join("runtime"), 8, &fetch, &cancel, &log)?;
     println!("Preparing Minecraft resources with Horizon");

@@ -4,20 +4,25 @@ using System.Text.Json;
 
 namespace Horizon.Builder.Core;
 
-/// <summary>A one-time ownership check. Tokens stay in memory and are not written to the launcher's account store.</summary>
+/// <summary>Checks Minecraft ownership and protects only the Microsoft refresh token for later builder runs.</summary>
 public sealed class MinecraftSignIn : IDisposable
 {
     private const string MicrosoftBase = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
     private const string MinecraftBase = "https://api.minecraftservices.com";
     private readonly HttpClient http;
+    private readonly IRefreshTokenStore sessionStore;
+    private static readonly IRefreshTokenStore DefaultSessionStore = new ProtectedRefreshTokenStore();
 
-    public MinecraftSignIn() : this(new SocketsHttpHandler { AllowAutoRedirect = false }) { }
-    internal MinecraftSignIn(HttpMessageHandler handler)
+    public MinecraftSignIn() : this(new SocketsHttpHandler { AllowAutoRedirect = false }, DefaultSessionStore) { }
+    internal MinecraftSignIn(HttpMessageHandler handler, IRefreshTokenStore sessionStore)
     {
         http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 1024 * 1024 };
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        this.sessionStore = sessionStore;
     }
     public void Dispose() => http.Dispose();
+    public static bool HasSavedSession => DefaultSessionStore.HasToken;
+    public static void ForgetSavedSession() => DefaultSessionStore.Clear();
 
     public sealed class Challenge
     {
@@ -56,6 +61,7 @@ public sealed class MinecraftSignIn : IDisposable
         ArgumentNullException.ThrowIfNull(challenge);
         var interval = challenge.Interval;
         string microsoftToken;
+        string? refreshToken;
         while (true)
         {
             if (DateTimeOffset.UtcNow >= challenge.Expires) throw new InvalidOperationException("The sign-in code expired. Start again.");
@@ -72,8 +78,45 @@ public sealed class MinecraftSignIn : IDisposable
             if (error == "slow_down") { interval = Math.Min(interval + 5, 1800); continue; }
             if (response.Status != 200) throw new InvalidOperationException("Microsoft sign-in was declined or could not be completed.");
             microsoftToken = RequiredString(response.Body.RootElement, "access_token");
+            refreshToken = OptionalString(response.Body.RootElement, "refresh_token");
             break;
         }
+
+        var ownsMinecraft = await CheckMinecraftOwnershipAsync(microsoftToken, cancellationToken);
+        if (ownsMinecraft && refreshToken is { Length: > 0 }) sessionStore.Write(refreshToken);
+        return ownsMinecraft;
+    }
+
+    public async Task<bool> CompleteSavedOwnershipCheckAsync(CancellationToken cancellationToken = default)
+    {
+        var oldRefreshToken = sessionStore.Read()
+            ?? throw new InvalidOperationException("There is no saved Microsoft sign-in. Sign in to Microsoft first.");
+        using var request = new HttpRequestMessage(HttpMethod.Post, MicrosoftBase + "/token")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string> {
+                ["grant_type"] = "refresh_token", ["client_id"] = HorizonIdentity.ClientId,
+                ["refresh_token"] = oldRefreshToken, ["scope"] = "XboxLive.signin offline_access" }),
+        };
+        using var response = await SendAsync(request, cancellationToken);
+        var error = OptionalString(response.Body.RootElement, "error");
+        if (response.Status != 200)
+        {
+            if (error is "invalid_grant" or "interaction_required")
+            {
+                sessionStore.Clear();
+                throw new InvalidOperationException("The saved Microsoft sign-in expired or was revoked. Sign in again.");
+            }
+            throw new InvalidOperationException("Could not refresh the saved Microsoft sign-in.");
+        }
+
+        var microsoftToken = RequiredString(response.Body.RootElement, "access_token");
+        var rotatedRefreshToken = OptionalString(response.Body.RootElement, "refresh_token");
+        if (rotatedRefreshToken is { Length: > 0 }) sessionStore.Write(rotatedRefreshToken);
+        return await CheckMinecraftOwnershipAsync(microsoftToken, cancellationToken);
+    }
+
+    private async Task<bool> CheckMinecraftOwnershipAsync(string microsoftToken, CancellationToken cancellationToken)
+    {
 
         using var xbox = await PostJsonAsync("https://user.auth.xboxlive.com/user/authenticate", new {
             Properties = new { AuthMethod = "RPS", SiteName = "user.auth.xboxlive.com", RpsTicket = "d=" + microsoftToken },

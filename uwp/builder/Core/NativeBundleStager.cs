@@ -36,7 +36,7 @@ public sealed class NativeBundleStager
         if (Directory.Exists(root) || File.Exists(root)) throw new IOException("The native-mod workspace already exists.");
         Directory.CreateDirectory(root);
         var archive = Path.Combine(root, "launcher.zip");
-        await transport.DownloadArtifactAsync(artifact, archive, cancellationToken);
+        await PinnedDownload.EnsureWorkspaceCopyAsync(transport, artifact, archive, cancellationToken);
         return OpenVerifiedArchive(archive, root, artifact.Sha256);
     }
 

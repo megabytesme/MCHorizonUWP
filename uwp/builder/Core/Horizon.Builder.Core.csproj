@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
     <EmbeddedResource Include="Assets/FrameworkLogo.png" />
     <EmbeddedResource Include="Assets/catalog-public.der" LogicalName="Horizon.Builder.Core.CatalogPublicKey.der" />
     <EmbeddedResource Include="../../shared/horizon-client-id.txt" LogicalName="Horizon.Builder.Core.HorizonClientId.txt" />
@@ -12,6 +13,9 @@
     <EmbeddedResource Include="../AssetTool/Cargo.toml" LogicalName="Horizon.Builder.Core.AssetTool.Cargo.toml" />
     <EmbeddedResource Include="../AssetTool/Cargo.lock" LogicalName="Horizon.Builder.Core.AssetTool.Cargo.lock" />
     <EmbeddedResource Include="../AssetTool/main.rs" LogicalName="Horizon.Builder.Core.AssetTool.main.rs" />
+    <EmbeddedResource Include="../../host/build-game.cmd" LogicalName="Horizon.Builder.Core.CompactClient.build-game.cmd" />
+    <EmbeddedResource Include="../../host/package.ps1" LogicalName="Horizon.Builder.Core.CompactClient.package.ps1" />
+    <EmbeddedResource Include="../../pregame/host/build-shell.cmd" LogicalName="Horizon.Builder.Core.CompactClient.build-shell.cmd" />
     <InternalsVisibleTo Include="Horizon.Builder.Tests" />
   </ItemGroup>
 </Project>

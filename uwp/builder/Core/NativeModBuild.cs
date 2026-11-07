@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -12,7 +13,7 @@ internal static class NativeModBuild
     private const string HooksFile = "crates/horizon-client/src/game/native_hooks.rs";
 
     internal static async Task<string> ApplyAsync(string source, string workspace, IReadOnlyList<string> requested,
-        string cargo, IReadOnlyDictionary<string, string> hostEnvironment, IProgress<string>? progress)
+        string cargo, IReadOnlyDictionary<string, string> hostEnvironment, Func<int> jobLimitProvider, IProgress<string>? progress)
     {
         if (requested.Count == 0) return source;
         if (requested.Count > 100 || requested.Distinct(StringComparer.Ordinal).Count() != requested.Count)
@@ -38,12 +39,36 @@ internal static class NativeModBuild
             mixinsRevision = revision;
         }
         if (mixinsRevision is null) throw new InvalidDataException("No native mods were staged.");
-        var toolRoot = Path.Combine(workspace, "native-tool");
-        progress?.Report("Building Horizon's native-mod transformation tool.");
-        await LocalBuildRunner.RunProcess(cargo, workspace,
-            ["+" + LocalRecipe.RustToolchain, "install", "--locked", "--git", "https://github.com/horizon-rust/horizon-mixins", "--rev", mixinsRevision,
-                "--root", toolRoot, "horizon-mixins-cli"], hostEnvironment);
+        var toolRoot = Path.Combine(LocalBuildRunner.BuildCacheRoot, "native-tools", mixinsRevision);
         var executable = Path.Combine(toolRoot, "bin", "horizon-mixins.exe");
+        var marker = Path.Combine(toolRoot, ".mchorizon-cache-proof");
+        var reuseTool = false;
+        if (File.Exists(executable) && File.Exists(marker))
+        {
+            var proof = (await File.ReadAllTextAsync(marker)).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            if (proof.Length == 2 && proof[0] == mixinsRevision)
+            {
+                await using var cachedTool = File.OpenRead(executable);
+                reuseTool = proof[1].Equals(Convert.ToHexString(await SHA256.HashDataAsync(cachedTool)), StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        if (reuseTool) progress?.Report("Reusing the verified cached native-mod transformation tool.");
+        else
+        {
+            Directory.CreateDirectory(toolRoot);
+            progress?.Report("Building Horizon's native-mod transformation tool.");
+            var installArgs = new List<string> { "+" + LocalRecipe.RustToolchain, "install", "--locked", "--git",
+                "https://github.com/horizon-rust/horizon-mixins", "--rev", mixinsRevision, "--root", toolRoot, "horizon-mixins-cli" };
+            if (File.Exists(executable)) installArgs.Insert(2, "--force");
+            var jobs = LocalBuildRunner.CurrentCargoJobCount(jobLimitProvider());
+            var installEnvironment = hostEnvironment.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+            installEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            progress?.Report($"Building the native-mod tool with {jobs} parallel Cargo jobs.");
+            await LocalBuildRunner.RunProcess(cargo, workspace, installArgs, installEnvironment, progress: progress);
+            await using var builtTool = File.OpenRead(executable);
+            var digest = Convert.ToHexString(await SHA256.HashDataAsync(builtTool));
+            await File.WriteAllTextAsync(marker, mixinsRevision + "\n" + digest + "\n", new UTF8Encoding(false));
+        }
         var staged = Path.Combine(workspace, "native-source");
         await File.WriteAllTextAsync(Path.Combine(source, ".horizon-revision"), LocalRecipe.UpstreamNightlyCommit + "\n");
         var lib = Path.Combine(source, "crates", "horizon-client", "src", "lib.rs");

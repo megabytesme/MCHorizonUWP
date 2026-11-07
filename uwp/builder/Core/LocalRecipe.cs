@@ -64,9 +64,10 @@ public static class LocalRecipe
         }
     }
 
-    public static LocalBuildPlan Plan(BuildSelection selection)
+    public static LocalBuildPlan Plan(BuildSelection selection, string? buildTargetDirectory = null)
     {
         var packageVersion = selection.ValidatedPackageVersion;
+        _ = selection.ValidatedCargoJobs;
         var clientId = selection.ValidatedMicrosoftClientId;
         var existingFramework = selection.ValidatedExistingResourceFramework;
         var arm32 = selection.Target == TargetProfile.WindowsMobile;
@@ -98,7 +99,7 @@ public static class LocalRecipe
         }
         var cargo = new List<string>(prefix);
         cargo.AddRange(["build", "--offline", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--features", string.Join(',', selection.Features),
-            "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", ".local/builder-target"]);
+            "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", buildTargetDirectory ?? ".local/builder-target"]);
         steps.Add(new("Build game bridge", "cargo", cargo.AsReadOnly()));
         steps.Add(new("Strict-link host", "cmd", ["/d", "/c", "uwp/host/build-game.cmd", arch]));
         if (selection.UseResourceFramework)
@@ -113,7 +114,7 @@ public static class LocalRecipe
             "The renderer is checked on the device before launch; unavailable graphics devices are not offered.",
             "The resulting APPX requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
-            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and uses all available processor cores." };
+            "At least 10 GiB free space is required. Cargo downloads missing dependencies before the offline build. Automatic parallelism balances processor count and available memory; the job count can be adjusted in Build performance." };
         if (existingFramework is null) notes.Add("The resource manifest version is checked; resource ownership and complete content integrity are not established by this check.");
         if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
         if (selection.UseResourceFramework) notes.Add("The separate unsigned resource framework contains your private prepared resources; retain it for clients using the same content and install it as a dependency.");
@@ -172,7 +173,7 @@ public static class LocalRecipe
             throw new InvalidDataException("Selected resources already contain some sound data. Use complete resources without sound preparation, or choose a sound-free copy.");
     }
 
-    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust, bool splitRelease = false, bool unifiedToolchain = false)
+    public static IReadOnlyList<string> ToolchainBlockers(BuildSelection selection, IProbe probe, RustToolchainFacts rust, bool splitRelease = false, bool unifiedToolchain = false, bool compactToolchain = false)
     {
         var blockers = new List<string>();
         foreach (var tool in new[] { "git.exe", "rustup.exe", "cargo.exe", "python.exe" })
@@ -190,6 +191,13 @@ public static class LocalRecipe
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
         };
+        if (compactToolchain)
+        {
+            if (PrivateWindowsSdk.FindReady(probe, [arch, "x64"]) is null) blockers.Add($"Windows SDK 19041 is missing files for the x64 host or {arch} target.");
+            if (ClangFinder.Find(probe) is null) blockers.Add("The Rust build requires Clang for its native dependencies.");
+            if (VisualCppInstallation.FindLinkToolset(probe, arch) is null) blockers.Add($"The Microsoft link libraries for the x64 host and {arch} target are missing.");
+            return blockers.AsReadOnly();
+        }
         var unifiedRoot = unifiedToolchain ? VisualCppInstallation.FindForTarget(probe, selection.Target) : null;
         var vc = unifiedToolchain ? (unifiedRoot is null ? "" : Path.Combine(unifiedRoot, "VC", "Auxiliary", "Build", "vcvarsall.bat")) : arch == "arm"
             ? Path.Combine(pfx86, "Microsoft Visual Studio", splitRelease ? "2022" : "2017", splitRelease ? "BuildTools" : "Community", "VC", "Auxiliary", "Build", "vcvarsall.bat")
@@ -233,5 +241,24 @@ public static class LocalRecipe
         var version = await Run("run", RustToolchain, "rustc", "--version");
         var sysroot = await Run("run", RustToolchain, "rustc", "--print", "sysroot");
         return new(version, !string.IsNullOrWhiteSpace(sysroot) && probe.FileExists(Path.Combine(sysroot, "lib", "rustlib", "src", "rust", "library", "Cargo.toml")));
+    }
+
+    public static async Task<string> FindRustLinkerAsync(IProbe probe)
+    {
+        var rustup = probe.FindOnPath("rustup.exe") ?? throw new InvalidOperationException("Rustup is missing.");
+        var start = new ProcessStartInfo(rustup) { UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var arg in new[] { "run", RustToolchain, "rustc", "--print", "sysroot" }) start.ArgumentList.Add(arg);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not locate Rust's linker.");
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        await Task.WhenAll(output, error);
+        if (process.ExitCode != 0) throw new InvalidOperationException("Could not locate the pinned Rust toolchain linker.");
+        var sysroot = (await output).Trim();
+        if (sysroot.Length == 0) throw new InvalidOperationException("Rust did not report its toolchain directory.");
+        var linker = Path.GetFullPath(Path.Combine(sysroot, "lib", "rustlib", "x86_64-pc-windows-msvc", "bin", "rust-lld.exe"));
+        if (!probe.FileExists(linker)) throw new FileNotFoundException("The pinned Rust toolchain does not include rust-lld.", linker);
+        return linker;
     }
 }

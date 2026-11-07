@@ -1,5 +1,218 @@
 using Horizon.Builder.Core;
 
+if (args.Length == 2 && args[0] == "--dependency-resolution-proof")
+{
+    var architecture = args[1];
+    var probe = new SystemProbe();
+    var dependencyMissing = await DependencyProvisioner.MissingAsync(probe, architecture);
+    Console.WriteLine($"Missing before setup ({dependencyMissing.Count}): {string.Join("; ", dependencyMissing)}");
+    var elapsed = System.Diagnostics.Stopwatch.StartNew();
+    await DependencyProvisioner.PrepareAsync(new ConsoleDependencyProgress(), architecture);
+    var remaining = await DependencyProvisioner.MissingAsync(new SystemProbe(), architecture);
+    Require(remaining.Count == 0, "dependency setup resolves every prerequisite: " + string.Join("; ", remaining));
+    Console.WriteLine($"All dependencies are ready for {architecture} in {elapsed.Elapsed.TotalSeconds:F1}s.");
+    return;
+}
+
+if (args.Length == 1 && args[0] == "--msvc-package-proof")
+{
+    var elapsed = System.Diagnostics.Stopwatch.StartNew();
+    foreach (var arch in new[] { "x64", "x86", "arm", "arm64" })
+    {
+        var target = System.Diagnostics.Stopwatch.StartNew();
+        await PrivateMsvcToolset.EnsurePrivateAsync(arch, PrivateMsvcToolset.PrivateRoot,
+            PrivateMsvcToolset.DownloadRoot, new ConsoleProgress());
+        Require(PrivateMsvcToolset.IsComplete(new SystemProbe(), PrivateMsvcToolset.PrivateRoot, arch),
+            $"direct Microsoft C++ package set is complete for {arch}");
+        Console.WriteLine($"{arch} direct-package setup: {target.Elapsed.TotalSeconds:F1}s");
+    }
+    Console.WriteLine($"All four direct-package architecture sets are ready in {elapsed.Elapsed.TotalSeconds:F1}s.");
+    return;
+}
+
+if (args.Length == 5 && args[0] == "--sdk-supplement-proof")
+{
+    var output = Path.GetFullPath(args[4]);
+    await PrivateWindowsSdk.AssembleSupplementAsync(args[1], args[2], output, [args[3]]);
+    Require(PrivateWindowsSdk.IsComplete(output, [args[3], "x64"]), "installed host SDK supplemented with selected target");
+    Console.WriteLine($"Reused the installed SDK and supplemented {args[3]}: {output}");
+    return;
+}
+
+if (args.Length == 4 && args[0] == "--compact-integrated-proof")
+{
+    var source = Path.GetFullPath(args[1]);
+    var profile = Enum.Parse<TargetProfile>(args[2]);
+    var arch = profile switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86", TargetProfile.SurfaceProX => "arm64", _ => "arm" };
+    var artifact = new CatalogArtifact("https://example.test/proof", new string('a', 64));
+    var release = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, artifact, artifact),
+        new CatalogClient("0.1.2", 1, artifact), new CompatibilityResult(true, false, false, "Synthetic local proof"), CatalogTrust.BuilderVersion, arch);
+    var proofSelection = new BuildSelection(profile, true, UseResourceFramework: true, NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId);
+    var result = await LocalBuildRunner.RunPreparedAsync(release, Path.GetFullPath(args[3]), proofSelection, new SystemProbe(), new ConsoleProgress());
+    Require(result.SignedOutput is { } signed && File.Exists(signed.Client) && File.Exists(signed.Certificate)
+        && signed.ResourceFramework is { } framework && File.Exists(framework), "compact pipeline produced a signed client, framework and certificate");
+    Console.WriteLine($"Compact integrated synthetic proof: {result.SignedOutput!.Client}");
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--compact-framework-proof")
+{
+    var root = Path.GetFullPath(args[2]);
+    if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new framework proof directory.");
+    Directory.CreateDirectory(root);
+    var resources = Path.Combine(root, "resources");
+    Directory.CreateDirectory(resources);
+    await File.WriteAllTextAsync(Path.Combine(resources, "horizon-resources.json"), "{\"minecraft\":\"26.3\"}");
+    var result = await ResourceFrameworkPacker.PackAsync(resources, Path.Combine(root, "output"), sdkRoot: Path.GetFullPath(args[1]));
+    Require(File.Exists(result.Package), "the compact SDK packaged a synthetic resource framework");
+    Console.WriteLine($"Packaged a synthetic resource framework with the compact SDK: {result.Package}");
+    return;
+}
+
+if (args.Length == 1 && args[0] == "--compact-diagnose")
+{
+    var probe = new SystemProbe();
+    foreach (var arch in new[] { "x86", "x64", "arm", "arm64" })
+    {
+        var compiler = VisualCppInstallation.FindCompact(probe, arch);
+        var sdkCandidate = PrivateWindowsSdk.FindReady(probe, [arch, "x64"]);
+        Console.WriteLine($"{arch}: compiler={(compiler is null ? "missing" : compiler.Value.Toolset)}, sdk={sdkCandidate ?? "missing"}, clang={ClangFinder.Find(probe) ?? "missing"}");
+    }
+    return;
+}
+
+if (args.Length is 3 or 4 && args[0] == "--client-backport-proof")
+{
+    var root = Path.GetFullPath(args[2]);
+    if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new client proof directory.");
+    Directory.CreateDirectory(root);
+    using (var zip = System.IO.Compression.ZipFile.OpenRead(args[1]))
+        foreach (var name in new[] { "uwp/host/build-game.cmd", "uwp/pregame/host/build-shell.cmd", "uwp/host/package.ps1" })
+        {
+            var target = Path.Combine(root, name.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            using var source = (zip.GetEntry(name) ?? throw new Exception("Missing client file.")).Open();
+            using var file = new FileStream(target, FileMode.CreateNew);
+            source.CopyTo(file);
+        }
+    var version = args.Length == 4 ? args[3] : "0.1.1";
+    ClientToolchainBackport.Apply(root, version);
+    ClientToolchainBackport.Apply(root, version);
+    Require(File.ReadAllText(Path.Combine(root, "uwp", "host", "build-game.cmd")).Contains("HORIZON_UWP_PREPARED_ENV"), "client has the compact-toolchain hook");
+    Console.WriteLine($"Validated and backported the pinned client scripts: {root}");
+    return;
+}
+
+if (args.Length == 7 && args[0] == "--compact-host-proof")
+{
+    var arch = args[1];
+    var root = Path.GetFullPath(args[6]);
+    if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new compact-toolchain proof directory.");
+    Directory.CreateDirectory(root);
+    var environments = CompactToolchain.Create(args[2], args[3], args[4], arch, Path.Combine(root, "linker"));
+    var host = new Dictionary<string, string>(environments.Host, StringComparer.OrdinalIgnoreCase)
+    {
+        ["HORIZON_UWP_GAME_LIB"] = Path.GetFullPath(args[5]), ["HORIZON_UWP_BUILD_DIR"] = Path.Combine(root, "host"),
+        ["HORIZON_UWP_XAML_SHELL"] = "1", ["HORIZON_UWP_ACCOUNT"] = "1", ["HORIZON_UWP_XAUDIO"] = "1",
+        ["HORIZON_UWP_HTTP"] = "1", ["HORIZON_UWP_NATIVE_D3D11"] = "1", ["HORIZON_UWP_TOUCH_MOD"] = "1",
+        ["HORIZON_UWP_DX12"] = "1", ["HORIZON_UWP_DEVICE_VIBRATION"] = "1"
+    };
+    await LocalBuildRunner.RunProcess(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
+        Environment.CurrentDirectory, ["/d", "/c", "uwp\\host\\build-game.cmd", arch], host);
+    Require(File.Exists(Path.Combine(root, "host", "HorizonUWP.exe")), "compact toolchain built and strictly linked the host");
+    Console.WriteLine($"Built the {arch} host with the compact toolchain: {root}");
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--private-git-proof")
+{
+    var root = Path.GetFullPath(args[2]);
+    var git = await PrivateGit.EnsureAsync([], root, Path.GetFullPath(args[1]));
+    Require(await PrivateGit.IsUsableAsync(git), "private Git executes");
+    Require(await PrivateGit.FindAsync([Path.Combine(root, "missing.exe"), git], root + "-unused") == git,
+        "a later usable Git is preferred over a private fallback");
+    PrivateGit.Activate(git);
+    await TestReleaseSource();
+    await TestSourceAssembler();
+    Console.WriteLine($"Prepared MinGit and applied the release patch: {git}");
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--private-python-proof")
+{
+    var root = Path.GetFullPath(args[2]);
+    var python = await PrivatePython.EnsureAsync(null, root, Path.GetFullPath(args[1]));
+    Require(await PrivatePython.IsUsableAsync(python), "private Python executes and meets the minimum version");
+    Require(await PrivatePython.FindAsync(python, root + "-unused") == python, "an existing compatible Python is preferred");
+    Require(await PrivatePython.FindCandidatesAsync([Path.Combine(root, "missing.exe"), python], root + "-unused") == python,
+        "a later compatible Python is used if the first candidate is unusable");
+    Console.WriteLine($"Prepared and reused embedded Python: {python}");
+    return;
+}
+
+if (args.Length == 4 && args[0] == "--private-sdk-target-proof")
+{
+    var destination = Path.GetFullPath(args[3]);
+    var prepared = await PrivateWindowsSdk.FindOrPrepareAsync(destination + "-missing", destination, Path.GetFullPath(args[2]), [args[1]]);
+    Require(prepared == destination, "missing installed SDK falls back to the verified private SDK");
+    Require(PrivateWindowsSdk.IsComplete(destination, [args[1]]), "private SDK contains the selected target");
+    Require(!PrivateWindowsSdk.IsComplete(destination), "single-target SDK does not claim all targets");
+    var reused = await PrivateWindowsSdk.FindOrPrepareAsync(destination, destination + "-unused", destination + "-downloads", [args[1]]);
+    Require(reused == destination && !Directory.Exists(destination + "-downloads"), "the installed target SDK avoids downloads");
+    Console.WriteLine($"Assembled and reused private SDK for {args[1]}: {destination}");
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--private-sdk-proof")
+{
+    var archives = Path.GetFullPath(args[1]);
+    var destination = Path.GetFullPath(args[2]);
+    await PrivateWindowsSdk.AssembleAsync(archives, destination);
+    Require(PrivateWindowsSdk.IsComplete(destination), "private SDK contains four target libraries and packaging tools");
+    var reused = await PrivateWindowsSdk.FindOrPrepareAsync(destination, destination + "-unused", destination + "-downloads");
+    Require(reused == destination && !Directory.Exists(destination + "-downloads"), "an existing complete SDK avoids downloads");
+    Console.WriteLine($"Assembled and verified private Windows SDK: {destination}");
+    return;
+}
+
+if (args.Length == 4 && args[0] == "--private-sdk-extension-proof")
+{
+    var archives = Path.GetFullPath(args[1]);
+    var destination = Path.GetFullPath(args[2]);
+    var architecture = args[3];
+    if (!Directory.Exists(destination)) await PrivateWindowsSdk.AssembleAsync(archives, destination, ["x64"]);
+    var extended = await PrivateWindowsSdk.FindOrPrepareAsync(destination + "-no-installed-sdk", destination, archives, [architecture]);
+    Require(extended == destination, "a builder-managed SDK can add another target architecture");
+    Require(PrivateWindowsSdk.IsComplete(destination, ["x64", architecture]), "the extended SDK contains its original and new target libraries");
+    Console.WriteLine($"Extended the private SDK with {architecture}: {destination}");
+    return;
+}
+
+{
+    var root = Path.Combine(Path.GetTempPath(), "HorizonSdkDigestTest-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        await File.WriteAllTextAsync(Path.Combine(root, PrivateWindowsSdk.PackageFileName("")), "tampered package");
+        var destination = Path.Combine(root, "sdk");
+        try { await PrivateWindowsSdk.AssembleAsync(root, destination); throw new Exception("tampered SDK was accepted"); }
+        catch (InvalidDataException) { }
+        Require(!Directory.Exists(destination), "tampered SDK did not create a usable layout");
+        Require(!Directory.EnumerateDirectories(root, ".sdk-staging-*").Any(), "failed SDK extraction cleaned its staging directory");
+        var bytes = System.Text.Encoding.UTF8.GetBytes("verified package");
+        var artifact = new CatalogArtifact("https://example.test/artifact", Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)));
+        var cached = Path.Combine(root, "package.zip");
+        await File.WriteAllTextAsync(cached, "damaged package");
+        using var transport = new CatalogTransport(new CatalogFixtureHandler([], [], bytes));
+        await PinnedDownload.EnsureAsync(transport, artifact, cached);
+        Require(File.ReadAllBytes(cached).SequenceEqual(bytes), "damaged cache is automatically replaced with verified content");
+        Require(Directory.EnumerateFiles(root, "package.zip.invalid-*").Count() == 1, "damaged cache is preserved for inspection");
+        await PinnedDownload.EnsureAsync(transport, artifact, cached);
+        Require(Directory.EnumerateFiles(root, "package.zip.invalid-*").Count() == 1, "valid cache is reused without another replacement");
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
+
 if (args.Length == 2 && args[0] == "--install-vs-proof")
 {
     if (!Enum.TryParse<TargetProfile>(args[1], out var target) || !Enum.IsDefined(target)) throw new ArgumentException("Invalid target profile.");
@@ -44,7 +257,7 @@ if (args.Length == 5 && args[0] == "--prepare-assets-candidate")
     var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
     await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
     var release = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
-        new CatalogClient("0.1.1", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+        new CatalogClient("0.1.2", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
     var resources = await MinecraftAssetPreparation.PrepareAsync(release, new BuildSelection(TargetProfile.DesktopX64, false), true,
         new SystemProbe(), new ConsoleProgress());
     Require(File.Exists(Path.Combine(resources, "horizon-resources.json")), "automatic resource preparation produced its manifest");
@@ -67,11 +280,36 @@ if (args.Length == 2 && args[0] == "--stage-asset-helper")
 if (args.Length == 1 && args[0] == "--install-clang-proof")
 {
     SystemProbe.RefreshProcessPath();
-    var probe = new SystemProbe();
-    await WindowsPackageManager.EnsureClangAsync(probe, TargetProfile.WindowsMobile,
-        tool => WindowsPackageManager.InstallAsync(probe, tool), new ConsoleProgress());
-    Require(probe.FileExists(Path.Combine(probe.EnvironmentValue("ProgramFiles")!, "LLVM", "bin", "clang.exe")), "ARM Clang available after setup");
-    Console.WriteLine("Verified automatic ARM Clang setup.");
+    var clang = await PrivateClang.EnsureAsync(PrivateClang.DownloadRoot, new ConsoleProgress());
+    Require(File.Exists(clang) && (clang != PrivateClang.ClangExecutable || PrivateClang.IsComplete(PrivateClang.Root)),
+        "ARM Clang and builtin headers are available after setup");
+    Console.WriteLine($"Verified ARM Clang setup: {clang}");
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--clang-archive-proof")
+{
+    var archive = Path.GetFullPath(args[1]);
+    var root = Path.GetFullPath(args[2]);
+    if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new Clang archive proof directory.");
+    Directory.CreateDirectory(root);
+    await PrivateClang.ExtractAsync(archive, root);
+    Require(PrivateClang.IsComplete(root), "the real LLVM archive extracts the compiler and builtin headers");
+    var clang = Path.Combine(root, "bin", "clang.exe");
+    var source = Path.Combine(root, "probe.c");
+    await File.WriteAllTextAsync(source, "#include <stddef.h>\nsize_t clang_probe(size_t n) { return n + 1; }\n");
+    foreach (var (target, name, machine) in new[]
+    {
+        ("aarch64-uwp-windows-msvc", "arm64.obj", (ushort)0xAA64),
+        ("thumbv7a-uwp-windows-msvc", "arm32.obj", (ushort)0x01C4)
+    })
+    {
+        await LocalBuildRunner.RunProcess(clang, root, ["--target=" + target, "-c", source, "-o", name]);
+        using var objectFile = File.OpenRead(Path.Combine(root, name));
+        using var reader = new BinaryReader(objectFile);
+        Require(reader.ReadUInt16() == machine, $"compact Clang compiles a {target} COFF object");
+    }
+    Console.WriteLine("The real compact LLVM archive extracted and compiled ARM32 and ARM64 COFF objects.");
     return;
 }
 
@@ -234,7 +472,7 @@ if ((args.Length == 4 || args.Length == 5) && args[0] == "--build-unified-candid
     var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
     await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
     var prepared = new PreparedRelease(source, new CatalogPatch("0.1.0", LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
-        new CatalogClient("0.1.1", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+        new CatalogClient("0.1.2", 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
     var hasResources = args.Length == 5;
     var candidateSelection = new BuildSelection(TargetProfile.DesktopX64, true, UseResourceFramework: hasResources,
         NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId, ReuseResourceFramework: !hasResources,
@@ -334,6 +572,19 @@ if (args.Length == 2 && args[0] == "--inspect-candidate-catalog")
         var result = candidate.Check("0.1.0", "0.1.0", "0.1.0", architecture);
         Require(result.Allowed && !result.BuildVerified && !result.DeviceVerified, "candidate status is declared but unverified");
         Console.WriteLine($"{architecture}: compatible candidate, no build or device evidence");
+    }
+    return;
+}
+
+if (args.Length == 2 && args[0] == "--inspect-current-builder-catalog")
+{
+    var candidate = CompatibilityCatalog.Parse(await File.ReadAllTextAsync(args[1]));
+    foreach (var architecture in new[] { "x86", "x64", "arm", "arm64" })
+    {
+        var result = candidate.Check("0.1.0", "0.1.1", CatalogTrust.BuilderVersion, architecture);
+        Require(!result.Allowed,
+            $"builder {CatalogTrust.BuilderVersion} must reject client 0.1.1 until the 0.1.2 prebuilt-host release is available");
+        Console.WriteLine($"{architecture}: builder {CatalogTrust.BuilderVersion} correctly blocks client 0.1.1");
     }
     return;
 }
@@ -595,6 +846,8 @@ await TestSourceAssembler();
 await TestReleaseSource();
 await TestNativeBundleStager();
 await TestMinecraftSignIn();
+await TestMinecraftAssetPrefetch();
+await TestPrivateClangArchive();
 var nativeFixture = $$$"""
 {"schema":1,"projects":[
  {"id":"example","kind":"native-mod","name":"Example","summary":"A native mod","authors":["A"],"versions":[
@@ -819,7 +1072,7 @@ Require(WindowsPackageManager.Arguments(InstallableTool.Git)[2] == "Git.Git", "f
 Require(WindowsPackageManager.Arguments(InstallableTool.Python)[2] == "Python.Python.3.13", "fixed Python package");
 Require(WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--silent") && WindowsPackageManager.Arguments(InstallableTool.Git).Contains("--disable-interactivity"), "Git setup is noninteractive");
 Require(WindowsPackageManager.Arguments(InstallableTool.Python).Contains("--silent") && WindowsPackageManager.Arguments(InstallableTool.Python).Contains("--disable-interactivity"), "Python setup is noninteractive");
-Require(WindowsPackageManager.Arguments(InstallableTool.Llvm).Contains("23.1.4"), "ARM Clang installation uses the tested release");
+Require(WindowsPackageManager.Arguments(InstallableTool.Python).Contains("/quiet /norestart InstallAllUsers=0 PrependPath=1 Include_doc=0 Include_test=0 Include_tcltk=0"), "Python setup omits unneeded UI, documentation and tests while adding the interpreter to PATH");
 var autoProbe = new FakeProbe();
 var autoInstalled = new List<InstallableTool>();
 Task InstallFake(InstallableTool tool)
@@ -833,16 +1086,6 @@ await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () =>
 await WindowsPackageManager.EnsureBuildBasicsAsync(autoProbe, InstallFake, () => { }, prepareRustup: () => rustupHomesPrepared++);
 Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python, InstallableTool.Rustup]), "missing Git, Python and Rustup installed once and then reused");
 Require(rustupHomesPrepared == 1, "new Rustup gets a private home without changing an existing installation");
-Task InstallFakeClang(InstallableTool tool)
-{
-    autoInstalled.Add(tool);
-    autoProbe.Files.Add(Path.Combine(autoProbe.Root, "LLVM", "bin", "clang.exe"));
-    return Task.CompletedTask;
-}
-await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.DesktopX64, InstallFakeClang);
-await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.WindowsMobile, InstallFakeClang);
-await WindowsPackageManager.EnsureClangAsync(autoProbe, TargetProfile.SurfaceProX, InstallFakeClang);
-Require(autoInstalled.SequenceEqual([InstallableTool.Git, InstallableTool.Python, InstallableTool.Rustup, InstallableTool.Llvm]), "Clang installed once only for ARM targets");
 try
 {
     await WindowsPackageManager.EnsureBuildBasicsAsync(new FakeProbe(), _ => Task.CompletedTask, () => { });
@@ -929,10 +1172,36 @@ Require(allComponents.Contains("Microsoft.VisualStudio.Component.VC.Tools.ARM")
     && allComponents.Contains("Microsoft.VisualStudio.Component.VC.Tools.ARM64")
     && allComponents.Contains("Microsoft.VisualStudio.Component.Windows10SDK.19041")
     && allComponents.Distinct(StringComparer.Ordinal).Count() == allComponents.Count,
-    "welcome setup includes all targets without duplicate components");
+    "the explicit all-targets component plan has no duplicate components");
+var x64CompactComponents = VisualStudioBootstrap.CompactComponentsFor("x64");
+var armCompactComponents = VisualStudioBootstrap.CompactComponentsFor("arm");
+var arm64CompactComponents = VisualStudioBootstrap.CompactComponentsFor("arm64");
+Require(x64CompactComponents.SequenceEqual(["Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "Microsoft.VisualStudio.ComponentGroup.UWP.VC.BuildTools"]),
+    "x64 setup installs the host linker libraries and UWP support");
+Require(armCompactComponents.SequenceEqual(["Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "Microsoft.VisualStudio.ComponentGroup.UWP.VC.BuildTools", "Microsoft.VisualStudio.Component.VC.Tools.ARM"]),
+    "ARM32 setup installs the host linker libraries, UWP support and ARM32 target libraries");
+Require(arm64CompactComponents.SequenceEqual(["Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "Microsoft.VisualStudio.ComponentGroup.UWP.VC.BuildTools", "Microsoft.VisualStudio.Component.VC.Tools.ARM64", "Microsoft.VisualStudio.Component.UWP.VC.ARM64"]),
+    "ARM64 setup installs host and target libraries with UWP support");
+var linkProbe = new FakeProbe();
+var linkVs = Path.Combine(linkProbe.Root, "Microsoft Visual Studio", "2022", "BuildTools");
+var linkToolsetParent = Path.Combine(linkVs, "VC", "Tools", "MSVC");
+var linkToolset = Path.Combine(linkToolsetParent, "14.44.35207");
+linkProbe.AddDirectory(Path.Combine(linkProbe.Root, "Microsoft Visual Studio"), Path.GetDirectoryName(linkVs)!);
+linkProbe.AddDirectory(Path.GetDirectoryName(linkVs)!, linkVs);
+linkProbe.AddDirectory(linkToolsetParent, linkToolset);
+linkProbe.Files.UnionWith([Path.Combine(linkToolset, "include", "vcruntime.h"),
+    Path.Combine(linkToolset, "lib", "x64", "msvcrt.lib"), Path.Combine(linkToolset, "lib", "x64", "vcruntime.lib"),
+    Path.Combine(linkToolset, "lib", "x64", "oldnames.lib"), Path.Combine(linkToolset, "lib", "x64", "libcmt.lib"),
+    Path.Combine(linkToolset, "lib", "x64", "legacy_stdio_definitions.lib"),
+    Path.Combine(linkToolset, "lib", "arm64", "store", "msvcrt.lib"),
+    Path.Combine(linkToolset, "lib", "arm64", "store", "vcruntime.lib"),
+    Path.Combine(linkToolset, "lib", "arm64", "store", "oldnames.lib")]);
+Require(VisualCppInstallation.FindLinkToolset(linkProbe, "arm64")?.Toolset == linkToolset,
+    "selected-target link libraries are discoverable without requiring the MSVC compiler");
 Require(!VisualStudioBootstrap.IsReadyForAllTargets(unifiedProbe), "one installed target does not count as setup for all targets");
 var cleanVsProbe = new FakeProbe();
 cleanVsProbe.Executables.Add("winget.exe");
+Require(VisualStudioBootstrap.RequiresWinGet(cleanVsProbe), "a new Build Tools installation needs the current WinGet path");
 var cleanVsPlan = VisualStudioBootstrap.Plan(cleanVsProbe, TargetProfile.WindowsMobile);
 Require(!cleanVsPlan.Elevate && cleanVsPlan.Arguments.Contains(VisualStudioBootstrap.PackageId)
     && cleanVsPlan.Arguments.Contains(VisualStudioBootstrap.TestedVersion)
@@ -941,9 +1210,32 @@ Require(!cleanVsPlan.Elevate && cleanVsPlan.Arguments.Contains(VisualStudioBoots
 var setupPath = Path.Combine(unifiedProbe.Root, "Microsoft Visual Studio", "Installer", "setup.exe");
 unifiedProbe.Files.Add(setupPath);
 unifiedProbe.AddDirectory(Path.GetDirectoryName(vsRoot)!, vsRoot);
+Require(!VisualStudioBootstrap.RequiresWinGet(unifiedProbe), "an existing Build Tools installation can be modified without WinGet");
+var mixedSdkProbe = new FakeProbe();
+var installedSdkFixture = Path.Combine(mixedSdkProbe.Root, "Windows Kits", "10");
+static void AddSdkFixture(FakeProbe fixture, string root, params string[] architectures)
+{
+    var version = PrivateWindowsSdk.Version;
+    foreach (var name in new[] { "makeappx.exe", "signtool.exe", "makepri.exe", "fxc.exe" }) fixture.Files.Add(Path.Combine(root, "bin", version, "x64", name));
+    foreach (var path in new[] { Path.Combine("um", "Windows.h"), Path.Combine("ucrt", "corecrt.h"), Path.Combine("shared", "winapifamily.h"),
+        Path.Combine("cppwinrt", "winrt", "base.h"), Path.Combine("winrt", "windows.ui.xaml.h") }) fixture.Files.Add(Path.Combine(root, "Include", version, path));
+    fixture.Files.Add(Path.Combine(root, "UnionMetadata", version, "Windows.winmd"));
+    fixture.Files.Add(Path.Combine(root, "References", version, "Windows.Foundation.UniversalApiContract", "10.0.0.0", "Windows.Foundation.UniversalApiContract.winmd"));
+    foreach (var arch in architectures)
+    {
+        fixture.Files.Add(Path.Combine(root, "Lib", version, "um", arch, "WindowsApp.lib"));
+        fixture.Files.Add(Path.Combine(root, "Lib", version, "ucrt", arch, "ucrt.lib"));
+    }
+}
+AddSdkFixture(mixedSdkProbe, installedSdkFixture, "x64", "x86");
+AddSdkFixture(mixedSdkProbe, PrivateWindowsSdk.PrivateRoot, "x64", "arm", "arm64");
+Require(PrivateWindowsSdk.AllReady(mixedSdkProbe), "installed and private SDK targets can be combined");
+Require(PrivateWindowsSdk.FindReady(mixedSdkProbe, ["x86", "x64"]) == installedSdkFixture, "installed SDK is preferred for an available target");
+Require(PrivateWindowsSdk.FindReady(mixedSdkProbe, ["arm", "x64"]) == PrivateWindowsSdk.PrivateRoot, "private SDK supplies a missing target");
 var repairVsPlan = VisualStudioBootstrap.Plan(unifiedProbe, TargetProfile.SurfaceProX);
 Require(repairVsPlan.Elevate && repairVsPlan.Executable == setupPath && repairVsPlan.Arguments.Contains(vsRoot)
-    && repairVsPlan.Arguments.Contains("modify"), "existing Build Tools receive only the selected components");
+    && repairVsPlan.Arguments.Contains("modify") && !repairVsPlan.Arguments.Contains("--wait"),
+    "existing Build Tools receive only the selected components without the bootstrapper-only wait flag");
 var sdkRoot = Path.Combine(unifiedProbe.Root, "Windows Kits", "10");
 var sdkVersion = "10.0.26100.0";
 var sdkInstalls = 0;
@@ -1018,19 +1310,145 @@ Console.WriteLine("Setup checker tests passed.");
 static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }
 static async Task TestMinecraftSignIn()
 {
-    using (var signIn = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: true, fallback: false)))
+    var root = Path.Combine(Path.GetTempPath(), "horizon-minecraft-session-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
     {
-        var challenge = await signIn.BeginAsync();
-        Require(challenge.UserCode == "ABCD-EFGH" && challenge.VerificationUri.Host == "www.microsoft.com", "device sign-in instructions returned");
-        Require(!challenge.ToString().Contains("device-secret", StringComparison.Ordinal), "device secret is not displayed");
-        Require(await signIn.CompleteOwnershipCheckAsync(challenge), "Microsoft, Xbox and Minecraft ownership verified");
+        var store = new ProtectedRefreshTokenStore(Path.Combine(root, "session.dpapi"));
+        using (var signIn = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: true, fallback: false), store))
+        {
+            var challenge = await signIn.BeginAsync();
+            Require(challenge.UserCode == "ABCD-EFGH" && challenge.VerificationUri.Host == "www.microsoft.com", "device sign-in instructions returned");
+            Require(!challenge.ToString().Contains("device-secret", StringComparison.Ordinal), "device secret is not displayed");
+            Require(await signIn.CompleteOwnershipCheckAsync(challenge), "Microsoft, Xbox and Minecraft ownership verified");
+        }
+        Require(store.Read() == "refresh-secret" && store.HasToken, "only the verified account's refresh token is saved");
+        var ciphertext = await File.ReadAllBytesAsync(Path.Combine(root, "session.dpapi"));
+        Require(!System.Text.Encoding.UTF8.GetString(ciphertext).Contains("refresh-secret", StringComparison.Ordinal), "saved refresh token is encrypted at rest");
+        using (var savedSignIn = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: true, fallback: false), store))
+            Require(await savedSignIn.CompleteSavedOwnershipCheckAsync(), "saved sign-in refreshes and verifies ownership without a new device code");
+        Require(store.Read() == "rotated-refresh-secret", "rotated refresh token replaces the old token");
+
+        using (var nonOwner = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: false, fallback: true), store))
+        {
+            var challenge = await nonOwner.BeginAsync();
+            Require(!await nonOwner.CompleteOwnershipCheckAsync(challenge), "an account without Minecraft is not treated as an owner");
+        }
+        Require(store.Read() == "rotated-refresh-secret", "an unowned account does not overwrite a verified saved session");
+
+        store.Write("expired-secret");
+        using (var expiredSignIn = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: true, fallback: false, refreshExpired: true), store))
+        {
+            try { await expiredSignIn.CompleteSavedOwnershipCheckAsync(); throw new Exception("expired saved session was accepted"); }
+            catch (InvalidOperationException error) when (error.Message.Contains("expired or was revoked", StringComparison.Ordinal))
+            { Require(!store.HasToken, "revoked refresh token is removed"); }
+        }
+        store.Clear();
+        Require(!store.HasToken, "sign out clears the saved Microsoft session");
     }
-    using (var signIn = new MinecraftSignIn(new MinecraftAuthFixtureHandler(owns: false, fallback: true)))
+    finally
     {
-        var challenge = await signIn.BeginAsync();
-        Require(!await signIn.CompleteOwnershipCheckAsync(challenge), "an account without Minecraft is not treated as an owner");
+        Directory.Delete(root, recursive: true);
     }
 }
+static async Task TestMinecraftAssetPrefetch()
+{
+    var root = Path.Combine(Path.GetTempPath(), "horizon-minecraft-assets-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        static string Sha1(byte[] bytes) => Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(bytes)).ToLowerInvariant();
+        var clientBytes = System.Text.Encoding.UTF8.GetBytes("pinned Minecraft client jar");
+        var assetBytes = System.Text.Encoding.UTF8.GetBytes("pinned Minecraft asset");
+        var clientHash = Sha1(clientBytes);
+        var assetHash = Sha1(assetBytes);
+        var assetIndex = System.Text.Encoding.UTF8.GetBytes($"{{\"objects\":{{\"logo\":{{\"hash\":\"{assetHash}\",\"size\":{assetBytes.Length}}}}}}}");
+        var assetIndexHash = Sha1(assetIndex);
+        var metadata = System.Text.Encoding.UTF8.GetBytes($"{{\"assetIndex\":{{\"id\":\"34\",\"sha1\":\"{assetIndexHash}\",\"size\":{assetIndex.Length},\"url\":\"https://piston-meta.mojang.com/v1/packages/index/34.json\"}},\"downloads\":{{\"client\":{{\"sha1\":\"{clientHash}\",\"size\":{clientBytes.Length},\"url\":\"https://piston-data.mojang.com/client.jar\"}}}}}}");
+        var manifestHash = Sha1(metadata);
+        var metadataUrl = $"https://piston-meta.mojang.com/v1/packages/{manifestHash}/26.3.json";
+        var responses = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            [metadataUrl] = metadata,
+            ["https://piston-meta.mojang.com/v1/packages/index/34.json"] = assetIndex,
+            ["https://piston-data.mojang.com/client.jar"] = clientBytes,
+            [$"https://resources.download.minecraft.net/{assetHash[..2]}/{assetHash}"] = assetBytes
+        };
+        var source = Path.Combine(root, "source");
+        Directory.CreateDirectory(source);
+        await File.WriteAllTextAsync(Path.Combine(source, "research-lock.json"),
+            $"{{\"minecraft\":{{\"version\":\"26.3\",\"manifest_sha1\":\"{manifestHash}\",\"client_sha1\":\"{clientHash}\",\"accepted_asset_index_sha1\":[\"{new string('0', 40)}\"]}}}}");
+
+        var cache = Path.Combine(root, "cache");
+        var downloaded = await MinecraftAssetPrefetcher.PrefetchAsync(source, true, null, testHandler: new AssetPrefetchFixtureHandler(responses), testCacheRoot: cache);
+        Require(downloaded.NetworkFilesFetched == 2 && downloaded.BytesFetched == clientBytes.Length + assetBytes.Length,
+            "authenticated prefetch verifies and downloads the client and asset objects from the index in pinned version metadata");
+        Require(File.ReadAllBytes(Path.Combine(downloaded.MinecraftDirectory, "versions", "26.3", "26.3.jar")).SequenceEqual(clientBytes)
+            && File.ReadAllBytes(Path.Combine(downloaded.MinecraftDirectory, "assets", "objects", assetHash[..2], assetHash)).SequenceEqual(assetBytes),
+            "prefetched Minecraft files use the launcher directory layout");
+        var reused = await MinecraftAssetPrefetcher.PrefetchAsync(source, true, null, testHandler: new AssetPrefetchFixtureHandler(responses), testCacheRoot: cache);
+        Require(reused.NetworkFilesFetched == 0 && reused.BytesFetched == 0, "a later build reuses verified cached files");
+
+        var local = Path.Combine(root, "local");
+        var localJar = Path.Combine(local, "versions", "26.3", "26.3.jar");
+        var localAsset = Path.Combine(local, "assets", "objects", assetHash[..2], assetHash);
+        Directory.CreateDirectory(Path.GetDirectoryName(localJar)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(localAsset)!);
+        await File.WriteAllBytesAsync(localJar, clientBytes);
+        await File.WriteAllBytesAsync(localAsset, assetBytes);
+        var localReuse = await MinecraftAssetPrefetcher.PrefetchAsync(source, true, local,
+            testHandler: new AssetPrefetchFixtureHandler(responses), testCacheRoot: Path.Combine(root, "local-cache"));
+        Require(localReuse.LocalFilesReused == 2 && localReuse.NetworkFilesFetched == 0,
+            "the builder copies verified files from a local Minecraft 26.3 installation");
+
+        var unauthorizedCache = Path.Combine(root, "unauthorized-cache");
+        try
+        {
+            await MinecraftAssetPrefetcher.PrefetchAsync(source, false, local, testHandler: new AssetPrefetchFixtureHandler(responses), testCacheRoot: unauthorizedCache);
+            throw new Exception("Minecraft files were prefetched before ownership verification");
+        }
+        catch (InvalidOperationException) { Require(!Directory.Exists(unauthorizedCache), "ownership is checked before local copy or network access"); }
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
+static async Task TestPrivateClangArchive()
+{
+    var root = Path.Combine(Path.GetTempPath(), "mchorizon-clang-archive-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var archive = Path.Combine(root, "clang.tar.zst");
+        var extracted = Path.Combine(root, "extracted");
+        Directory.CreateDirectory(extracted);
+        await using (var output = File.Create(archive))
+        using (var zstd = new ZstdSharp.CompressionStream(output, 1))
+        using (var tar = new System.Formats.Tar.TarWriter(zstd, System.Formats.Tar.TarEntryFormat.Pax, leaveOpen: true))
+        {
+            var prefix = PrivateClang.ArchiveRoot;
+            tar.WriteEntry(new System.Formats.Tar.PaxTarEntry(System.Formats.Tar.TarEntryType.Directory, prefix + "/"));
+            Add(prefix + "/bin/clang.exe", "clang-test");
+            Add(prefix + "/bin/llvm-lib.exe", "llvm-lib-test");
+            Add(prefix + "/lib/clang/23/include/stddef.h", "header-test");
+            Add(prefix + "/bin/clang++.exe", "unneeded");
+
+            void Add(string name, string content)
+            {
+                var entry = new System.Formats.Tar.PaxTarEntry(System.Formats.Tar.TarEntryType.RegularFile, name)
+                { DataStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content)) };
+                tar.WriteEntry(entry);
+            }
+        }
+        await PrivateClang.ExtractAsync(archive, extracted);
+        Require(PrivateClang.IsComplete(extracted), "private Clang checks its compiler, archiver and builtin headers");
+        Require(!File.Exists(Path.Combine(extracted, "bin", "clang++.exe")), "private Clang extracts only the required C compiler tools and builtin headers");
+        Require(await File.ReadAllTextAsync(Path.Combine(extracted, "bin", "clang.exe")) == "clang-test"
+            && await File.ReadAllTextAsync(Path.Combine(extracted, "bin", "llvm-lib.exe")) == "llvm-lib-test"
+            && await File.ReadAllTextAsync(Path.Combine(extracted, "lib", "clang", "23", "include", "stddef.h")) == "header-test",
+            "private Clang extracts the required files from a Zstandard tar archive");
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
+
 static async Task TestNativeBundleStager()
 {
     var root = Path.Combine(Path.GetTempPath(), "horizon-native-stager-test-" + Guid.NewGuid().ToString("N"));
@@ -1089,7 +1507,7 @@ static async Task TestReleaseSource()
         Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
         Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
         var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = "0.1.0", UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
-            prepared.Client with { Version = "0.1.0" }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
+            prepared.Client with { Version = "0.1.2" }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.DesktopX64, true));
         try { LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.WindowsMobile, true)); throw new Exception("wrong build architecture accepted"); }
         catch (InvalidOperationException) { }
@@ -1151,10 +1569,15 @@ sealed class ConsoleProgress : IProgress<string>
 {
     public void Report(string value) => Console.WriteLine(value);
 }
-sealed class MinecraftAuthFixtureHandler(bool owns, bool fallback) : HttpMessageHandler
+
+sealed class ConsoleDependencyProgress : IProgress<DependencyProgress>
+{
+    public void Report(DependencyProgress value) => Console.WriteLine($"{value.Id}: {value.Detail}");
+}
+sealed class MinecraftAuthFixtureHandler(bool owns, bool fallback, bool refreshExpired = false) : HttpMessageHandler
 {
     private int polls;
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var uri = request.RequestUri!;
         string json;
@@ -1163,9 +1586,18 @@ sealed class MinecraftAuthFixtureHandler(bool owns, bool fallback) : HttpMessage
             json = "{\"user_code\":\"ABCD-EFGH\",\"device_code\":\"device-secret\",\"verification_uri\":\"https://www.microsoft.com/link\",\"interval\":1,\"expires_in\":60}";
         else if (uri.Host == "login.microsoftonline.com" && uri.AbsolutePath.EndsWith("/token", StringComparison.Ordinal))
         {
-            polls++;
-            if (polls == 1) { status = System.Net.HttpStatusCode.BadRequest; json = "{\"error\":\"authorization_pending\"}"; }
-            else json = "{\"access_token\":\"microsoft-token\"}";
+            var grant = await request.Content!.ReadAsStringAsync(cancellationToken);
+            if (grant.Contains("grant_type=refresh_token", StringComparison.Ordinal))
+            {
+                if (refreshExpired) { status = System.Net.HttpStatusCode.BadRequest; json = "{\"error\":\"invalid_grant\"}"; }
+                else json = "{\"access_token\":\"microsoft-token\",\"refresh_token\":\"rotated-refresh-secret\"}";
+            }
+            else
+            {
+                polls++;
+                if (polls == 1) { status = System.Net.HttpStatusCode.BadRequest; json = "{\"error\":\"authorization_pending\"}"; }
+                else json = "{\"access_token\":\"microsoft-token\",\"refresh_token\":\"refresh-secret\"}";
+            }
         }
         else if (uri.Host == "user.auth.xboxlive.com") json = "{\"Token\":\"xbox-token\"}";
         else if (uri.Host == "xsts.auth.xboxlive.com") json = "{\"Token\":\"xsts-token\",\"DisplayClaims\":{\"xui\":[{\"uhs\":\"user-hash\"}]}}";
@@ -1181,8 +1613,15 @@ sealed class MinecraftAuthFixtureHandler(bool owns, bool fallback) : HttpMessage
             json = owns ? "{\"items\":[{\"name\":\"game_minecraft\"}]}" : "{\"items\":[]}";
         }
         else { status = System.Net.HttpStatusCode.NotFound; json = "{}"; }
-        return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(json) });
+        return new HttpResponseMessage(status) { Content = new StringContent(json) };
     }
+}
+sealed class AssetPrefetchFixtureHandler(Dictionary<string, byte[]> inputs) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        => Task.FromResult(inputs.TryGetValue(request.RequestUri!.AbsoluteUri, out var bytes)
+            ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }
+            : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
 }
 sealed class ReleaseFixtureHandler(Dictionary<string, byte[]> inputs) : HttpMessageHandler
 {

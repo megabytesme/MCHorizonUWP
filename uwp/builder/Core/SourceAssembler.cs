@@ -82,8 +82,44 @@ public static class SourceAssembler
             total += entry.Length;
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             using var input = entry.Open();
-            using var file = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            input.CopyTo(file);
+            if (File.Exists(target))
+            {
+                if (upstream)
+                    throw new InvalidDataException($"The upstream archive contains a conflicting file ({relative}).");
+                if ((File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException($"The client archive cannot replace a link ({relative}).");
+                if (ContentsEqual(target, input, entry.Length)) continue;
+            }
+            if (Directory.Exists(target)) throw new InvalidDataException($"The client archive file conflicts with a directory ({relative}).");
+            var temporary = target + ".client-overlay-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    input.CopyTo(file);
+                // A signed client release is the app-specific layer applied after
+                // Horizon's patch. It may intentionally update files under uwp/.
+                File.Move(temporary, target, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
+        }
+    }
+
+    private static bool ContentsEqual(string existingPath, Stream incoming, long incomingLength)
+    {
+        using var existing = File.OpenRead(existingPath);
+        if (existing.Length != incomingLength) return false;
+        var left = new byte[64 * 1024];
+        var right = new byte[left.Length];
+        while (true)
+        {
+            var leftRead = existing.Read(left, 0, left.Length);
+            var rightRead = incoming.Read(right, 0, right.Length);
+            if (leftRead != rightRead) return false;
+            if (leftRead == 0) return true;
+            if (!left.AsSpan(0, leftRead).SequenceEqual(right.AsSpan(0, rightRead))) return false;
         }
     }
 

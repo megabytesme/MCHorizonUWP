@@ -1,8 +1,10 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", bool ReuseResourceFramework = false, string ExistingResourceFramework = "", IReadOnlyList<string>? RegistryNativeMods = null)
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", bool ReuseResourceFramework = false, string ExistingResourceFramework = "", IReadOnlyList<string>? RegistryNativeMods = null, int CargoJobs = 0)
 {
+    /// <summary>Optional live job-limit source used by the builder while a multi-step build is running.</summary>
+    public Func<int>? CargoJobsProvider { get; init; }
     public static TargetProfile DefaultTarget(System.Runtime.InteropServices.Architecture architecture) => architecture switch
     {
         System.Runtime.InteropServices.Architecture.X86 => TargetProfile.DesktopX86,
@@ -32,6 +34,16 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     public IReadOnlyList<string> ModIds => new[]
         { IncludesNativeTouchMod ? TouchModId : null, NativeDeviceVibration ? DeviceVibrationModId : null }
         .Where(id => id is not null).Select(id => id!).ToArray();
+    public int ValidatedCargoJobs
+    {
+        get
+        {
+            var jobs = CargoJobsProvider?.Invoke() ?? CargoJobs;
+            if (jobs < 0 || jobs > Math.Max(1, Environment.ProcessorCount))
+                throw new ArgumentOutOfRangeException(nameof(CargoJobs), "Choose automatic jobs or a value no greater than the available processor count.");
+            return jobs;
+        }
+    }
     public string ValidatedPackageVersion
     {
         get

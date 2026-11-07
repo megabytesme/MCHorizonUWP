@@ -48,8 +48,11 @@ public sealed class SystemProbe : IProbe
         catch (IOException) { return Array.Empty<string>(); }
         catch (UnauthorizedAccessException) { return Array.Empty<string>(); }
     }
-    public string? FindOnPath(string executable)
+    public string? FindOnPath(string executable) => FindAllOnPath(executable).FirstOrDefault();
+
+    internal IReadOnlyList<string> FindAllOnPath(string executable)
     {
+        var found = new List<string>();
         var path = Environment.GetEnvironmentVariable("PATH") ?? "";
         foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -60,7 +63,7 @@ public sealed class SystemProbe : IProbe
                 {
                     if (IsPythonExecutionAlias(executable, candidate, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), File.GetAttributes(candidate)))
                         continue;
-                    return candidate;
+                    if (!found.Contains(candidate, StringComparer.OrdinalIgnoreCase)) found.Add(candidate);
                 }
             }
             catch (ArgumentException) { }
@@ -68,7 +71,7 @@ public sealed class SystemProbe : IProbe
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
-        return null;
+        return found;
     }
 
     internal static bool IsPythonExecutionAlias(string executable, string candidate, string localAppData, FileAttributes attributes)

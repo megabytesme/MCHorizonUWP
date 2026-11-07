@@ -13,6 +13,10 @@ public sealed class PreparedRelease
     public CompatibilityResult Compatibility { get; }
     public string BuilderVersion { get; }
     public string Architecture { get; }
+
+    /// <summary>Stable cache identity that changes when any signed source artifact changes.</summary>
+    public string BuildCacheKey => string.Join('-', Patch.Upstream.Sha256[..16].ToLowerInvariant(),
+        Patch.Artifact.Sha256[..16].ToLowerInvariant(), Client.Artifact.Sha256[..16].ToLowerInvariant());
 }
 
 /// <summary>Authenticates, selects and assembles a release in a new workspace.</summary>
@@ -34,9 +38,9 @@ public static class ReleaseSource
         var upstreamFile = Path.Combine(root, "upstream.zip");
         var patchFile = Path.Combine(root, "patch.diff");
         var clientFile = Path.Combine(root, "client.zip");
-        await transport.DownloadArtifactAsync(patch.Upstream, upstreamFile, cancellationToken);
-        await transport.DownloadArtifactAsync(patch.Artifact, patchFile, cancellationToken);
-        await transport.DownloadArtifactAsync(client.Artifact, clientFile, cancellationToken);
+        await PinnedDownload.EnsureWorkspaceCopyAsync(transport, patch.Upstream, upstreamFile, cancellationToken);
+        await PinnedDownload.EnsureWorkspaceCopyAsync(transport, patch.Artifact, patchFile, cancellationToken);
+        await PinnedDownload.EnsureWorkspaceCopyAsync(transport, client.Artifact, clientFile, cancellationToken);
         var source = Path.Combine(root, "source");
         await SourceAssembler.AssembleAsync(upstreamFile, patch.Upstream.Sha256, patchFile, patch.Artifact.Sha256,
             clientFile, client.Artifact.Sha256, source, git);
