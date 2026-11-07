@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Horizon.Builder.Core;
 
-public sealed record BuilderUpdate(string Version, Uri ReleaseUri);
+public sealed record BuilderUpdate(string Version, Uri ReleaseUri, string Changelog);
 
 /// <summary>Checks public, stable builder releases without downloading or installing them.</summary>
 public static class BuilderUpdateChecker
@@ -66,8 +66,12 @@ public static class BuilderUpdateChecker
             var version = Version.Parse(versionText);
             if (newestVersion is not null && version <= newestVersion) continue;
             newestVersion = version;
+            var changelog = release.TryGetProperty("body", out var bodyElement) && bodyElement.ValueKind == JsonValueKind.String
+                ? bodyElement.GetString() ?? ""
+                : "";
+            if (changelog.Length > 16 * 1024) changelog = changelog[..(16 * 1024)];
             newest = new BuilderUpdate(versionText,
-                new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/" + Uri.EscapeDataString(tag)));
+                new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/" + Uri.EscapeDataString(tag)), changelog);
         }
 
         return newestVersion is not null && newestVersion > Version.Parse(installedVersion) ? newest : null;

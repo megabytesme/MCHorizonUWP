@@ -113,6 +113,7 @@ public sealed partial class MainWindow : Window
             BuilderUpdateLink.NavigateUri = update.ReleaseUri;
             BuilderUpdateLink.Visibility = Visibility.Visible;
             BuilderActivityLog.Record("Updates", $"Builder {update.Version} is available: {update.ReleaseUri}");
+            await ShowBuilderUpdateDialogAsync(update);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception error)
@@ -121,6 +122,37 @@ public sealed partial class MainWindow : Window
             BuilderUpdateStatus.Text = "Builder updates could not be checked. You can continue using the builder.";
             BuilderActivityLog.Record("Updates", $"Update check unavailable: {error.Message}");
         }
+    }
+
+    private async Task ShowBuilderUpdateDialogAsync(BuilderUpdate update)
+    {
+        var changelog = string.IsNullOrWhiteSpace(update.Changelog)
+            ? "No release notes were provided. Open the GitHub release for details."
+            : update.Changelog.Trim();
+        var content = new StackPanel { Spacing = 10 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"MCHorizonUWP Builder {update.Version} is available. Review its changes before downloading it.",
+            TextWrapping = TextWrapping.Wrap,
+        });
+        content.Children.Add(new TextBlock { Text = "Release notes", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        content.Children.Add(new ScrollViewer
+        {
+            MaxHeight = 320,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = new TextBlock { Text = changelog, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true },
+        });
+        var dialog = new ContentDialog
+        {
+            XamlRoot = WindowRoot.XamlRoot,
+            Title = "Builder update available",
+            Content = content,
+            PrimaryButtonText = "View release",
+            CloseButtonText = "Later",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            await Windows.System.Launcher.LaunchUriAsync(update.ReleaseUri);
     }
     private IReadOnlyList<NativeModListing> nativeMods = [];
     private readonly HashSet<string> selectedNativeMods = new(StringComparer.Ordinal);

@@ -1580,7 +1580,7 @@ static async Task TestBuilderUpdateChecker()
           {"tag_name":"builder-v0.1.2-preview.1","draft":false,"prerelease":true},
           {"tag_name":"builder-v0.1.9","draft":true,"prerelease":false},
           {"tag_name":"client-v0.9.0","draft":false,"prerelease":false},
-          {"tag_name":"builder-v0.1.4","draft":false,"prerelease":false},
+          {"tag_name":"builder-v0.1.4","draft":false,"prerelease":false,"body":"Build speed settings and progress details."},
           {"tag_name":"builder-v0.1.3","draft":false,"prerelease":false}
         ]
         """;
@@ -1589,7 +1589,7 @@ static async Task TestBuilderUpdateChecker()
     var update = await BuilderUpdateChecker.CheckAsync(client, "0.1.3");
     Require(handler.RequestedEndpoint == BuilderUpdateChecker.ReleasesEndpoint, "builder checks the MCHorizonUWP GitHub release list");
     Require(handler.UserAgent?.Contains("0.1.3", StringComparison.Ordinal) == true, "builder update requests identify the installed version");
-    Require(update is { Version: "0.1.4" }
+    Require(update is { Version: "0.1.4", Changelog: "Build speed settings and progress details." }
         && update.ReleaseUri == new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/builder-v0.1.4"),
         "builder update checker selects the newest stable builder release only");
 
