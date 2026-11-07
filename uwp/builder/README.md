@@ -1,4 +1,4 @@
-# Horizon UWP Builder preview
+# MCHorizonUWP Builder
 
 The WinUI 3 builder is an in-development wizard for assembling a Horizon UWP
 client package. It selects the current Windows architecture by default and
@@ -7,11 +7,11 @@ renderers and selects one on the target device.
 
 The builder fetches its signed compatibility catalog from this repository,
 then verifies the hashes of the selected Horizon source, patch and client
-artifacts before assembling them. The first patch and client are published as
-prereleases. A catalog compatibility rule is not a successful build or device
-test: the wizard labels combinations without recorded build evidence as
-unverified. This preview has one pinned recipe; later patch and client versions
-need compatible recipes and catalog entries.
+artifacts before assembling them. Patch 0.1.1 and client 0.1.2 provide the
+current release recipe across x86, x64, ARM32 and ARM64. A catalog compatibility
+rule is not a successful build or device test: combinations without recorded
+evidence remain unverified. Later patch and client versions need compatible
+recipes and catalog entries.
 
 You can choose bundled Minecraft resources, a new reusable resource framework,
 or an existing framework on the target. Minecraft: Java Edition ownership
@@ -28,6 +28,10 @@ code with the player's permissions. A real Zoom bundle has been transformed
 and its x64 UWP game bridge compiled, but other mods and devices have not been
 established compatible. The builder refuses unsupported combinations, including
 mods requiring different mixin revisions, bundled data or post-build steps.
+
+At startup, the builder checks for a newer stable builder release when update
+checks are enabled. If one is available, a dialog shows that release's notes
+and links to its GitHub page; the builder does not update itself silently.
 The built-in touch and vibration options are separate from registry mods.
 
 Packages from the authenticated release recipe are signed with a locally

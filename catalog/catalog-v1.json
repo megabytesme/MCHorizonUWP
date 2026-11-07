@@ -114,7 +114,7 @@
       },
       "builder": {
         "min_inclusive": "0.1.3",
-        "max_exclusive": "0.1.4"
+        "max_exclusive": "0.1.6"
       },
       "architectures": [
         "x86",
