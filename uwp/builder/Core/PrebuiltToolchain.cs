@@ -6,7 +6,7 @@ namespace Horizon.Builder.Core;
 internal static class PrebuiltToolchain
 {
     internal static CompactEnvironment Create(string source, string sdkRoot, string architecture, string clang,
-        string rustLld, string msvcToolsetRoot, string wrapperDirectory)
+        string rustLld, string msvcToolsetRoot, string wrapperDirectory, IProbe probe)
     {
         if (architecture is not ("x86" or "x64" or "arm" or "arm64"))
             throw new ArgumentException("Unsupported target architecture.", nameof(architecture));
@@ -46,6 +46,12 @@ internal static class PrebuiltToolchain
         var sdkVersionBin = Path.Combine(sdk, "bin", PrivateWindowsSdk.Version);
         var wrappers = Path.GetFullPath(wrapperDirectory);
         Directory.CreateDirectory(wrappers);
+        var python = probe.FindOnPath("python.exe");
+        var pythonRuntimeDirectory = python is null ? null : Path.GetDirectoryName(Path.GetFullPath(python));
+        // Rust's MSVC build-script executables need the VC runtime DLLs at launch time on clean PCs.
+        // The builder's pinned Python bundle carries the x64 runtime used by these host tools.
+        if (pythonRuntimeDirectory is not null && !File.Exists(Path.Combine(pythonRuntimeDirectory, "vcruntime140.dll")))
+            pythonRuntimeDirectory = null;
         var hostLinker = WriteLinker(wrappers, "rust-host-link.cmd", linker, [
             "/NOLOGO", $"/LIBPATH:{hostLib}", $"/LIBPATH:{hostUcrt}", $"/LIBPATH:{hostUm}"]);
         var targetLinker = WriteLinker(wrappers, "rust-uwp-" + architecture + "-link.cmd", linker, [
@@ -55,7 +61,8 @@ internal static class PrebuiltToolchain
         var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["INCLUDE"] = include,
-            ["PATH"] = string.Join(';', Path.GetDirectoryName(compiler)!, Path.Combine(sdk, "bin", PrivateWindowsSdk.Version, "x64"), Environment.GetEnvironmentVariable("PATH") ?? ""),
+            ["PATH"] = string.Join(';', new[] { pythonRuntimeDirectory, Path.GetDirectoryName(compiler)!, Path.Combine(sdk, "bin", PrivateWindowsSdk.Version, "x64"), Environment.GetEnvironmentVariable("PATH") ?? "" }
+                .Where(path => !string.IsNullOrWhiteSpace(path))),
             ["VCToolsInstallDir"] = msvc.TrimEnd('\\') + "\\",
             ["VCINSTALLDIR"] = vcRoot.TrimEnd('\\') + "\\",
             ["WindowsSdkDir"] = sdk.TrimEnd('\\') + "\\",
@@ -65,6 +72,8 @@ internal static class PrebuiltToolchain
             ["WindowsSdkBinPath"] = Path.Combine(sdk, "bin") + "\\",
             ["WindowsSdkVerBinPath"] = sdkVersionBin + "\\",
             ["CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"] = hostLinker,
+            ["CC_x86_64_pc_windows_msvc"] = compiler,
+            ["CFLAGS_x86_64_pc_windows_msvc"] = "-DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP",
         };
         var triple = architecture switch { "x86" => "I686_UWP_WINDOWS_MSVC", "x64" => "X86_64_UWP_WINDOWS_MSVC",
             "arm" => "THUMBV7A_UWP_WINDOWS_MSVC", _ => "AARCH64_UWP_WINDOWS_MSVC" };
@@ -72,7 +81,10 @@ internal static class PrebuiltToolchain
         environment[$"CC_{TargetKey(architecture)}"] = compiler;
         environment[$"CFLAGS_{TargetKey(architecture)}"] = "-DWINAPI_FAMILY=WINAPI_FAMILY_APP";
         if (File.Exists(Path.Combine(Path.GetDirectoryName(compiler)!, "llvm-lib.exe")))
+        {
             environment[$"AR_{TargetKey(architecture)}"] = Path.Combine(Path.GetDirectoryName(compiler)!, "llvm-lib.exe");
+            environment["AR_x86_64_pc_windows_msvc"] = Path.Combine(Path.GetDirectoryName(compiler)!, "llvm-lib.exe");
+        }
         environment["HORIZON_UWP_RUST_LLD"] = linker;
         environment["HORIZON_UWP_HOST_KIT"] = hostKit;
         environment["HORIZON_UWP_SDK_ROOT"] = sdk;

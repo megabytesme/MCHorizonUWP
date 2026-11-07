@@ -334,5 +334,14 @@ been addressed for the preview; it did not build a package.
   | ToolProfile | 41,100,701 |
   | Builder logs | 4,282 |
 
-- The asset download and complete build/package run are still pending account
-  ownership confirmation. This is not the end-to-end storage requirement.
+- After the user confirmed ownership, the builder downloaded and verified the
+  Minecraft 26.3 assets (502 MiB), then failed while building its resource
+  preparation helper with Cargo exit code 101. The retained helper workspace
+  exposed two missing host-build settings: Cargo build scripts could not find
+  the VC runtime DLL, then `ring` could not find `cl.exe`. With the builder's
+  bundled Python runtime directory on `PATH` and the pinned Clang/LLVM tools
+  configured for the x64 host target, the same incremental helper build
+  completed in 19 seconds. The builder now supplies those settings and passes
+  the compact runtime path to the helper process.
+- The full appx/package build has not yet completed in Sandbox, so peak build
+  storage and the final signed package remain unmeasured.

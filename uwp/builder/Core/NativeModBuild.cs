@@ -42,7 +42,7 @@ internal static class NativeModBuild
         progress?.Report("Building Horizon's native-mod transformation tool.");
         await LocalBuildRunner.RunProcess(cargo, workspace,
             ["+" + LocalRecipe.RustToolchain, "install", "--locked", "--git", "https://github.com/horizon-rust/horizon-mixins", "--rev", mixinsRevision,
-                "--root", toolRoot, "horizon-mixins-cli"], hostEnvironment);
+                "--root", toolRoot, "horizon-mixins-cli"], hostEnvironment, progress: progress);
         var executable = Path.Combine(toolRoot, "bin", "horizon-mixins.exe");
         var staged = Path.Combine(workspace, "native-source");
         await File.WriteAllTextAsync(Path.Combine(source, ".horizon-revision"), LocalRecipe.UpstreamNightlyCommit + "\n");

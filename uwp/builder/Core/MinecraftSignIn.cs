@@ -36,8 +36,9 @@ public sealed class MinecraftSignIn : IDisposable
         public override string ToString() => "Microsoft sign-in challenge";
     }
 
-    public async Task<Challenge> BeginAsync(CancellationToken cancellationToken = default)
+    public async Task<Challenge> BeginAsync(CancellationToken cancellationToken = default, IProgress<string>? progress = null)
     {
+        progress?.Report("Connecting to Microsoft to start sign-in…");
         using var request = new HttpRequestMessage(HttpMethod.Post, MicrosoftBase + "/devicecode")
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["client_id"] = HorizonIdentity.ClientId, ["scope"] = "XboxLive.signin offline_access" }),
@@ -56,12 +57,14 @@ public sealed class MinecraftSignIn : IDisposable
         return new(code, secret, uri, DateTimeOffset.UtcNow.AddSeconds(lifetime), interval);
     }
 
-    public async Task<bool> CompleteOwnershipCheckAsync(Challenge challenge, CancellationToken cancellationToken = default)
+    public async Task<bool> CompleteOwnershipCheckAsync(Challenge challenge, CancellationToken cancellationToken = default,
+        IProgress<string>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(challenge);
         var interval = challenge.Interval;
         string microsoftToken;
         string? refreshToken;
+        progress?.Report("Waiting for Microsoft to approve sign-in in your browser…");
         while (true)
         {
             if (DateTimeOffset.UtcNow >= challenge.Expires) throw new InvalidOperationException("The sign-in code expired. Start again.");
@@ -74,21 +77,24 @@ public sealed class MinecraftSignIn : IDisposable
             };
             using var response = await SendAsync(request, cancellationToken);
             var error = OptionalString(response.Body.RootElement, "error");
-            if (error == "authorization_pending") continue;
-            if (error == "slow_down") { interval = Math.Min(interval + 5, 1800); continue; }
+            if (error == "authorization_pending") { progress?.Report("Still waiting for Microsoft sign-in approval…"); continue; }
+            if (error == "slow_down") { interval = Math.Min(interval + 5, 1800); progress?.Report("Microsoft is still processing sign-in…"); continue; }
             if (response.Status != 200) throw new InvalidOperationException("Microsoft sign-in was declined or could not be completed.");
             microsoftToken = RequiredString(response.Body.RootElement, "access_token");
             refreshToken = OptionalString(response.Body.RootElement, "refresh_token");
             break;
         }
 
-        var ownsMinecraft = await CheckMinecraftOwnershipAsync(microsoftToken, cancellationToken);
+        progress?.Report("Sign-in approved. Checking your Minecraft account…");
+        var ownsMinecraft = await CheckMinecraftOwnershipAsync(microsoftToken, cancellationToken, progress);
         if (ownsMinecraft && refreshToken is { Length: > 0 }) sessionStore.Write(refreshToken);
         return ownsMinecraft;
     }
 
-    public async Task<bool> CompleteSavedOwnershipCheckAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> CompleteSavedOwnershipCheckAsync(CancellationToken cancellationToken = default,
+        IProgress<string>? progress = null)
     {
+        progress?.Report("Refreshing your saved Microsoft sign-in…");
         var oldRefreshToken = sessionStore.Read()
             ?? throw new InvalidOperationException("There is no saved Microsoft sign-in. Sign in to Microsoft first.");
         using var request = new HttpRequestMessage(HttpMethod.Post, MicrosoftBase + "/token")
@@ -112,17 +118,20 @@ public sealed class MinecraftSignIn : IDisposable
         var microsoftToken = RequiredString(response.Body.RootElement, "access_token");
         var rotatedRefreshToken = OptionalString(response.Body.RootElement, "refresh_token");
         if (rotatedRefreshToken is { Length: > 0 }) sessionStore.Write(rotatedRefreshToken);
-        return await CheckMinecraftOwnershipAsync(microsoftToken, cancellationToken);
+        progress?.Report("Saved sign-in refreshed. Checking your Minecraft account…");
+        return await CheckMinecraftOwnershipAsync(microsoftToken, cancellationToken, progress);
     }
 
-    private async Task<bool> CheckMinecraftOwnershipAsync(string microsoftToken, CancellationToken cancellationToken)
+    private async Task<bool> CheckMinecraftOwnershipAsync(string microsoftToken, CancellationToken cancellationToken,
+        IProgress<string>? progress)
     {
-
+        progress?.Report("Connecting to Xbox Live…");
         using var xbox = await PostJsonAsync("https://user.auth.xboxlive.com/user/authenticate", new {
             Properties = new { AuthMethod = "RPS", SiteName = "user.auth.xboxlive.com", RpsTicket = "d=" + microsoftToken },
             RelyingParty = "http://auth.xboxlive.com", TokenType = "JWT" }, cancellationToken);
         if (xbox.Status != 200) throw new InvalidOperationException("Xbox Live refused the sign-in.");
         var xboxToken = RequiredString(xbox.Body.RootElement, "Token");
+        progress?.Report("Checking Xbox account permissions…");
         using var xsts = await PostJsonAsync("https://xsts.auth.xboxlive.com/xsts/authorize", new {
             Properties = new { SandboxId = "RETAIL", UserTokens = new[] { xboxToken } },
             RelyingParty = "rp://api.minecraftservices.com/", TokenType = "JWT" }, cancellationToken);
@@ -132,6 +141,7 @@ public sealed class MinecraftSignIn : IDisposable
         if (claims.GetArrayLength() == 0) throw new InvalidDataException("Xbox Live returned incomplete sign-in information.");
         var userHash = RequiredString(claims[0], "uhs");
         var xToken = $"XBL3.0 x={userHash};{xstsToken}";
+        progress?.Report("Connecting to Minecraft services…");
         using var primary = await PostJsonAsync(MinecraftBase + "/launcher/login", new { xtoken = xToken, platform = "PC_LAUNCHER" }, cancellationToken);
         string minecraftToken;
         if (primary.Status == 200 && OptionalString(primary.Body.RootElement, "access_token") is { Length: > 0 } token)
@@ -142,6 +152,7 @@ public sealed class MinecraftSignIn : IDisposable
             if (fallback.Status != 200) throw new InvalidOperationException("Minecraft services refused the sign-in.");
             minecraftToken = RequiredString(fallback.Body.RootElement, "access_token");
         }
+        progress?.Report("Checking Minecraft: Java Edition ownership…");
         using var ownershipRequest = new HttpRequestMessage(HttpMethod.Get, MinecraftBase + "/entitlements/mcstore");
         ownershipRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", minecraftToken);
         using var ownership = await SendAsync(ownershipRequest, cancellationToken);

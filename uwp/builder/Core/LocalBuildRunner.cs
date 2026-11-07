@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Formats.Tar;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
@@ -118,7 +119,7 @@ public static class LocalBuildRunner
             var clang = ClangFinder.Find(probe) ?? throw new InvalidOperationException("The compact LLVM C compiler is missing. Check setup again.");
             var rustLld = await LocalRecipe.FindRustLinkerAsync(probe);
             compact = PrebuiltToolchain.Create(snapshot, compactSdk!, targetArchitecture, clang, rustLld, msvcToolset!,
-                Path.Combine(root, "prebuilt-linker"));
+                Path.Combine(root, "prebuilt-linker"), probe);
         }
         IReadOnlyList<string>? dependencies = null;
         if (release is not null)
@@ -192,7 +193,7 @@ public static class LocalBuildRunner
         progress?.Report("Fetching missing Cargo dependencies from configured registries.");
         try
         {
-            await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Fetch Cargo dependencies").Arguments, vcEnvironment);
+            await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Fetch Cargo dependencies").Arguments, vcEnvironment, progress: progress);
         }
         catch (InvalidOperationException error)
         {
@@ -206,7 +207,7 @@ public static class LocalBuildRunner
         progress?.Report("Building the game bridge. This may take several minutes.");
         try
         {
-            await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Build game bridge").Arguments, vcEnvironment);
+            await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Build game bridge").Arguments, vcEnvironment, progress: progress);
         }
         catch (InvalidOperationException error)
         {
@@ -385,19 +386,43 @@ public static class LocalBuildRunner
     }
 
     internal static async Task<string> RunProcess(string executable, string directory, IReadOnlyList<string> args,
-        IReadOnlyDictionary<string, string>? environment = null, bool captureOutput = false)
+        IReadOnlyDictionary<string, string>? environment = null, bool captureOutput = false, IProgress<string>? progress = null)
     {
         var start = new ProcessStartInfo(executable) { WorkingDirectory = Path.GetFullPath(directory), UseShellExecute = false,
             CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in args) start.ArgumentList.Add(arg);
         if (environment is not null) foreach (var (key, value) in environment) start.Environment[key] = value;
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start a required build tool.");
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
+        var output = ReadProcessStreamAsync(process.StandardOutput, captureOutput, progress);
+        var error = ReadProcessStreamAsync(process.StandardError, captureOutput: false, progress);
         await process.WaitForExitAsync();
-        await Task.WhenAll(output, error); // Never persist tool output, environment variables or credentials.
+        await Task.WhenAll(output, error); // Tool output is streamed only through the safe progress filter; credentials are never persisted.
         if (process.ExitCode != 0) throw new InvalidOperationException($"{Path.GetFileName(executable)} failed (exit code {process.ExitCode}); working directory: {directory}. The workspace was retained.");
         return captureOutput ? await output : "";
+    }
+
+    private static async Task<string> ReadProcessStreamAsync(StreamReader reader, bool captureOutput, IProgress<string>? progress)
+    {
+        var captured = captureOutput ? new StringBuilder() : null;
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            if (captured is not null) captured.AppendLine(line);
+            if (progress is not null && IsSafeCargoProgressLine(line)) progress.Report("Cargo: " + line.Trim());
+        }
+        return captured?.ToString() ?? "";
+    }
+
+    private static bool IsSafeCargoProgressLine(string line)
+    {
+        var value = line.TrimStart();
+        return value.StartsWith("Compiling ", StringComparison.Ordinal)
+            || value.StartsWith("Checking ", StringComparison.Ordinal)
+            || value.StartsWith("Building ", StringComparison.Ordinal)
+            || value.StartsWith("Downloading ", StringComparison.Ordinal)
+            || value.StartsWith("Updating ", StringComparison.Ordinal)
+            || value.StartsWith("Locking ", StringComparison.Ordinal)
+            || value.StartsWith("Installing ", StringComparison.Ordinal)
+            || value.StartsWith("Finished ", StringComparison.Ordinal);
     }
 
     private static void ExtractSnapshot(string archive, string destination)
@@ -439,7 +464,7 @@ public static class LocalBuildRunner
         hostEnvironment["CARGO_BUILD_JOBS"] = CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var plan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
         progress?.Report("Building Horizon's resource preparation tool.");
-        await RunProcess(cargo, root, plan.Steps.Single(step => step.Name == "Build resource preparer").Arguments, hostEnvironment);
+        await RunProcess(cargo, root, plan.Steps.Single(step => step.Name == "Build resource preparer").Arguments, hostEnvironment, progress: progress);
         var preparer = Path.Combine(root, ".local", "builder-prepare-target", "x86_64-pc-windows-msvc", "debug", "horizon-prepare.exe");
         progress?.Report("Preparing verified sound assets from the selected Minecraft installation.");
         try

@@ -34,12 +34,12 @@ public static class MinecraftAssetPreparation
         var msvc = VisualCppInstallation.FindLinkToolset(probe, "x64")?.Toolset ?? throw new InvalidOperationException("The Microsoft link libraries are missing.");
         var clang = ClangFinder.Find(probe) ?? throw new InvalidOperationException("The compact LLVM C compiler is missing.");
         var rustLld = await LocalRecipe.FindRustLinkerAsync(probe);
-        var compact = PrebuiltToolchain.Create(source, sdk, "x64", clang, rustLld, msvc, Path.Combine(workspace, "asset-toolchain"));
+        var compact = PrebuiltToolchain.Create(source, sdk, "x64", clang, rustLld, msvc, Path.Combine(workspace, "asset-toolchain"), probe);
         var environment = new Dictionary<string, string>(compact.Cargo, StringComparer.OrdinalIgnoreCase);
         environment["CARGO_BUILD_JOBS"] = LocalBuildRunner.CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
         progress?.Report("Building Horizon's Minecraft resource preparation helper.");
         await LocalBuildRunner.RunProcess(cargo, tool, ["+" + LocalRecipe.RustToolchain, "build", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
-            "--manifest-path", Path.Combine(tool, "Cargo.toml"), "--target-dir", Path.Combine(tool, "target")], environment);
+            "--manifest-path", Path.Combine(tool, "Cargo.toml"), "--target-dir", Path.Combine(tool, "target")], environment, progress: progress);
         var executable = Path.Combine(tool, "target", "x86_64-pc-windows-msvc", "release", "horizon-uwp-assets.exe");
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true,
             WorkingDirectory = workspace, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -49,6 +49,7 @@ public static class MinecraftAssetPreparation
             ("XDG_DATA_HOME", "xdg-data"), ("XDG_CONFIG_HOME", "xdg-config"), ("HORIZON_LAUNCHER_TRASH", "trash"),
             ("HORIZON_LAUNCHER_CLIPBOARD", "clipboard"), ("HORIZON_LAUNCHER_DESKTOP", "desktop") })
             start.Environment[name] = Path.Combine(workspace, "isolated", folder);
+        start.Environment["PATH"] = environment["PATH"];
         start.Environment["HORIZON_LAUNCHER_NO_SELF_UPDATE"] = "1";
         start.Environment["HORIZON_NO_AUDIO"] = "1";
         progress?.Report("Preparing your prefetched Minecraft resources with Horizon.");

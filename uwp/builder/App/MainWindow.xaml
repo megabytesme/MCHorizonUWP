@@ -115,7 +115,10 @@
                 <Button x:Name="CancelMinecraftSignIn" Content="Cancel sign-in" Click="CancelMinecraftSignIn_Click" IsEnabled="False" Visibility="Collapsed" />
               </StackPanel>
               <TextBlock Text="A saved sign-in is encrypted for this Windows account on this PC. It stores a Microsoft refresh token, not your password." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-              <TextBlock x:Name="MinecraftSignInStatus" TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <ProgressRing x:Name="MinecraftSignInProgressRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="MinecraftSignInStatus" TextWrapping="Wrap" VerticalAlignment="Center" />
+              </StackPanel>
               <HyperlinkButton x:Name="MinecraftSignInLink" Content="Open the Microsoft sign-in page" Visibility="Collapsed" />
             </StackPanel>
             <StackPanel x:Name="ReleasePage" Spacing="14" Visibility="Collapsed">
@@ -168,8 +171,18 @@
             <StackPanel x:Name="BuildPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Build your package" Style="{StaticResource TitleTextBlockStyle}" />
               <TextBlock Text="The client package and any new resource framework are signed with your local certificate." TextWrapping="Wrap" />
-              <Button x:Name="InstallLocal" Content="Install on this PC" Click="InstallLocal_Click" Visibility="Collapsed" />
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <ProgressRing x:Name="BuildProgressRing" Width="24" Height="24" IsActive="False" Visibility="Collapsed" />
+                <StackPanel Spacing="3" VerticalAlignment="Center">
+                  <TextBlock x:Name="BuildProgressStatus" Text="Waiting to build" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" />
+                  <TextBlock x:Name="BuildProgressDetail" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+              </StackPanel>
+              <Expander x:Name="BuildDetails" Header="Details" HorizontalAlignment="Stretch" IsExpanded="True">
+                <StackPanel x:Name="BuildStepItems" Spacing="12" />
+              </Expander>
               <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
+              <Button x:Name="InstallLocal" Content="Install on this PC" Click="InstallLocal_Click" Visibility="Collapsed" />
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

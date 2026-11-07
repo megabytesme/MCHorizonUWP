@@ -152,6 +152,10 @@ public sealed partial class MainWindow : Window
     private bool assetPrefetchSucceeded;
     private bool assetPrefetchRunning;
     private ActivityLogWindow? activityLogWindow;
+    private readonly Dictionary<string, BuildProgressRow> buildProgressRows = new(StringComparer.Ordinal);
+    private BuildProgressRow? activeBuildProgressRow;
+    private sealed record BuildProgressRow(string Key, ProgressRing Ring, TextBlock CompleteMark,
+        TextBlock State, TextBlock Detail, ProgressBar Progress);
     private sealed record ReleaseChoice(string Patch, string Client, string Architecture, CompatibilityResult Compatibility)
     {
         public override string ToString() => $"Patch {Patch} · UWP client {Client} · {(Compatibility.BuildVerified ? "build verified" : "build not verified")}";
@@ -645,11 +649,12 @@ public sealed partial class MainWindow : Window
         minecraftSignInCancellation = cancellation;
         try
         {
-            var challenge = await signIn.BeginAsync(cancellation.Token);
+            var signInProgress = new Progress<string>(message => MinecraftSignInStatus.Text = message);
+            var challenge = await signIn.BeginAsync(cancellation.Token, signInProgress);
             MinecraftSignInLink.NavigateUri = challenge.VerificationUri;
             MinecraftSignInLink.Visibility = Visibility.Visible;
             MinecraftSignInStatus.Text = $"Open the sign-in page and enter code {challenge.UserCode}.";
-            var owns = await signIn.CompleteOwnershipCheckAsync(challenge, cancellation.Token);
+            var owns = await signIn.CompleteOwnershipCheckAsync(challenge, cancellation.Token, signInProgress);
             minecraftOwnershipVerified = owns;
             UpdateBuildActions();
             MinecraftSignInStatus.Text = owns
@@ -679,7 +684,8 @@ public sealed partial class MainWindow : Window
         minecraftSignInCancellation = cancellation;
         try
         {
-            var owns = await signIn.CompleteSavedOwnershipCheckAsync(cancellation.Token);
+            var signInProgress = new Progress<string>(message => MinecraftSignInStatus.Text = message);
+            var owns = await signIn.CompleteSavedOwnershipCheckAsync(cancellation.Token, signInProgress);
             minecraftOwnershipVerified = owns;
             MinecraftSignInStatus.Text = owns
                 ? "Minecraft: Java Edition ownership confirmed with your saved Microsoft sign-in."
@@ -714,6 +720,8 @@ public sealed partial class MainWindow : Window
 
     private void UpdateSignInActions(bool busy)
     {
+        MinecraftSignInProgressRing.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        MinecraftSignInProgressRing.IsActive = busy;
         var saved = MinecraftSignIn.HasSavedSession;
         StartMinecraftSignIn.Visibility = !busy && !minecraftOwnershipVerified ? Visibility.Visible : Visibility.Collapsed;
         StartMinecraftSignIn.IsEnabled = !busy;
@@ -845,6 +853,7 @@ public sealed partial class MainWindow : Window
         builtOutput = null;
         InstallLocal.Visibility = Visibility.Collapsed;
         buildActionRunning = true;
+        BeginBuildProgress();
         wizardStep = BuildStep;
         completedPages = Math.Max(completedPages, BuildStep);
         highestVisited = Math.Max(highestVisited, BuildStep);
@@ -863,8 +872,7 @@ public sealed partial class MainWindow : Window
             if (!download) LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var progress = new Progress<string>(message =>
             {
-                RecipeStatus.Text = message;
-                BuilderActivityLog.Record("Build", message);
+                ReportBuildProgress(message);
             });
             SystemProbe.RefreshProcessPath();
             var probe = new SystemProbe();
@@ -891,10 +899,12 @@ public sealed partial class MainWindow : Window
                 RecipeStatus.Text += $" Requires existing resource framework {existing} on the target.";
             if (result.SoundWarning is { } warning)
                 RecipeStatus.Text += " " + warning;
+            CompleteBuildProgress(succeeded: true, "The signed package and certificate are ready.");
         }
         catch (Exception error)
         {
-            RecipeStatus.Text = $"{RecipeStatus.Text} Build failed: {error.Message}";
+            RecipeStatus.Text = $"Build failed: {error.Message}";
+            CompleteBuildProgress(succeeded: false, error.Message);
             BuilderActivityLog.Record("Build", "Build failed: " + error.Message);
         }
         finally
@@ -904,6 +914,156 @@ public sealed partial class MainWindow : Window
             buildActionRunning = false;
             UpdateWizard();
             UpdateBuildActions();
+        }
+    }
+
+    private void BeginBuildProgress()
+    {
+        buildProgressRows.Clear();
+        activeBuildProgressRow = null;
+        BuildStepItems.Children.Clear();
+        BuildProgressRing.Visibility = Visibility.Visible;
+        BuildProgressRing.IsActive = true;
+        BuildProgressStatus.Text = "Starting your build…";
+        BuildProgressDetail.Text = "Preparing the selected release and local build tools.";
+        RecipeStatus.Text = "";
+    }
+
+    private void ReportBuildProgress(string message)
+    {
+        var (key, title) = ResolveBuildStep(message, activeBuildProgressRow?.Key);
+        if (activeBuildProgressRow?.Key != key)
+        {
+            if (activeBuildProgressRow is not null) MarkBuildProgressRowComplete(activeBuildProgressRow);
+            if (!buildProgressRows.TryGetValue(key, out var row))
+            {
+                row = CreateBuildProgressRow(key);
+                buildProgressRows.Add(key, row);
+                BuildStepItems.Children.Add(CreateBuildProgressVisual(row, title));
+            }
+            activeBuildProgressRow = row;
+            row.Ring.Visibility = Visibility.Visible;
+            row.Ring.IsActive = true;
+            row.CompleteMark.Visibility = Visibility.Collapsed;
+            row.State.Text = "In progress";
+            BuildProgressStatus.Text = title;
+        }
+
+        var active = activeBuildProgressRow!;
+        active.Detail.Text = message;
+        UpdateBuildStepDeterminateProgress(active, message);
+        BuildProgressDetail.Text = message;
+        BuildProgressRing.Visibility = Visibility.Visible;
+        BuildProgressRing.IsActive = true;
+        if (!message.StartsWith("Cargo: ", StringComparison.OrdinalIgnoreCase)) BuilderActivityLog.Record("Build", message);
+    }
+
+    private static (string Key, string Title) ResolveBuildStep(string message, string? activeKey)
+    {
+        if (message.StartsWith("Cargo: ", StringComparison.OrdinalIgnoreCase))
+            return (activeKey ?? "cargo", activeKey switch
+            {
+                "asset-helper" => "Build the resource helper",
+                "compile-client" => "Compile the Horizon client",
+                "cargo-dependencies" => "Resolve Cargo dependencies",
+                "native-mods" => "Build the native-mod tool",
+                _ => "Run Cargo build tools",
+            });
+        if (message.StartsWith("Minecraft 26.3 assets", StringComparison.OrdinalIgnoreCase)) return ("minecraft-assets", "Prepare Minecraft assets");
+        if (message.Contains("Minecraft resource preparation helper", StringComparison.OrdinalIgnoreCase)) return ("asset-helper", "Build the resource helper");
+        if (message.Contains("prefetched Minecraft resources", StringComparison.OrdinalIgnoreCase)) return ("prepare-resources", "Prepare Minecraft resources");
+        if (message.Contains("native mod", StringComparison.OrdinalIgnoreCase)) return ("native-mods", "Install selected native mods");
+        if (message.Contains("release source", StringComparison.OrdinalIgnoreCase) || message.Contains("authenticated release source", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("isolated snapshot", StringComparison.OrdinalIgnoreCase)) return ("release-source", "Download and verify the Horizon release");
+        if (message.Contains("Microsoft framework", StringComparison.OrdinalIgnoreCase)) return ("frameworks", "Check package frameworks");
+        if (message.Contains("Cargo dependenc", StringComparison.OrdinalIgnoreCase)) return ("cargo-dependencies", "Resolve Cargo dependencies");
+        if (message.Contains("game bridge", StringComparison.OrdinalIgnoreCase) || message.Contains("Strict-linking", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("Linking the selected Horizon", StringComparison.OrdinalIgnoreCase)) return ("compile-client", "Compile the Horizon client");
+        if (message.Contains("Packaging", StringComparison.OrdinalIgnoreCase) || message.Contains("resource framework", StringComparison.OrdinalIgnoreCase)) return ("package", "Package the client and resources");
+        if (message.Contains("Signing", StringComparison.OrdinalIgnoreCase) || message.Contains("certificate", StringComparison.OrdinalIgnoreCase)) return ("sign", "Sign packages and export the certificate");
+        if (message.Contains("Rust standard-library", StringComparison.OrdinalIgnoreCase) || message.Contains("ARM32 offline", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("compact Rust", StringComparison.OrdinalIgnoreCase) || message.Contains("Visual C++ environment", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("parallel Cargo jobs", StringComparison.OrdinalIgnoreCase)) return ("toolchain", "Prepare the compiler and Rust toolchain");
+        if (activeKey == "prepare-resources") return ("prepare-resources", "Prepare Minecraft resources");
+        return ("step:" + message, message.Length <= 72 ? message : message[..69] + "…");
+    }
+
+    private BuildProgressRow CreateBuildProgressRow(string key)
+    {
+        var ring = new ProgressRing { Width = 20, Height = 20, IsActive = false, Visibility = Visibility.Collapsed };
+        var completeMark = new TextBlock { Text = "✓", FontSize = 18, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+        var state = new TextBlock { Text = "Waiting", Opacity = 0.8 };
+        var detail = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+        var progress = new ProgressBar { Minimum = 0, Maximum = 1, Value = 0, Visibility = Visibility.Collapsed };
+        return new(key, ring, completeMark, state, detail, progress);
+    }
+
+    private static UIElement CreateBuildProgressVisual(BuildProgressRow row, string title)
+    {
+        var icon = new Grid { Width = 22, Height = 22 };
+        icon.Children.Add(row.Ring);
+        icon.Children.Add(row.CompleteMark);
+        var heading = new Grid { ColumnSpacing = 12 };
+        heading.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var titleText = new TextBlock { Text = title, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        Grid.SetColumn(row.State, 1);
+        heading.Children.Add(titleText);
+        heading.Children.Add(row.State);
+        var content = new StackPanel { Spacing = 4 };
+        content.Children.Add(heading);
+        content.Children.Add(row.Detail);
+        content.Children.Add(row.Progress);
+        var layout = new Grid { ColumnSpacing = 10 };
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.Children.Add(icon);
+        Grid.SetColumn(content, 1);
+        layout.Children.Add(content);
+        return layout;
+    }
+
+    private static void UpdateBuildStepDeterminateProgress(BuildProgressRow row, string message)
+    {
+        var marker = " files ready";
+        var end = message.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (end < 0) return;
+        var start = message.LastIndexOf(' ', end);
+        var count = start < 0 ? message[..end] : message[(start + 1)..end];
+        var separator = count.IndexOf('/');
+        if (separator <= 0 || !int.TryParse(count[..separator], System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var current)
+            || !int.TryParse(count[(separator + 1)..], System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var maximum) || maximum <= 0 || current < 0 || current > maximum) return;
+        row.Progress.Maximum = maximum;
+        row.Progress.Value = current;
+        row.Progress.Visibility = Visibility.Visible;
+        row.State.Text = $"{current:0} / {maximum:0}";
+    }
+
+    private static void MarkBuildProgressRowComplete(BuildProgressRow row)
+    {
+        row.Ring.IsActive = false;
+        row.Ring.Visibility = Visibility.Collapsed;
+        row.CompleteMark.Visibility = Visibility.Visible;
+        row.State.Text = "Complete";
+        if (row.Progress.Visibility == Visibility.Visible) row.Progress.Value = row.Progress.Maximum;
+    }
+
+    private void CompleteBuildProgress(bool succeeded, string detail)
+    {
+        BuildProgressRing.IsActive = false;
+        BuildProgressRing.Visibility = Visibility.Collapsed;
+        BuildProgressStatus.Text = succeeded ? "Build complete" : "Build failed";
+        BuildProgressDetail.Text = detail;
+        if (succeeded && activeBuildProgressRow is not null) MarkBuildProgressRowComplete(activeBuildProgressRow);
+        else if (activeBuildProgressRow is { } failed)
+        {
+            failed.Ring.IsActive = false;
+            failed.Ring.Visibility = Visibility.Collapsed;
+            failed.CompleteMark.Text = "!";
+            failed.CompleteMark.Visibility = Visibility.Visible;
+            failed.State.Text = "Failed";
         }
     }
 
