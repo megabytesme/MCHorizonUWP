@@ -863,6 +863,8 @@ catch (InvalidDataException) { }
 
 await TestSourceAssembler();
 await TestReleaseSource();
+await TestBuilderUpdateChecker();
+await TestBuilderUpdatePreferences();
 await TestNativeBundleStager();
 await TestMinecraftSignIn();
 await TestMinecraftAssetPrefetch();
@@ -1542,6 +1544,48 @@ static async Task TestReleaseSource()
     }
     finally { Directory.Delete(root, recursive: true); }
 }
+
+static async Task TestBuilderUpdateChecker()
+{
+    const string response = """
+        [
+          {"tag_name":"builder-v0.1.2-preview.1","draft":false,"prerelease":true},
+          {"tag_name":"builder-v0.1.9","draft":true,"prerelease":false},
+          {"tag_name":"client-v0.9.0","draft":false,"prerelease":false},
+          {"tag_name":"builder-v0.1.4","draft":false,"prerelease":false},
+          {"tag_name":"builder-v0.1.3","draft":false,"prerelease":false}
+        ]
+        """;
+    using var handler = new BuilderUpdateFixtureHandler(response);
+    using var client = new HttpClient(handler);
+    var update = await BuilderUpdateChecker.CheckAsync(client, "0.1.3");
+    Require(handler.RequestedEndpoint == BuilderUpdateChecker.ReleasesEndpoint, "builder checks the MCHorizonUWP GitHub release list");
+    Require(handler.UserAgent?.Contains("0.1.3", StringComparison.Ordinal) == true, "builder update requests identify the installed version");
+    Require(update is { Version: "0.1.4" }
+        && update.ReleaseUri == new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/builder-v0.1.4"),
+        "builder update checker selects the newest stable builder release only");
+
+    using var sameVersionHandler = new BuilderUpdateFixtureHandler(response);
+    using var sameVersionClient = new HttpClient(sameVersionHandler);
+    Require(await BuilderUpdateChecker.CheckAsync(sameVersionClient, "0.1.4") is null,
+        "builder update checker reports no update when the current version is latest");
+}
+
+static async Task TestBuilderUpdatePreferences()
+{
+    var root = Path.Combine(Path.GetTempPath(), "HorizonBuilderUpdateSettings-" + Guid.NewGuid().ToString("N"));
+    var path = Path.Combine(root, "settings.json");
+    try
+    {
+        Require(BuilderUpdatePreferences.ReadEnabled(path), "builder update checks default to enabled");
+        BuilderUpdatePreferences.WriteEnabled(false, path);
+        Require(!BuilderUpdatePreferences.ReadEnabled(path), "builder update checks persist as disabled");
+        BuilderUpdatePreferences.WriteEnabled(true, path);
+        Require(BuilderUpdatePreferences.ReadEnabled(path), "builder update checks can be re-enabled");
+    }
+    finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+}
+
 static async Task TestSourceAssembler()
 {
     var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed for the source assembly test.");
@@ -1648,6 +1692,21 @@ sealed class ReleaseFixtureHandler(Dictionary<string, byte[]> inputs) : HttpMess
         Task.FromResult(inputs.TryGetValue(request.RequestUri!.AbsolutePath, out var bytes)
             ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }
             : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+}
+sealed class BuilderUpdateFixtureHandler(string response) : HttpMessageHandler
+{
+    public string? RequestedEndpoint { get; private set; }
+    public string? UserAgent { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestedEndpoint = request.RequestUri?.AbsoluteUri;
+        UserAgent = request.Headers.UserAgent.ToString();
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent(response, System.Text.Encoding.UTF8, "application/json"),
+        });
+    }
 }
 sealed class CatalogFixtureHandler(byte[] catalog, byte[] signature, byte[] artifact) : HttpMessageHandler
 {

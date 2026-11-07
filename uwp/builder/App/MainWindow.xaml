@@ -71,12 +71,16 @@
         <ScrollViewer x:Name="PageScroller" Grid.Row="1" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="16">
             <StackPanel x:Name="WelcomePage" Spacing="14">
-              <TextBlock Text="Welcome to Horizon UWP Builder" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="Welcome to MCHorizonUWP Builder" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="Create a Horizon package for a Windows PC or a Windows 10 Mobile device." TextWrapping="Wrap" />
               <TextBlock Text="You need an internet connection. The builder checks for existing tools and prepares any missing ones. Allow at least 20 GiB free for Minecraft resources and a build, plus space for the compact SDK and compiler tools." TextWrapping="Wrap" />
               <TextBlock Text="The builder compiles the Rust client and links a prebuilt Windows host, so it does not compile the C++/CX app. It prepares the pinned Rust, LLVM and Windows SDK pieces, plus the selected architecture’s Microsoft link libraries and app frameworks." TextWrapping="Wrap" />
               <TextBlock Text="The setup reuses tools already available on this PC and downloads only the selected architecture’s missing pieces. Windows may ask for administrator approval for Microsoft build tools or app frameworks. You can continue through the wizard while setup runs." TextWrapping="Wrap" />
               <TextBlock Text="The builder retrieves compatible releases from the MCHorizonUWP repository." TextWrapping="Wrap" />
+              <ToggleSwitch x:Name="BuilderUpdateToggle" Header="Check for builder updates at startup" OnContent="On" OffContent="Off" />
+              <TextBlock x:Name="BuilderUpdateStatus" Text="Checking for builder updates…" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+              <HyperlinkButton x:Name="BuilderUpdateLink" Content="Download the latest builder" Visibility="Collapsed" />
+              <TextBlock Text="Updates are opened from GitHub and installed by you; the builder never updates itself silently." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <StackPanel x:Name="TargetPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Choose a target device" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />

@@ -11,6 +11,7 @@ public sealed partial class MainWindow : Window
     private const int ReviewStep = 7;
     private const int BuildStep = 8;
     private static readonly string[] DependencyIds = ["git", "python", "rustup", "rust", "msvc", "sdk", "llvm", "ui", "vclibs", "minecraft-assets"];
+    private CancellationTokenSource? builderUpdateCheckCancellation;
 
     public MainWindow()
     {
@@ -35,6 +36,8 @@ public sealed partial class MainWindow : Window
         WizardPips.SelectedIndexChanged += WizardPips_SelectedIndexChanged;
         Closed += (_, _) =>
         {
+            builderUpdateCheckCancellation?.Cancel();
+            builderUpdateCheckCancellation?.Dispose();
             minecraftSignInCancellation?.Cancel();
             assetPrefetchCancellation?.Cancel();
         };
@@ -56,6 +59,68 @@ public sealed partial class MainWindow : Window
         UpdateResourceChoices();
         UpdateWizard();
         UpdateReleaseChoices();
+        BuilderUpdateToggle.IsOn = BuilderUpdatePreferences.ReadEnabled();
+        BuilderUpdateToggle.Toggled += BuilderUpdateToggle_Toggled;
+        if (BuilderUpdateToggle.IsOn) StartBuilderUpdateCheck();
+        else BuilderUpdateStatus.Text = "Builder update checks are turned off.";
+    }
+
+    private void BuilderUpdateToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            BuilderUpdatePreferences.WriteEnabled(BuilderUpdateToggle.IsOn);
+        }
+        catch (Exception error)
+        {
+            BuilderActivityLog.Record("Updates", $"Could not save the update-check setting: {error.Message}");
+            BuilderUpdateStatus.Text = "The update-check setting could not be saved.";
+        }
+
+        if (BuilderUpdateToggle.IsOn) StartBuilderUpdateCheck();
+        else
+        {
+            builderUpdateCheckCancellation?.Cancel();
+            BuilderUpdateLink.Visibility = Visibility.Collapsed;
+            BuilderUpdateStatus.Text = "Builder update checks are turned off.";
+            BuilderActivityLog.Record("Updates", "Builder update checks were turned off.");
+        }
+    }
+
+    private void StartBuilderUpdateCheck()
+    {
+        builderUpdateCheckCancellation?.Cancel();
+        builderUpdateCheckCancellation?.Dispose();
+        builderUpdateCheckCancellation = new CancellationTokenSource();
+        BuilderUpdateStatus.Text = "Checking for builder updates…";
+        _ = CheckForBuilderUpdateAsync(builderUpdateCheckCancellation.Token);
+    }
+
+    private async Task CheckForBuilderUpdateAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var update = await BuilderUpdateChecker.CheckAsync(cancellationToken);
+            if (cancellationToken.IsCancellationRequested || !BuilderUpdateToggle.IsOn) return;
+            if (update is null)
+            {
+                BuilderUpdateStatus.Text = "The latest MCHorizonUWP Builder release is installed.";
+                BuilderActivityLog.Record("Updates", "No newer stable builder release was found.");
+                return;
+            }
+
+            BuilderUpdateStatus.Text = $"MCHorizonUWP Builder {update.Version} is available.";
+            BuilderUpdateLink.NavigateUri = update.ReleaseUri;
+            BuilderUpdateLink.Visibility = Visibility.Visible;
+            BuilderActivityLog.Record("Updates", $"Builder {update.Version} is available: {update.ReleaseUri}");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            if (!BuilderUpdateToggle.IsOn) return;
+            BuilderUpdateStatus.Text = "Builder updates could not be checked. You can continue using the builder.";
+            BuilderActivityLog.Record("Updates", $"Update check unavailable: {error.Message}");
+        }
     }
     private IReadOnlyList<NativeModListing> nativeMods = [];
     private readonly HashSet<string> selectedNativeMods = new(StringComparer.Ordinal);
