@@ -1583,7 +1583,10 @@ struct TelemetryDialogContent {
 
 TelemetryDialogContent telemetry_dialog_content(uint32_t mask) {
     auto panel = ref new StackPanel();
-    panel->Children->Append(text(L"Review the switches before saving. Each choice applies independently to its service. The MCHorizonUWP endpoint is separate from the official Horizon endpoint and uses its own unrelated random ID.", 14));
+    panel->Children->Append(text(L"Why this helps", 16));
+    panel->Children->Append(text(L"Optional diagnostics help me find crashes, slowdowns and device-specific issues so I can improve MCHorizonUWP.", 14));
+    panel->Children->Append(text(L"Your privacy", 16));
+    panel->Children->Append(text(L"Each category is optional and controlled separately for each service. Data is sent only for categories you enable, and each switch describes what that category sends. Bug-report logs are added only after you preview them and choose to attach them. You can change or clear your choices later in Settings.", 14));
     auto toggles = ref new Platform::Array<ToggleSwitch^>(10);
     auto add_toggle = [panel, toggles, mask](unsigned index, const wchar_t* label, const wchar_t* detail) {
         auto control = ref new ToggleSwitch();
@@ -1594,18 +1597,18 @@ TelemetryDialogContent telemetry_dialog_content(uint32_t mask) {
         panel->Children->Append(control);
         panel->Children->Append(text(ref new Platform::String(detail), 12));
     };
-    panel->Children->Append(text(L"Official Horizon service — telemetry.playhorizon.dev", 16));
-    add_toggle(0, L"Performance", L"Frame and tick summaries, settings, memory use and device details. Raw frame timings are not sent.");
-    add_toggle(1, L"Crash reports", L"Scrubbed crash messages, stack traces and graphics details. No log or world data.");
-    add_toggle(2, L"Bug reports", L"Reports you submit include a device summary and your text. A log is included only after preview and a separate attachment choice.");
-    add_toggle(3, L"Benchmark reports", L"Version 1 benchmark results, including hardware and graphics details.");
-    add_toggle(8, L"Live player count", L"A random session ID, game version, platform and whether LAN play is open. No account, install ID or hardware details.");
-    panel->Children->Append(text(L"MCHorizonUWP endpoint — https://horizontelemetry.bytesdirect.com", 16));
+    panel->Children->Append(text(L"MCHorizonUWP service", 16));
     add_toggle(4, L"Performance", L"Send the same performance summaries and device details to the MCHorizonUWP service.");
     add_toggle(5, L"Crash reports", L"Send the same scrubbed crash reports to the MCHorizonUWP service.");
     add_toggle(6, L"Bug reports", L"Send the device summary and your submitted report to the MCHorizonUWP service. A log is included only after preview and a separate choice.");
     add_toggle(7, L"Benchmark reports", L"Send version 1 benchmark results, including hardware and graphics details, to the MCHorizonUWP service.");
     add_toggle(9, L"Live player count", L"Send a separate random session ID and live player-count fields to the MCHorizonUWP service.");
+    panel->Children->Append(text(L"Official Horizon service", 16));
+    add_toggle(0, L"Performance", L"Frame and tick summaries, settings, memory use and device details. Raw frame timings are not sent.");
+    add_toggle(1, L"Crash reports", L"Scrubbed crash messages, stack traces and graphics details. No log or world data.");
+    add_toggle(2, L"Bug reports", L"Reports you submit include a device summary and your text. A log is included only after preview and a separate attachment choice.");
+    add_toggle(3, L"Benchmark reports", L"Version 1 benchmark results, including hardware and graphics details.");
+    add_toggle(8, L"Live player count", L"A random session ID, game version, platform and whether LAN play is open. No account, install ID or hardware details.");
     auto scroll = ref new ScrollViewer();
     scroll->Content = panel;
     scroll->MaxHeight = 560;

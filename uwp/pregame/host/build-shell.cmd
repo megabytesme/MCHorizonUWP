@@ -1,5 +1,6 @@
 @echo off
 setlocal
+set "CL=%CL% /utf-8"
 set "ARCH=%~1"
 set "OUTPUT=%~2"
 if "%OUTPUT%"=="" exit /b 1
