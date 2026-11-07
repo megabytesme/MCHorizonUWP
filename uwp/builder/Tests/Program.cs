@@ -1422,6 +1422,34 @@ static async Task TestMinecraftAssetPrefetch()
         Require(localReuse.LocalFilesReused == 2 && localReuse.NetworkFilesFetched == 0,
             "the builder copies verified files from a local Minecraft 26.3 installation");
 
+        var lowSpaceCache = Path.Combine(root, "low-space-cache");
+        long checkedAvailable = -1;
+        long checkedRequired = -1;
+        try
+        {
+            await MinecraftAssetPrefetcher.PrefetchAsync(source, true, null,
+                testHandler: new AssetPrefetchFixtureHandler(responses), testCacheRoot: lowSpaceCache,
+                confirmInsufficientSpace: (available, required) =>
+                {
+                    checkedAvailable = available;
+                    checkedRequired = required;
+                    return Task.FromResult(false);
+                }, testAvailableSpaceBytes: 0);
+            throw new Exception("low-space asset preparation was not canceled");
+        }
+        catch (OperationCanceledException)
+        {
+            Require(!Directory.Exists(lowSpaceCache), "low-space cancellation happens before writing assets into the cache");
+        }
+        Require(checkedAvailable == 0 && checkedRequired == metadata.Length + assetIndex.Length + clientBytes.Length + assetBytes.Length,
+            "low-space warning receives the exact missing metadata, index, client and asset byte count");
+
+        var bypassed = await MinecraftAssetPrefetcher.PrefetchAsync(source, true, null,
+            testHandler: new AssetPrefetchFixtureHandler(responses), testCacheRoot: Path.Combine(root, "bypassed-cache"),
+            confirmInsufficientSpace: (_, _) => Task.FromResult(true), testAvailableSpaceBytes: 0);
+        Require(bypassed.NetworkFilesFetched == 2 && bypassed.BytesFetched == clientBytes.Length + assetBytes.Length,
+            "choosing to continue bypasses the low-space warning and completes the verified asset download");
+
         var unauthorizedCache = Path.Combine(root, "unauthorized-cache");
         try
         {

@@ -305,3 +305,34 @@ not through a downloaded builder on a blank PC.
 The original first Sandbox attempt is recorded in Git history. It found missing
 WinGet, a missing PRI file and a startup selection problem, which have since
 been addressed for the preview; it did not build a package.
+
+## Fresh x64 storage check (2026-11-07)
+
+- Started the released x64 builder in a clean Windows Sandbox configured for
+  8192 MB. The guest reported 8,588,824,576 bytes of physical memory and
+  85,764,059,136 bytes on C:. The measured free-space baseline was
+  82,837,581,824 bytes, after extracting the builder.
+- The builder ZIP was 69,846,431 bytes; the extracted app folder was
+  175,326,618 bytes. The ZIP itself was provided from a host share and is not
+  part of the guest baseline.
+- All nine x64 dependency groups were missing. Setup started at 07:22:33 UTC
+  and reported ready at 07:26:43 UTC (4 minutes 10 seconds).
+- The resulting `%LOCALAPPDATA%\MCHorizonUWP` tree occupied 2,613,320,547
+  bytes (2.43 GiB, rounded up to 2.5 GiB), including 568,075,366 bytes of
+  retained downloads. The folder breakdown was:
+
+  | Folder | Bytes |
+  | --- | ---: |
+  | Downloads | 568,075,366 |
+  | Git | 86,439,889 |
+  | LLVM | 149,875,229 |
+  | Python | 22,640,861 |
+  | Rust | 705,123,591 |
+  | SDK | 686,467,199 |
+  | Setup | 29,617,778 |
+  | Toolchains | 323,975,651 |
+  | ToolProfile | 41,100,701 |
+  | Builder logs | 4,282 |
+
+- The asset download and complete build/package run are still pending account
+  ownership confirmation. This is not the end-to-end storage requirement.

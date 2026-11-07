@@ -76,8 +76,12 @@ dotnet run --project .\Tests\Horizon.Builder.Tests.csproj -c Release
 `-Publish` produces a self-contained x64 builder. Its WinUI application opens
 in Windows Sandbox without a separate .NET runtime. A native ARM64 or x86
 builder distribution has not been established. Builds use private workspaces
-under `%USERPROFILE%\.huwp\b` and parallel jobs limited by available memory. At least
-20 GiB of free space is required for automatic resource preparation; actual
-requirements can be higher.
+under `%USERPROFILE%\.huwp\b` and parallel jobs limited by available memory.
+The builder reuses installed tools and verified files in its cache. It can also
+copy verified Minecraft 26.3 files from a local game installation into that
+cache. Before filling the cache, it compares the exact additional files needed
+with free space and lets you continue if the drive is low. A full build also
+needs room for the selected source, prepared resources and compiled output; its
+peak depends on the release and architecture.
 See [installation guidance](../../docs/install.md) and
 [builder design](../BUILDER-DESIGN.md) for further details.

@@ -11,7 +11,6 @@ public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, 
 /// <summary>Runs only the pinned local recipe in a fresh, builder-owned workspace.</summary>
 public static class LocalBuildRunner
 {
-    public const long MinimumFreeBytes = 10L * 1024 * 1024 * 1024;
     public static int CargoJobCount(int processors, long memoryBytes)
     {
         const long gib = 1024L * 1024 * 1024;
@@ -100,11 +99,6 @@ public static class LocalBuildRunner
             splitRelease: release is not null, unifiedToolchain: unifiedToolchain, compactToolchain: release is not null);
         if (blockers.Count != 0) throw new InvalidOperationException(string.Join(" ", blockers));
         var hostExecutable = release is null ? null : RequirePrebuiltHost(source, targetArchitecture);
-        var workspaceDrive = Path.GetPathRoot(release is null ? workspaceBase : Path.GetFullPath(source))
-            ?? throw new InvalidOperationException("Could not determine the builder workspace drive.");
-        if (new DriveInfo(workspaceDrive).AvailableFreeSpace < MinimumFreeBytes)
-            throw new IOException("At least 10 GiB of free space is required on the builder workspace drive before starting a build.");
-
         progress?.Report(release is null ? "Creating an isolated snapshot of the pinned source revision." : "Using the authenticated release source workspace.");
         var root = release is null ? await CreateSnapshotAsync(source, probe)
             : Directory.GetParent(Path.GetFullPath(source))?.FullName ?? throw new InvalidOperationException("Invalid release workspace.");

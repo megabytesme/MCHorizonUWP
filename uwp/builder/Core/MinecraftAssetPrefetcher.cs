@@ -23,7 +23,8 @@ internal static class MinecraftAssetPrefetcher
 
     internal static async Task<Result> PrefetchAsync(string source, bool ownershipVerified, string? selectedMinecraftDirectory,
         IProgress<string>? progress = null, CancellationToken cancellationToken = default, HttpMessageHandler? testHandler = null,
-        string? testCacheRoot = null)
+        string? testCacheRoot = null, Func<long, long, Task<bool>>? confirmInsufficientSpace = null,
+        long? testAvailableSpaceBytes = null)
     {
         if (!ownershipVerified) throw new InvalidOperationException("Sign in with an account that owns Minecraft: Java Edition first.");
         var lockPath = Path.Combine(Path.GetFullPath(source), "research-lock.json");
@@ -34,11 +35,7 @@ internal static class MinecraftAssetPrefetcher
         var clientSha1 = RequiredHash(minecraft, "client_sha1");
         var cacheRoot = testCacheRoot ?? CacheRoot;
         var gameDirectory = Path.Combine(cacheRoot, "minecraft");
-        Directory.CreateDirectory(cacheRoot);
-        Directory.CreateDirectory(gameDirectory);
         var cacheDrive = Path.GetPathRoot(cacheRoot) ?? throw new InvalidOperationException("The Minecraft asset cache path is invalid.");
-        if (testCacheRoot is null && new DriveInfo(cacheDrive).AvailableFreeSpace < 20L * 1024 * 1024 * 1024)
-            throw new IOException("At least 20 GiB of free space is required to prepare Minecraft resources and build the client.");
 
         var http = testHandler is null ? Http : new HttpClient(testHandler) { Timeout = TimeSpan.FromMinutes(5), MaxResponseContentBufferSize = MaxFileBytes };
         try
@@ -49,7 +46,6 @@ internal static class MinecraftAssetPrefetcher
             VerifyBytes(metadata, manifestSha1, null, "Minecraft version metadata");
             var versionDirectory = Path.Combine(gameDirectory, "versions", Version);
             var versionMetadataPath = Path.Combine(versionDirectory, Version + ".json");
-            await WriteVerifiedAsync(versionMetadataPath, metadata, cancellationToken);
             using var manifest = JsonDocument.Parse(metadata);
             var root = manifest.RootElement;
             var assetIndex = root.GetProperty("assetIndex");
@@ -64,7 +60,6 @@ internal static class MinecraftAssetPrefetcher
             var assetIndexBytes = await GetBytesAsync(http, assetIndexUrl, cancellationToken);
             VerifyBytes(assetIndexBytes, assetIndexSha1, OptionalSize(assetIndex), "Minecraft asset index");
             var indexPath = Path.Combine(gameDirectory, "assets", "indexes", assetIndexId + ".json");
-            await WriteVerifiedAsync(indexPath, assetIndexBytes, cancellationToken);
             using var index = JsonDocument.Parse(assetIndexBytes);
 
             var localRoots = FindLocalMinecraftRoots(selectedMinecraftDirectory);
@@ -103,16 +98,39 @@ internal static class MinecraftAssetPrefetcher
             var localReused = 0;
             var alreadyCached = 0;
             var pending = new List<Asset>();
+            var localCopies = new List<(string Source, Asset Asset)>();
+            long bytesToAdd = 0;
+            if (!await MatchesAsync(versionMetadataPath, manifestSha1, metadata.LongLength, cancellationToken))
+                bytesToAdd = checked(bytesToAdd + metadata.LongLength);
+            if (!await MatchesAsync(indexPath, assetIndexSha1, assetIndexBytes.LongLength, cancellationToken))
+                bytesToAdd = checked(bytesToAdd + assetIndexBytes.LongLength);
             foreach (var file in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (await MatchesAsync(file.Destination, file.Sha1, file.Size, cancellationToken)) { alreadyCached++; continue; }
                 var isClient = file.Destination.EndsWith(Version + ".jar", StringComparison.OrdinalIgnoreCase);
-                var copied = isClient
-                    ? localClient is not null && await CopyVerifiedAsync(localClient, file, cancellationToken)
-                    : await CopyFromLocalAssetsAsync(localRoots, objectsRoot, file, cancellationToken);
-                if (copied) localReused++;
+                var localCopy = isClient
+                    ? localClient is not null && await MatchesAsync(localClient, file.Sha1, file.Size, cancellationToken) ? localClient : null
+                    : await FindLocalAssetAsync(localRoots, objectsRoot, file, cancellationToken);
+                if (file.Size is { } size) bytesToAdd = checked(bytesToAdd + size);
+                else bytesToAdd = checked(bytesToAdd + MaxFileBytes);
+                if (localCopy is not null) localCopies.Add((localCopy, file));
                 else pending.Add(file);
+            }
+
+            var availableBytes = testAvailableSpaceBytes ?? new DriveInfo(cacheDrive).AvailableFreeSpace;
+            if (bytesToAdd > availableBytes && confirmInsufficientSpace is not null
+                && !await confirmInsufficientSpace(availableBytes, bytesToAdd))
+                throw new OperationCanceledException("Minecraft asset preparation was canceled because the cache drive is low on space.", cancellationToken);
+
+            Directory.CreateDirectory(cacheRoot);
+            Directory.CreateDirectory(gameDirectory);
+            await WriteVerifiedAsync(versionMetadataPath, metadata, cancellationToken);
+            await WriteVerifiedAsync(indexPath, assetIndexBytes, cancellationToken);
+            foreach (var (localSource, asset) in localCopies)
+            {
+                if (await CopyVerifiedAsync(localSource, asset, cancellationToken)) localReused++;
+                else pending.Add(asset);
             }
 
             var total = files.Count;
@@ -216,16 +234,16 @@ internal static class MinecraftAssetPrefetcher
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
-    private static async Task<bool> CopyFromLocalAssetsAsync(IReadOnlyList<string> roots, string objectsRoot, Asset file,
+    private static async Task<string?> FindLocalAssetAsync(IReadOnlyList<string> roots, string objectsRoot, Asset file,
         CancellationToken cancellationToken)
     {
         var relative = Path.GetRelativePath(objectsRoot, file.Destination);
         foreach (var root in roots)
         {
             var local = Path.Combine(root, "assets", "objects", relative);
-            if (await CopyVerifiedAsync(local, file, cancellationToken)) return true;
+            if (await MatchesAsync(local, file.Sha1, file.Size, cancellationToken)) return local;
         }
-        return false;
+        return null;
     }
 
     private static async Task<bool> CopyVerifiedAsync(string source, Asset file, CancellationToken cancellationToken)

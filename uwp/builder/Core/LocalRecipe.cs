@@ -115,7 +115,7 @@ public static class LocalRecipe
             "The renderer is checked on the device before launch; unavailable graphics devices are not offered.",
             "The resulting APPX requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
-            "At least 10 GiB free space is required. Cargo fetches missing dependencies before the offline build and uses all available processor cores." };
+            "The builder reuses installed tools and cached Minecraft files. Before an asset download, it compares the exact verified cache files still needed with free space and lets you continue if the drive is low. Cargo fetches missing dependencies before the offline build and uses all available processor cores." };
         if (existingFramework is null) notes.Add("The resource manifest version is checked; resource ownership and complete content integrity are not established by this check.");
         if (selection.PrepareSounds) notes.Add("Sound preparation copies selected resources into the build workspace and reads your Minecraft asset store; it does not modify either selection.");
         if (selection.UseResourceFramework) notes.Add("The separate unsigned resource framework contains your private prepared resources; retain it for clients using the same content and install it as a dependency.");

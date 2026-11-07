@@ -190,16 +190,26 @@ public sealed partial class MainWindow : Window
                     content.Children.Add(new TextBlock { Text = string.Join("\n", missing.Select(item => "• " + item)), TextWrapping = TextWrapping.Wrap });
                     content.Children.Add(new TextBlock { Text = "Microsoft C++ files are downloaded directly from Microsoft, hash-verified, and extracted into a private per-user cache. The Visual Studio IDE and machine-wide Build Tools installer are not used.", TextWrapping = TextWrapping.Wrap });
                     content.Children.Add(new TextBlock { Text = "Only the selected architecture and shared host files are prepared. You can continue through setup while downloads run.", TextWrapping = TextWrapping.Wrap });
-                    var terms = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-                    foreach (var (label, url) in new[] {
+                    var links = new (string Label, string Url)[] {
                         ("Windows SDK", "https://aka.ms/WinSDKLicenseURL"),
                         ("Microsoft C++ components", "https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution"),
                         ("Microsoft UI XAML", "https://github.com/microsoft/microsoft-ui-xaml/blob/main/LICENSE"),
                         ("LLVM/Clang", "https://llvm.org/LICENSE.txt"),
                         ("Git", "https://git-scm.com/about/free-and-open-source"),
                         ("Python", "https://docs.python.org/3/license.html"),
-                        ("Rust", "https://www.rust-lang.org/policies/licenses") })
-                        terms.Children.Add(new HyperlinkButton { Content = label, NavigateUri = new Uri(url) });
+                        ("Rust", "https://www.rust-lang.org/policies/licenses") };
+                    var terms = new Grid { ColumnSpacing = 8, RowSpacing = 4 };
+                    for (var column = 0; column < 3; column++) terms.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    for (var row = 0; row < (links.Length + 2) / 3; row++) terms.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    for (var index = 0; index < links.Length; index++)
+                    {
+                        var (label, url) = links[index];
+                        var link = new HyperlinkButton { Content = label, NavigateUri = new Uri(url), HorizontalAlignment = HorizontalAlignment.Stretch,
+                            HorizontalContentAlignment = HorizontalAlignment.Left };
+                        Grid.SetRow(link, index / 3);
+                        Grid.SetColumn(link, index % 3);
+                        terms.Children.Add(link);
+                    }
                     content.Children.Add(terms);
                     var dialog = new ContentDialog { XamlRoot = WelcomePage.XamlRoot, Title = "Install required dependencies?", Content = content,
                         PrimaryButtonText = "Install in background", CloseButtonText = "Not now", DefaultButton = ContentDialogButton.Primary };
@@ -525,7 +535,7 @@ public sealed partial class MainWindow : Window
         {
             var prepared = await EnsurePreparedReleaseAsync(choice, progress, cancellationToken);
             var result = await MinecraftAssetPreparation.PrefetchAsync(prepared.SourceDirectory, minecraftOwnershipVerified,
-                null, progress, cancellationToken);
+                null, progress, cancellationToken, ConfirmAssetStorageAsync);
             assetPrefetchSucceeded = true;
             AssetPrefetchStatus.Text = $"Minecraft 26.3 files are ready. Reused {result.LocalFilesReused} local files and downloaded {result.NetworkFilesFetched} files ({result.BytesFetched / (1024d * 1024):0} MiB).";
             ShowDependencyProgress(new("minecraft-assets", "Ready", false, true, 100));
@@ -568,6 +578,31 @@ public sealed partial class MainWindow : Window
             UpdateDependencyHeader();
             if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
         }
+    }
+
+    private async Task<bool> ConfirmAssetStorageAsync(long availableBytes, long requiredBytes)
+    {
+        static string HalfGiB(long bytes)
+        {
+            var rounded = Math.Ceiling(bytes / (512d * 1024 * 1024)) / 2;
+            return rounded.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " GiB";
+        }
+        static string ExactMiB(long bytes) => (bytes / (1024d * 1024)).ToString("N1", System.Globalization.CultureInfo.CurrentCulture) + " MiB";
+
+        var content = new StackPanel { Spacing = 8 };
+        content.Children.Add(new TextBlock { Text = $"The verified Minecraft 26.3 index shows that the asset cache needs {ExactMiB(requiredBytes)} of additional space ({HalfGiB(requiredBytes)} rounded up).", TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(new TextBlock { Text = $"This drive currently has {ExactMiB(availableBytes)} free. The cache is stored at {MinecraftAssetPreparation.CacheRoot}.", TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(new TextBlock { Text = "You can continue anyway. If Windows runs out of space, asset preparation or the later build may fail.", TextWrapping = TextWrapping.Wrap });
+        var dialog = new ContentDialog
+        {
+            XamlRoot = WelcomePage.XamlRoot,
+            Title = "Low storage space",
+            Content = content,
+            PrimaryButtonText = "Continue anyway",
+            CloseButtonText = "Cancel asset preparation",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
     private Task<PreparedRelease> EnsurePreparedReleaseAsync(ReleaseChoice choice, IProgress<string>? progress, CancellationToken cancellationToken)
@@ -839,7 +874,7 @@ public sealed partial class MainWindow : Window
             if (assetPrefetchTask is { IsCompleted: false } prefetchTask) await prefetchTask;
             var prepared = await EnsurePreparedReleaseAsync(release, progress, CancellationToken.None);
             if (download) resources = await MinecraftAssetPreparation.PrepareAsync(prepared, selection, minecraftOwnershipVerified,
-                probe, progress, minecraft);
+                probe, progress, minecraft, confirmInsufficientSpace: ConfirmAssetStorageAsync);
             var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft);
             var signed = result.SignedOutput ?? throw new InvalidOperationException("The build did not produce signed output.");
             builtOutput = signed;

@@ -6,26 +6,28 @@ namespace Horizon.Builder.Core;
 public static class MinecraftAssetPreparation
 {
     public sealed record PrefetchResult(string MinecraftDirectory, int LocalFilesReused, int NetworkFilesFetched, long BytesFetched);
+    public static string CacheRoot => MinecraftAssetPrefetcher.CacheRoot;
 
     public static async Task<PrefetchResult> PrefetchAsync(string source, bool ownershipVerified, string? minecraftDirectory,
-        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default,
+        Func<long, long, Task<bool>>? confirmInsufficientSpace = null)
     {
-        var result = await MinecraftAssetPrefetcher.PrefetchAsync(source, ownershipVerified, minecraftDirectory, progress, cancellationToken);
+        var result = await MinecraftAssetPrefetcher.PrefetchAsync(source, ownershipVerified, minecraftDirectory, progress,
+            cancellationToken, confirmInsufficientSpace: confirmInsufficientSpace);
         return new(result.MinecraftDirectory, result.LocalFilesReused, result.NetworkFilesFetched, result.BytesFetched);
     }
 
     public static async Task<string> PrepareAsync(PreparedRelease release, BuildSelection selection, bool ownershipVerified,
-        IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null, CancellationToken cancellationToken = default)
+        IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null, CancellationToken cancellationToken = default,
+        Func<long, long, Task<bool>>? confirmInsufficientSpace = null)
     {
         if (!ownershipVerified) throw new InvalidOperationException("Sign in with an account that owns Minecraft: Java Edition first.");
         LocalBuildRunner.ValidatePreparedRelease(release, selection);
         var source = Path.GetFullPath(release.SourceDirectory);
         var workspace = Directory.GetParent(source)?.FullName ?? throw new InvalidOperationException("The release workspace is invalid.");
-        var drive = Path.GetPathRoot(workspace) ?? throw new InvalidOperationException("The release drive is invalid.");
-        if (new DriveInfo(drive).AvailableFreeSpace < 20L * 1024 * 1024 * 1024)
-            throw new IOException("At least 20 GiB of free space is required to download and prepare Minecraft resources and build the client.");
         var privateData = MinecraftAssetPrefetcher.CacheRoot;
-        await MinecraftAssetPrefetcher.PrefetchAsync(source, ownershipVerified, minecraftDirectory, progress, cancellationToken);
+        await MinecraftAssetPrefetcher.PrefetchAsync(source, ownershipVerified, minecraftDirectory, progress,
+            cancellationToken, confirmInsufficientSpace: confirmInsufficientSpace);
         var tool = await StageHelperAsync(source, workspace);
         var cargo = probe.FindOnPath("cargo.exe") ?? throw new InvalidOperationException("Cargo is required to prepare Minecraft resources.");
         var sdk = PrivateWindowsSdk.FindReady(probe, ["x64"]) ?? throw new InvalidOperationException("The x64 Windows SDK is missing.");
