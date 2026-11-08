@@ -1025,6 +1025,8 @@ Require(desktopRecipe.Steps.All(step => !step.Arguments.Contains("--offline-arm3
 Require(LocalBuildRunner.CargoJobCount(32, 32L * 1024 * 1024 * 1024) == 15, "parallelism leaves memory for the OS");
 Require(LocalBuildRunner.CargoJobCount(4, 64L * 1024 * 1024 * 1024) == 4, "parallelism uses available CPUs");
 Require(LocalBuildRunner.CargoJobCount(32, 8L * 1024 * 1024 * 1024) == 3, "an 8 GiB Sandbox uses a memory-aware number of jobs");
+Require(LocalBuildRunner.CargoJobCount(32, 8L * 1024 * 1024 * 1024, 4) == 4, "a selected Cargo job limit overrides automatic memory sizing");
+Require(LocalBuildRunner.CargoJobCount(4, 64L * 1024 * 1024 * 1024, 16) == 4, "a selected Cargo job limit is capped at available processors");
 Require(LocalBuildRunner.CargoJobCount(32, 1) == 1, "parallelism remains positive when memory is scarce");
 var frameworkRecipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, UseResourceFramework: true));
 Require(frameworkRecipe.Steps.Any(step => step.Name == "Package reusable resources")
@@ -1580,22 +1582,22 @@ static async Task TestBuilderUpdateChecker()
           {"tag_name":"builder-v0.1.2-preview.1","draft":false,"prerelease":true},
           {"tag_name":"builder-v0.1.9","draft":true,"prerelease":false},
           {"tag_name":"client-v0.9.0","draft":false,"prerelease":false},
-          {"tag_name":"builder-v0.1.4","draft":false,"prerelease":false,"body":"Build speed settings and progress details."},
-          {"tag_name":"builder-v0.1.3","draft":false,"prerelease":false}
+          {"tag_name":"builder-v0.1.7","draft":false,"prerelease":false,"body":"Multi-architecture builds and Cargo caching."},
+          {"tag_name":"builder-v0.1.6","draft":false,"prerelease":false,"body":"Build speed settings and progress details."}
         ]
         """;
     using var handler = new BuilderUpdateFixtureHandler(response);
     using var client = new HttpClient(handler);
-    var update = await BuilderUpdateChecker.CheckAsync(client, "0.1.3");
+    var update = await BuilderUpdateChecker.CheckAsync(client, "0.1.6");
     Require(handler.RequestedEndpoint == BuilderUpdateChecker.ReleasesEndpoint, "builder checks the MCHorizonUWP GitHub release list");
-    Require(handler.UserAgent?.Contains("0.1.3", StringComparison.Ordinal) == true, "builder update requests identify the installed version");
-    Require(update is { Version: "0.1.4", Changelog: "Build speed settings and progress details." }
-        && update.ReleaseUri == new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/builder-v0.1.4"),
+    Require(handler.UserAgent?.Contains("0.1.6", StringComparison.Ordinal) == true, "builder update requests identify the installed version");
+    Require(update is { Version: "0.1.7", Changelog: "Multi-architecture builds and Cargo caching." }
+        && update.ReleaseUri == new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/builder-v0.1.7"),
         "builder update checker selects the newest stable builder release only");
 
     using var sameVersionHandler = new BuilderUpdateFixtureHandler(response);
     using var sameVersionClient = new HttpClient(sameVersionHandler);
-    Require(await BuilderUpdateChecker.CheckAsync(sameVersionClient, "0.1.4") is null,
+    Require(await BuilderUpdateChecker.CheckAsync(sameVersionClient, "0.1.7") is null,
         "builder update checker reports no update when the current version is latest");
 }
 

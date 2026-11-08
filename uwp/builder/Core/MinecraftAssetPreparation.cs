@@ -19,7 +19,7 @@ public static class MinecraftAssetPreparation
 
     public static async Task<string> PrepareAsync(PreparedRelease release, BuildSelection selection, bool ownershipVerified,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null, CancellationToken cancellationToken = default,
-        Func<long, long, Task<bool>>? confirmInsufficientSpace = null)
+        Func<long, long, Task<bool>>? confirmInsufficientSpace = null, Func<int>? requestedCargoJobs = null)
     {
         if (!ownershipVerified) throw new InvalidOperationException("Sign in with an account that owns Minecraft: Java Edition first.");
         LocalBuildRunner.ValidatePreparedRelease(release, selection);
@@ -36,11 +36,15 @@ public static class MinecraftAssetPreparation
         var rustLld = await LocalRecipe.FindRustLinkerAsync(probe);
         var compact = PrebuiltToolchain.Create(source, sdk, "x64", clang, rustLld, msvc, Path.Combine(workspace, "asset-toolchain"), probe);
         var environment = new Dictionary<string, string>(compact.Cargo, StringComparer.OrdinalIgnoreCase);
-        environment["CARGO_BUILD_JOBS"] = LocalBuildRunner.CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var requested = requestedCargoJobs?.Invoke() ?? 0;
+        var jobs = LocalBuildRunner.CurrentCargoJobCount(requested);
+        environment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        progress?.Report($"Starting Cargo compile for the Minecraft resource helper with {jobs} parallel jobs{(requested <= 0 ? " (automatic, memory-aware)" : " (selected limit)")}. The build-speed setting is now locked for this run.");
         progress?.Report("Building Horizon's Minecraft resource preparation helper.");
+        var cargoTarget = LocalBuildRunner.SharedCargoTargetDirectory;
         await LocalBuildRunner.RunProcess(cargo, tool, ["+" + LocalRecipe.RustToolchain, "build", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
-            "--manifest-path", Path.Combine(tool, "Cargo.toml"), "--target-dir", Path.Combine(tool, "target")], environment, progress: progress);
-        var executable = Path.Combine(tool, "target", "x86_64-pc-windows-msvc", "release", "horizon-uwp-assets.exe");
+            "--manifest-path", Path.Combine(tool, "Cargo.toml"), "--target-dir", cargoTarget], environment, progress: progress);
+        var executable = Path.Combine(cargoTarget, "x86_64-pc-windows-msvc", "release", "horizon-uwp-assets.exe");
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true,
             WorkingDirectory = workspace, RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(source);

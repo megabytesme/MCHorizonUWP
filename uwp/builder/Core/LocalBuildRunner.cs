@@ -12,11 +12,12 @@ public sealed record LocalBuildResult(string Workspace, string UnsignedPackage, 
 /// <summary>Runs only the pinned local recipe in a fresh, builder-owned workspace.</summary>
 public static class LocalBuildRunner
 {
-    public static int CargoJobCount(int processors, long memoryBytes)
+    public static int CargoJobCount(int processors, long memoryBytes, int requestedJobs = 0)
     {
         const long gib = 1024L * 1024 * 1024;
         var memoryJobs = Math.Max(1, (memoryBytes - Math.Min(memoryBytes, 2 * gib)) / (2 * gib));
-        return (int)Math.Min(Math.Max(1, processors), memoryJobs);
+        var automatic = (int)Math.Min(Math.Max(1, processors), memoryJobs);
+        return requestedJobs <= 0 ? automatic : Math.Min(Math.Max(1, processors), Math.Max(1, requestedJobs));
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -35,18 +36,20 @@ public static class LocalBuildRunner
         if (!GlobalMemoryStatusEx(ref status)) return GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
         return (long)Math.Min(Math.Min(status.TotalPhysical, status.AvailablePageFile), (ulong)long.MaxValue);
     }
-    internal static int CurrentCargoJobCount() => CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory());
+    internal static int CurrentCargoJobCount(int requestedJobs = 0) => CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory(), requestedJobs);
+    internal static string SharedCargoTargetDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MCHorizonUWP", "Cache", "CargoTarget");
 
     public static async Task<LocalBuildResult> RunAsync(string source, string? resources, BuildSelection selection,
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
-        => await RunCoreAsync(source, resources, selection, probe, progress, minecraftDirectory, null);
+        => await RunCoreAsync(source, resources, selection, probe, progress, minecraftDirectory, null, null);
 
     /// <summary>Build the exact split-source recipe and sign its output. Other catalog versions need their own recipe.</summary>
     public static async Task<LocalBuildResult> RunPreparedAsync(PreparedRelease release, string? resources, BuildSelection selection,
-        IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null)
+        IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null, Func<int>? requestedCargoJobs = null)
     {
         ValidatePreparedRelease(release, selection);
-        return await RunCoreAsync(release.SourceDirectory, resources, selection, probe, progress, minecraftDirectory, release);
+        return await RunCoreAsync(release.SourceDirectory, resources, selection, probe, progress, minecraftDirectory, release, requestedCargoJobs);
     }
 
     internal static void ValidatePreparedRelease(PreparedRelease release, BuildSelection selection)
@@ -61,8 +64,16 @@ public static class LocalBuildRunner
     }
 
     private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,
-        IProbe probe, IProgress<string>? progress, string? minecraftDirectory, PreparedRelease? release)
+        IProbe probe, IProgress<string>? progress, string? minecraftDirectory, PreparedRelease? release, Func<int>? requestedCargoJobs)
     {
+        int CaptureCargoJobs(string step)
+        {
+            var requested = requestedCargoJobs?.Invoke() ?? 0;
+            var jobs = CurrentCargoJobCount(requested);
+            progress?.Report($"Starting Cargo compile for {step} with {jobs} parallel jobs{(requested <= 0 ? " (automatic, memory-aware)" : " (selected limit)")}. The build-speed setting is now locked for this run.");
+            return jobs;
+        }
+
         var plan = LocalRecipe.Plan(selection);
         if (release is null) await LocalRecipe.ValidateSourceAsync(source, probe);
         else if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The prepared release source is missing.");
@@ -135,6 +146,8 @@ public static class LocalBuildRunner
         {
             if (release is null) throw new InvalidOperationException("Native registry mods require an authenticated source release.");
             var hostEnvironment = new Dictionary<string, string>(compact!.Cargo, StringComparer.OrdinalIgnoreCase);
+            hostEnvironment["CARGO_TARGET_DIR"] = SharedCargoTargetDirectory;
+            jobs = CaptureCargoJobs("the native-mod tool");
             hostEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
             snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, progress);
         }
@@ -166,6 +179,7 @@ public static class LocalBuildRunner
         progress?.Report(release is null ? "Preparing the Visual C++ environment." : "Preparing the compact Rust and Clang environment.");
         var vcEnvironment = compact is null ? await VisualCppEnvironment(cmd, selection.Target, probe, splitRelease: false, unifiedRoot: null)
             : new Dictionary<string, string>(compact.Cargo, StringComparer.OrdinalIgnoreCase);
+        if (release is not null) vcEnvironment["CARGO_TARGET_DIR"] = SharedCargoTargetDirectory;
         if (release is not null)
             vcEnvironment["HORIZON_UWP_RUST_LLD"] = await LocalRecipe.FindRustLinkerAsync(probe);
         // Never inherit an unrelated client ID from the parent environment.
@@ -178,9 +192,7 @@ public static class LocalBuildRunner
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
         vcEnvironment["__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS"] = "nightly";
         vcEnvironment["__CARGO_TESTS_ONLY_SRC_ROOT"] = Path.Combine(snapshot, ".local", "builder-rust-std", "library");
-        jobs = CurrentCargoJobCount();
-        vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        progress?.Report($"Using {jobs} parallel Cargo jobs based on available processors and memory.");
+        vcEnvironment["CARGO_BUILD_JOBS"] = CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (selection.Target == TargetProfile.SurfaceProX)
         {
             vcEnvironment["CC_aarch64_uwp_windows_msvc"] = ClangFinder.Find(probe) ?? throw new InvalidOperationException("Clang is missing.");
@@ -201,13 +213,17 @@ public static class LocalBuildRunner
         }
 
         var packageResources = existingFramework is not null ? null : selection.PrepareSounds
-            ? await PrepareSoundResourcesAsync(snapshot, resources!, minecraftDirectory!, probe, progress, toolchainRoot, compact?.Cargo)
+            ? await PrepareSoundResourcesAsync(snapshot, resources!, minecraftDirectory!, probe, progress, toolchainRoot, compact?.Cargo, requestedCargoJobs)
             : Path.GetFullPath(resources!);
 
         progress?.Report("Building the game bridge. This may take several minutes.");
         try
         {
-            await RunProcess(cargo, snapshot, plan.Steps.Single(step => step.Name == "Build game bridge").Arguments, vcEnvironment, progress: progress);
+            jobs = CaptureCargoJobs("the Horizon game bridge");
+            vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var bridgeArguments = plan.Steps.Single(step => step.Name == "Build game bridge").Arguments
+                .Select(argument => argument == ".local/builder-target" ? SharedCargoTargetDirectory : argument).ToArray();
+            await RunProcess(cargo, snapshot, bridgeArguments, vcEnvironment, progress: progress);
         }
         catch (InvalidOperationException error)
         {
@@ -222,6 +238,11 @@ public static class LocalBuildRunner
             TargetProfile.WindowsMobile => "arm",
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
         };
+        var cachedGameLibrary = Path.Combine(SharedCargoTargetDirectory, selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
+        if (!File.Exists(cachedGameLibrary)) throw new FileNotFoundException("Cargo did not produce the Horizon game bridge library.", cachedGameLibrary);
+        var workspaceGameLibrary = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
+        Directory.CreateDirectory(Path.GetDirectoryName(workspaceGameLibrary)!);
+        File.Copy(cachedGameLibrary, workspaceGameLibrary, overwrite: true);
         vcEnvironment["HORIZON_UWP_XAUDIO"] = "1";
         vcEnvironment["HORIZON_UWP_HTTP"] = "1";
         vcEnvironment["HORIZON_UWP_ACCOUNT"] = "1";
@@ -233,7 +254,7 @@ public static class LocalBuildRunner
         // The UWP client probes available renderers and chooses on the target device.
         vcEnvironment["HORIZON_UWP_DEFAULT_RENDERER"] = "";
         vcEnvironment["HORIZON_UWP_DEVICE_VIBRATION"] = selection.NativeDeviceVibration ? "1" : "";
-        vcEnvironment["HORIZON_UWP_GAME_LIB"] = Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib");
+        vcEnvironment["HORIZON_UWP_GAME_LIB"] = workspaceGameLibrary;
         var hostOutput = Path.Combine(root, "native-host", "game-" + arch);
         vcEnvironment["HORIZON_UWP_BUILD_DIR"] = hostOutput;
         var hostBuildEnvironment = new Dictionary<string, string>(vcEnvironment, StringComparer.OrdinalIgnoreCase);
@@ -255,7 +276,7 @@ public static class LocalBuildRunner
             progress?.Report("Linking the selected Horizon game bridge with Rust's bundled linker.");
             await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/strict-bridge-link.ps1",
                 "-Architecture", arch,
-                "-RustLibrary", Path.Combine(snapshot, ".local", "builder-target", selection.RustTarget, "release", "horizon_uwp_game_bridge.lib"),
+                "-RustLibrary", workspaceGameLibrary,
                 "-HostKit", Path.Combine(snapshot, "uwp", "host", "prebuilt", arch),
                 "-MsvcToolsetRoot", msvcToolset!,
                 "-SdkRoot", compactSdk!,
@@ -448,7 +469,8 @@ public static class LocalBuildRunner
 
     /// Prepares sounds only in a new resource tree under the selected build snapshot.
     internal static async Task<string> PrepareSoundResourcesAsync(string snapshot, string resources, string minecraftDirectory,
-        IProbe probe, IProgress<string>? progress = null, string? unifiedRoot = null, IReadOnlyDictionary<string, string>? compactEnvironment = null)
+        IProbe probe, IProgress<string>? progress = null, string? unifiedRoot = null, IReadOnlyDictionary<string, string>? compactEnvironment = null,
+        Func<int>? requestedCargoJobs = null)
     {
         LocalRecipe.ValidateResources(resources);
         LocalRecipe.ValidateSoundPreparation(resources, minecraftDirectory);
@@ -461,11 +483,17 @@ public static class LocalBuildRunner
         var hostEnvironment = compactEnvironment is null
             ? await VisualCppEnvironment(cmd, TargetProfile.DesktopX64, probe, splitRelease: false, unifiedRoot: unifiedRoot)
             : new Dictionary<string, string>(compactEnvironment, StringComparer.OrdinalIgnoreCase);
-        hostEnvironment["CARGO_BUILD_JOBS"] = CurrentCargoJobCount().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var requested = requestedCargoJobs?.Invoke() ?? 0;
+        var jobs = CurrentCargoJobCount(requested);
+        hostEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        hostEnvironment["CARGO_TARGET_DIR"] = SharedCargoTargetDirectory;
+        progress?.Report($"Starting Cargo compile for Horizon's resource preparer with {jobs} parallel jobs{(requested <= 0 ? " (automatic, memory-aware)" : " (selected limit)")}. The build-speed setting is now locked for this run.");
         var plan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, false, PrepareSounds: true));
         progress?.Report("Building Horizon's resource preparation tool.");
-        await RunProcess(cargo, root, plan.Steps.Single(step => step.Name == "Build resource preparer").Arguments, hostEnvironment, progress: progress);
-        var preparer = Path.Combine(root, ".local", "builder-prepare-target", "x86_64-pc-windows-msvc", "debug", "horizon-prepare.exe");
+        var prepareArguments = plan.Steps.Single(step => step.Name == "Build resource preparer").Arguments
+            .Select(argument => argument == ".local/builder-prepare-target" ? SharedCargoTargetDirectory : argument).ToArray();
+        await RunProcess(cargo, root, prepareArguments, hostEnvironment, progress: progress);
+        var preparer = Path.Combine(SharedCargoTargetDirectory, "x86_64-pc-windows-msvc", "debug", "horizon-prepare.exe");
         progress?.Report("Preparing verified sound assets from the selected Minecraft installation.");
         try
         {
