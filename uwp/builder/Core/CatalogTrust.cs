@@ -3,7 +3,7 @@ namespace Horizon.Builder.Core;
 /// <summary>The public key and fixed HTTPS location for the maintainer-signed release catalog.</summary>
 public static class CatalogTrust
 {
-    public const string BuilderVersion = "0.1.10";
+    public const string BuilderVersion = "1.0.0";
     public static readonly Uri CatalogUri = new("https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/main/catalog/catalog-v1.json");
     public static readonly Uri SignatureUri = new("https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/main/catalog/catalog-v1.sig");
 

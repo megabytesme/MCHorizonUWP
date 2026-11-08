@@ -5,10 +5,11 @@ The signed, versioned release catalog tracks three independent release types:
 includes a parser, compatibility checker, P-256 signature verifier, HTTPS
 transport and an embedded public verification key. The builder selects catalog
 releases and passes verified inputs to the build runner. Client 0.1.3 and patch
-0.1.1 are the current production releases; Builder 0.1.10 is compatible with
-that pair on x86, x64, ARM32 and ARM64. Client 0.1.2 remains listed so the
-Builder can identify it as incompatible; its prebuilt hosts omit the WinMD
-required to activate the UWP application.
+0.1.1 are the current production releases; Builder 1.0.0 is compatible with
+that pair on x86, x64, ARM32 and ARM64. Builder 0.1.6 through 0.1.10 remain
+available as beta releases. Client 0.1.2 remains listed so the Builder can
+identify it as incompatible; its prebuilt hosts omit the WinMD required to
+activate the UWP application.
 
 Schema 1 uses three-part numeric stable versions. A rule has inclusive lower
 and exclusive upper bounds for patch, client and builder versions, and an
@@ -19,8 +20,9 @@ both bridge numbers match and one rule matches all four dimensions.
 The current builder recipe requires client 0.1.3, which packages the WinMD
 activation metadata and prebuilt host files for all four architectures, and
 patch 0.1.1, which pins the matching Horizon nightly. The signed catalog
-permits Builder 0.1.10 to assemble that pair. The release notes distinguish
-compatibility from per-architecture build or device evidence.
+permits Builder 1.0.0 and the earlier Builder 0.1.10 beta to assemble that
+pair. The release notes distinguish compatibility from per-architecture build
+or device evidence.
 
 Artifacts have HTTPS URLs and SHA-256 digests. Catalog authenticity is a
 separate required check: a hash from an unauthenticated catalog does not

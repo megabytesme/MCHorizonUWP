@@ -115,7 +115,7 @@ def main():
     parser.add_argument("--patch-version", default="0.1.0", help="Patch release version (three numeric components)")
     parser.add_argument("--patch-path", help="Committed patch path under patches/ (defaults to the known path for this version)")
     parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
-    parser.add_argument("--builder-version", default="0.1.0", help="Builder version for the candidate compatibility rule")
+    parser.add_argument("--builder-version", default="1.0.0", help="Builder version for the candidate compatibility rule")
     parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared four-architecture host kit to include in the client archive")
     parser.add_argument("--catalog-input", type=Path, default=Path("catalog/catalog-v1.json"),

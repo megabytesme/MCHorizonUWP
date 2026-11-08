@@ -1,7 +1,5 @@
-Batch builds can now target x86, x64, ARM32 and ARM64. The finished page groups each architecture’s signed APPX, public certificate, optional resource framework, Microsoft framework dependencies and platform installation guide in its own output folder.
+The finished page now groups each architecture’s signed APPX, public certificate, optional resource framework and Microsoft framework dependencies in its own output folder. It also provides installation guidance for the target platform.
 
-Build speed can be adjusted through the first Rust compile, and compiled Cargo outputs are reused between builds. Minecraft asset progress now settles to Ready after verification. The bridge runtime shim is built with compact Clang for the selected architecture.
-
-The welcome page prepares dependencies only for selected architectures. The signed compatibility catalog is checked before building, and each resulting APPX includes its public certificate.
+The sign-in page keeps the Microsoft device code visible while waiting for approval. Build diagnostics now give clearer details when compact SDK setup or packaging fails.
 
 Extract the ZIP and run Horizon.Builder.App.exe. See README.md and THIRD_PARTY_NOTICES.md for project and dependency information.
