@@ -85,7 +85,14 @@
             <StackPanel x:Name="TargetPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Choose a target device" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="The architecture of this PC is selected by default. Choose the device that will run the package." TextWrapping="Wrap" />
-              <ComboBox x:Name="Profile" SelectedIndex="0" HorizontalAlignment="Stretch">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Select one or more architectures to build in this run." FontWeight="SemiBold" />
+                <CheckBox x:Name="ArchX64" Content="x64 — Intel and AMD PCs, Xbox One/Series" Checked="Architecture_Checked" Unchecked="Architecture_Unchecked" />
+                <CheckBox x:Name="ArchArm64" Content="ARM64 — Snapdragon, Microsoft SQ, HoloLens 2" Checked="Architecture_Checked" Unchecked="Architecture_Unchecked" />
+                <CheckBox x:Name="ArchArm32" Content="ARM32 — Windows 10 Mobile phones" Checked="Architecture_Checked" Unchecked="Architecture_Unchecked" />
+                <CheckBox x:Name="ArchX86" Content="x86 — 32-bit PCs, first-generation HoloLens" Checked="Architecture_Checked" Unchecked="Architecture_Unchecked" />
+              </StackPanel>
+              <ComboBox x:Name="Profile" SelectedIndex="0" Visibility="Collapsed" HorizontalAlignment="Stretch">
                 <ComboBoxItem Content="x64 — Intel and AMD" />
                 <ComboBoxItem Content="ARM64 — Snapdragon and Microsoft SQ" />
                 <ComboBoxItem Content="ARM32 — Windows 10 Mobile" />
@@ -163,6 +170,15 @@
                 <TextBlock x:Name="ReadinessStatus" Text="Checking your setup…" TextWrapping="Wrap" Style="{StaticResource BodyStrongTextBlockStyle}" />
               </StackPanel>
               <TextBlock x:Name="BuildSummary" TextWrapping="Wrap" />
+              <ComboBox x:Name="BuildSpeedReview" Header="Cargo build speed" SelectionChanged="BuildSpeed_SelectionChanged">
+                <ComboBoxItem Content="Automatic — balance memory and CPU" Tag="0" />
+                <ComboBoxItem Content="1 job — lowest memory use" Tag="1" />
+                <ComboBoxItem Content="2 jobs" Tag="2" />
+                <ComboBoxItem Content="4 jobs" Tag="4" />
+                <ComboBoxItem Content="8 jobs" Tag="8" />
+                <ComboBoxItem Content="16 jobs" Tag="16" />
+              </ComboBox>
+              <TextBlock Text="Cargo reuses compiled files from previous architectures and builds. You can change this limit until the first Rust compile begins." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
               <CheckBox x:Name="AutoBuild" Content="Start building automatically when ready" IsChecked="True" />
               <Expander Header="Check your setup" HorizontalAlignment="Stretch"><StackPanel x:Name="Results" Spacing="12" /></Expander>
               <Expander Header="Local build plan" HorizontalAlignment="Stretch"><StackPanel x:Name="RecipeSteps" Spacing="6" /></Expander>
@@ -171,6 +187,15 @@
             <StackPanel x:Name="BuildPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Build your package" Style="{StaticResource TitleTextBlockStyle}" />
               <TextBlock Text="The client package and any new resource framework are signed with your local certificate." TextWrapping="Wrap" />
+              <ComboBox x:Name="BuildSpeedBuild" Header="Cargo build speed" SelectionChanged="BuildSpeed_SelectionChanged">
+                <ComboBoxItem Content="Automatic — balance memory and CPU" Tag="0" />
+                <ComboBoxItem Content="1 job — lowest memory use" Tag="1" />
+                <ComboBoxItem Content="2 jobs" Tag="2" />
+                <ComboBoxItem Content="4 jobs" Tag="4" />
+                <ComboBoxItem Content="8 jobs" Tag="8" />
+                <ComboBoxItem Content="16 jobs" Tag="16" />
+              </ComboBox>
+              <TextBlock Text="This setting stays available until the first Rust compile begins. Compiled Cargo files are cached between architecture builds." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <ProgressRing x:Name="BuildProgressRing" Width="24" Height="24" IsActive="False" Visibility="Collapsed" />
                 <StackPanel Spacing="3" VerticalAlignment="Center">

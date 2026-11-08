@@ -41,17 +41,27 @@ public sealed partial class MainWindow : Window
             minecraftSignInCancellation?.Cancel();
             assetPrefetchCancellation?.Cancel();
         };
-        Profile.SelectionChanged += Profile_SelectionChanged;
         ReleaseSelection.SelectionChanged += (_, _) =>
         {
             UpdateBuildActions();
+            UpdateWizard();
             if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
             MaybeStartAssetPrefetch();
         };
         ResourceMode.SelectionChanged += ResourceMode_SelectionChanged;
+        ExistingFrameworkName.TextChanged += (_, _) => UpdateWizard();
+        PackageVersion.TextChanged += (_, _) => { UpdateBuildActions(); UpdateWizard(); };
         AutoBuild.Checked += (_, _) => _ = MaybeAutoStartAsync();
         AutoBuild.Unchecked += (_, _) => { if (wizardStep == ReviewStep && readinessReady) ReadinessStatus.Text = "Ready to build"; };
-        Profile.SelectedIndex = (int)BuildSelection.DefaultTarget(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture);
+        var defaultTarget = BuildSelection.DefaultTarget(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture);
+        Profile.SelectedIndex = (int)defaultTarget;
+        ArchX64.IsChecked = defaultTarget == TargetProfile.DesktopX64;
+        ArchArm64.IsChecked = defaultTarget == TargetProfile.SurfaceProX;
+        ArchArm32.IsChecked = defaultTarget == TargetProfile.WindowsMobile;
+        ArchX86.IsChecked = defaultTarget == TargetProfile.DesktopX86;
+        initializingArchitectures = false;
+        BuildSpeedReview.SelectedIndex = 0;
+        BuildSpeedBuild.SelectedIndex = 0;
         PackageVersion.Text = LocalRecipe.DefaultPackageVersion;
         UpdateSignInActions(busy: false);
         if (MinecraftSignIn.HasSavedSession)
@@ -168,15 +178,17 @@ public sealed partial class MainWindow : Window
     private bool readinessReady;
     private bool readinessRefreshRequested;
     private bool autoStartScheduled;
+    private bool initializingArchitectures = true;
+    private bool synchronizingBuildSpeed;
+    private bool cargoCompileStarted;
     private int lastRenderedStep = -1;
     private int highestVisited;
     private int completedPages;
     private readonly HashSet<string> readyDependencies = new(StringComparer.Ordinal);
     private string? activeDependency;
-    private string? dependencyArchitecture;
-    private string? requestedDependencyArchitecture;
+    private string[]? requestedDependencyArchitectures;
     private bool minecraftOwnershipVerified;
-    private SignedPackageOutput? builtOutput;
+    private readonly List<(TargetProfile Target, SignedPackageOutput Output)> builtOutputs = [];
     private readonly Dictionary<string, Task<PreparedRelease>> preparedReleaseTasks = new(StringComparer.Ordinal);
     private CancellationTokenSource? assetPrefetchCancellation;
     private Task? assetPrefetchTask;
@@ -186,6 +198,7 @@ public sealed partial class MainWindow : Window
     private ActivityLogWindow? activityLogWindow;
     private readonly Dictionary<string, BuildProgressRow> buildProgressRows = new(StringComparer.Ordinal);
     private BuildProgressRow? activeBuildProgressRow;
+    private string? activeBuildArchitecture;
     private sealed record BuildProgressRow(string Key, ProgressRing Ring, TextBlock CompleteMark,
         TextBlock State, TextBlock Detail, ProgressBar Progress);
     private sealed record ReleaseChoice(string Patch, string Client, string Architecture, CompatibilityResult Compatibility)
@@ -202,7 +215,7 @@ public sealed partial class MainWindow : Window
 
     private async void Next_Click(object sender, RoutedEventArgs e)
     {
-        if (navigationBusy) return;
+        if (navigationBusy || !CanAdvanceWizardStep(wizardStep)) return;
         if (wizardStep == 0 && !dependencyStarted)
         {
             navigationBusy = true;
@@ -213,19 +226,27 @@ public sealed partial class MainWindow : Window
                 DependencySummary.Text = "Checking what is already installed…";
                 DependencyRing.Visibility = Visibility.Visible;
                 DependencyRing.IsActive = true;
-                var architecture = SelectedArchitecture;
-                var missing = await Task.Run(() => DependencyProvisioner.MissingAsync(new SystemProbe(), architecture));
+                var architectures = SelectedArchitectures();
+                if (architectures.Count == 0) throw new InvalidOperationException("Select at least one target architecture.");
+                var missingByArchitecture = await Task.Run(async () =>
+                {
+                    var results = new List<(string Architecture, IReadOnlyList<string> Missing)>();
+                    foreach (var architecture in architectures)
+                        results.Add((architecture, await DependencyProvisioner.MissingAsync(new SystemProbe(), architecture)));
+                    return results;
+                });
+                var missing = missingByArchitecture.SelectMany(item => item.Missing.Select(name => $"{item.Architecture}: {name}"))
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 DependencyRing.IsActive = false;
                 DependencyRing.Visibility = Visibility.Collapsed;
-                var absentTools = missing.Count;
-                DependencyHeader.Text = $"Dependencies · {Math.Clamp(9 - absentTools, 0, 9)}/9 required tools found for {architecture}";
-                if (missing.Count > 0)
+                DependencyHeader.Text = $"Dependencies · {missing.Length} missing across {string.Join(", ", architectures)}";
+                if (missing.Length > 0)
                 {
                     var content = new StackPanel { Spacing = 12 };
-                    content.Children.Add(new TextBlock { Text = $"These components are missing for {architecture}:", TextWrapping = TextWrapping.Wrap });
+                    content.Children.Add(new TextBlock { Text = $"These components are missing for the selected targets ({string.Join(", ", architectures)}):", TextWrapping = TextWrapping.Wrap });
                     content.Children.Add(new TextBlock { Text = string.Join("\n", missing.Select(item => "• " + item)), TextWrapping = TextWrapping.Wrap });
                     content.Children.Add(new TextBlock { Text = "Microsoft C++ files are downloaded directly from Microsoft, hash-verified, and extracted into a private per-user cache. The Visual Studio IDE and machine-wide Build Tools installer are not used.", TextWrapping = TextWrapping.Wrap });
-                    content.Children.Add(new TextBlock { Text = "Only the selected architecture and shared host files are prepared. You can continue through setup while downloads run.", TextWrapping = TextWrapping.Wrap });
+                    content.Children.Add(new TextBlock { Text = "Only the selected architectures and shared host files are prepared. You can continue through setup while downloads run.", TextWrapping = TextWrapping.Wrap });
                     var links = new (string Label, string Url)[] {
                         ("Windows SDK", "https://aka.ms/WinSDKLicenseURL"),
                         ("Microsoft C++ components", "https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution"),
@@ -291,9 +312,9 @@ public sealed partial class MainWindow : Window
 
     private void BeginDependencySetup()
     {
-        requestedDependencyArchitecture = SelectedArchitecture;
+        requestedDependencyArchitectures = SelectedArchitectures().ToArray();
         if (dependencyRunning) return;
-        BuilderActivityLog.Record("Dependencies", $"Checking and preparing build tools for {requestedDependencyArchitecture}.");
+        BuilderActivityLog.Record("Dependencies", $"Checking and preparing build tools for {string.Join(", ", requestedDependencyArchitectures)}.");
         dependencyStarted = true;
         if (catalog is null && RefreshReleases.IsEnabled) _ = LoadCatalogAsync();
         dependencyReady = false;
@@ -318,17 +339,21 @@ public sealed partial class MainWindow : Window
         {
             while (true)
             {
-                var architecture = requestedDependencyArchitecture ?? SelectedArchitecture;
-                await Task.Run(() => DependencyProvisioner.PrepareAsync(progress, architecture));
-                dependencyArchitecture = architecture;
-                if (string.Equals(requestedDependencyArchitecture ?? SelectedArchitecture, architecture, StringComparison.Ordinal)) break;
-                BuilderActivityLog.Record("Dependencies", $"Architecture changed during setup; preparing {requestedDependencyArchitecture} next.");
+                var architectures = requestedDependencyArchitectures ?? SelectedArchitectures().ToArray();
+                foreach (var architecture in architectures)
+                {
+                    await Task.Run(() => DependencyProvisioner.PrepareAsync(progress, architecture));
+                }
+                var latest = requestedDependencyArchitectures ?? SelectedArchitectures().ToArray();
+                if (architectures.SequenceEqual(latest, StringComparer.Ordinal)) break;
+                BuilderActivityLog.Record("Dependencies", $"Architecture selection changed during setup; preparing {string.Join(", ", latest)} next.");
             }
             dependencyReady = true;
+            var readyFor = string.Join(", ", requestedDependencyArchitectures ?? SelectedArchitectures().ToArray());
             DependencySummary.Text = assetPrefetchRunning
-                ? $"Build tools are ready for {dependencyArchitecture}. Minecraft assets are still being prepared."
-                : $"Build tools are ready for {dependencyArchitecture}.";
-            BuilderActivityLog.Record("Dependencies", $"Build tools are ready for {dependencyArchitecture}.");
+                ? $"Build tools are ready for {readyFor}. Minecraft assets are still being prepared."
+                : $"Build tools are ready for {readyFor}.";
+            BuilderActivityLog.Record("Dependencies", $"Build tools are ready for {readyFor}.");
         }
         catch (Exception error)
         {
@@ -371,8 +396,8 @@ public sealed partial class MainWindow : Window
 
     private void UpdateDependencyHeader()
     {
-        var architecture = requestedDependencyArchitecture ?? dependencyArchitecture ?? SelectedArchitecture;
-        DependencyHeader.Text = $"Dependencies · {readyDependencies.Count}/{DependencyIds.Length} ready for {architecture}";
+        var architectures = requestedDependencyArchitectures ?? SelectedArchitectures().ToArray();
+        DependencyHeader.Text = $"Dependencies · {readyDependencies.Count}/{DependencyIds.Length} ready · {string.Join(", ", architectures)}";
         var active = dependencyRunning || assetPrefetchRunning;
         DependencyRing.IsActive = active;
         DependencyRing.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
@@ -402,9 +427,31 @@ public sealed partial class MainWindow : Window
         updatingPips = false;
         PageProgress.Value = completedPages;
         BackButton.IsEnabled = !navigationBusy && !buildActionRunning && wizardStep > 0;
-        NextButton.IsEnabled = !navigationBusy && wizardStep < ReviewStep;
+        NextButton.IsEnabled = !navigationBusy && wizardStep < ReviewStep && CanAdvanceWizardStep(wizardStep);
         if (wizardStep == ReviewStep && lastRenderedStep != ReviewStep) _ = RefreshReadinessAsync();
         lastRenderedStep = wizardStep;
+    }
+
+    private bool CanAdvanceWizardStep(int step)
+    {
+        if (step == 0) return true;
+        if (step == 1) return SelectedTargets().Count > 0;
+        if (step == 2) return minecraftOwnershipVerified;
+        if (step == 3) return ReleaseSelection.SelectedItem is ReleaseChoice;
+        if (step == 4)
+        {
+            if (ResourceMode.SelectedIndex != 1) return ResourceMode.SelectedIndex is 0 or 2;
+            try { return CurrentSelection(SelectedTargets().FirstOrDefault()).ValidatedExistingResourceFramework is not null; }
+            catch (ArgumentException) { return false; }
+        }
+        if (step == 5) return true;
+        if (step == 6)
+        {
+            try { _ = CurrentSelection(SelectedTargets().FirstOrDefault()).ValidatedPackageVersion; return true; }
+            catch (ArgumentException) { return false; }
+        }
+        if (step == ReviewStep) return readinessReady;
+        return false;
     }
 
     private void WizardBody_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -419,14 +466,37 @@ public sealed partial class MainWindow : Window
         SummaryCard.MaxHeight = wide ? double.PositiveInfinity : 260;
     }
 
-    private void Profile_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void Architecture_Checked(object sender, RoutedEventArgs e) => ArchitectureSelectionChanged(sender);
+    private void Architecture_Unchecked(object sender, RoutedEventArgs e) => ArchitectureSelectionChanged(sender);
+
+    private void ArchitectureSelectionChanged(object sender)
     {
+        if (initializingArchitectures) return;
+        var targets = SelectedTargets();
+        if (targets.Count == 0 && sender is CheckBox changed)
+        {
+            initializingArchitectures = true;
+            changed.IsChecked = true;
+            initializingArchitectures = false;
+            targets = SelectedTargets();
+        }
+        if (targets.Count == 0) return;
+        Profile.SelectedIndex = (int)targets[0];
         UpdateReleaseChoices();
-        if (!dependencyStarted || string.Equals(dependencyArchitecture, SelectedArchitecture, StringComparison.Ordinal)) return;
-        dependencyReady = false;
-        BeginDependencySetup();
+        UpdateBuildActions();
+        UpdateWizard();
+        if (dependencyStarted)
+        {
+            dependencyReady = false;
+            BeginDependencySetup();
+        }
+        if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
     }
-    private void ResourceMode_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateResourceChoices();
+    private void ResourceMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateResourceChoices();
+        UpdateWizard();
+    }
     private void UpdateResourceChoices()
     {
         if (ResourceMode is null || ExistingFrameworkName is null || ResourceModeDescription is null) return;
@@ -452,12 +522,30 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private BuildSelection CurrentSelection() => new((TargetProfile)Profile.SelectedIndex,
+    private BuildSelection CurrentSelection(TargetProfile? target = null) => new(target ?? (TargetProfile)Profile.SelectedIndex,
         NativeTouchMod.IsChecked == true, PackageVersion.Text, false,
         ResourceMode.SelectedIndex == 0, NativeDeviceVibration.IsChecked == true,
         HorizonIdentity.ClientId, ReuseResourceFramework: ResourceMode.SelectedIndex == 1,
         ExistingResourceFramework: ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "",
         RegistryNativeMods: selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal).ToArray());
+
+    private IReadOnlyList<TargetProfile> SelectedTargets()
+    {
+        var targets = new List<TargetProfile>(4);
+        if (ArchX64.IsChecked == true) targets.Add(TargetProfile.DesktopX64);
+        if (ArchArm64.IsChecked == true) targets.Add(TargetProfile.SurfaceProX);
+        if (ArchArm32.IsChecked == true) targets.Add(TargetProfile.WindowsMobile);
+        if (ArchX86.IsChecked == true) targets.Add(TargetProfile.DesktopX86);
+        return targets;
+    }
+
+    private IReadOnlyList<string> SelectedArchitectures() => SelectedTargets().Select(ArchitectureFor).ToArray();
+
+    private static string ArchitectureFor(TargetProfile target) => target switch
+    {
+        TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
+        TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "",
+    };
 
     private string SelectedArchitecture => (TargetProfile)Profile.SelectedIndex switch
     {
@@ -473,18 +561,24 @@ public sealed partial class MainWindow : Window
         if (catalog is not null)
         {
             var arch = SelectedArchitecture;
+            var architectures = SelectedArchitectures();
             foreach (var patch in catalog.Patches.OrderByDescending(item => new Version(item.Version)))
                 foreach (var client in catalog.Clients.OrderByDescending(item => new Version(item.Version)))
                 {
-                    var check = catalog.Check(patch.Version, client.Version, CatalogTrust.BuilderVersion, arch);
-                    if (check.Allowed) ReleaseSelection.Items.Add(new ReleaseChoice(patch.Version, client.Version, arch, check));
+                    var checks = architectures.Select(targetArch => catalog.Check(patch.Version, client.Version, CatalogTrust.BuilderVersion, targetArch)).ToArray();
+                    if (checks.Length > 0 && checks.All(check => check.Allowed))
+                    {
+                        var combined = new CompatibilityResult(true, checks.All(check => check.BuildVerified), checks.All(check => check.DeviceVerified),
+                            string.Join(" ", checks.Select(check => check.Reason).Distinct(StringComparer.Ordinal)));
+                        ReleaseSelection.Items.Add(new ReleaseChoice(patch.Version, client.Version, arch, combined));
+                    }
                 }
             ReleaseStatus.Text = ReleaseSelection.Items.Count == 0
-                ? "No catalog release is declared compatible with this target and builder."
-                : "The signed catalog was verified. Choose a compatible release.";
+                ? "No catalog release is declared compatible with every selected architecture and this builder."
+                : "The signed catalog was verified. Choose a release that supports every selected architecture.";
         }
         var matching = previous is null ? null : ReleaseSelection.Items.OfType<ReleaseChoice>()
-            .FirstOrDefault(item => item.Patch == previous.Patch && item.Client == previous.Client && item.Architecture == previous.Architecture);
+            .FirstOrDefault(item => item.Patch == previous.Patch && item.Client == previous.Client);
         ReleaseSelection.SelectedItem = matching ?? (ReleaseSelection.Items.Count > 0 ? ReleaseSelection.Items[0] : null);
         UpdateBuildActions();
     }
@@ -494,6 +588,41 @@ public sealed partial class MainWindow : Window
         if (ReleaseSelection is null || RunRecipe is null) return;
         var available = !buildActionRunning && ReleaseSelection.SelectedItem is ReleaseChoice;
         RunRecipe.IsEnabled = available && minecraftOwnershipVerified && dependencyReady && readinessReady && !readinessRunning;
+        if (NextButton is not null && WizardPips is not null)
+            NextButton.IsEnabled = !navigationBusy && wizardStep < ReviewStep && CanAdvanceWizardStep(wizardStep);
+    }
+
+    private int SelectedCargoJobLimit()
+    {
+        if (BuildSpeedReview.SelectedItem is not ComboBoxItem item || item.Tag is not string tag
+            || !int.TryParse(tag, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var jobs)) return 0;
+        return Math.Max(0, jobs);
+    }
+
+    private void BuildSpeed_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (synchronizingBuildSpeed || BuildSpeedReview is null || BuildSpeedBuild is null) return;
+        synchronizingBuildSpeed = true;
+        var selected = sender is ComboBox combo ? combo.SelectedIndex : 0;
+        BuildSpeedReview.SelectedIndex = selected;
+        BuildSpeedBuild.SelectedIndex = selected;
+        var enabled = !cargoCompileStarted;
+        BuildSpeedReview.IsEnabled = enabled;
+        BuildSpeedBuild.IsEnabled = enabled;
+        synchronizingBuildSpeed = false;
+    }
+
+    private int CaptureCargoJobRequest()
+    {
+        var requested = SelectedCargoJobLimit();
+        if (!cargoCompileStarted)
+        {
+            cargoCompileStarted = true;
+            BuildSpeedReview.IsEnabled = false;
+            BuildSpeedBuild.IsEnabled = false;
+            BuilderActivityLog.Record("Build", $"Cargo build speed locked at {(requested == 0 ? "automatic" : requested.ToString(System.Globalization.CultureInfo.InvariantCulture) + " jobs")} for the current multi-architecture run.");
+        }
+        return requested;
     }
 
     private async Task LoadCatalogAsync()
@@ -689,6 +818,7 @@ public sealed partial class MainWindow : Window
             var owns = await signIn.CompleteOwnershipCheckAsync(challenge, cancellation.Token, signInProgress);
             minecraftOwnershipVerified = owns;
             UpdateBuildActions();
+            UpdateWizard();
             MinecraftSignInStatus.Text = owns
                 ? "Minecraft: Java Edition ownership confirmed. Your resources can now be downloaded and prepared."
                 : "This account does not have Minecraft: Java Edition. Sign in with an account that owns it.";
@@ -701,6 +831,7 @@ public sealed partial class MainWindow : Window
             MinecraftSignInLink.Visibility = Visibility.Collapsed;
             UpdateSignInActions(busy: false);
             MaybeStartAssetPrefetch();
+            UpdateWizard();
             if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
         }
     }
@@ -730,6 +861,7 @@ public sealed partial class MainWindow : Window
             minecraftSignInCancellation = null;
             UpdateSignInActions(busy: false);
             UpdateBuildActions();
+            UpdateWizard();
             MaybeStartAssetPrefetch();
             if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
         }
@@ -747,6 +879,7 @@ public sealed partial class MainWindow : Window
         RetryAssetPrefetch.Visibility = Visibility.Collapsed;
         UpdateSignInActions(busy: false);
         UpdateBuildActions();
+        UpdateWizard();
         if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
     }
 
@@ -811,19 +944,34 @@ public sealed partial class MainWindow : Window
             string? resources = null;
             string? minecraft = null;
             var selection = CurrentSelection();
+            var targets = SelectedTargets();
+            if (targets.Count == 0) throw new InvalidOperationException("Select at least one target architecture.");
             var release = ReleaseSelection.SelectedItem as ReleaseChoice ?? throw new InvalidOperationException("Choose a compatible catalog release.");
-            var plan = LocalRecipe.Plan(selection);
             var download = ResourceMode.SelectedIndex != 1;
             if (!download) LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var probe = new SystemProbe();
             SystemProbe.RefreshProcessPath();
-            var checks = new SetupChecker(probe).Scan(selection.Target, splitRelease: true, unifiedToolchain: true, compactToolchain: true);
+            var checks = new List<SetupCheck>();
+            var blockers = new List<string>();
+            foreach (var target in targets)
+            {
+                var targetSelection = CurrentSelection(target);
+                var architecture = ArchitectureFor(target);
+                checks.AddRange(new SetupChecker(probe).Scan(target, splitRelease: true, unifiedToolchain: true, compactToolchain: true)
+                    .Select(check => check with { Name = $"{architecture}: {check.Name}" }));
+                blockers.AddRange(LocalRecipe.ToolchainBlockers(targetSelection, probe, await LocalRecipe.InspectRustAsync(probe),
+                    splitRelease: true, unifiedToolchain: true, compactToolchain: true).Select(blocker => $"{architecture}: {blocker}"));
+            }
             RenderSetupChecks(checks);
-            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
-                splitRelease: true, unifiedToolchain: true, compactToolchain: true);
             foreach (var blocker in blockers) RecipeSteps.Children.Add(new TextBlock { Text = blocker, TextWrapping = TextWrapping.Wrap });
             if (download) RecipeSteps.Children.Add(new TextBlock { Text = "Download and prepare Minecraft resources in the private build workspace.", TextWrapping = TextWrapping.Wrap });
-            foreach (var step in plan.Steps) RecipeSteps.Children.Add(new TextBlock { Text = step.Name == "Snapshot pinned source" ? "Download and verify the selected release source" : step.Name, TextWrapping = TextWrapping.Wrap });
+            foreach (var target in targets)
+            {
+                var architecture = ArchitectureFor(target);
+                RecipeSteps.Children.Add(new TextBlock { Text = $"Build and sign the {architecture} package.", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                foreach (var step in LocalRecipe.Plan(CurrentSelection(target)).Steps)
+                    RecipeSteps.Children.Add(new TextBlock { Text = step.Name == "Snapshot pinned source" ? $"{architecture}: download and verify the selected release source" : $"{architecture}: {step.Name}", TextWrapping = TextWrapping.Wrap });
+            }
             if (selection.RegistryNativeMods is { Count: > 0 } mods)
                 RecipeSteps.Children.Add(new TextBlock { Text = $"Selected native mods: {string.Join(", ", mods)}. Their compatibility is checked while building.", TextWrapping = TextWrapping.Wrap });
             RecipeSteps.Children.Add(new TextBlock { Text = "The client and any new resource framework will be signed with your local certificate. The public certificate and installation guide are included.", TextWrapping = TextWrapping.Wrap });
@@ -833,8 +981,8 @@ public sealed partial class MainWindow : Window
             if (NativeDeviceVibration.IsChecked == true) selectedMods.Add("Device vibration");
             selectedMods.AddRange(selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal));
             var modsSummary = selectedMods.Count == 0 ? "None" : string.Join(", ", selectedMods);
-            var targetLabel = (Profile.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? SelectedArchitecture;
-            BuildSummary.Text = $"Target: {targetLabel}\nHorizon patch: {release.Patch}  ·  UWP client: {release.Client}\nResources: {resourceChoice}\nNative mods: {modsSummary}\nPackage version: {selection.PackageVersion}";
+            var targetLabel = string.Join(", ", targets.Select(ArchitectureFor));
+            BuildSummary.Text = $"Targets: {targetLabel}\nHorizon patch: {release.Patch}  ·  UWP client: {release.Client}\nResources: {resourceChoice}\nNative mods: {modsSummary}\nPackage version: {selection.PackageVersion}";
             if (!minecraftOwnershipVerified) ReadinessStatus.Text = "Sign in to confirm Minecraft ownership before building.";
             else if (!dependencyReady || (download && !assetPrefetchSucceeded)) ReadinessStatus.Text = dependencyRunning || assetPrefetchRunning
                 ? "You are set — waiting for dependencies…" : "Dependency setup needs attention. Open Dependencies to see details or retry.";
@@ -869,8 +1017,8 @@ public sealed partial class MainWindow : Window
         autoStartScheduled = true;
         try
         {
-            ReadinessStatus.Text = "Ready to build — starting in 3 seconds…";
-            await Task.Delay(3000);
+            ReadinessStatus.Text = "Ready to build — starting now…";
+            await Task.Yield();
             if (wizardStep == ReviewStep && readinessReady && AutoBuild.IsChecked == true && !buildActionRunning)
                 await StartBuildAsync();
         }
@@ -882,14 +1030,14 @@ public sealed partial class MainWindow : Window
     private async Task StartBuildAsync()
     {
         if (!readinessReady || !dependencyReady || !minecraftOwnershipVerified || buildActionRunning) return;
-        builtOutput = null;
+        builtOutputs.Clear();
         InstallLocal.Visibility = Visibility.Collapsed;
         buildActionRunning = true;
         BeginBuildProgress();
         wizardStep = BuildStep;
         completedPages = Math.Max(completedPages, BuildStep);
         highestVisited = Math.Max(highestVisited, BuildStep);
-        string? preparedReleaseKey = null;
+        var preparedReleaseKeys = new HashSet<string>(StringComparer.Ordinal);
         UpdateWizard();
         UpdateBuildActions();
         try
@@ -897,52 +1045,75 @@ public sealed partial class MainWindow : Window
             if (!minecraftOwnershipVerified) throw new InvalidOperationException("Sign in with an account that owns Minecraft: Java Edition before building.");
             string? resources = null;
             string? minecraft = null;
-            var selection = CurrentSelection();
             var release = ReleaseSelection.SelectedItem as ReleaseChoice ?? throw new InvalidOperationException("Choose a compatible catalog release.");
-            preparedReleaseKey = ReleaseKey(release);
             var download = ResourceMode.SelectedIndex != 1;
-            if (!download) LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
+            var targets = SelectedTargets();
+            if (targets.Count == 0) throw new InvalidOperationException("Select at least one architecture.");
             var progress = new Progress<string>(message =>
             {
                 ReportBuildProgress(message);
             });
             SystemProbe.RefreshProcessPath();
             var probe = new SystemProbe();
-            var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
-                splitRelease: true, unifiedToolchain: true, compactToolchain: true);
-            if (blockers.Count > 0) throw new InvalidOperationException("Dependency setup is incomplete. " + string.Join(" ", blockers));
+            foreach (var target in targets)
+            {
+                var selection = CurrentSelection(target);
+                if (!download) LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
+                var blockers = LocalRecipe.ToolchainBlockers(selection, probe, await LocalRecipe.InspectRustAsync(probe),
+                    splitRelease: true, unifiedToolchain: true, compactToolchain: true);
+                if (blockers.Count > 0) throw new InvalidOperationException($"Dependency setup is incomplete for {ArchitectureFor(target)}. " + string.Join(" ", blockers));
+            }
             if (assetPrefetchTask is { IsCompleted: false } prefetchTask) await prefetchTask;
-            var prepared = await EnsurePreparedReleaseAsync(release, progress, CancellationToken.None);
-            if (download) resources = await MinecraftAssetPreparation.PrepareAsync(prepared, selection, minecraftOwnershipVerified,
-                probe, progress, minecraft, confirmInsufficientSpace: ConfirmAssetStorageAsync);
-            var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft);
-            var signed = result.SignedOutput ?? throw new InvalidOperationException("The build did not produce signed output.");
-            builtOutput = signed;
+            var warnings = new List<string>();
+            foreach (var target in targets)
+            {
+                activeBuildArchitecture = ArchitectureFor(target);
+                BuildProgressStatus.Text = $"Preparing {activeBuildArchitecture} package";
+                BuildProgressDetail.Text = $"Build {targets.ToList().IndexOf(target) + 1} of {targets.Count}";
+                var selection = CurrentSelection(target);
+                var compatibility = catalog?.Check(release.Patch, release.Client, CatalogTrust.BuilderVersion, activeBuildArchitecture)
+                    ?? throw new InvalidOperationException("The signed compatibility catalog is unavailable.");
+                if (!compatibility.Allowed) throw new InvalidOperationException($"The selected release is not compatible with {activeBuildArchitecture}.");
+                var targetRelease = release with { Architecture = activeBuildArchitecture, Compatibility = compatibility };
+                var preparedReleaseKey = ReleaseKey(targetRelease);
+                preparedReleaseKeys.Add(preparedReleaseKey);
+                var prepared = await EnsurePreparedReleaseAsync(targetRelease, progress, CancellationToken.None);
+                if (download && resources is null)
+                    resources = await MinecraftAssetPreparation.PrepareAsync(prepared, selection, minecraftOwnershipVerified,
+                        probe, progress, minecraft, confirmInsufficientSpace: ConfirmAssetStorageAsync,
+                        requestedCargoJobs: CaptureCargoJobRequest);
+                var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, selection, probe, progress, minecraft,
+                    requestedCargoJobs: CaptureCargoJobRequest);
+                var signed = result.SignedOutput ?? throw new InvalidOperationException($"The {activeBuildArchitecture} build did not produce signed output.");
+                builtOutputs.Add((target, signed));
+                preparedReleaseTasks.Remove(preparedReleaseKey);
+                preparedReleaseKeys.Remove(preparedReleaseKey);
+                if (result.SoundWarning is { } warning) warnings.Add($"{activeBuildArchitecture}: {warning}");
+            }
             completedPages = BuildStep;
             UpdateWizard();
-            if (LocalPackageInstaller.CanInstall(selection.Target, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture, Environment.OSVersion.Version))
-                InstallLocal.Visibility = Visibility.Visible;
-            RecipeStatus.Text = $"Signed client: {signed.Client}. Public certificate: {signed.Certificate}. Installation guide: {signed.InstallationGuide}.";
-            if (signed.Dependencies is { Count: > 0 })
-                RecipeStatus.Text += $" Microsoft framework dependencies: {Path.GetDirectoryName(signed.Dependencies[0])}.";
-            if (result.SignedOutput?.ResourceFramework is { } signedFramework)
-                RecipeStatus.Text += $" Signed resource framework: {signedFramework}. It contains private Minecraft resources.";
-            if (selection.ValidatedExistingResourceFramework is { } existing)
+            var hostArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture;
+            UpdateLocalInstallVisibility(hostArchitecture);
+            RecipeStatus.Text = FormatBuiltOutputs("Signed client packages:");
+            if (CurrentSelection(targets[0]).ValidatedExistingResourceFramework is { } existing)
                 RecipeStatus.Text += $" Requires existing resource framework {existing} on the target.";
-            if (result.SoundWarning is { } warning)
-                RecipeStatus.Text += " " + warning;
-            CompleteBuildProgress(succeeded: true, "The signed package and certificate are ready.");
+            if (warnings.Count > 0) RecipeStatus.Text += "\n" + string.Join("\n", warnings);
+            CompleteBuildProgress(succeeded: true, $"Signed {builtOutputs.Count} architecture package(s). The certificate and installation guides are ready.");
         }
         catch (Exception error)
         {
-            RecipeStatus.Text = $"Build failed: {error.Message}";
+            var hostArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture;
+            UpdateLocalInstallVisibility(hostArchitecture);
+            RecipeStatus.Text = $"Build failed{(activeBuildArchitecture is null ? "" : $" for {activeBuildArchitecture}")}: {error.Message}";
+            if (builtOutputs.Count > 0) RecipeStatus.Text += "\n\n" + FormatBuiltOutputs("Completed packages (available despite the later failure):");
             CompleteBuildProgress(succeeded: false, error.Message);
             BuilderActivityLog.Record("Build", "Build failed: " + error.Message);
         }
         finally
         {
             // RunPreparedAsync modifies its isolated source tree. Do not reuse it for a later build.
-            if (preparedReleaseKey is not null) preparedReleaseTasks.Remove(preparedReleaseKey);
+            foreach (var key in preparedReleaseKeys) preparedReleaseTasks.Remove(key);
+            activeBuildArchitecture = null;
             buildActionRunning = false;
             UpdateWizard();
             UpdateBuildActions();
@@ -951,6 +1122,9 @@ public sealed partial class MainWindow : Window
 
     private void BeginBuildProgress()
     {
+        cargoCompileStarted = false;
+        BuildSpeedReview.IsEnabled = true;
+        BuildSpeedBuild.IsEnabled = true;
         buildProgressRows.Clear();
         activeBuildProgressRow = null;
         BuildStepItems.Children.Clear();
@@ -963,7 +1137,9 @@ public sealed partial class MainWindow : Window
 
     private void ReportBuildProgress(string message)
     {
-        var (key, title) = ResolveBuildStep(message, activeBuildProgressRow?.Key);
+        var (stepKey, stepTitle) = ResolveBuildStep(message, activeBuildProgressRow?.Key);
+        var key = activeBuildArchitecture is null ? stepKey : $"{activeBuildArchitecture}|{stepKey}";
+        var title = activeBuildArchitecture is null ? stepTitle : $"{activeBuildArchitecture} · {stepTitle}";
         if (activeBuildProgressRow?.Key != key)
         {
             if (activeBuildProgressRow is not null) MarkBuildProgressRowComplete(activeBuildProgressRow);
@@ -993,7 +1169,9 @@ public sealed partial class MainWindow : Window
     private static (string Key, string Title) ResolveBuildStep(string message, string? activeKey)
     {
         if (message.StartsWith("Cargo: ", StringComparison.OrdinalIgnoreCase))
-            return (activeKey ?? "cargo", activeKey switch
+        {
+            var stepKey = activeKey?.Split('|').LastOrDefault();
+            return (stepKey ?? "cargo", stepKey switch
             {
                 "asset-helper" => "Build the resource helper",
                 "compile-client" => "Compile the Horizon client",
@@ -1001,6 +1179,7 @@ public sealed partial class MainWindow : Window
                 "native-mods" => "Build the native-mod tool",
                 _ => "Run Cargo build tools",
             });
+        }
         if (message.StartsWith("Minecraft 26.3 assets", StringComparison.OrdinalIgnoreCase)) return ("minecraft-assets", "Prepare Minecraft assets");
         if (message.Contains("Minecraft resource preparation helper", StringComparison.OrdinalIgnoreCase)) return ("asset-helper", "Build the resource helper");
         if (message.Contains("prefetched Minecraft resources", StringComparison.OrdinalIgnoreCase)) return ("prepare-resources", "Prepare Minecraft resources");
@@ -1016,7 +1195,8 @@ public sealed partial class MainWindow : Window
         if (message.Contains("Rust standard-library", StringComparison.OrdinalIgnoreCase) || message.Contains("ARM32 offline", StringComparison.OrdinalIgnoreCase)
             || message.Contains("compact Rust", StringComparison.OrdinalIgnoreCase) || message.Contains("Visual C++ environment", StringComparison.OrdinalIgnoreCase)
             || message.Contains("parallel Cargo jobs", StringComparison.OrdinalIgnoreCase)) return ("toolchain", "Prepare the compiler and Rust toolchain");
-        if (activeKey == "prepare-resources") return ("prepare-resources", "Prepare Minecraft resources");
+        if (activeKey?.EndsWith("|prepare-resources", StringComparison.Ordinal) == true)
+            return ("prepare-resources", "Prepare Minecraft resources");
         return ("step:" + message, message.Length <= 72 ? message : message[..69] + "…");
     }
 
@@ -1101,15 +1281,30 @@ public sealed partial class MainWindow : Window
 
     private async void InstallLocal_Click(object sender, RoutedEventArgs e)
     {
-        if (builtOutput is not { } output) return;
+        var hostArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture;
+        var installable = builtOutputs.Where(item => LocalPackageInstaller.CanInstall(item.Target, hostArchitecture, Environment.OSVersion.Version)).ToArray();
+        if (installable.Length == 0) return;
+        var choices = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, SelectedIndex = 0 };
+        foreach (var item in installable)
+            choices.Items.Add(new ComboBoxItem { Content = $"{ArchitectureFor(item.Target)} — {Path.GetFileName(item.Output.Client)}", Tag = item.Output });
+        var defaultIndex = Array.FindIndex(installable, item => item.Target == BuildSelection.DefaultTarget(hostArchitecture));
+        if (defaultIndex >= 0) choices.SelectedIndex = defaultIndex;
+        var installContent = new StackPanel { Spacing = 10 };
+        installContent.Children.Add(new TextBlock { Text = "Windows will trust your local signing certificate and install the client and its required frameworks for your account. Windows may ask for administrator approval.", TextWrapping = TextWrapping.Wrap });
+        if (installable.Length > 1)
+        {
+            installContent.Children.Add(new TextBlock { Text = "Choose the package architecture to install:", TextWrapping = TextWrapping.Wrap });
+            installContent.Children.Add(choices);
+        }
         var dialog = new ContentDialog
         {
             XamlRoot = ((FrameworkElement)Content).XamlRoot,
             Title = "Install Horizon on this PC?",
-            Content = "Windows will trust your local signing certificate for packages from this builder and install the client and its required frameworks for your account. Windows may ask for administrator approval.",
+            Content = installContent,
             PrimaryButtonText = "Install", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close,
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var output = choices.SelectedItem is ComboBoxItem { Tag: SignedPackageOutput selectedOutput } ? selectedOutput : installable[0].Output;
         InstallLocal.IsEnabled = false;
         try
         {
@@ -1118,6 +1313,17 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception error) { RecipeStatus.Text = $"Installation did not complete: {error.Message}"; }
         finally { InstallLocal.IsEnabled = true; }
+    }
+
+    private string FormatBuiltOutputs(string heading) => heading + "\n" + string.Join("\n\n", builtOutputs.Select(item =>
+        $"{ArchitectureFor(item.Target)}: {item.Output.Client}\nCertificate: {item.Output.Certificate}\nInstallation guide: {item.Output.InstallationGuide}"
+        + (item.Output.Dependencies is { Count: > 0 } dependencies ? $"\nMicrosoft framework dependencies: {Path.GetDirectoryName(dependencies[0])}" : "")
+        + (item.Output.ResourceFramework is { } framework ? $"\nSigned resource framework: {framework} (contains private Minecraft resources)" : "")));
+
+    private void UpdateLocalInstallVisibility(System.Runtime.InteropServices.Architecture hostArchitecture)
+    {
+        InstallLocal.Visibility = builtOutputs.Any(item => LocalPackageInstaller.CanInstall(item.Target, hostArchitecture, Environment.OSVersion.Version))
+            ? Visibility.Visible : Visibility.Collapsed;
     }
     private async void BrowseNativeMods_Click(object sender, RoutedEventArgs e)
     {
