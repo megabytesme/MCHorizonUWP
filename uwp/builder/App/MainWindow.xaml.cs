@@ -804,6 +804,8 @@ public sealed partial class MainWindow : Window
         UpdateBuildActions();
         UpdateSignInActions(busy: true);
         MinecraftSignInLink.Visibility = Visibility.Collapsed;
+        MinecraftSignInCodeCard.Visibility = Visibility.Collapsed;
+        MinecraftSignInCode.Text = string.Empty;
         MinecraftSignInStatus.Text = "Starting Microsoft sign-in…";
         using var signIn = new MinecraftSignIn();
         using var cancellation = new CancellationTokenSource();
@@ -812,9 +814,11 @@ public sealed partial class MainWindow : Window
         {
             var signInProgress = new Progress<string>(message => MinecraftSignInStatus.Text = message);
             var challenge = await signIn.BeginAsync(cancellation.Token, signInProgress);
+            MinecraftSignInCode.Text = challenge.UserCode;
+            MinecraftSignInCodeCard.Visibility = Visibility.Visible;
             MinecraftSignInLink.NavigateUri = challenge.VerificationUri;
             MinecraftSignInLink.Visibility = Visibility.Visible;
-            MinecraftSignInStatus.Text = $"Open the sign-in page and enter code {challenge.UserCode}.";
+            MinecraftSignInStatus.Text = "Waiting for Microsoft to approve sign-in in your browser…";
             var owns = await signIn.CompleteOwnershipCheckAsync(challenge, cancellation.Token, signInProgress);
             minecraftOwnershipVerified = owns;
             UpdateBuildActions();
@@ -828,6 +832,8 @@ public sealed partial class MainWindow : Window
         finally
         {
             minecraftSignInCancellation = null;
+            MinecraftSignInCodeCard.Visibility = Visibility.Collapsed;
+            MinecraftSignInCode.Text = string.Empty;
             MinecraftSignInLink.Visibility = Visibility.Collapsed;
             UpdateSignInActions(busy: false);
             MaybeStartAssetPrefetch();

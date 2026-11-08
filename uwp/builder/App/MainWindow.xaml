@@ -122,6 +122,12 @@
                 <Button x:Name="CancelMinecraftSignIn" Content="Cancel sign-in" Click="CancelMinecraftSignIn_Click" IsEnabled="False" Visibility="Collapsed" />
               </StackPanel>
               <TextBlock Text="A saved sign-in is encrypted for this Windows account on this PC. It stores a Microsoft refresh token, not your password." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+              <Border x:Name="MinecraftSignInCodeCard" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Visibility="Collapsed">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="Enter this code on the Microsoft sign-in page" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock x:Name="MinecraftSignInCode" FontSize="28" FontFamily="Consolas" FontWeight="Bold" IsTextSelectionEnabled="True" />
+                </StackPanel>
+              </Border>
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <ProgressRing x:Name="MinecraftSignInProgressRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
                 <TextBlock x:Name="MinecraftSignInStatus" TextWrapping="Wrap" VerticalAlignment="Center" />
