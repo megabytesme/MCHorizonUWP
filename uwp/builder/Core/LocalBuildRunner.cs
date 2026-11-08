@@ -57,7 +57,13 @@ public static class LocalBuildRunner
         IProbe probe, IProgress<string>? progress = null, string? minecraftDirectory = null, Func<int>? requestedCargoJobs = null)
     {
         ValidatePreparedRelease(release, selection);
-        return await RunCoreAsync(release.SourceDirectory, resources, selection, probe, progress, minecraftDirectory, release, requestedCargoJobs);
+        var workspaceBase = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
+        Directory.CreateDirectory(workspaceBase);
+        var root = Path.Combine(workspaceBase, "r" + Guid.NewGuid().ToString("N")[..15]);
+        var snapshot = Path.Combine(root, "source");
+        CopyPreparedSource(release.SourceDirectory, snapshot);
+        var isolatedRelease = release.WithSourceDirectory(snapshot);
+        return await RunCoreAsync(snapshot, resources, selection, probe, progress, minecraftDirectory, isolatedRelease, requestedCargoJobs);
     }
 
     internal static void ValidatePreparedRelease(PreparedRelease release, BuildSelection selection)
@@ -564,6 +570,32 @@ public static class LocalBuildRunner
                 var attributes = File.GetAttributes(entry);
                 if ((attributes & FileAttributes.ReparsePoint) != 0)
                     throw new InvalidDataException("Prepared resources contain a link.");
+                var target = Path.Combine(current.Output, Path.GetFileName(entry));
+                if ((attributes & FileAttributes.Directory) != 0) pending.Push((entry, target));
+                else File.Copy(entry, target, overwrite: false);
+            }
+        }
+    }
+
+    internal static void CopyPreparedSource(string source, string destination)
+    {
+        var input = Path.GetFullPath(source);
+        var output = Path.GetFullPath(destination);
+        if (!Directory.Exists(input)) throw new DirectoryNotFoundException("Prepared release source is missing.");
+        if (Directory.Exists(output) || File.Exists(output)) throw new IOException("The isolated build source already exists.");
+        if (ResourcesContainWorkspace(input, output)) throw new InvalidDataException("The isolated build source cannot be inside the prepared release source.");
+        var pending = new Stack<(string Input, string Output)>();
+        pending.Push((input, output));
+        while (pending.TryPop(out var current))
+        {
+            if ((File.GetAttributes(current.Input) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("Prepared release source contains a link.");
+            Directory.CreateDirectory(current.Output);
+            foreach (var entry in Directory.EnumerateFileSystemEntries(current.Input))
+            {
+                var attributes = File.GetAttributes(entry);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("Prepared release source contains a link.");
                 var target = Path.Combine(current.Output, Path.GetFileName(entry));
                 if ((attributes & FileAttributes.Directory) != 0) pending.Push((entry, target));
                 else File.Copy(entry, target, overwrite: false);

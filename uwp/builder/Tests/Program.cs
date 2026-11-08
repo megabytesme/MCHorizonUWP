@@ -1605,6 +1605,14 @@ static async Task TestReleaseSource()
         var prepared = await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", destination, git);
         Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
         Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
+        var armPrepared = prepared.ForArchitecture("arm", new CompatibilityResult(true, false, false, "Signed catalog permits ARM32"));
+        Require(armPrepared.SourceDirectory == prepared.SourceDirectory && armPrepared.Architecture == "arm"
+            && armPrepared.Compatibility.Allowed, "a prepared source is reusable with separately checked target compatibility");
+        var isolatedSource = Path.Combine(root, "isolated-source");
+        LocalBuildRunner.CopyPreparedSource(prepared.SourceDirectory, isolatedSource);
+        await File.WriteAllTextAsync(Path.Combine(isolatedSource, "main.txt"), "changed\n");
+        Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n",
+            "a target's private build source cannot mutate the shared prepared release");
         var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = LocalRecipe.PatchVersion, UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
             prepared.Client with { Version = LocalRecipe.ClientVersion }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.DesktopX64, true));

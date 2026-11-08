@@ -787,15 +787,23 @@ public sealed partial class MainWindow : Window
         var key = ReleaseKey(choice);
         if (preparedReleaseTasks.TryGetValue(key, out var existing))
         {
-            if (!existing.IsCanceled && !existing.IsFaulted) return existing;
+            if (!existing.IsCanceled && !existing.IsFaulted) return ForArchitectureAsync(existing, choice);
             preparedReleaseTasks.Remove(key);
         }
         var task = PrepareReleaseSourceAsync(choice, progress, cancellationToken);
         preparedReleaseTasks.Add(key, task);
-        return task;
+        return ForArchitectureAsync(task, choice);
     }
 
-    private static string ReleaseKey(ReleaseChoice choice) => $"{choice.Patch}|{choice.Client}|{choice.Architecture}";
+    private static async Task<PreparedRelease> ForArchitectureAsync(Task<PreparedRelease> task, ReleaseChoice choice)
+    {
+        var prepared = await task;
+        return prepared.Architecture == choice.Architecture && prepared.Compatibility == choice.Compatibility
+            ? prepared
+            : prepared.ForArchitecture(choice.Architecture, choice.Compatibility);
+    }
+
+    private static string ReleaseKey(ReleaseChoice choice) => $"{choice.Patch}|{choice.Client}";
 
     private async Task<PreparedRelease> PrepareReleaseSourceAsync(ReleaseChoice choice, IProgress<string>? progress, CancellationToken cancellationToken)
     {
@@ -1063,7 +1071,6 @@ public sealed partial class MainWindow : Window
         wizardStep = BuildStep;
         completedPages = Math.Max(completedPages, BuildStep);
         highestVisited = Math.Max(highestVisited, BuildStep);
-        var preparedReleaseKeys = new HashSet<string>(StringComparer.Ordinal);
         UpdateWizard();
         UpdateBuildActions();
         try
@@ -1095,6 +1102,7 @@ public sealed partial class MainWindow : Window
             }
             if (assetPrefetchTask is { IsCompleted: false } prefetchTask) await prefetchTask;
             var warnings = new List<string>();
+            PreparedRelease? sharedPreparedRelease = null;
             foreach (var target in targets)
             {
                 activeBuildArchitecture = ArchitectureFor(target);
@@ -1105,9 +1113,10 @@ public sealed partial class MainWindow : Window
                     ?? throw new InvalidOperationException("The signed compatibility catalog is unavailable.");
                 if (!compatibility.Allowed) throw new InvalidOperationException($"The selected release is not compatible with {activeBuildArchitecture}.");
                 var targetRelease = release with { Architecture = activeBuildArchitecture, Compatibility = compatibility };
-                var preparedReleaseKey = ReleaseKey(targetRelease);
-                preparedReleaseKeys.Add(preparedReleaseKey);
-                var prepared = await EnsurePreparedReleaseAsync(targetRelease, progress, CancellationToken.None);
+                var prepared = sharedPreparedRelease is null
+                    ? await EnsurePreparedReleaseAsync(targetRelease, progress, CancellationToken.None)
+                    : sharedPreparedRelease.ForArchitecture(activeBuildArchitecture, compatibility);
+                sharedPreparedRelease ??= prepared;
                 if (download && resources is null)
                     resources = await MinecraftAssetPreparation.PrepareAsync(prepared, selection, minecraftOwnershipVerified,
                         probe, progress, minecraft, confirmInsufficientSpace: ConfirmAssetStorageAsync,
@@ -1116,8 +1125,6 @@ public sealed partial class MainWindow : Window
                     requestedCargoJobs: CaptureCargoJobRequest);
                 var signed = result.SignedOutput ?? throw new InvalidOperationException($"The {activeBuildArchitecture} build did not produce signed output.");
                 builtOutputs.Add((target, signed));
-                preparedReleaseTasks.Remove(preparedReleaseKey);
-                preparedReleaseKeys.Remove(preparedReleaseKey);
                 if (result.SoundWarning is { } warning) warnings.Add($"{activeBuildArchitecture}: {warning}");
             }
             completedPages = FinishedStep;
@@ -1152,8 +1159,7 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            // RunPreparedAsync modifies its isolated source tree. Do not reuse it for a later build.
-            foreach (var key in preparedReleaseKeys) preparedReleaseTasks.Remove(key);
+            // Prepared release inputs are immutable; each target build receives its own isolated source copy.
             activeBuildArchitecture = null;
             buildActionRunning = false;
             UpdateWizard();

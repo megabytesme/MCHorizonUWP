@@ -13,6 +13,17 @@ public sealed class PreparedRelease
     public CompatibilityResult Compatibility { get; }
     public string BuilderVersion { get; }
     public string Architecture { get; }
+
+    public PreparedRelease ForArchitecture(string architecture, CompatibilityResult compatibility)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(architecture);
+        ArgumentNullException.ThrowIfNull(compatibility);
+        if (!compatibility.Allowed) throw new ArgumentException("An incompatible target cannot use a prepared release.", nameof(compatibility));
+        return new(SourceDirectory, Patch, Client, compatibility, BuilderVersion, architecture);
+    }
+
+    internal PreparedRelease WithSourceDirectory(string sourceDirectory) =>
+        new(sourceDirectory, Patch, Client, Compatibility, BuilderVersion, Architecture);
 }
 
 /// <summary>Authenticates, selects and assembles a release in a new workspace.</summary>
