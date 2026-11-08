@@ -197,6 +197,7 @@ public sealed partial class MainWindow : Window
     private bool assetPrefetchAttempted;
     private bool assetPrefetchSucceeded;
     private bool assetPrefetchRunning;
+    private string? assetPrefetchReadySummary;
     private int builtResourceMode = -1;
     private string? builtExistingResourceFrameworkName;
     private ActivityLogWindow? activityLogWindow;
@@ -669,7 +670,12 @@ public sealed partial class MainWindow : Window
             if (dependencyStarted) ShowDependencyProgress(new("minecraft-assets", "Waiting for sign-in", false, false));
             return;
         }
-        if (assetPrefetchSucceeded) return;
+        if (assetPrefetchSucceeded)
+        {
+            AssetPrefetchStatus.Text = assetPrefetchReadySummary ?? "Minecraft 26.3 files are ready in the verified private cache.";
+            if (dependencyStarted) ShowDependencyProgress(new("minecraft-assets", "Ready", false, true, 100));
+            return;
+        }
         if (assetPrefetchTask is { IsCompleted: false } || assetPrefetchAttempted) return;
         if (ReleaseSelection.SelectedItem is not ReleaseChoice choice)
         {
@@ -714,7 +720,8 @@ public sealed partial class MainWindow : Window
             var result = await MinecraftAssetPreparation.PrefetchAsync(prepared.SourceDirectory, minecraftOwnershipVerified,
                 null, progress, cancellationToken, ConfirmAssetStorageAsync);
             assetPrefetchSucceeded = true;
-            AssetPrefetchStatus.Text = $"Minecraft 26.3 files are ready. Reused {result.LocalFilesReused} local files and downloaded {result.NetworkFilesFetched} files ({result.BytesFetched / (1024d * 1024):0} MiB).";
+            assetPrefetchReadySummary = $"Minecraft 26.3 files are ready. Reused {result.LocalFilesReused} local files and downloaded {result.NetworkFilesFetched} files ({result.BytesFetched / (1024d * 1024):0} MiB).";
+            AssetPrefetchStatus.Text = assetPrefetchReadySummary;
             ShowDependencyProgress(new("minecraft-assets", "Ready", false, true, 100));
             BuilderActivityLog.Record("Minecraft assets", "Minecraft 26.3 assets prefetched and verified.");
         }
