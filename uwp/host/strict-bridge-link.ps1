@@ -24,7 +24,7 @@ $hostImport = Join-Path $hostKit 'HorizonUWPHost.lib'
 $targetMsvcRuntime = Join-Path $msvc "lib\$sdkArchitecture\store"
 $hostMsvcRuntime = Join-Path $msvc 'lib\x64'
 $bridgeExports = Join-Path $PSScriptRoot 'game-bridge-exports.def'
-$runtime = @('libcmt.lib', 'atexit.lib', 'tls_index.obj')
+$runtime = @('libcmt.lib', 'tls_index.obj')
 
 foreach ($path in @($rust, $linker, $hostImport, $bridgeExports, $sentinel,
         (Join-Path $msvc 'include\vcruntime.h'),
@@ -32,7 +32,7 @@ foreach ($path in @($rust, $linker, $hostImport, $bridgeExports, $sentinel,
         (Join-Path $targetMsvcRuntime 'msvcrt.lib'), (Join-Path $targetMsvcRuntime 'vcruntime.lib'),
         (Join-Path $sdk "Lib\10.0.19041.0\ucrt\$sdkArchitecture\ucrt.lib"),
         (Join-Path $sdk "Lib\10.0.19041.0\um\$sdkArchitecture\WindowsApp.lib"),
-        (Join-Path $sdk "Lib\10.0.19041.0\um\$sdkArchitecture\iphlpapi.lib"))) {
+    (Join-Path $sdk "Lib\10.0.19041.0\um\$sdkArchitecture\iphlpapi.lib"))) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required UWP link input is missing: $path" }
 }
 foreach ($name in $runtime) {
@@ -43,7 +43,8 @@ foreach ($name in $runtime) {
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 $arguments = @(
     '-flavor', 'link', '/NOLOGO', '/DLL', '/NOENTRY', '/APPCONTAINER', "/MACHINE:$machine", '/OPT:REF',
-    '/NODEFAULTLIB:kernel32.lib', '/NODEFAULTLIB:libucrt.lib', '/DEFAULTLIB:msvcrt', '/DEFAULTLIB:vcruntime', '/DEFAULTLIB:ucrt',
+    '/NODEFAULTLIB:kernel32.lib', '/NODEFAULTLIB:libucrt.lib',
+    '/DEFAULTLIB:msvcrt', '/DEFAULTLIB:vcruntime', '/DEFAULTLIB:ucrt',
     "/LIBPATH:$hostKit\link",
     "/LIBPATH:$targetMsvcRuntime",
     "/LIBPATH:$sdk\Lib\10.0.19041.0\ucrt\$sdkArchitecture",
@@ -51,7 +52,7 @@ $arguments = @(
     "/OUT:$outputPath", "/IMPLIB:$outputPath.lib", "/MAP:$outputPath.map", "/DEF:$bridgeExports",
     $rust, $hostImport, $sentinel,
     'WindowsApp.lib', 'ntdll.lib', 'd3d11.lib', 'd3d12.lib', 'dxgi.lib', 'xaudio2.lib', 'iphlpapi.lib',
-    (Join-Path $hostKit 'link\atexit.lib'), (Join-Path $hostKit 'link\tls_index.obj')
+    (Join-Path $hostKit 'link\tls_index.obj')
 )
 & $linker @arguments
 if ($LASTEXITCODE -ne 0) { throw "Rust LLD failed to link the prebuilt host bridge (exit code $LASTEXITCODE)." }
@@ -73,4 +74,8 @@ try {
     $expected = @{ X86 = 0x014c; X64 = 0x8664; ARM = 0x01c4; ARM64 = 0xaa64 }[$machine]
     if ($actual -ne $expected) { throw "The game bridge architecture is incorrect for $Architecture." }
 } finally { $reader.Dispose() }
+if (Select-String -LiteralPath "$outputPath.map" -Pattern 'atexit:api-ms-win-crt-runtime-l1-1-0\.dll' -Quiet) {
+    Remove-Item -LiteralPath $outputPath -Force
+    throw 'The linked game bridge imports the unavailable UCRT atexit entry point.'
+}
 Write-Host "Strict UWP bridge link succeeded for $Architecture."

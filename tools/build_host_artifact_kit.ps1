@@ -83,8 +83,6 @@ try {
             'if errorlevel 1 exit /b %ERRORLEVEL%',
             "cl.exe /nologo /c /Zl /GS- /Fo`"$runtimeDirectory\tls_index.obj`" `"$sourceRoot\uwp\host\tls-index.c`"",
             'if errorlevel 1 exit /b %ERRORLEVEL%',
-            "lib.exe /nologo /def:`"$sourceRoot\uwp\host\atexit.def`" /machine:$($target.Machine) /out:`"$runtimeDirectory\atexit.lib`"",
-            'if errorlevel 1 exit /b %ERRORLEVEL%',
             "lib.exe /nologo /def:`"$emptyCrt`" /machine:$($target.Machine) /out:`"$runtimeDirectory\libcmt.lib`"",
             'if errorlevel 1 exit /b %ERRORLEVEL%',
             'exit /b 0'
@@ -101,7 +99,7 @@ try {
             if (Test-Path -LiteralPath $stderr) { Get-Content -LiteralPath $stderr -Tail 40 | Write-Output }
             throw "The $name prebuilt UWP host build failed (exit code $buildExitCode)."
         }
-        foreach ($file in @('HorizonUWP.exe', 'HorizonUWPHost.lib', 'dead-import-sentinels.obj')) {
+        foreach ($file in @('HorizonUWP.exe', 'HorizonUWP.winmd', 'HorizonUWPHost.lib', 'dead-import-sentinels.obj')) {
             Copy-Required (Join-Path $buildRoot $file) (Join-Path $architectureRoot $file)
         }
         Write-Host "Generated the $name prebuilt host and runtime link kit."

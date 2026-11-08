@@ -3013,10 +3013,13 @@ void refresh() {
     } else content->Content = scroll;
 }
 
-ref class ShellApp sealed : Application, Windows::UI::Xaml::Markup::IXamlMetadataProvider {
+}
+
+namespace HorizonUWP {
+public ref class App sealed : Application, Windows::UI::Xaml::Markup::IXamlMetadataProvider {
     Microsoft::UI::Xaml::XamlTypeInfo::XamlControlsXamlMetaDataProvider^ metadata_;
 public:
-    ShellApp() {
+    App() {
         // WinUI activation is deferred until OnLaunched, after the UWP XAML
         // application runtime has initialized.
         metadata_ = nullptr;
@@ -3029,8 +3032,8 @@ public:
     virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Windows::UI::Xaml::Interop::TypeName type) {
         return metadata_ ? metadata_->GetXamlType(type) : nullptr;
     }
-    virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Platform::String^ name) {
-        return metadata_ ? metadata_->GetXamlType(name) : nullptr;
+    virtual Windows::UI::Xaml::Markup::IXamlType^ GetXamlType(Platform::String^ fullName) {
+        return metadata_ ? metadata_->GetXamlType(fullName) : nullptr;
     }
     virtual Platform::Array<Windows::UI::Xaml::Markup::XmlnsDefinition>^ GetXmlnsDefinitions() {
         return metadata_ ? metadata_->GetXmlnsDefinitions() : ref new Platform::Array<Windows::UI::Xaml::Markup::XmlnsDefinition>(0);
@@ -3907,6 +3910,6 @@ extern "C" void __cdecl horizon_uwp_page_tick() {}
 extern "C" void __cdecl horizon_uwp_page_event(const void*) {}
 extern "C" void __cdecl horizon_uwp_page_shutdown() {}
 extern "C" int __cdecl horizon_uwp_xaml_start() {
-    Application::Start(ref new ApplicationInitializationCallback([](ApplicationInitializationCallbackParams^) { ref new ShellApp(); }));
+    Application::Start(ref new ApplicationInitializationCallback([](ApplicationInitializationCallbackParams^) { ref new HorizonUWP::App(); }));
     return 0;
 }

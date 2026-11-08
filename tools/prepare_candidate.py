@@ -85,9 +85,10 @@ def client_archive(revision, host_artifacts=None):
             for architecture in ("arm", "arm64", "x86", "x64"):
                 expected.extend([
                     f"{architecture}/HorizonUWP.exe",
+                    f"{architecture}/HorizonUWP.winmd",
                     f"{architecture}/HorizonUWPHost.lib",
                     f"{architecture}/dead-import-sentinels.obj",
-                    *(f"{architecture}/link/{name}" for name in ("libcmt.lib", "atexit.lib", "tls_index.obj")),
+                    *(f"{architecture}/link/{name}" for name in ("libcmt.lib", "tls_index.obj")),
                 ])
             for relative in expected:
                 if not (root / relative).is_file():
@@ -140,8 +141,8 @@ def main():
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Invalid Git commit")
     patch = git("show", f"{revision}:{patch_path}")
-    if args.client_version == "0.1.2" and args.host_artifacts is None:
-        raise ValueError("Client 0.1.2 requires --host-artifacts for the four prebuilt host kits")
+    if args.client_version in ("0.1.2", "0.1.3") and args.host_artifacts is None:
+        raise ValueError(f"Client {args.client_version} requires --host-artifacts for the four prebuilt host kits")
     client = client_archive(revision, args.host_artifacts)
     verify_upstream(args.upstream_archive, args.upstream_repo)
     upstream_hash = digest(args.upstream_archive.read_bytes())

@@ -37,6 +37,14 @@ public static class LocalBuildRunner
         return (long)Math.Min(Math.Min(status.TotalPhysical, status.AvailablePageFile), (ulong)long.MaxValue);
     }
     internal static int CurrentCargoJobCount(int requestedJobs = 0) => CargoJobCount(Environment.ProcessorCount, AvailableBuildMemory(), requestedJobs);
+    internal static string SignedOutputDirectoryName(string architecture) => architecture switch
+    {
+        "x64" => "x64",
+        "x86" => "x86",
+        "arm64" => "arm64",
+        "arm" => "arm32",
+        _ => throw new ArgumentOutOfRangeException(nameof(architecture), architecture, "Unsupported UWP package architecture."),
+    };
     internal static string SharedCargoTargetDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "MCHorizonUWP", "Cache", "CargoTarget");
 
@@ -129,6 +137,7 @@ public static class LocalBuildRunner
         {
             var clang = ClangFinder.Find(probe) ?? throw new InvalidOperationException("The compact LLVM C compiler is missing. Check setup again.");
             var rustLld = await LocalRecipe.FindRustLinkerAsync(probe);
+            progress?.Report($"Preparing the {targetArchitecture} UWP C runtime shim with compact Clang.");
             compact = PrebuiltToolchain.Create(snapshot, compactSdk!, targetArchitecture, clang, rustLld, msvcToolset!,
                 Path.Combine(root, "prebuilt-linker"), probe);
         }
@@ -336,7 +345,10 @@ public static class LocalBuildRunner
         if (identity is not null)
         {
             progress?.Report("Signing the package and exporting its public certificate.");
-            signed = await PackageOutput.CreateAsync(package, framework?.Package, identity, signTool, Path.Combine(root, "signed-output"), dependencies);
+            var signedOutputRoot = Path.Combine(root, "signed-output");
+            Directory.CreateDirectory(signedOutputRoot);
+            signed = await PackageOutput.CreateAsync(package, framework?.Package, identity, signTool,
+                Path.Combine(signedOutputRoot, SignedOutputDirectoryName(arch)), dependencies);
         }
         return new(root, package, packageResources is null ? null : LocalRecipe.SoundWarning(packageResources), framework?.Package, signed);
     }
@@ -345,7 +357,7 @@ public static class LocalBuildRunner
     {
         var hostRoot = Path.Combine(Path.GetFullPath(source), "uwp", "host", "prebuilt", architecture);
         var executable = Path.Combine(hostRoot, "HorizonUWP.exe");
-        foreach (var path in new[] { executable, Path.Combine(hostRoot, "HorizonUWPHost.lib"),
+        foreach (var path in new[] { executable, Path.Combine(hostRoot, "HorizonUWP.winmd"), Path.Combine(hostRoot, "HorizonUWPHost.lib"),
                      Path.Combine(hostRoot, "dead-import-sentinels.obj") })
             if (!File.Exists(path)) throw new FileNotFoundException($"The authenticated client release is missing its prebuilt {architecture} host kit.", path);
         var expected = architecture switch { "x86" => (ushort)0x014c, "x64" => (ushort)0x8664,

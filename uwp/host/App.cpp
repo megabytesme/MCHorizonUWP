@@ -802,10 +802,14 @@ private:
     bool visible_;
 };
 
-ref class AppViewSource sealed : IFrameworkViewSource {
+#ifndef HORIZON_UWP_XAML_SHELL
+namespace HorizonUWP {
+public ref class App sealed : IFrameworkViewSource {
 public:
     virtual IFrameworkView^ CreateView() { return ref new AppView(); }
 };
+}
+#endif
 
 #ifdef HORIZON_UWP_XAML_SHELL
 static void prepare_next_game_session() {
@@ -1124,7 +1128,7 @@ int main(Platform::Array<Platform::String^>^) {
 #ifdef HORIZON_UWP_XAML_SHELL
     horizon_uwp_xaml_start();
 #else
-    CoreApplication::Run(ref new AppViewSource());
+    CoreApplication::Run(ref new HorizonUWP::App());
 #endif
 #ifdef HORIZON_UWP_GAME_BRIDGE
     } catch (Platform::Exception^ error) {

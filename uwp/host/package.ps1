@@ -46,6 +46,10 @@ if (-not $Executable) {
 }
 if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { throw "Missing executable: $Executable" }
 Assert-PEArchitecture $Executable $Architecture
+$metadata = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($Executable))) 'HorizonUWP.winmd'
+if (-not (Test-Path -LiteralPath $metadata -PathType Leaf)) {
+    throw "Missing HorizonUWP.winmd activation metadata next to the UWP host: $metadata"
+}
 $stage = Join-Path $build 'package'
 $repositoryRoot = Split-Path -Parent (Split-Path -Parent $hostDir)
 if (-not $AngleBin) {
@@ -86,6 +90,7 @@ if ($AngleBin) {
 }
 New-Item -ItemType Directory -Force -Path $stage,(Join-Path $stage 'Assets') | Out-Null
 Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage 'HorizonUWP.exe') -Force
+Copy-Item -LiteralPath $metadata -Destination (Join-Path $stage 'HorizonUWP.winmd') -Force
 if ($GameBridge) {
     Assert-PEArchitecture $GameBridge $Architecture
     Copy-Item -LiteralPath $GameBridge -Destination (Join-Path $stage 'horizon_uwp_game_bridge.dll') -Force

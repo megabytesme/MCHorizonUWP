@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 
 namespace Horizon.Builder.Core;
@@ -5,6 +6,24 @@ namespace Horizon.Builder.Core;
 /// <summary>Builds Rust and C dependencies with Rust's linker and a client-release host kit.</summary>
 internal static class PrebuiltToolchain
 {
+    internal static string ClangTargetTriple(string architecture) => architecture switch
+    {
+        "x86" => "i686-uwp-windows-msvc",
+        "x64" => "x86_64-uwp-windows-msvc",
+        "arm" => "thumbv7a-uwp-windows-msvc",
+        "arm64" => "aarch64-uwp-windows-msvc",
+        _ => throw new ArgumentException("Unsupported target architecture.", nameof(architecture)),
+    };
+
+    internal static ushort CoffMachine(string architecture) => architecture switch
+    {
+        "x86" => 0x014c,
+        "x64" => 0x8664,
+        "arm" => 0x01c4,
+        "arm64" => 0xaa64,
+        _ => throw new ArgumentException("Unsupported target architecture.", nameof(architecture)),
+    };
+
     internal static CompactEnvironment Create(string source, string sdkRoot, string architecture, string clang,
         string rustLld, string msvcToolsetRoot, string wrapperDirectory, IProbe probe)
     {
@@ -27,9 +46,10 @@ internal static class PrebuiltToolchain
 
         string Sdk(string area, string architectureName) => Path.Combine(sdk, area, PrivateWindowsSdk.Version, architectureName);
         var targetRuntime = Path.Combine(hostKit, "link");
-        foreach (var name in new[] { "libcmt.lib", "atexit.lib", "tls_index.obj" })
+        foreach (var name in new[] { "libcmt.lib", "tls_index.obj" })
             if (!File.Exists(Path.Combine(targetRuntime, name)))
                 throw new FileNotFoundException("The verified client release is missing a bridge-link input.", Path.Combine(targetRuntime, name));
+        CompileUwpTlsIndexShim(compiler, root, architecture, targetRuntime, wrapperDirectory);
         var targetMsvcRuntime = Path.Combine(msvc, "lib", architecture, "store");
         foreach (var name in new[] { "msvcrt.lib", "vcruntime.lib", "oldnames.lib" })
             if (!File.Exists(Path.Combine(targetMsvcRuntime, name)))
@@ -94,6 +114,56 @@ internal static class PrebuiltToolchain
         environment["HORIZON_UWP_MSVC_TOOLSET"] = msvc;
         environment["HORIZON_UWP_PREBUILT"] = "1";
         return new(environment, environment);
+    }
+
+    private static void CompileUwpTlsIndexShim(string clang, string sourceRoot, string architecture,
+        string targetRuntime, string wrapperDirectory)
+    {
+        var source = Path.Combine(sourceRoot, "uwp", "host", "tls-index.c");
+        if (!File.Exists(source))
+            throw new FileNotFoundException("The selected client release is missing the UWP C runtime shim source.", source);
+
+        Directory.CreateDirectory(wrapperDirectory);
+        var temporaryObject = Path.Combine(wrapperDirectory, $"tls-index-{architecture}-{Guid.NewGuid():N}.obj");
+        try
+        {
+            var start = new ProcessStartInfo(clang)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            foreach (var argument in new[] { $"--target={ClangTargetTriple(architecture)}", "-c", "-fno-stack-protector",
+                         "-nostdinc", "-o", temporaryObject, source })
+                start.ArgumentList.Add(argument);
+            using var process = Process.Start(start)
+                ?? throw new InvalidOperationException("Could not start compact Clang to prepare the UWP C runtime shim.");
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            process.WaitForExit();
+            Task.WhenAll(stdout, stderr).GetAwaiter().GetResult();
+            if (process.ExitCode != 0 || !File.Exists(temporaryObject))
+            {
+                var details = string.Join(Environment.NewLine, new[] { stdout.Result.Trim(), stderr.Result.Trim() }
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(details)
+                    ? $"Clang could not prepare the {architecture} UWP C runtime shim (exit code {process.ExitCode})."
+                    : $"Clang could not prepare the {architecture} UWP C runtime shim: {details}");
+            }
+
+            using (var stream = File.OpenRead(temporaryObject))
+            using (var reader = new BinaryReader(stream))
+            {
+                if (stream.Length < sizeof(ushort) || reader.ReadUInt16() != CoffMachine(architecture))
+                    throw new InvalidDataException($"Clang produced a C runtime shim with the wrong COFF architecture for {architecture}.");
+            }
+            File.Copy(temporaryObject, Path.Combine(targetRuntime, "tls_index.obj"), overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryObject)) File.Delete(temporaryObject);
+        }
     }
 
     private static string TargetKey(string architecture) => architecture switch

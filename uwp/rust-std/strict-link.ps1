@@ -28,8 +28,9 @@ if (-not $env:HORIZON_UWP_SENTINEL_OBJECT) {
     throw 'The precompiled UWP link sentinel object is missing.'
 }
 
+$metadataPath = Join-Path $outputDir 'HorizonUWP.winmd'
 $linkArgs = @('/nologo', '/APPCONTAINER', '/SUBSYSTEM:WINDOWS', "/MACHINE:$Machine", '/OPT:REF',
-    '/NODEFAULTLIB:kernel32.lib', "/MAP:$mapPath", "/OUT:$outputPath") +
+    '/NODEFAULTLIB:kernel32.lib', "/MAP:$mapPath", "/OUT:$outputPath", '/WINMD', "/WINMDFILE:$metadataPath") +
     $Objects + @($stubObj, 'WindowsApp.lib', 'ntdll.lib') + $ExtraLibraries + @($RustLibrary)
 # Rust's MSVC-target standard library can emit compiler-rt half-float helpers.
 # The Rust static library intentionally leaves these intrinsic symbols for the

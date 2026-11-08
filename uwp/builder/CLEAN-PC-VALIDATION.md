@@ -1,12 +1,15 @@
 # Fresh-PC builder validation (2026-11-06)
 
-The complete clean-PC acceptance test has **not passed**. A fresh Sandbox
-resolved dependencies for all four target architectures in about 5 minutes 46
-seconds. After Minecraft ownership was confirmed, the builder prepared and
-verified the full 26.3 asset cache. Its automatic build stopped at the recipe
-guard because the only published client release is too old for the prebuilt-host
-recipe. A complete source-to-signed-APPX build and device compatibility remain
-unverified. The earlier Visual Studio Build Tools setup took about 35 minutes.
+The latest-source clean-PC acceptance test is **not yet complete**. A fresh
+Sandbox resolved dependencies for all four architectures in about 5 minutes 46
+seconds. The first build attempt stopped at the recipe guard because the
+required client release had not yet been published. After client 0.1.2 became
+available, the Sandbox produced signed packages for x64, x86, ARM32 and ARM64
+in separate target builds. A corrected x64 test package now activates in
+Windows. The new Finished page, per-architecture output presentation and a
+single four-architecture run of this exact source revision still need an
+end-to-end UI pass; real target-device compatibility is unverified. The earlier
+Visual Studio Build Tools setup took about 35 minutes.
 
 An earlier 2026-11-06 blank Sandbox was started with 8,588,824,576 bytes of
 guest memory. Its fresh Windows 11
@@ -343,5 +346,37 @@ been addressed for the preview; it did not build a package.
   configured for the x64 host target, the same incremental helper build
   completed in 19 seconds. The builder now supplies those settings and passes
   the compact runtime path to the helper process.
-- The full appx/package build has not yet completed in Sandbox, so peak build
-  storage and the final signed package remain unmeasured.
+- At the time of this 2026-11-07 measurement, the full appx/package build had
+  not yet completed in Sandbox, so peak build storage and the final signed
+  package remained unmeasured.
+
+## Sandbox build and activation follow-up (2026-11-08)
+
+- The 8 GB Sandbox that had started from the clean-PC dependency run completed
+  asset preparation and produced signed client and resource-framework APPXs
+  for x64, x86, ARM32 and ARM64 in separate target builds. The `builder.log`
+  records all 5,148 Minecraft asset files verified and the dependency changing
+  to `Ready`. The dependency-state UI check also reported `AssetState: Ready`.
+- A test package copied from the installed x64 client and signed with the
+  Sandbox's existing builder certificate was updated to use the corrected
+  bridge. `Add-AppxPackage` installed it with the two Microsoft frameworks
+  declared by its manifest; its exact Horizon asset framework was already
+  installed. Launching the package through `shell:AppsFolder` kept
+  `HorizonUWP.exe` running, and TWinUI recorded successful app activation.
+  An earlier install attempt passed an unrelated Horizon asset framework, and
+  Windows correctly rejected it as an unused dependency. This confirms that
+  local installation must pass only the dependencies selected by that build.
+- The bridge's UCRT startup fix was compiled with compact Clang and strict-linked
+  against cached Rust game libraries for all four architectures. Each DLL had
+  the expected COFF machine and imported `_crt_atexit`, avoiding the unavailable
+  plain `atexit` UCRT import. This validates the shim and linker path; the
+  other three architectures were not run on matching hardware.
+- The Builder now rebuilds that small C shim from the authenticated client
+  source during setup, so a previously published host kit does not retain its
+  old `tls_index.obj`. The UI build and tests passed locally on Ben-Desktop.
+- The new Finished page and output-folder grouping compile, and their core
+  installer/architecture-selection rules pass unit tests. A complete run of
+  this exact source revision through the Sandbox UI, including opening the
+  Finished page after a four-architecture batch, remains outstanding. The
+  signed package launch test used a test package assembled from retained
+  Sandbox files, rather than a package emitted by this new Builder revision.

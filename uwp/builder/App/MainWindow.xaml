@@ -21,8 +21,8 @@
         <StackPanel Spacing="5">
           <TextBlock Text="MCHORIZONUWP BUILDER" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
           <TextBlock x:Name="StepLabel" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-          <PipsPager x:Name="WizardPips" NumberOfPages="9" MaxVisiblePips="9" HorizontalAlignment="Center" />
-          <ProgressBar x:Name="PageProgress" Minimum="0" Maximum="8" Value="0" AutomationProperties.Name="Wizard pages completed" />
+          <PipsPager x:Name="WizardPips" NumberOfPages="10" MaxVisiblePips="10" HorizontalAlignment="Center" />
+          <ProgressBar x:Name="PageProgress" Minimum="0" Maximum="9" Value="0" AutomationProperties.Name="Wizard pages completed" />
         </StackPanel>
         <Grid x:Name="WizardBody" Grid.Row="1" ColumnSpacing="20" RowSpacing="16" SizeChanged="WizardBody_SizeChanged">
           <Grid.ColumnDefinitions><ColumnDefinition x:Name="SummaryColumn" Width="*" /><ColumnDefinition x:Name="ContentColumn" Width="0" /></Grid.ColumnDefinitions>
@@ -214,6 +214,43 @@
               </Expander>
               <TextBlock x:Name="RecipeStatus" TextWrapping="Wrap" />
               <Button x:Name="InstallLocal" Content="Install on this PC" Click="InstallLocal_Click" Visibility="Collapsed" />
+            </StackPanel>
+            <StackPanel x:Name="FinishedPage" Spacing="14" Visibility="Collapsed">
+              <TextBlock Text="Your packages are ready" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
+              <TextBlock Text="Each architecture has its own signed output folder containing its client APPX, public certificate, installation guide, and Microsoft framework dependencies." TextWrapping="Wrap" />
+              <TextBlock x:Name="FinishedResourceSummary" TextWrapping="Wrap" />
+              <StackPanel x:Name="FinishedOutputs" Spacing="10" />
+              <Button x:Name="InstallLocalFinished" Content="Install on this PC" Click="InstallLocal_Click" Visibility="Collapsed" HorizontalAlignment="Left" />
+              <TextBlock x:Name="LocalInstallAvailability" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+              <TextBlock x:Name="FinishedStatus" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+              <Expander Header="Install on Windows 10 or Windows 11" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Use the output folder matching the target PC. Keep HorizonUWP.appx, HorizonUWP.cer, and Dependencies together. Install the Microsoft framework packages and, if provided, HorizonResources.appx before the client. Follow the included Install.md guide to trust the public certificate and install the package. The builder's Install on this PC action is available only when this computer supports the selected architecture and resource mode." TextWrapping="Wrap" />
+                  <HyperlinkButton Content="Microsoft: install and troubleshoot app packages" NavigateUri="https://learn.microsoft.com/en-us/windows/msix/app-installer/troubleshoot-appinstaller-issues" HorizontalAlignment="Left" />
+                </StackPanel>
+              </Expander>
+              <Expander Header="Install on Xbox One or Xbox Series" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Build x64. Xbox sideloading requires Developer Mode and Xbox Device Portal; Retail Mode does not accept a private sideload. In Device Portal's Apps manager, upload the client APPX, its certificate, the Microsoft framework packages from Dependencies, and HorizonResources.appx when present. The selected Horizon client release must itself support Xbox; an x64 package alone does not guarantee compatibility. Install on this PC targets this Windows computer only." TextWrapping="Wrap" />
+                  <HyperlinkButton Content="Microsoft: deploy UWP apps to Xbox" NavigateUri="https://learn.microsoft.com/en-us/windows/uwp/apps-for-xbox/development-options" HorizontalAlignment="Left" />
+                </StackPanel>
+              </Expander>
+              <Expander Header="Install on Windows 10 Mobile" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Build ARM32. On the phone, enable Developer Mode, Device discovery, and Device Portal, then pair the phone with a PC. In Device Portal's app manager, deploy HorizonUWP.appx with HorizonUWP.cer, the ARM framework packages from Dependencies, and HorizonResources.appx when present. Check the phone's deployment result. Windows 10 Mobile is a legacy platform, so portal features vary by OS build." TextWrapping="Wrap" />
+                  <HyperlinkButton Content="Microsoft: set up Device Portal on Windows 10 Mobile" NavigateUri="https://learn.microsoft.com/en-us/previous-versions/windows/uwp/debug-test-perf/device-portal-mobile" HorizontalAlignment="Left" />
+                </StackPanel>
+              </Expander>
+              <Expander Header="Install on HoloLens or another Windows Core OS device" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Windows Core OS has no universal consumer sideload procedure; deployment depends on the specific device and its supported UWP APIs. For HoloLens, use its documented App Installer or Device Portal workflow: HoloLens 2 is ARM64 and first-generation HoloLens is x86. Device Portal requires the device's documented developer setup and the matching architecture package, certificate, and framework/resource dependencies. Other Core OS devices require an OEM-supported deployment method. Architecture alone does not guarantee app compatibility." TextWrapping="Wrap" />
+                  <HyperlinkButton Content="Microsoft: deploy apps to HoloLens" NavigateUri="https://learn.microsoft.com/en-us/hololens/app-deploy-overview" HorizontalAlignment="Left" />
+                </StackPanel>
+              </Expander>
+              <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                <Button x:Name="StartAnotherBuild" Content="Start over" Click="StartAnotherBuild_Click" />
+                <Button x:Name="ExitBuilder" Content="Exit" Click="ExitBuilder_Click" />
+              </StackPanel>
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

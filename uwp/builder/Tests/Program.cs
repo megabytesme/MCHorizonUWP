@@ -583,7 +583,7 @@ if (args.Length == 2 && args[0] == "--inspect-current-builder-catalog")
     {
         var result = candidate.Check("0.1.0", "0.1.1", CatalogTrust.BuilderVersion, architecture);
         Require(!result.Allowed,
-            $"builder {CatalogTrust.BuilderVersion} must reject client 0.1.1 until the 0.1.2 prebuilt-host release is available");
+            $"builder {CatalogTrust.BuilderVersion} must reject client 0.1.1 until the 0.1.3 activation-metadata host kit is available");
         Console.WriteLine($"{architecture}: builder {CatalogTrust.BuilderVersion} correctly blocks client 0.1.1");
     }
     return;
@@ -1278,6 +1278,34 @@ Require(LocalPackageInstaller.CanInstall(TargetProfile.DesktopX86, System.Runtim
 Require(!LocalPackageInstaller.CanInstall(TargetProfile.WindowsMobile, System.Runtime.InteropServices.Architecture.X64, new Version(10, 0, 19045)), "ARM32 is not offered on x64 Windows");
 Require(!LocalPackageInstaller.CanInstall(TargetProfile.DesktopX64, System.Runtime.InteropServices.Architecture.Arm64, new Version(10, 0, 19045)), "Windows 10 ARM64 does not offer x64 installation");
 Require(LocalPackageInstaller.CanInstall(TargetProfile.DesktopX64, System.Runtime.InteropServices.Architecture.Arm64, new Version(10, 0, 22621)), "Windows 11 ARM64 can offer x64 installation");
+Require(LocalBuildRunner.SignedOutputDirectoryName("x64") == "x64"
+    && LocalBuildRunner.SignedOutputDirectoryName("arm64") == "arm64"
+    && LocalBuildRunner.SignedOutputDirectoryName("arm") == "arm32"
+    && LocalBuildRunner.SignedOutputDirectoryName("x86") == "x86", "signed outputs use recognizable architecture directory names");
+try { _ = LocalBuildRunner.SignedOutputDirectoryName("neutral"); throw new Exception("unsupported signed output architecture accepted"); }
+catch (ArgumentOutOfRangeException) { }
+Require(PrebuiltToolchain.ClangTargetTriple("x64") == "x86_64-uwp-windows-msvc"
+    && PrebuiltToolchain.ClangTargetTriple("x86") == "i686-uwp-windows-msvc"
+    && PrebuiltToolchain.ClangTargetTriple("arm64") == "aarch64-uwp-windows-msvc"
+    && PrebuiltToolchain.ClangTargetTriple("arm") == "thumbv7a-uwp-windows-msvc", "compact Clang target triples cover all UWP architectures");
+Require(PrebuiltToolchain.CoffMachine("x86") == 0x014c
+    && PrebuiltToolchain.CoffMachine("x64") == 0x8664
+    && PrebuiltToolchain.CoffMachine("arm") == 0x01c4
+    && PrebuiltToolchain.CoffMachine("arm64") == 0xaa64, "UWP shim validation checks the target COFF machine");
+var desktopReuse = reuse with { Target = TargetProfile.DesktopX64 };
+var localWindowsVersion = new Version(10, 0, 22621);
+Require(!LocalPackageInstaller.CanInstall(desktopReuse, System.Runtime.InteropServices.Architecture.X64, localWindowsVersion, false),
+    "local install is withheld when the exact reused resource framework is not installed");
+Require(LocalPackageInstaller.CanInstall(desktopReuse, System.Runtime.InteropServices.Architecture.X64, localWindowsVersion, true),
+    "local install is allowed when the exact reused resource framework is installed");
+Require(LocalPackageInstaller.CanInstall(new BuildSelection(TargetProfile.DesktopX64, false, UseResourceFramework: true),
+        System.Runtime.InteropServices.Architecture.X64, localWindowsVersion, false),
+    "a newly generated resource framework does not require an existing framework on this PC");
+Require(LocalPackageInstaller.CanInstall(new BuildSelection(TargetProfile.DesktopX64, false),
+        System.Runtime.InteropServices.Architecture.X64, localWindowsVersion, false),
+    "bundled resources do not require a separate Horizon framework on this PC");
+try { await LocalPackageInstaller.IsResourceFrameworkInstalledAsync("Horizon.Asset.26-3.bad;name", ResourceFrameworkPacker.Publisher); throw new Exception("unsafe package name reached the PowerShell query"); }
+catch (ArgumentException) { }
 Require(missing.Single(c => c.Name == "Git").Status == CheckStatus.Missing, "missing Git");
 Require(missing.Single(c => c.Name == "Git").Instructions?.Host == "git-scm.com", "official Git instructions");
 Require(missing.Single(c => c.Name == "Windows SDK and packaging tools").Instructions?.Host == "learn.microsoft.com", "official SDK instructions");

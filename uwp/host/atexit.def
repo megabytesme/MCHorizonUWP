@@ -1,3 +1,0 @@
-LIBRARY api-ms-win-crt-runtime-l1-1-0.dll
-EXPORTS
-atexit=_crt_atexit

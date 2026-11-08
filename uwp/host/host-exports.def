@@ -1,4 +1,4 @@
-LIBRARY HorizonUWP.exe
+NAME HorizonUWP.exe
 EXPORTS
 horizon_uwp_acquire_game_swapchain_panel
 horizon_uwp_angle_window_properties

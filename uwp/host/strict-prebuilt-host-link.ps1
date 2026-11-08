@@ -29,10 +29,14 @@ $map = "$output.map"
 $importLibrary = Join-Path (Get-Location).Path 'HorizonUWPHost.lib'
 $arguments = @('/NOLOGO', '/APPCONTAINER', '/SUBSYSTEM:WINDOWS', "/MACHINE:$machine", '/OPT:REF',
     '/NODEFAULTLIB:kernel32.lib', '/STACK:8388608', "/MAP:$map", "/OUT:$output",
-    "/DEF:$hostDefinition", "/IMPLIB:$importLibrary") + $objects + @('WindowsApp.lib', 'ntdll.lib') + $libraries + @($bridge)
+    "/WINMD", '/WINMDFILE:HorizonUWP.winmd', "/DEF:$hostDefinition", "/IMPLIB:$importLibrary") + $objects + @('WindowsApp.lib', 'ntdll.lib') + $libraries + @($bridge)
 if ($machine -eq 'X86') { $arguments += '/LARGEADDRESSAWARE' }
 & link.exe @arguments
 if ($LASTEXITCODE -ne 0) { throw "Prebuilt UWP host link failed (exit code $LASTEXITCODE)." }
+if (-not (Test-Path -LiteralPath (Join-Path (Get-Location).Path 'HorizonUWP.winmd') -PathType Leaf)) {
+    Remove-Item -LiteralPath $output -Force
+    throw 'The prebuilt host did not emit its HorizonUWP activation metadata.'
+}
 if (Select-String -LiteralPath $map -Pattern 'dead-import-sentinels\.obj|forbidden_api' -Quiet) {
     Remove-Item -LiteralPath $output -Force
     throw 'The prebuilt UWP host uses a forbidden desktop API sentinel.'

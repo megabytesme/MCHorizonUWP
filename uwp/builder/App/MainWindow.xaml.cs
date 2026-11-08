@@ -10,6 +10,7 @@ public sealed partial class MainWindow : Window
 {
     private const int ReviewStep = 7;
     private const int BuildStep = 8;
+    private const int FinishedStep = 9;
     private static readonly string[] DependencyIds = ["git", "python", "rustup", "rust", "msvc", "sdk", "llvm", "ui", "vclibs", "minecraft-assets"];
     private CancellationTokenSource? builderUpdateCheckCancellation;
 
@@ -192,9 +193,12 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, Task<PreparedRelease>> preparedReleaseTasks = new(StringComparer.Ordinal);
     private CancellationTokenSource? assetPrefetchCancellation;
     private Task? assetPrefetchTask;
+    private int assetPrefetchAttemptGeneration;
     private bool assetPrefetchAttempted;
     private bool assetPrefetchSucceeded;
     private bool assetPrefetchRunning;
+    private int builtResourceMode = -1;
+    private string? builtExistingResourceFrameworkName;
     private ActivityLogWindow? activityLogWindow;
     private readonly Dictionary<string, BuildProgressRow> buildProgressRows = new(StringComparer.Ordinal);
     private BuildProgressRow? activeBuildProgressRow;
@@ -405,8 +409,8 @@ public sealed partial class MainWindow : Window
 
     private void UpdateWizard()
     {
-        FrameworkElement[] pages = [WelcomePage, TargetPage, AccountPage, ReleasePage, FrameworkPage, ModsPage, PackageVersionPage, ReviewPage, BuildPage];
-        string[] labels = ["Welcome", "Architecture", "Microsoft account", "Horizon release", "Resources", "Native mods", "Package version", "Review", "Build"];
+        FrameworkElement[] pages = [WelcomePage, TargetPage, AccountPage, ReleasePage, FrameworkPage, ModsPage, PackageVersionPage, ReviewPage, BuildPage, FinishedPage];
+        string[] labels = ["Welcome", "Architecture", "Microsoft account", "Horizon release", "Resources", "Native mods", "Package version", "Review", "Build", "Finished"];
         for (var i = 0; i < pages.Length; i++) pages[i].Visibility = i == wizardStep ? Visibility.Visible : Visibility.Collapsed;
         StepLabel.Text = $"Step {wizardStep + 1} of {pages.Length} · {labels[wizardStep]}";
         SummaryTitle.Text = labels[wizardStep];
@@ -419,13 +423,16 @@ public sealed partial class MainWindow : Window
             "Choose built-in features and trusted Horizon native mods.",
             "Set the four-part Windows package version.",
             "Review the build and let the builder start when everything is ready.",
-            "Follow the build and find your signed package and installation guide."
+            "Follow the build and find your signed package and installation guide.",
+            "Your signed packages are ready. Review the architecture folders and installation options."
         ];
         SummaryDetail.Text = summaries[wizardStep];
         updatingPips = true;
         WizardPips.SelectedPageIndex = wizardStep;
         updatingPips = false;
         PageProgress.Value = completedPages;
+        BackButton.Visibility = wizardStep == FinishedStep ? Visibility.Collapsed : Visibility.Visible;
+        NextButton.Visibility = wizardStep == FinishedStep ? Visibility.Collapsed : Visibility.Visible;
         BackButton.IsEnabled = !navigationBusy && !buildActionRunning && wizardStep > 0;
         NextButton.IsEnabled = !navigationBusy && wizardStep < ReviewStep && CanAdvanceWizardStep(wizardStep);
         if (wizardStep == ReviewStep && lastRenderedStep != ReviewStep) _ = RefreshReadinessAsync();
@@ -511,6 +518,7 @@ public sealed partial class MainWindow : Window
         };
         if (reuse)
         {
+            assetPrefetchAttemptGeneration++;
             assetPrefetchCancellation?.Cancel();
             AssetPrefetchStatus.Text = "Not needed: the selected framework is already installed on the target.";
             ShowDependencyProgress(new("minecraft-assets", "Not needed for this build", false, true, 100));
@@ -685,8 +693,12 @@ public sealed partial class MainWindow : Window
         RetryAssetPrefetch.Visibility = Visibility.Collapsed;
         AssetPrefetchStatus.Text = "Preparing the selected Horizon release so Minecraft assets can start downloading.";
         ShowDependencyProgress(new("minecraft-assets", "Preparing Minecraft assets", true, false));
+        var attemptGeneration = ++assetPrefetchAttemptGeneration;
         var progress = new Progress<string>(message =>
         {
+            // Progress<T> posts callbacks to the UI dispatcher. A final callback can arrive
+            // after success (or after a later attempt has begun), so discard stale updates.
+            if (attemptGeneration != assetPrefetchAttemptGeneration || assetPrefetchSucceeded) return;
             AssetPrefetchStatus.Text = message;
             BuilderActivityLog.Record("Minecraft assets", message);
             ShowDependencyProgress(new("minecraft-assets", message, true, false));
@@ -875,6 +887,7 @@ public sealed partial class MainWindow : Window
 
     private void SignOutMinecraft_Click(object sender, RoutedEventArgs e)
     {
+        assetPrefetchAttemptGeneration++;
         assetPrefetchCancellation?.Cancel();
         MinecraftSignIn.ForgetSavedSession();
         minecraftOwnershipVerified = false;
@@ -908,7 +921,11 @@ public sealed partial class MainWindow : Window
 
     private void CancelMinecraftSignIn_Click(object sender, RoutedEventArgs e) => minecraftSignInCancellation?.Cancel();
 
-    private void CancelAssetPrefetch_Click(object sender, RoutedEventArgs e) => assetPrefetchCancellation?.Cancel();
+    private void CancelAssetPrefetch_Click(object sender, RoutedEventArgs e)
+    {
+        assetPrefetchAttemptGeneration++;
+        assetPrefetchCancellation?.Cancel();
+    }
     private void RetryAssetPrefetch_Click(object sender, RoutedEventArgs e)
     {
         assetPrefetchAttempted = false;
@@ -1037,7 +1054,10 @@ public sealed partial class MainWindow : Window
     {
         if (!readinessReady || !dependencyReady || !minecraftOwnershipVerified || buildActionRunning) return;
         builtOutputs.Clear();
+        builtResourceMode = -1;
+        builtExistingResourceFrameworkName = null;
         InstallLocal.Visibility = Visibility.Collapsed;
+        InstallLocalFinished.Visibility = Visibility.Collapsed;
         buildActionRunning = true;
         BeginBuildProgress();
         wizardStep = BuildStep;
@@ -1055,6 +1075,10 @@ public sealed partial class MainWindow : Window
             var download = ResourceMode.SelectedIndex != 1;
             var targets = SelectedTargets();
             if (targets.Count == 0) throw new InvalidOperationException("Select at least one architecture.");
+            builtResourceMode = ResourceMode.SelectedIndex;
+            builtExistingResourceFrameworkName = builtResourceMode == 1
+                ? CurrentSelection(targets[0]).ValidatedExistingResourceFramework
+                : null;
             var progress = new Progress<string>(message =>
             {
                 ReportBuildProgress(message);
@@ -1096,20 +1120,31 @@ public sealed partial class MainWindow : Window
                 preparedReleaseKeys.Remove(preparedReleaseKey);
                 if (result.SoundWarning is { } warning) warnings.Add($"{activeBuildArchitecture}: {warning}");
             }
-            completedPages = BuildStep;
-            UpdateWizard();
+            completedPages = FinishedStep;
+            wizardStep = FinishedStep;
+            highestVisited = Math.Max(highestVisited, FinishedStep);
             var hostArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture;
-            UpdateLocalInstallVisibility(hostArchitecture);
+            await UpdateLocalInstallVisibilityAsync(hostArchitecture);
             RecipeStatus.Text = FormatBuiltOutputs("Signed client packages:");
             if (CurrentSelection(targets[0]).ValidatedExistingResourceFramework is { } existing)
                 RecipeStatus.Text += $" Requires existing resource framework {existing} on the target.";
             if (warnings.Count > 0) RecipeStatus.Text += "\n" + string.Join("\n", warnings);
+            FinishedResourceSummary.Text = builtResourceMode switch
+            {
+                0 => "Resource option: Minecraft 26.3 is in a separate signed HorizonResources.appx for each architecture. Install it with the client package.",
+                1 => $"Resource option: the client uses existing framework {builtExistingResourceFrameworkName} on the target. No resource APPX was generated.",
+                2 => "Resource option: Minecraft 26.3 is bundled inside each client APPX. No separate resource framework is needed.",
+                _ => "Resource packaging follows the option selected earlier in the wizard.",
+            };
+            FinishedStatus.Text = "The signed packages and their installation files are ready.";
+            UpdateFinishedOutputs();
+            UpdateWizard();
             CompleteBuildProgress(succeeded: true, $"Signed {builtOutputs.Count} architecture package(s). The certificate and installation guides are ready.");
         }
         catch (Exception error)
         {
             var hostArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture;
-            UpdateLocalInstallVisibility(hostArchitecture);
+            await UpdateLocalInstallVisibilityAsync(hostArchitecture);
             RecipeStatus.Text = $"Build failed{(activeBuildArchitecture is null ? "" : $" for {activeBuildArchitecture}")}: {error.Message}";
             if (builtOutputs.Count > 0) RecipeStatus.Text += "\n\n" + FormatBuiltOutputs("Completed packages (available despite the later failure):");
             CompleteBuildProgress(succeeded: false, error.Message);
@@ -1288,16 +1323,23 @@ public sealed partial class MainWindow : Window
     private async void InstallLocal_Click(object sender, RoutedEventArgs e)
     {
         var hostArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture;
-        var installable = builtOutputs.Where(item => LocalPackageInstaller.CanInstall(item.Target, hostArchitecture, Environment.OSVersion.Version)).ToArray();
-        if (installable.Length == 0) return;
+        var eligibility = await CheckLocalInstallAvailabilityAsync(hostArchitecture);
+        var installable = eligibility.Eligible;
+        if (installable.Count == 0)
+        {
+            LocalInstallAvailability.Text = FormatLocalInstallAvailability(eligibility);
+            InstallLocal.Visibility = Visibility.Collapsed;
+            InstallLocalFinished.Visibility = Visibility.Collapsed;
+            return;
+        }
         var choices = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, SelectedIndex = 0 };
         foreach (var item in installable)
             choices.Items.Add(new ComboBoxItem { Content = $"{ArchitectureFor(item.Target)} — {Path.GetFileName(item.Output.Client)}", Tag = item.Output });
-        var defaultIndex = Array.FindIndex(installable, item => item.Target == BuildSelection.DefaultTarget(hostArchitecture));
+        var defaultIndex = Array.FindIndex(installable.ToArray(), item => item.Target == BuildSelection.DefaultTarget(hostArchitecture));
         if (defaultIndex >= 0) choices.SelectedIndex = defaultIndex;
         var installContent = new StackPanel { Spacing = 10 };
         installContent.Children.Add(new TextBlock { Text = "Windows will trust your local signing certificate and install the client and its required frameworks for your account. Windows may ask for administrator approval.", TextWrapping = TextWrapping.Wrap });
-        if (installable.Length > 1)
+        if (installable.Count > 1)
         {
             installContent.Children.Add(new TextBlock { Text = "Choose the package architecture to install:", TextWrapping = TextWrapping.Wrap });
             installContent.Children.Add(choices);
@@ -1311,14 +1353,29 @@ public sealed partial class MainWindow : Window
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         var output = choices.SelectedItem is ComboBoxItem { Tag: SignedPackageOutput selectedOutput } ? selectedOutput : installable[0].Output;
+        var latestEligibility = await CheckLocalInstallAvailabilityAsync(hostArchitecture);
+        if (!latestEligibility.Eligible.Any(item => Path.GetFullPath(item.Output.Client) == Path.GetFullPath(output.Client)))
+        {
+            LocalInstallAvailability.Text = FormatLocalInstallAvailability(latestEligibility);
+            InstallLocal.Visibility = Visibility.Collapsed;
+            InstallLocalFinished.Visibility = Visibility.Collapsed;
+            return;
+        }
         InstallLocal.IsEnabled = false;
+        InstallLocalFinished.IsEnabled = false;
         try
         {
-            await LocalPackageInstaller.InstallAsync(output, new Progress<string>(message => RecipeStatus.Text = message));
-            RecipeStatus.Text = "Horizon was installed for your Windows account.";
+            await LocalPackageInstaller.InstallAsync(output, new Progress<string>(SetInstallStatus));
+            SetInstallStatus("Horizon was installed for your Windows account.");
         }
-        catch (Exception error) { RecipeStatus.Text = $"Installation did not complete: {error.Message}"; }
-        finally { InstallLocal.IsEnabled = true; }
+        catch (Exception error) { SetInstallStatus($"Installation did not complete: {error.Message}"); }
+        finally { InstallLocal.IsEnabled = true; InstallLocalFinished.IsEnabled = true; }
+    }
+
+    private void SetInstallStatus(string message)
+    {
+        RecipeStatus.Text = message;
+        FinishedStatus.Text = message;
     }
 
     private string FormatBuiltOutputs(string heading) => heading + "\n" + string.Join("\n\n", builtOutputs.Select(item =>
@@ -1326,10 +1383,13 @@ public sealed partial class MainWindow : Window
         + (item.Output.Dependencies is { Count: > 0 } dependencies ? $"\nMicrosoft framework dependencies: {Path.GetDirectoryName(dependencies[0])}" : "")
         + (item.Output.ResourceFramework is { } framework ? $"\nSigned resource framework: {framework} (contains private Minecraft resources)" : "")));
 
-    private void UpdateLocalInstallVisibility(System.Runtime.InteropServices.Architecture hostArchitecture)
+    private async Task UpdateLocalInstallVisibilityAsync(System.Runtime.InteropServices.Architecture hostArchitecture)
     {
-        InstallLocal.Visibility = builtOutputs.Any(item => LocalPackageInstaller.CanInstall(item.Target, hostArchitecture, Environment.OSVersion.Version))
-            ? Visibility.Visible : Visibility.Collapsed;
+        var eligibility = await CheckLocalInstallAvailabilityAsync(hostArchitecture);
+        var canInstall = eligibility.Eligible.Count > 0;
+        InstallLocal.Visibility = canInstall ? Visibility.Visible : Visibility.Collapsed;
+        InstallLocalFinished.Visibility = canInstall ? Visibility.Visible : Visibility.Collapsed;
+        LocalInstallAvailability.Text = FormatLocalInstallAvailability(eligibility);
     }
     private async void BrowseNativeMods_Click(object sender, RoutedEventArgs e)
     {
