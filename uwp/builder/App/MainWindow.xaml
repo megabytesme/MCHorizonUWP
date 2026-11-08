@@ -137,7 +137,8 @@
             <StackPanel x:Name="ReleasePage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Choose a Horizon release" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
               <TextBlock Text="Choose a compatible patch and UWP client from the signed MCHorizonUWP release catalog. The newest compatible choice is selected for you." TextWrapping="Wrap" />
-              <ComboBox x:Name="ReleaseSelection" PlaceholderText="No compatible release loaded" HorizontalAlignment="Stretch" />
+              <ComboBox x:Name="ReleaseSelection" PlaceholderText="No compatible release loaded" HorizontalAlignment="Stretch" SelectionChanged="ReleaseSelection_SelectionChanged" />
+              <TextBlock x:Name="SelectedReleaseDetails" Text="The Horizon revision will appear when the signed catalog is loaded." TextWrapping="Wrap" IsTextSelectionEnabled="True" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
               <TextBlock x:Name="ReleaseStatus" Text="Checking the signed release catalog…" TextWrapping="Wrap" />
               <Button x:Name="RefreshReleases" Content="Refresh releases" Click="RefreshReleases_Click" HorizontalAlignment="Left" />
             </StackPanel>
