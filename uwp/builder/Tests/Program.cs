@@ -946,6 +946,16 @@ using (var signingKey = System.Security.Cryptography.ECDsa.Create(System.Securit
             catch (InvalidDataException) { Require(!File.Exists(bad), "invalid download removed"); }
             try { await transport.DownloadArtifactAsync(new CatalogArtifact("https://example.test/insecure-redirect", digest), bad); throw new Exception("insecure redirect accepted"); }
             catch (InvalidDataException) { Require(!File.Exists(bad), "insecure redirect created no artifact"); }
+            var githubArtifact = Path.Combine(folder, "github-release-asset");
+            var githubHandler = new GitHubReleaseAssetHandler(content);
+            using (var githubTransport = new CatalogTransport(githubHandler))
+                await githubTransport.DownloadArtifactAsync(new CatalogArtifact("https://api.github.com/repos/example/project/releases/assets/123", digest), githubArtifact);
+            Require(File.ReadAllBytes(githubArtifact).SequenceEqual(content), "GitHub API release asset follows its HTTPS redirect and verifies the digest");
+            Require(githubHandler.ApiAccept == "application/octet-stream"
+                && githubHandler.ApiVersion == "2022-11-28"
+                && githubHandler.UserAgent?.StartsWith("MCHorizonUWPBuilder/", StringComparison.Ordinal) == true
+                && githubHandler.RedirectedAssetRequested,
+                "GitHub release asset requests use the binary API headers and a Builder user agent");
         }
         finally { Directory.Delete(folder, recursive: true); }
     }
@@ -1620,22 +1630,23 @@ static async Task TestBuilderUpdateChecker()
           {"tag_name":"builder-v0.1.2-preview.1","draft":false,"prerelease":true},
           {"tag_name":"builder-v0.1.9","draft":true,"prerelease":false},
           {"tag_name":"client-v0.9.0","draft":false,"prerelease":false},
+          {"tag_name":"builder-v0.1.8","draft":false,"prerelease":false,"body":"Reliable GitHub release asset downloads."},
           {"tag_name":"builder-v0.1.7","draft":false,"prerelease":false,"body":"Multi-architecture builds and Cargo caching."},
           {"tag_name":"builder-v0.1.6","draft":false,"prerelease":false,"body":"Build speed settings and progress details."}
         ]
         """;
     using var handler = new BuilderUpdateFixtureHandler(response);
     using var client = new HttpClient(handler);
-    var update = await BuilderUpdateChecker.CheckAsync(client, "0.1.6");
+    var update = await BuilderUpdateChecker.CheckAsync(client, "0.1.7");
     Require(handler.RequestedEndpoint == BuilderUpdateChecker.ReleasesEndpoint, "builder checks the MCHorizonUWP GitHub release list");
-    Require(handler.UserAgent?.Contains("0.1.6", StringComparison.Ordinal) == true, "builder update requests identify the installed version");
-    Require(update is { Version: "0.1.7", Changelog: "Multi-architecture builds and Cargo caching." }
-        && update.ReleaseUri == new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/builder-v0.1.7"),
+    Require(handler.UserAgent?.Contains("0.1.7", StringComparison.Ordinal) == true, "builder update requests identify the installed version");
+    Require(update is { Version: "0.1.8", Changelog: "Reliable GitHub release asset downloads." }
+        && update.ReleaseUri == new Uri("https://github.com/megabytesme/MCHorizonUWP/releases/tag/builder-v0.1.8"),
         "builder update checker selects the newest stable builder release only");
 
     using var sameVersionHandler = new BuilderUpdateFixtureHandler(response);
     using var sameVersionClient = new HttpClient(sameVersionHandler);
-    Require(await BuilderUpdateChecker.CheckAsync(sameVersionClient, "0.1.7") is null,
+    Require(await BuilderUpdateChecker.CheckAsync(sameVersionClient, "0.1.8") is null,
         "builder update checker reports no update when the current version is latest");
 }
 
@@ -1789,6 +1800,32 @@ sealed class CatalogFixtureHandler(byte[] catalog, byte[] signature, byte[] arti
         var bytes = request.RequestUri.AbsolutePath switch { "/catalog" => catalog, "/signature" => signature, "/artifact" => artifact, _ => null };
         return Task.FromResult(bytes is null ? new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
             : new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+    }
+}
+
+sealed class GitHubReleaseAssetHandler(byte[] artifact) : HttpMessageHandler
+{
+    public string? ApiAccept { get; private set; }
+    public string? ApiVersion { get; private set; }
+    public string? UserAgent { get; private set; }
+    public bool RedirectedAssetRequested { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (request.RequestUri!.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            ApiAccept = request.Headers.Accept.FirstOrDefault()?.MediaType;
+            ApiVersion = request.Headers.TryGetValues("X-GitHub-Api-Version", out var values) ? values.SingleOrDefault() : null;
+            UserAgent = request.Headers.UserAgent.ToString();
+            var redirect = new HttpResponseMessage(System.Net.HttpStatusCode.Redirect);
+            redirect.Headers.Location = new Uri("https://release-assets.example.test/client.zip");
+            return Task.FromResult(redirect);
+        }
+
+        RedirectedAssetRequested = request.RequestUri.Host.Equals("release-assets.example.test", StringComparison.OrdinalIgnoreCase);
+        return Task.FromResult(RedirectedAssetRequested
+            ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(artifact) }
+            : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
     }
 }
 

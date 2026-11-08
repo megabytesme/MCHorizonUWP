@@ -116,6 +116,7 @@ def main():
     parser.add_argument("--patch-path", help="Committed patch path under patches/ (defaults to the known path for this version)")
     parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
     parser.add_argument("--builder-version", default="0.1.0", help="Builder version for the candidate compatibility rule")
+    parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared four-architecture host kit to include in the client archive")
     parser.add_argument("--catalog-input", type=Path, default=Path("catalog/catalog-v1.json"),
                         help="Existing signed catalog whose older entries and rules must be retained")
@@ -140,6 +141,8 @@ def main():
     revision = git("rev-parse", "--verify", args.revision + "^{commit}").decode().strip()
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Invalid Git commit")
+    if args.client_asset_id is not None and not re.fullmatch(r"[1-9][0-9]*", args.client_asset_id):
+        raise ValueError("The GitHub client asset ID must be a positive decimal number")
     patch = git("show", f"{revision}:{patch_path}")
     if args.client_version in ("0.1.2", "0.1.3") and args.host_artifacts is None:
         raise ValueError(f"Client {args.client_version} requires --host-artifacts for the four prebuilt host kits")
@@ -155,19 +158,27 @@ def main():
     }
     patch_entry = {"version": args.patch_version, "upstream_commit": UPSTREAM, "bridge": 1,
                    "upstream": upstream,
-                   "artifact": {"url": f"{REPOSITORY}/releases/download/patch-v{args.patch_version}/horizon-uwp-{args.patch_version}.patch",
+                   "artifact": {"url": f"https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/{revision}/{patch_path}",
                                 "sha256": digest(patch)}}
     matching_patch = [item for item in catalog["patches"] if item["version"] == args.patch_version]
     if matching_patch:
-        if matching_patch[0] != patch_entry:
+        retained = matching_patch[0]
+        same_identity = (retained.get("upstream_commit") == patch_entry["upstream_commit"]
+                         and retained.get("bridge") == patch_entry["bridge"]
+                         and retained.get("upstream") == patch_entry["upstream"]
+                         and retained.get("artifact", {}).get("sha256") == patch_entry["artifact"]["sha256"])
+        if not same_identity:
             raise ValueError("The candidate patch or upstream archive differs from the retained catalog entry")
+        patch_entry = retained
     else:
         catalog["patches"].append(patch_entry)
     if any(item["version"] == args.client_version for item in catalog["clients"]):
         raise ValueError(f"Client {args.client_version} already exists in the input catalog")
+    client_url = (f"https://api.github.com/repos/megabytesme/MCHorizonUWP/releases/assets/{args.client_asset_id}"
+                  if args.client_asset_id else
+                  f"{REPOSITORY}/releases/download/client-v{args.client_version}/uwp-client-{args.client_version}.zip")
     catalog["clients"].append({"version": args.client_version, "bridge": 1,
-                               "artifact": {"url": f"{REPOSITORY}/releases/download/client-v{args.client_version}/uwp-client-{args.client_version}.zip",
-                                            "sha256": digest(client)}})
+                               "artifact": {"url": client_url, "sha256": digest(client)}})
     catalog["rules"].append({"patch": {"min_inclusive": args.patch_version, "max_exclusive": patch_upper},
                              "client": {"min_inclusive": args.client_version, "max_exclusive": client_upper},
                              "builder": {"min_inclusive": args.builder_version, "max_exclusive": builder_upper},

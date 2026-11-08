@@ -14,6 +14,7 @@ public sealed class CatalogTransport : IDisposable
     internal CatalogTransport(HttpMessageHandler handler, TimeSpan? inactivityTimeout = null)
     {
         http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(90) };
+        http.DefaultRequestHeaders.UserAgent.ParseAdd($"MCHorizonUWPBuilder/{CatalogTrust.BuilderVersion}");
         this.inactivityTimeout = inactivityTimeout ?? TimeSpan.FromSeconds(45);
     }
     public void Dispose() => http.Dispose();
@@ -102,7 +103,13 @@ public sealed class CatalogTransport : IDisposable
         {
             if (!uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(uri.UserInfo))
                 throw new InvalidDataException("Catalog downloads require HTTPS URLs without credentials.");
-            var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            if (uri.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase))
+            {
+                request.Headers.Accept.ParseAdd("application/octet-stream");
+                request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+            }
+            var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if ((int)response.StatusCode is >= 300 and <= 399)
             {
                 var location = response.Headers.Location;

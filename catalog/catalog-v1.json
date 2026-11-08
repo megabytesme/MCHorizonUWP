@@ -10,7 +10,7 @@
         "sha256": "97205ce67c81d1bbfb754aed11185d779dbfa114cdb9898c0ad0b8adf9851467"
       },
       "artifact": {
-        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/patch-v0.1.1/horizon-uwp-0.1.1.patch",
+        "url": "https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/92b0d873c46a920020150597410ab3b03b5451c3/patches/nightly-2026-11-03/horizon-uwp-0.1.1.patch",
         "sha256": "76b7dcee0ddad1bdf5d9a7da2461f7c528e24fa6a25d48773d27e30e81e26fa8"
       }
     }
@@ -28,7 +28,7 @@
       "version": "0.1.3",
       "bridge": 1,
       "artifact": {
-        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/client-v0.1.3/uwp-client-0.1.3.zip",
+        "url": "https://api.github.com/repos/megabytesme/MCHorizonUWP/releases/assets/723558634",
         "sha256": "1424f087aae9527573737fbb3325f9728040ed03d3b6301a37107ac44ede656f"
       }
     }
@@ -44,8 +44,8 @@
         "max_exclusive": "0.1.4"
       },
       "builder": {
-        "min_inclusive": "0.1.7",
-        "max_exclusive": "0.1.8"
+        "min_inclusive": "0.1.8",
+        "max_exclusive": "0.1.9"
       },
       "architectures": [
         "x86",
