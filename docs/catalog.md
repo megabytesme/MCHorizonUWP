@@ -5,7 +5,7 @@ The signed, versioned release catalog tracks three independent release types:
 includes a parser, compatibility checker, P-256 signature verifier, HTTPS
 transport and an embedded public verification key. The builder selects catalog
 releases and passes verified inputs to the build runner. Client 0.1.3 and patch
-0.1.1 are the current production releases; Builder 0.1.9 is compatible with
+0.1.1 are the current production releases; Builder 0.1.10 is compatible with
 that pair on x86, x64, ARM32 and ARM64. Client 0.1.2 remains listed so the
 Builder can identify it as incompatible; its prebuilt hosts omit the WinMD
 required to activate the UWP application.
@@ -19,7 +19,7 @@ both bridge numbers match and one rule matches all four dimensions.
 The current builder recipe requires client 0.1.3, which packages the WinMD
 activation metadata and prebuilt host files for all four architectures, and
 patch 0.1.1, which pins the matching Horizon nightly. The signed catalog
-permits Builder 0.1.9 to assemble that pair. The release notes distinguish
+permits Builder 0.1.10 to assemble that pair. The release notes distinguish
 compatibility from per-architecture build or device evidence.
 
 Artifacts have HTTPS URLs and SHA-256 digests. Catalog authenticity is a
@@ -106,6 +106,11 @@ contains the matching host executable and bridge DLL. This skips compiling the
 Windows host on a user's PC; the builder still prepares Rust, Clang, the
 Windows SDK and Microsoft app frameworks when they are unavailable. Setup
 links the component license terms.
+
+Minecraft resource-helper workspaces are keyed to their exact authenticated
+inputs and reused on retry. Horizon's resource manifest then skips exports
+whose inputs and outputs still match. Stale or changed helper workspaces are
+left intact while the builder stages a separate workspace.
 
 The fresh-PC flow and runtime behavior for all four architectures remain under
 validation. Compatibility rules describe which versions a builder recognizes;

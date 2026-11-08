@@ -75,6 +75,8 @@ jobs:
 
           Fixes app startup for compatible client releases by emitting and validating the PE TLS directory required by Rust thread-local storage. This applies with or without native mods; the compatible client source is hash-checked before the builder applies the fix.
 
+          Minecraft asset preparation now reuses its content-matched helper workspace on retry. Horizon's prepared-resource manifest skips unchanged exports, so selecting different native mods no longer fails on an existing helper directory or repeats completed resource work.
+
           The signed catalog pins patch files to immutable source commits and retrieves client release assets through GitHub's binary API endpoint, avoiding direct release-download redirects that returned HTTP 504 in the Sandbox.
 
           The welcome page prepares only the selected architecture dependencies. The signed release catalog is checked before building, and each resulting APPX includes its public certificate and installation guide.

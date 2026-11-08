@@ -314,8 +314,8 @@ if (args.Length == 2 && args[0] == "--stage-asset-helper")
     var source = Path.Combine(workspace, "source");
     var staged = await MinecraftAssetPreparation.StageHelperAsync(source, workspace);
     Require(File.Exists(Path.Combine(staged, "Cargo.lock")) && File.Exists(Path.Combine(staged, "src", "mojang.rs")), "asset helper and pinned Horizon downloader staged");
-    try { await MinecraftAssetPreparation.StageHelperAsync(source, workspace); throw new Exception("existing asset helper accepted"); }
-    catch (IOException) { }
+    var reused = await MinecraftAssetPreparation.StageHelperAsync(source, workspace);
+    Require(reused == staged, "matching asset helper workspace is reused on a build retry");
     Console.WriteLine($"Asset helper staged: {staged}");
     return;
 }
@@ -911,6 +911,7 @@ await TestBuilderUpdatePreferences();
 await TestNativeBundleStager();
 await TestMinecraftSignIn();
 await TestMinecraftAssetPrefetch();
+await TestMinecraftAssetHelperCache();
 await TestPrivateClangArchive();
 var nativeFixture = $$$"""
 {"schema":1,"projects":[
@@ -1550,6 +1551,44 @@ static async Task TestMinecraftAssetPrefetch()
             throw new Exception("Minecraft files were prefetched before ownership verification");
         }
         catch (InvalidOperationException) { Require(!Directory.Exists(unauthorizedCache), "ownership is checked before local copy or network access"); }
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
+static async Task TestMinecraftAssetHelperCache()
+{
+    var root = Path.Combine(Path.GetTempPath(), "mchorizon-asset-helper-cache-test-" + Guid.NewGuid().ToString("N"));
+    var source = Path.Combine(root, "source");
+    var workspace = Path.Combine(root, "workspace");
+    Directory.CreateDirectory(Path.Combine(source, "launcher", "src"));
+    Directory.CreateDirectory(workspace);
+    try
+    {
+        var mojang = Path.Combine(source, "launcher", "src", "mojang.rs");
+        var sources = Path.Combine(source, "launcher", "src", "sources.rs");
+        await File.WriteAllTextAsync(mojang, "pinned mojang downloader");
+        await File.WriteAllTextAsync(sources, "pinned source downloader");
+
+        var first = await MinecraftAssetPreparation.StageHelperAsync(source, workspace);
+        var firstWriteTime = File.GetLastWriteTimeUtc(Path.Combine(first, "src", "main.rs"));
+        var repeated = await MinecraftAssetPreparation.StageHelperAsync(source, workspace);
+        Require(repeated == first && File.GetLastWriteTimeUtc(Path.Combine(repeated, "src", "main.rs")) == firstWriteTime,
+            "an exact asset-helper workspace is reused without rewriting its files");
+
+        await File.WriteAllTextAsync(mojang, "changed pinned downloader");
+        var changed = await MinecraftAssetPreparation.StageHelperAsync(source, workspace);
+        Require(changed != first && File.ReadAllText(Path.Combine(changed, "src", "mojang.rs")) == "changed pinned downloader",
+            "changed authenticated helper inputs receive a separate content-keyed workspace");
+        Require(File.ReadAllText(Path.Combine(first, "src", "mojang.rs")) == "pinned mojang downloader",
+            "creating a new helper workspace preserves the prior release workspace");
+
+        var staleWorkspace = Path.Combine(root, "stale-workspace");
+        var staleHelper = Path.Combine(staleWorkspace, "asset-tool");
+        Directory.CreateDirectory(staleHelper);
+        await File.WriteAllTextAsync(Path.Combine(staleHelper, "partial.tmp"), "interrupted build");
+        var rebuilt = await MinecraftAssetPreparation.StageHelperAsync(source, staleWorkspace);
+        Require(rebuilt != staleHelper && File.ReadAllText(Path.Combine(staleHelper, "partial.tmp")) == "interrupted build"
+            && File.Exists(Path.Combine(rebuilt, "Cargo.lock")),
+            "an incomplete helper workspace is left intact while a matching isolated workspace is prepared");
     }
     finally { Directory.Delete(root, recursive: true); }
 }
