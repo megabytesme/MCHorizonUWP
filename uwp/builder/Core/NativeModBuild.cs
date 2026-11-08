@@ -10,29 +10,79 @@ namespace Horizon.Builder.Core;
 internal static class NativeModBuild
 {
     private const string HooksFile = "crates/horizon-client/src/game/native_hooks.rs";
+    private sealed record BundleCompatibility(string Horizon, string Mixins, int? Hooks);
+
+    internal static Task<string> ApplyAsync(string source, string workspace, IReadOnlyList<string> requested,
+        string cargo, IReadOnlyDictionary<string, string> hostEnvironment, IProgress<string>? progress)
+        => ApplyAsync(source, workspace, requested, cargo, hostEnvironment, LocalRecipe.UpstreamNightlyCommit, progress);
 
     internal static async Task<string> ApplyAsync(string source, string workspace, IReadOnlyList<string> requested,
-        string cargo, IReadOnlyDictionary<string, string> hostEnvironment, IProgress<string>? progress)
+        string cargo, IReadOnlyDictionary<string, string> hostEnvironment, string targetCommit, IProgress<string>? progress)
     {
         if (requested.Count == 0) return source;
         if (requested.Count > 100 || requested.Distinct(StringComparer.Ordinal).Count() != requested.Count)
             throw new InvalidDataException("The selected native-mod list is invalid.");
-        progress?.Report("Downloading and verifying selected native mods with Horizon.");
+        if (!Regex.IsMatch(targetCommit, "^[0-9a-f]{40}$")) throw new InvalidDataException("The selected Horizon release has an invalid commit.");
+        progress?.Report($"Finding native-mod versions compatible with Horizon commit {targetCommit}.");
         using var transport = new CatalogTransport();
         var stager = await NativeBundleStager.CreateAsync(transport, Path.Combine(workspace, "native-download"), RuntimeInformation.ProcessArchitecture);
-        var bundles = new Dictionary<string, StagedNativeBundle>(StringComparer.Ordinal);
-        foreach (var id in requested)
-            foreach (var bundle in await stager.InstallAsync(id)) bundles[bundle.Id] = bundle;
+        var catalog = await NativeModIndex.FetchCatalogAsync();
         var hookText = await File.ReadAllTextAsync(Path.Combine(source, HooksFile));
         var hookMatch = Regex.Match(hookText, @"(?m)^pub\(crate\) const NATIVE_HOOKS_API: u32 = (\d+);\s*$");
         if (!hookMatch.Success || !int.TryParse(hookMatch.Groups[1].Value, out var availableHooks))
             throw new InvalidDataException("This patch does not declare a supported native-mod hook version.");
+
+        var discovered = new Dictionary<string, List<ResolvedNativeMod>>(StringComparer.Ordinal);
+        foreach (var id in requested)
+        {
+            var listing = catalog.Mods.SingleOrDefault(mod => mod.Id == id)
+                ?? throw new InvalidDataException($"{id} is no longer available in Horizon's native-mod registry for Minecraft {LocalRecipe.MinecraftVersion}.");
+            var compatible = new List<ResolvedNativeMod>();
+            foreach (var candidate in listing.Versions)
+            {
+                if (candidate.BrokenCommits.Contains(targetCommit, StringComparer.OrdinalIgnoreCase))
+                {
+                    progress?.Report($"Skipping {listing.Name} {candidate.Version}: the registry marks it broken on Horizon {targetCommit}.");
+                    continue;
+                }
+                if (candidate.Url.Length == 0 || candidate.Size <= 0)
+                    throw new InvalidDataException($"The registry entry for {listing.Name} {candidate.Version} is missing its download details.");
+                var bundlePath = Path.Combine(stager.Workspace, "candidate-" + candidate.Sha256.ToLowerInvariant() + ".hnmod");
+                progress?.Report($"Checking {listing.Name} {candidate.Version} against Horizon {targetCommit}.");
+                await transport.DownloadArtifactAsync(new CatalogArtifact(candidate.Url, candidate.Sha256), bundlePath);
+                if (new FileInfo(bundlePath).Length != candidate.Size)
+                    throw new InvalidDataException($"The downloaded {listing.Name} {candidate.Version} bundle has the wrong size.");
+                var metadata = ReadCompatibility(bundlePath, candidate);
+                var matchesHooks = metadata.Hooks is { } hooks && hooks > 0 && hooks <= availableHooks;
+                if (!matchesHooks && !metadata.Horizon.Equals(targetCommit, StringComparison.OrdinalIgnoreCase))
+                {
+                    progress?.Report($"{listing.Name} {candidate.Version} targets Horizon {metadata.Horizon}; checking older releases.");
+                    continue;
+                }
+                compatible.Add(new(candidate, bundlePath, metadata.Horizon, metadata.Mixins, metadata.Hooks));
+            }
+            if (compatible.Count == 0)
+                throw new InvalidOperationException($"No version of {listing.Name} is compatible with Horizon commit {targetCommit} and hook API {availableHooks}.");
+            discovered.Add(id, compatible);
+        }
+
+        var commonMixins = discovered.Values.First().Select(mod => mod.MixinsRevision).ToHashSet(StringComparer.Ordinal);
+        foreach (var options in discovered.Values.Skip(1)) commonMixins.IntersectWith(options.Select(mod => mod.MixinsRevision));
+        if (commonMixins.Count == 0)
+            throw new InvalidOperationException("The selected native mods have no versions that share a Horizon mixin-tool revision. Choose a different combination.");
+        var sharedMixins = commonMixins
+            .Select(revision => (Revision: revision, Score: discovered.Values.Sum(options => options.FindIndex(mod => mod.MixinsRevision == revision))))
+            .OrderBy(option => option.Score).ThenBy(option => option.Revision, StringComparer.Ordinal).First().Revision;
+        var selected = requested.Select(id => discovered[id].First(mod => mod.MixinsRevision == sharedMixins)).ToArray();
+        foreach (var mod in selected)
+            progress?.Report($"Using {mod.Candidate.Name} {mod.Candidate.Version} with Horizon commit {targetCommit}.");
+        var bundles = (await stager.InstallResolvedAsync(catalog, selected)).ToDictionary(bundle => bundle.Id, StringComparer.Ordinal);
         var mods = Path.Combine(workspace, "native-mixins");
         Directory.CreateDirectory(mods);
         string? mixinsRevision = null;
         foreach (var bundle in bundles.Values.OrderBy(b => b.Id, StringComparer.Ordinal))
         {
-            var revision = ExtractBundle(bundle, mods, availableHooks);
+            var revision = ExtractBundle(bundle, mods, targetCommit, availableHooks);
             if (mixinsRevision is not null && mixinsRevision != revision)
                 throw new InvalidOperationException("These selected mods require different versions of Horizon's mixin tool; choose compatible mods.");
             mixinsRevision = revision;
@@ -45,7 +95,7 @@ internal static class NativeModBuild
                 "--root", toolRoot, "horizon-mixins-cli"], hostEnvironment, progress: progress);
         var executable = Path.Combine(toolRoot, "bin", "horizon-mixins.exe");
         var staged = Path.Combine(workspace, "native-source");
-        await File.WriteAllTextAsync(Path.Combine(source, ".horizon-revision"), LocalRecipe.UpstreamNightlyCommit + "\n");
+        await File.WriteAllTextAsync(Path.Combine(source, ".horizon-revision"), targetCommit + "\n");
         var lib = Path.Combine(source, "crates", "horizon-client", "src", "lib.rs");
         var original = await File.ReadAllTextAsync(lib);
         // The upstream transformer mistakes this built-in crate setting for an attribute macro.
@@ -69,7 +119,35 @@ internal static class NativeModBuild
         return staged;
     }
 
-    private static string ExtractBundle(StagedNativeBundle bundle, string modsRoot, int availableHooks)
+    private static BundleCompatibility ReadCompatibility(string bundlePath, NativeModCandidate candidate)
+    {
+        using var zip = ZipFile.OpenRead(bundlePath);
+        if (zip.Entries.Count > 512) throw new InvalidDataException($"{candidate.Name} {candidate.Version} contains too many files.");
+        var metadataEntries = zip.Entries.Where(entry => entry.FullName == "horizon-native.json").ToArray();
+        if (metadataEntries.Length != 1 || metadataEntries[0].Length is <= 0 or > 65536)
+            throw new InvalidDataException($"{candidate.Name} {candidate.Version} has invalid native-mod metadata.");
+        using var metadataStream = metadataEntries[0].Open();
+        using var metadata = JsonDocument.Parse(metadataStream);
+        var root = metadata.RootElement;
+        var revision = root.GetProperty("mixins").GetString() ?? "";
+        var horizon = root.GetProperty("horizon").GetString() ?? "";
+        var id = root.GetProperty("id").GetString() ?? "";
+        var version = root.GetProperty("version").GetString() ?? "";
+        var game = root.GetProperty("game").GetString() ?? "";
+        int? hooks = null;
+        if (root.TryGetProperty("hooks", out var hooksValue))
+        {
+            if (hooksValue.ValueKind != JsonValueKind.Number || !hooksValue.TryGetInt32(out var parsedHooks) || parsedHooks <= 0)
+                throw new InvalidDataException($"{candidate.Name} {candidate.Version} has an invalid hook API declaration.");
+            hooks = parsedHooks;
+        }
+        if (id != candidate.Id || version != candidate.Version || game != LocalRecipe.MinecraftVersion
+            || !Regex.IsMatch(revision, "^[0-9a-f]{40}$") || !Regex.IsMatch(horizon, "^[0-9a-f]{40}$"))
+            throw new InvalidDataException($"{candidate.Name} {candidate.Version} metadata does not match the signed registry entry.");
+        return new(horizon, revision, hooks);
+    }
+
+    private static string ExtractBundle(StagedNativeBundle bundle, string modsRoot, string targetCommit, int availableHooks)
     {
         using var zip = ZipFile.OpenRead(bundle.Path);
         var metadataEntries = zip.Entries.Where(e => e.FullName == "horizon-native.json").ToArray();
@@ -84,9 +162,9 @@ internal static class NativeModBuild
             || !Regex.IsMatch(revision, "^[0-9a-f]{40}$") || !Regex.IsMatch(horizon, "^[0-9a-f]{40}$"))
             throw new InvalidDataException("Native mod metadata does not match the selected release.");
         var hasHooks = root.TryGetProperty("hooks", out var hooks);
-        if (hasHooks && (hooks.ValueKind != JsonValueKind.Number || !hooks.TryGetInt32(out var required) || required < 0 || required > availableHooks))
+        if (hasHooks && (hooks.ValueKind != JsonValueKind.Number || !hooks.TryGetInt32(out var required) || required <= 0 || required > availableHooks))
             throw new InvalidDataException($"{bundle.Id} needs a different version of Horizon's native hooks.");
-        if (!hasHooks && horizon != LocalRecipe.UpstreamNightlyCommit)
+        if (!hasHooks && !horizon.Equals(targetCommit, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException($"{bundle.Id} requires a different Horizon revision.");
         var prefix = $"mixins/{bundle.Id}/";
         var destination = Path.Combine(modsRoot, bundle.Id);
@@ -120,7 +198,7 @@ internal static class NativeModBuild
             var pattern = $"(?m)^([ \\t]*horizon_revision[ \\t]*=[ \\t]*\"{Regex.Escape(horizon)}\")[ \\t]*\\r?$";
             var matches = Regex.Matches(manifest, pattern);
             if (matches.Count != 1) throw new InvalidDataException("Native mod Horizon revision is not unambiguous.");
-            manifest = manifest[..matches[0].Index] + matches[0].Value.Replace(horizon, LocalRecipe.UpstreamNightlyCommit, StringComparison.Ordinal)
+            manifest = manifest[..matches[0].Index] + matches[0].Value.Replace(horizon, targetCommit, StringComparison.Ordinal)
                 + manifest[(matches[0].Index + matches[0].Length)..];
             File.WriteAllText(manifestPath, manifest, new UTF8Encoding(false));
         }

@@ -1478,7 +1478,10 @@ public sealed partial class MainWindow : Window
         try
         {
             if (nativeMods.Count == 0) nativeMods = await NativeModIndex.FetchAsync();
-            var picker = new NativeModsDialog(nativeMods, selectedNativeMods)
+            var selectedRelease = ReleaseSelection.SelectedItem as ReleaseChoice;
+            var patch = selectedRelease is null ? null : catalog?.Patches.SingleOrDefault(item => item.Version == selectedRelease.Patch);
+            var targetCommit = patch?.UpstreamCommit ?? LocalRecipe.UpstreamNightlyCommit;
+            var picker = new NativeModsDialog(nativeMods, selectedNativeMods, targetCommit)
             {
                 Width = Math.Max(420, Math.Min(1000, WindowRoot.ActualWidth - 48)),
                 Height = Math.Max(360, Math.Min(620, WindowRoot.ActualHeight - 220))

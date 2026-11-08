@@ -166,7 +166,7 @@ public static class LocalBuildRunner
             hostEnvironment["CARGO_TARGET_DIR"] = SharedCargoTargetDirectory;
             jobs = CaptureCargoJobs("the native-mod tool");
             hostEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, progress);
+            snapshot = await NativeModBuild.ApplyAsync(snapshot, root, selectedMods, cargo, hostEnvironment, release.Patch.UpstreamCommit, progress);
         }
 
         var rustSource = Path.Combine(snapshot, ".local", "builder-rust-std");

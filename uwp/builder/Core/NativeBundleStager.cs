@@ -8,6 +8,8 @@ using System.Text.RegularExpressions;
 namespace Horizon.Builder.Core;
 
 public sealed record StagedNativeBundle(string Id, string Version, string Path, string Sha256, string Verification);
+internal sealed record ResolvedNativeMod(NativeModCandidate Candidate, string Path, string HorizonCommit,
+    string MixinsRevision, int? Hooks);
 
 /// <summary>Uses a pinned Horizon launcher to verify registry bundles in an isolated workspace.</summary>
 public sealed class NativeBundleStager
@@ -16,6 +18,7 @@ public sealed class NativeBundleStager
     private readonly string launcher;
     private readonly SemaphoreSlim gate = new(1, 1);
     private NativeBundleStager(string root, string launcher) => (this.root, this.launcher) = (root, launcher);
+    internal string Workspace => root;
 
     public static CatalogArtifact LauncherFor(Architecture architecture)
     {
@@ -61,11 +64,36 @@ public sealed class NativeBundleStager
     {
         if (!Regex.IsMatch(id, "^[a-z0-9_]{1,64}$")) throw new ArgumentException("Invalid native mod ID.", nameof(id));
         await gate.WaitAsync(cancellationToken);
-        try { return await InstallCoreAsync(id, cancellationToken); }
+        try { return await InstallCoreAsync(id, null, null, cancellationToken); }
         finally { gate.Release(); }
     }
 
-    private async Task<IReadOnlyList<StagedNativeBundle>> InstallCoreAsync(string id, CancellationToken cancellationToken)
+    internal async Task<IReadOnlyList<StagedNativeBundle>> InstallResolvedAsync(NativeModCatalog catalog,
+        IReadOnlyList<ResolvedNativeMod> mods, CancellationToken cancellationToken = default)
+    {
+        if (mods.Count == 0 || mods.Count > 100 || mods.Select(mod => mod.Candidate.Id).Distinct(StringComparer.Ordinal).Count() != mods.Count)
+            throw new InvalidDataException("The resolved native-mod list is invalid.");
+        var indexPath = Path.Combine(root, "verified-compatible-mod-index.json");
+        var indexBytes = NativeModIndex.CreatePinnedIndex(catalog, mods.Select(mod => (mod.Candidate, mod.Path)).ToArray());
+        await File.WriteAllBytesAsync(indexPath, indexBytes, cancellationToken);
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            var result = new List<StagedNativeBundle>();
+            foreach (var mod in mods)
+            {
+                var staged = await InstallCoreAsync(mod.Candidate.Id, mod.Candidate.Version, indexPath, cancellationToken);
+                if (!staged.Any(bundle => bundle.Id == mod.Candidate.Id && bundle.Version == mod.Candidate.Version))
+                    throw new InvalidDataException($"Horizon did not install the selected {mod.Candidate.Name} version {mod.Candidate.Version}.");
+                result.AddRange(staged);
+            }
+            return result;
+        }
+        finally { gate.Release(); }
+    }
+
+    private async Task<IReadOnlyList<StagedNativeBundle>> InstallCoreAsync(string id, string? expectedVersion,
+        string? modIndexPath, CancellationToken cancellationToken)
     {
         var game = Path.Combine(root, "game");
         var start = new ProcessStartInfo(launcher) { UseShellExecute = false, CreateNoWindow = true,
@@ -77,7 +105,8 @@ public sealed class NativeBundleStager
             start.Environment[name] = Path.Combine(root, folder);
         start.Environment["HORIZON_LAUNCHER_NO_SELF_UPDATE"] = "1";
         start.Environment["HORIZON_NO_AUDIO"] = "1";
-        start.Environment.Remove("HORIZON_MOD_INDEX");
+        if (modIndexPath is null) start.Environment.Remove("HORIZON_MOD_INDEX");
+        else start.Environment["HORIZON_MOD_INDEX"] = modIndexPath;
         start.Environment.Remove("HORIZON_GITHUB_TOKEN");
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the Horizon launcher.");
         var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -99,6 +128,8 @@ public sealed class NativeBundleStager
                 || !checksum.StartsWith("SHA-256:", StringComparison.Ordinal) || checksum.Length != 72
                 || !checksum[8..].All(char.IsAsciiHexDigit) || version.Length == 0)
                 throw new InvalidDataException("Horizon returned an unexpected native-mod result.");
+            if (project == id && expectedVersion is not null && version != expectedVersion)
+                throw new InvalidDataException($"Horizon selected native mod version {version}, but this build pinned {expectedVersion}.");
             var path = Path.Combine(game, "horizon-native-mods", project + ".hnmod");
             await using var stream = File.OpenRead(path);
             var actual = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
