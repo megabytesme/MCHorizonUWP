@@ -98,7 +98,17 @@ if (args.Length is 3 or 4 && args[0] == "--client-backport-proof")
     var version = args.Length == 4 ? args[3] : "0.1.1";
     ClientToolchainBackport.Apply(root, version);
     ClientToolchainBackport.Apply(root, version);
+    ClientTlsBackport.Apply(root, version);
+    ClientTlsBackport.Apply(root, version);
     Require(File.ReadAllText(Path.Combine(root, "uwp", "host", "build-game.cmd")).Contains("HORIZON_UWP_PREPARED_ENV"), "client has the compact-toolchain hook");
+    if (version == "0.1.3")
+    {
+        var tlsSource = File.ReadAllText(Path.Combine(root, "uwp", "host", "tls-index.c"));
+        var linkScript = File.ReadAllText(Path.Combine(root, "uwp", "host", "strict-bridge-link.ps1"));
+        Require(tlsSource.Contains("_tls_used") && tlsSource.Contains("_tls_start"), "client TLS shim defines the PE TLS directory and sentinels");
+        Require(linkScript.Contains("/INCLUDE:_tls_used") && linkScript.Contains("IMAGE_DIRECTORY_ENTRY_TLS"), "client linker includes and validates the TLS directory");
+        Require(linkScript.IndexOf("$tlsObject, $rust", StringComparison.Ordinal) >= 0, "TLS object is linked before Rust code");
+    }
     Console.WriteLine($"Validated and backported the pinned client scripts: {root}");
     return;
 }
@@ -121,6 +131,39 @@ if (args.Length == 7 && args[0] == "--compact-host-proof")
         Environment.CurrentDirectory, ["/d", "/c", "uwp\\host\\build-game.cmd", arch], host);
     Require(File.Exists(Path.Combine(root, "host", "HorizonUWP.exe")), "compact toolchain built and strictly linked the host");
     Console.WriteLine($"Built the {arch} host with the compact toolchain: {root}");
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--client-tls-backport-proof")
+{
+    var root = Path.GetFullPath(args[2]);
+    if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Choose a new client TLS proof directory.");
+    try
+    {
+        using (var zip = System.IO.Compression.ZipFile.OpenRead(args[1]))
+            foreach (var name in new[] { "uwp/host/tls-index.c", "uwp/host/strict-bridge-link.ps1" })
+            {
+                var target = Path.Combine(root, name.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                var entry = zip.Entries.SingleOrDefault(item => item.FullName.Replace('\\', '/') == name)
+                    ?? throw new Exception("Missing client TLS input.");
+                using var source = entry.Open();
+                using var file = new FileStream(target, FileMode.CreateNew);
+                source.CopyTo(file);
+            }
+        ClientTlsBackport.Apply(root, "0.1.3");
+        ClientTlsBackport.Apply(root, "0.1.3");
+        var tlsSource = File.ReadAllText(Path.Combine(root, "uwp", "host", "tls-index.c"));
+        var linkScript = File.ReadAllText(Path.Combine(root, "uwp", "host", "strict-bridge-link.ps1"));
+        Require(tlsSource.Contains("_tls_used") && tlsSource.Contains("_tls_start"), "backport defines the PE TLS directory and sentinels");
+        Require(linkScript.Contains("/INCLUDE:__tls_used") && linkScript.Contains("/INCLUDE:_tls_used"), "backport forces the TLS directory for 32-bit and 64-bit symbols");
+        Require(linkScript.Contains("IMAGE_DIRECTORY_ENTRY_TLS") && linkScript.Contains("$tlsObject, $rust"), "backport validates TLS metadata and links the object before Rust");
+        Console.WriteLine("Client 0.1.3 TLS backport validation passed.");
+    }
+    finally
+    {
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
     return;
 }
 

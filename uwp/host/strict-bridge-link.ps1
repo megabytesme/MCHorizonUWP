@@ -21,6 +21,7 @@ $sentinel = [IO.Path]::GetFullPath($SentinelObject)
 $outputPath = [IO.Path]::GetFullPath($Output)
 $outputDirectory = [IO.Path]::GetDirectoryName($outputPath)
 $hostImport = Join-Path $hostKit 'HorizonUWPHost.lib'
+$tlsObject = Join-Path $hostKit 'link\tls_index.obj'
 $targetMsvcRuntime = Join-Path $msvc "lib\$sdkArchitecture\store"
 $hostMsvcRuntime = Join-Path $msvc 'lib\x64'
 $bridgeExports = Join-Path $PSScriptRoot 'game-bridge-exports.def'
@@ -44,15 +45,15 @@ New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 $arguments = @(
     '-flavor', 'link', '/NOLOGO', '/DLL', '/NOENTRY', '/APPCONTAINER', "/MACHINE:$machine", '/OPT:REF',
     '/NODEFAULTLIB:kernel32.lib', '/NODEFAULTLIB:libucrt.lib',
+    $(if ($Architecture -eq 'x86') { '/INCLUDE:__tls_used' } else { '/INCLUDE:_tls_used' }),
     '/DEFAULTLIB:msvcrt', '/DEFAULTLIB:vcruntime', '/DEFAULTLIB:ucrt',
     "/LIBPATH:$hostKit\link",
     "/LIBPATH:$targetMsvcRuntime",
     "/LIBPATH:$sdk\Lib\10.0.19041.0\ucrt\$sdkArchitecture",
     "/LIBPATH:$sdk\Lib\10.0.19041.0\um\$sdkArchitecture",
     "/OUT:$outputPath", "/IMPLIB:$outputPath.lib", "/MAP:$outputPath.map", "/DEF:$bridgeExports",
-    $rust, $hostImport, $sentinel,
-    'WindowsApp.lib', 'ntdll.lib', 'd3d11.lib', 'd3d12.lib', 'dxgi.lib', 'xaudio2.lib', 'iphlpapi.lib',
-    (Join-Path $hostKit 'link\tls_index.obj')
+    $tlsObject, $rust, $hostImport, $sentinel,
+    'WindowsApp.lib', 'ntdll.lib', 'd3d11.lib', 'd3d12.lib', 'dxgi.lib', 'xaudio2.lib', 'iphlpapi.lib'
 )
 & $linker @arguments
 if ($LASTEXITCODE -ne 0) { throw "Rust LLD failed to link the prebuilt host bridge (exit code $LASTEXITCODE)." }
@@ -71,8 +72,43 @@ try {
     $stream.Position = $pe
     if ($reader.ReadUInt32() -ne 0x4550) { throw 'The linked game bridge has an invalid PE signature.' }
     $actual = $reader.ReadUInt16()
+    $stream.Position = $pe + 20
+    $optionalHeaderSize = $reader.ReadUInt16()
     $expected = @{ X86 = 0x014c; X64 = 0x8664; ARM = 0x01c4; ARM64 = 0xaa64 }[$machine]
     if ($actual -ne $expected) { throw "The game bridge architecture is incorrect for $Architecture." }
+
+    # Validate DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS]. Rust's thread-local
+    # runtime needs this directory even when the bridge has no native mods.
+    $optionalHeader = $pe + 24
+    $stream.Position = $optionalHeader
+    $magic = $reader.ReadUInt16()
+    if ($magic -eq 0x10b) {
+        $directoryCountOffset = $optionalHeader + 92
+        $directoriesOffset = $optionalHeader + 96
+        $expectedTlsSize = 24
+    } elseif ($magic -eq 0x20b) {
+        $directoryCountOffset = $optionalHeader + 108
+        $directoriesOffset = $optionalHeader + 112
+        $expectedTlsSize = 40
+    } else {
+        throw 'The linked game bridge has an unsupported PE optional-header format.'
+    }
+    if ($directoriesOffset + (10 * 8) -gt $optionalHeader + $optionalHeaderSize -or
+        $optionalHeader + $optionalHeaderSize -gt $stream.Length) {
+        throw 'The linked game bridge has a truncated PE optional header.'
+    }
+    $stream.Position = $directoryCountOffset
+    $directoryCount = $reader.ReadUInt32()
+    if ($directoryCount -le 9) { throw 'The game bridge has no PE TLS data directory.' }
+    $stream.Position = $directoriesOffset + (9 * 8)
+    $tlsRva = $reader.ReadUInt32()
+    $tlsSize = $reader.ReadUInt32()
+    if ($tlsRva -eq 0 -or $tlsSize -ne $expectedTlsSize) {
+        throw 'The game bridge is missing the PE TLS directory required by Rust thread-local storage.'
+    }
+} catch {
+    Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
+    throw
 } finally { $reader.Dispose() }
 if (Select-String -LiteralPath "$outputPath.map" -Pattern 'atexit:api-ms-win-crt-runtime-l1-1-0\.dll' -Quiet) {
     Remove-Item -LiteralPath $outputPath -Force

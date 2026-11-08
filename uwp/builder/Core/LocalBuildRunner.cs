@@ -131,6 +131,8 @@ public static class LocalBuildRunner
         var snapshot = release is null ? Path.Combine(root, "source") : Path.GetFullPath(source);
         if (release is not null && release.Client.Version is "0.1.0" or "0.1.1")
             ClientToolchainBackport.Apply(snapshot, release.Client.Version);
+        if (release is not null)
+            ClientTlsBackport.Apply(snapshot, release.Client.Version);
         var cargo = probe.FindOnPath("cargo.exe")!;
         var python = probe.FindOnPath("python.exe")!;
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);

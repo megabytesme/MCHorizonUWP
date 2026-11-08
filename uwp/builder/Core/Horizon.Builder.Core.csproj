@@ -16,6 +16,8 @@
     <EmbeddedResource Include="../../host/build-game.cmd" LogicalName="Horizon.Builder.Core.CompactClient.build-game.cmd" />
     <EmbeddedResource Include="../../host/package.ps1" LogicalName="Horizon.Builder.Core.CompactClient.package.ps1" />
     <EmbeddedResource Include="../../pregame/host/build-shell.cmd" LogicalName="Horizon.Builder.Core.CompactClient.build-shell.cmd" />
+    <EmbeddedResource Include="../../host/tls-index.c" LogicalName="Horizon.Builder.Core.CompactClient.tls-index.c" />
+    <EmbeddedResource Include="../../host/strict-bridge-link.ps1" LogicalName="Horizon.Builder.Core.CompactClient.strict-bridge-link.ps1" />
     <InternalsVisibleTo Include="Horizon.Builder.Tests" />
   </ItemGroup>
 </Project>

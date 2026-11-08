@@ -5,7 +5,7 @@ The signed, versioned release catalog tracks three independent release types:
 includes a parser, compatibility checker, P-256 signature verifier, HTTPS
 transport and an embedded public verification key. The builder selects catalog
 releases and passes verified inputs to the build runner. Client 0.1.3 and patch
-0.1.1 are the current production releases; Builder 0.1.8 is compatible with
+0.1.1 are the current production releases; Builder 0.1.9 is compatible with
 that pair on x86, x64, ARM32 and ARM64. Client 0.1.2 remains listed so the
 Builder can identify it as incompatible; its prebuilt hosts omit the WinMD
 required to activate the UWP application.
@@ -19,7 +19,7 @@ both bridge numbers match and one rule matches all four dimensions.
 The current builder recipe requires client 0.1.3, which packages the WinMD
 activation metadata and prebuilt host files for all four architectures, and
 patch 0.1.1, which pins the matching Horizon nightly. The signed catalog
-permits Builder 0.1.8 to assemble that pair. The release notes distinguish
+permits Builder 0.1.9 to assemble that pair. The release notes distinguish
 compatibility from per-architecture build or device evidence.
 
 Artifacts have HTTPS URLs and SHA-256 digests. Catalog authenticity is a
@@ -99,7 +99,9 @@ Client 0.1.3 carries four architecture-specific C++/CX host executables, their
 activation WinMD metadata, import libraries and a compact link kit. Client
 0.1.2 omitted the WinMD and could be installed but not activated. The builder
 compiles the selected Horizon patch and mods as a Rust static library, then
-links that library into a bridge DLL with Rust's bundled `rust-lld`. The APPX
+links that library into a bridge DLL with Rust's bundled `rust-lld`. It also
+provides and validates the PE TLS directory required by Rust thread-local
+storage, including for client 0.1.3 sources. The APPX
 contains the matching host executable and bridge DLL. This skips compiling the
 Windows host on a user's PC; the builder still prepares Rust, Clang, the
 Windows SDK and Microsoft app frameworks when they are unavailable. Setup

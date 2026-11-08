@@ -45,7 +45,7 @@
       },
       "builder": {
         "min_inclusive": "0.1.8",
-        "max_exclusive": "0.1.9"
+        "max_exclusive": "0.1.10"
       },
       "architectures": [
         "x86",
