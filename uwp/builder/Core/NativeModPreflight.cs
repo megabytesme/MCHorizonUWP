@@ -58,19 +58,27 @@ public static class NativeModPreflight
                     reasons.Add($"{candidate.Version} is missing its bundle download details.");
                     continue;
                 }
-                var bundlePath = await EnsureBundleAsync(transport, candidate, token);
-                var bundle = ReadCompatibility(bundlePath, candidate);
-                if (!bundle.Mixins.Equals(indexedMixins, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException($"{listing.Name} {candidate.Version} does not match its registry compatibility record.");
-                if (bundle.Horizon.Equals(horizonCommit, StringComparison.OrdinalIgnoreCase)
-                    || bundle.Hooks is { } hooks && hooks <= hookApi)
+                try
                 {
-                    compatible.Add(candidate);
+                    var bundlePath = await EnsureBundleAsync(transport, candidate, token);
+                    var bundle = ReadCompatibility(bundlePath, candidate);
+                    if (!bundle.Mixins.Equals(indexedMixins, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException($"{listing.Name} {candidate.Version} does not match its registry compatibility record.");
+                    if (bundle.Horizon.Equals(horizonCommit, StringComparison.OrdinalIgnoreCase)
+                        || bundle.Hooks is { } hooks && hooks <= hookApi)
+                    {
+                        compatible.Add(candidate);
+                    }
+                    else
+                    {
+                        var requires = bundle.Hooks is { } required ? $"hook API {required}" : $"Horizon commit {bundle.Horizon}";
+                        reasons.Add($"{candidate.Version} requires {requires}.");
+                    }
                 }
-                else
+                catch (Exception error) when (error is InvalidDataException or JsonException or InvalidOperationException
+                    or KeyNotFoundException or FormatException or OverflowException)
                 {
-                    var requires = bundle.Hooks is { } required ? $"hook API {required}" : $"Horizon commit {bundle.Horizon}";
-                    reasons.Add($"{candidate.Version} requires {requires}.");
+                    reasons.Add($"{candidate.Version} has invalid compatibility metadata: {error.Message}");
                 }
             }
             var message = compatible.Count > 0
@@ -150,7 +158,7 @@ public static class NativeModPreflight
         var horizon = root.GetProperty("horizon").GetString() ?? "";
         var mixins = root.GetProperty("mixins").GetString() ?? "";
         int? hooks = null;
-        if (root.TryGetProperty("hooks", out var hooksJson))
+        if (root.TryGetProperty("hooks", out var hooksJson) && hooksJson.ValueKind != JsonValueKind.Null)
         {
             if (hooksJson.ValueKind != JsonValueKind.Number || !hooksJson.TryGetInt32(out var parsed) || parsed <= 0)
                 throw new InvalidDataException($"{candidate.Name} {candidate.Version} declares an invalid hook API.");

@@ -138,7 +138,7 @@ internal static class NativeModBuild
         var version = root.GetProperty("version").GetString() ?? "";
         var game = root.GetProperty("game").GetString() ?? "";
         int? hooks = null;
-        if (root.TryGetProperty("hooks", out var hooksValue))
+        if (root.TryGetProperty("hooks", out var hooksValue) && hooksValue.ValueKind != JsonValueKind.Null)
         {
             if (hooksValue.ValueKind != JsonValueKind.Number || !hooksValue.TryGetInt32(out var parsedHooks) || parsedHooks <= 0)
                 throw new InvalidDataException($"{candidate.Name} {candidate.Version} has an invalid hook API declaration.");
