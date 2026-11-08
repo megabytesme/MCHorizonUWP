@@ -69,6 +69,10 @@ jobs:
 
           This release adds batch builds for x86, x64, ARM32 and ARM64, with target-specific progress and partial package recovery if a later architecture fails. Cargo build speed can be adjusted through the first Rust compile, and compiled Cargo outputs are cached between builds and architectures.
 
+          The final page lists each architecture's output folder, signed client APPX, public certificate, optional Horizon resource framework, Microsoft framework dependencies, and installation guide. It includes platform guidance for Windows PCs, Xbox, Windows 10 Mobile, HoloLens and other Windows Core OS devices. Local installation is offered only when the target architecture and selected resource method are available on this PC.
+
+          Minecraft asset progress now settles to Ready after verification. The UWP bridge runtime shim is rebuilt with compact Clang for the selected architecture. This Builder release requires compatible client 0.1.3 host kits with the packaged activation metadata.
+
           The welcome page prepares only the selected architecture dependencies. The signed release catalog is checked before building, and each resulting APPX includes its public certificate and installation guide.
 
           Extract the ZIP and run Horizon.Builder.App.exe. See README.md and THIRD_PARTY_NOTICES.md for project and dependency information.

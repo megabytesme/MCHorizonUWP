@@ -1,15 +1,16 @@
 # Fresh-PC builder validation (2026-11-06)
 
-The latest-source clean-PC acceptance test is **not yet complete**. A fresh
-Sandbox resolved dependencies for all four architectures in about 5 minutes 46
+The latest-source clean-PC acceptance test is **in progress**. A fresh Sandbox
+resolved dependencies for all four architectures in about 5 minutes 46
 seconds. The first build attempt stopped at the recipe guard because the
-required client release had not yet been published. After client 0.1.2 became
-available, the Sandbox produced signed packages for x64, x86, ARM32 and ARM64
-in separate target builds. A corrected x64 test package now activates in
-Windows. The new Finished page, per-architecture output presentation and a
-single four-architecture run of this exact source revision still need an
-end-to-end UI pass; real target-device compatibility is unverified. The earlier
-Visual Studio Build Tools setup took about 35 minutes.
+required client release had not yet been published. Client 0.1.2 then produced
+signed packages, but its prebuilt hosts omitted `HorizonUWP.winmd` and Windows
+showed “Can't open this app.” Client 0.1.3 now includes activation metadata for
+all architectures, and Builder 0.1.7 rebuilds the UCRT startup shim before
+linking. A signed x64 test package activated successfully. The latest Builder
+is being checked through one four-architecture run and its Finished page; real
+target-device compatibility is unverified. The earlier Visual Studio Build
+Tools setup took about 35 minutes.
 
 An earlier 2026-11-06 blank Sandbox was started with 8,588,824,576 bytes of
 guest memory. Its fresh Windows 11
@@ -374,9 +375,9 @@ been addressed for the preview; it did not build a package.
 - The Builder now rebuilds that small C shim from the authenticated client
   source during setup, so a previously published host kit does not retain its
   old `tls_index.obj`. The UI build and tests passed locally on Ben-Desktop.
-- The new Finished page and output-folder grouping compile, and their core
-  installer/architecture-selection rules pass unit tests. A complete run of
-  this exact source revision through the Sandbox UI, including opening the
-  Finished page after a four-architecture batch, remains outstanding. The
-  signed package launch test used a test package assembled from retained
-  Sandbox files, rather than a package emitted by this new Builder revision.
+- The new Finished page, per-architecture output paths, and platform-specific
+  install guides compile; their core installer/architecture-selection rules
+  pass unit tests. The latest-source all-architecture Sandbox run is in
+  progress. The earlier signed package launch test used a test package
+  assembled from retained Sandbox files rather than the package emitted by
+  Builder 0.1.7.

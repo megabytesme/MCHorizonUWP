@@ -7,7 +7,7 @@ renderers and selects one on the target device.
 
 The builder fetches its signed compatibility catalog from this repository,
 then verifies the hashes of the selected Horizon source, patch and client
-artifacts before assembling them. Patch 0.1.1 and client 0.1.2 provide the
+artifacts before assembling them. Patch 0.1.1 and client 0.1.3 provide the
 current release recipe across x86, x64, ARM32 and ARM64. A catalog compatibility
 rule is not a successful build or device test: combinations without recorded
 evidence remain unverified. Later patch and client versions need compatible
