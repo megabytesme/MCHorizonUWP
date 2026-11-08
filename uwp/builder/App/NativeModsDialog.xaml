@@ -11,34 +11,41 @@
       </StackPanel>
     </DataTemplate>
     <DataTemplate x:Key="ModCardTemplate" x:DataType="app:NativeModChoice">
-      <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch" Padding="8">
-        <StackPanel Spacing="4" MaxWidth="740">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="{x:Bind Name}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" />
-            <TextBlock Text="{x:Bind Version}" />
-          </StackPanel>
-          <TextBlock Text="{x:Bind Summary}" TextWrapping="Wrap" />
-          <TextBlock Text="{x:Bind AuthorsText}" TextWrapping="Wrap" />
-          <TextBlock Text="{x:Bind Id}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
-        </StackPanel>
+      <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8">
+        <Grid ColumnSpacing="8" RowSpacing="4" HorizontalAlignment="Stretch">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+          <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Bind Name}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" MinWidth="0" />
+          <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind LatestVersionLabel}" VerticalAlignment="Top" />
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{x:Bind Summary}" TextWrapping="Wrap" MinWidth="0" />
+          <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{x:Bind AuthorsText}" TextWrapping="Wrap" MinWidth="0" />
+          <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{x:Bind Id}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" MinWidth="0" />
+        </Grid>
       </CheckBox>
     </DataTemplate>
     <DataTemplate x:Key="ModIndexTemplate">
       <TextBlock Text="{Binding Group.Key}" Style="{StaticResource SubtitleTextBlockStyle}" Margin="16" />
     </DataTemplate>
+    <Style x:Key="ModListViewItemStyle" TargetType="ListViewItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
   </UserControl.Resources>
   <Grid Padding="8" RowSpacing="10">
     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
     <StackPanel Spacing="6">
       <TextBlock Text="Browse trusted native mods from Horizon’s registry. Search by name or description, or zoom out to jump to a letter." TextWrapping="Wrap" />
+      <TextBlock x:Name="CompatibilityLabel" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
       <TextBox x:Name="SearchBox" PlaceholderText="Search native mods" TextChanged="SearchBox_TextChanged" />
       <TextBlock x:Name="CountLabel" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
     </StackPanel>
     <TextBlock x:Name="EmptyLabel" Grid.Row="1" Text="No native mods match this search." Visibility="Collapsed" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-    <SemanticZoom x:Name="ModsSemanticZoom" Grid.Row="2" IsZoomedInViewActive="True" MinHeight="360">
+    <SemanticZoom x:Name="ModsSemanticZoom" Grid.Row="2" IsZoomedInViewActive="True" MinHeight="360" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
       <SemanticZoom.ZoomedInView>
         <ListView x:Name="ModsZoomedIn" ItemsSource="{x:Bind ModsCollectionView.View, Mode=OneWay}"
-                  ItemTemplate="{StaticResource ModCardTemplate}" SelectionMode="None" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                  ItemTemplate="{StaticResource ModCardTemplate}" ItemContainerStyle="{StaticResource ModListViewItemStyle}" SelectionMode="None"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                  ScrollViewer.HorizontalScrollMode="Disabled">
           <ListView.GroupStyle>
             <GroupStyle HeaderTemplate="{StaticResource ModGroupHeaderTemplate}" />
           </ListView.GroupStyle>
@@ -46,7 +53,14 @@
       </SemanticZoom.ZoomedInView>
       <SemanticZoom.ZoomedOutView>
         <GridView x:Name="ModsZoomedOut" ItemsSource="{x:Bind ModsCollectionView.View.CollectionGroups, Mode=OneWay}"
-                  ItemTemplate="{StaticResource ModIndexTemplate}" SelectionMode="None" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                  ItemTemplate="{StaticResource ModIndexTemplate}" SelectionMode="None" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollMode="Disabled">
+          <GridView.ItemsPanel>
+            <ItemsPanelTemplate>
+              <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4" />
+            </ItemsPanelTemplate>
+          </GridView.ItemsPanel>
+        </GridView>
       </SemanticZoom.ZoomedOutView>
     </SemanticZoom>
   </Grid>

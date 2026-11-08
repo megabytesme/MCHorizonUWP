@@ -14,9 +14,10 @@ public sealed partial class NativeModsDialog : UserControl
     private string search = "";
     private int visibleCount;
 
-    public NativeModsDialog(IReadOnlyList<NativeModListing> mods, IEnumerable<string> selectedIds)
+    public NativeModsDialog(IReadOnlyList<NativeModListing> mods, IEnumerable<string> selectedIds, string horizonCommit)
     {
         InitializeComponent();
+        CompatibilityLabel.Text = $"Target Horizon commit: {horizonCommit}. The builder checks each release and chooses the newest compatible version; exact versions appear in build details.";
         var selected = selectedIds.ToHashSet(StringComparer.Ordinal);
         choices = mods.OrderBy(mod => mod.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(mod => mod.Id, StringComparer.Ordinal)
@@ -83,6 +84,7 @@ public sealed class NativeModChoice : INotifyPropertyChanged
     public string Name { get; }
     public string Summary { get; }
     public string Version { get; }
+    public string LatestVersionLabel => "Latest " + Version;
     public string AuthorsText { get; }
     public bool IsSelected
     {
