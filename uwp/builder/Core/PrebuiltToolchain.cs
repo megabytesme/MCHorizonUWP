@@ -71,6 +71,9 @@ internal static class PrebuiltToolchain
             ["UCRTVersion"] = PrivateWindowsSdk.Version,
             ["WindowsSdkBinPath"] = Path.Combine(sdk, "bin") + "\\",
             ["WindowsSdkVerBinPath"] = sdkVersionBin + "\\",
+            // package.ps1 must use this verified private SDK instead of looking
+            // for a machine-wide Windows Kits installation.
+            ["HORIZON_UWP_PREPARED_ENV"] = "1",
             ["CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"] = hostLinker,
             ["CC_x86_64_pc_windows_msvc"] = compiler,
             ["CFLAGS_x86_64_pc_windows_msvc"] = "-DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP",

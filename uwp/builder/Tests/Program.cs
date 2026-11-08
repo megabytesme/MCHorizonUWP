@@ -1328,6 +1328,16 @@ var desktop = new SetupChecker(fake).Scan(TargetProfile.DesktopX64);
 Require(desktop.Single(c => c.Name == "Visual C++ UWP tools").Status == CheckStatus.Missing, "ARM tools do not satisfy x64");
 fake.Files.Remove(Path.Combine(packageSdk, "signtool.exe"));
 Require(new SetupChecker(fake).Scan(TargetProfile.WindowsMobile).Single(c => c.Name == "Windows SDK and packaging tools").Status == CheckStatus.Missing, "incomplete SDK rejected");
+try
+{
+    var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+    await LocalBuildRunner.RunProcess(cmd, Path.GetTempPath(), ["/d", "/c", "echo package-diagnostic-proof 1>&2 & exit /b 7"], captureFailureOutput: true);
+    throw new Exception("failed packaging tools unexpectedly succeeded");
+}
+catch (InvalidOperationException error)
+{
+    Require(error.Message.Contains("package-diagnostic-proof", StringComparison.Ordinal), "failed packaging tools include their useful diagnostic output");
+}
 Console.WriteLine("Setup checker tests passed.");
 
 static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }

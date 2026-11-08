@@ -328,7 +328,8 @@ public static class LocalBuildRunner
             packageArguments.Add("-ReleaseMetadataPath");
             packageArguments.Add(metadataPath);
         }
-        await RunProcess(powershell, snapshot, packageArguments, compact is null ? null : hostBuildEnvironment);
+        await RunProcess(powershell, snapshot, packageArguments, compact is null ? null : hostBuildEnvironment,
+            captureFailureOutput: compact is not null);
         var package = Path.Combine(packageDir, $"HorizonUWP-{arch}.appx");
         if (!File.Exists(package)) throw new InvalidOperationException("The package script did not produce the expected APPX.");
         SignedPackageOutput? signed = null;
@@ -407,30 +408,52 @@ public static class LocalBuildRunner
     }
 
     internal static async Task<string> RunProcess(string executable, string directory, IReadOnlyList<string> args,
-        IReadOnlyDictionary<string, string>? environment = null, bool captureOutput = false, IProgress<string>? progress = null)
+        IReadOnlyDictionary<string, string>? environment = null, bool captureOutput = false, IProgress<string>? progress = null,
+        bool captureFailureOutput = false)
     {
         var start = new ProcessStartInfo(executable) { WorkingDirectory = Path.GetFullPath(directory), UseShellExecute = false,
             CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in args) start.ArgumentList.Add(arg);
         if (environment is not null) foreach (var (key, value) in environment) start.Environment[key] = value;
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start a required build tool.");
-        var output = ReadProcessStreamAsync(process.StandardOutput, captureOutput, progress);
-        var error = ReadProcessStreamAsync(process.StandardError, captureOutput: false, progress);
+        var output = ReadProcessStreamAsync(process.StandardOutput, captureOutput, progress, captureFailureOutput);
+        var error = ReadProcessStreamAsync(process.StandardError, captureOutput: false, progress: progress, captureFailureOutput: captureFailureOutput);
         await process.WaitForExitAsync();
         await Task.WhenAll(output, error); // Tool output is streamed only through the safe progress filter; credentials are never persisted.
-        if (process.ExitCode != 0) throw new InvalidOperationException($"{Path.GetFileName(executable)} failed (exit code {process.ExitCode}); working directory: {directory}. The workspace was retained.");
+        if (process.ExitCode != 0)
+        {
+            var diagnostics = captureFailureOutput ? FormatFailureOutput(await output, await error) : "";
+            throw new InvalidOperationException($"{Path.GetFileName(executable)} failed (exit code {process.ExitCode}); working directory: {directory}. The workspace was retained.{diagnostics}");
+        }
         return captureOutput ? await output : "";
     }
 
-    private static async Task<string> ReadProcessStreamAsync(StreamReader reader, bool captureOutput, IProgress<string>? progress)
+    private static async Task<string> ReadProcessStreamAsync(StreamReader reader, bool captureOutput, IProgress<string>? progress, bool captureFailureOutput = false)
     {
         var captured = captureOutput ? new StringBuilder() : null;
+        Queue<string>? failureTail = captureFailureOutput ? new Queue<string>() : null;
         while (await reader.ReadLineAsync() is { } line)
         {
             if (captured is not null) captured.AppendLine(line);
+            if (failureTail is not null)
+            {
+                failureTail.Enqueue(line);
+                while (failureTail.Count > 40) failureTail.Dequeue();
+            }
             if (progress is not null && IsSafeCargoProgressLine(line)) progress.Report("Cargo: " + line.Trim());
         }
-        return captured?.ToString() ?? "";
+        if (captured is not null) return captured.ToString();
+        if (failureTail is null) return "";
+        var tail = string.Join(Environment.NewLine, failureTail);
+        return tail.Length <= 8_000 ? tail : tail[^8_000..];
+    }
+
+    private static string FormatFailureOutput(string standardOutput, string standardError)
+    {
+        var sections = new List<string>();
+        if (!string.IsNullOrWhiteSpace(standardOutput)) sections.Add("Standard output:\n" + standardOutput.Trim());
+        if (!string.IsNullOrWhiteSpace(standardError)) sections.Add("Standard error:\n" + standardError.Trim());
+        return sections.Count == 0 ? "" : "\n\nTool details:\n" + string.Join("\n", sections);
     }
 
     private static bool IsSafeCargoProgressLine(string line)
