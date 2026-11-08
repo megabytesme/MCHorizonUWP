@@ -50,6 +50,23 @@ public static class LocalRecipe
         return FormattableString.Invariant($"{utc.Year}.{utc.Month * 100 + utc.Day}.{utc.Hour * 100 + utc.Minute}.{utc.Second}");
     }
 
+    /// <summary>Suggest a package version newer than the currently installed app when necessary.</summary>
+    public static string NextPackageVersion(DateTimeOffset now, Version? installedVersion = null)
+    {
+        var candidate = new Version(PackageVersionFor(now));
+        if (installedVersion is null || candidate > installedVersion) return candidate.ToString(4);
+
+        var parts = new[] { installedVersion.Major, installedVersion.Minor, installedVersion.Build, installedVersion.Revision };
+        for (var index = parts.Length - 1; index >= 0; index--)
+        {
+            if (parts[index] >= ushort.MaxValue) continue;
+            parts[index]++;
+            for (var following = index + 1; following < parts.Length; following++) parts[following] = 0;
+            return string.Join(".", parts.Select(part => part.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+        throw new InvalidOperationException("The installed app already uses the highest Windows package version. It cannot be upgraded with a higher version.");
+    }
+
     public static void ConfigureManifest(XDocument manifest, BuildSelection selection, PackageSigningIdentity? signingIdentity = null)
     {
         var identity = manifest.Root?.Element(manifest.Root.Name.Namespace + "Identity")

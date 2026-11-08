@@ -5,9 +5,13 @@ using System.Text.Json;
 
 namespace Horizon.Builder.Core;
 
+public sealed record InstalledClientPackage(string Architecture, Version Version);
+
 /// <summary>Installs a builder-produced signed package after the user chooses to trust its certificate.</summary>
 public static class LocalPackageInstaller
 {
+    public const string ClientPackageName = "MCHorizonUWP";
+
     public static bool CanInstall(TargetProfile target, Architecture machine, Version windows) => (machine, target) switch
     {
         (Architecture.X64, TargetProfile.DesktopX64 or TargetProfile.DesktopX86) => true,
@@ -64,6 +68,53 @@ public static class LocalPackageInstaller
         throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr.Result)
             ? $"Windows could not check the installed resource framework (PowerShell exit code {process.ExitCode})."
             : "Windows could not check the installed resource framework: " + stderr.Result.Trim());
+    }
+
+    /// <summary>Finds this builder's installed client package for the current Windows user.</summary>
+    public static async Task<InstalledClientPackage?> FindInstalledClientAsync(string expectedPublisher,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedPublisher);
+        if (!OperatingSystem.IsWindows()) return null;
+
+        var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+        var start = new ProcessStartInfo(powershell)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-Command",
+            "$ErrorActionPreference='Stop'; $n=$env:HORIZON_CLIENT_PACKAGE_NAME; $expectedPublisher=$env:HORIZON_CLIENT_PUBLISHER; $p=@(Get-AppxPackage -Name $n -ErrorAction SilentlyContinue | Where-Object { $_.Name -ceq $n -and $_.Publisher -ceq $expectedPublisher } | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1); if ($p.Count -eq 0) { [Console]::Out.WriteLine('null') } else { [PSCustomObject]@{ architecture=[string]$p[0].Architecture; version=[string]$p[0].Version } | ConvertTo-Json -Compress }" })
+            start.ArgumentList.Add(argument);
+        start.Environment["HORIZON_CLIENT_PACKAGE_NAME"] = ClientPackageName;
+        start.Environment["HORIZON_CLIENT_PUBLISHER"] = expectedPublisher;
+
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not query installed Horizon packages.");
+        var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        await Task.WhenAll(stdout, stderr);
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr.Result)
+                ? $"Windows could not check the installed Horizon package (PowerShell exit code {process.ExitCode})."
+                : "Windows could not check the installed Horizon package: " + stderr.Result.Trim());
+        if (string.IsNullOrWhiteSpace(stdout.Result) || stdout.Result.Trim().Equals("null", StringComparison.OrdinalIgnoreCase)) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(stdout.Result);
+            var root = document.RootElement;
+            var architecture = root.GetProperty("architecture").GetString();
+            var versionText = root.GetProperty("version").GetString();
+            if (string.IsNullOrWhiteSpace(architecture) || !Version.TryParse(versionText, out var version))
+                throw new InvalidDataException("Windows returned invalid installed Horizon package metadata.");
+            return new(architecture, version);
+        }
+        catch (JsonException error)
+        {
+            throw new InvalidDataException("Windows returned invalid installed Horizon package metadata.", error);
+        }
     }
 
     public static async Task InstallAsync(SignedPackageOutput output, IProgress<string>? progress = null)

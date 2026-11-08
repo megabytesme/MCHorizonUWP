@@ -12,13 +12,19 @@ public sealed partial class MainWindow
         bool RequiresExistingResourceFramework,
         string? ExistingResourceFrameworkName,
         bool ExactResourceFrameworkInstalled,
-        string? FrameworkQueryError);
+        string? FrameworkQueryError,
+        InstalledClientPackage? InstalledClient,
+        string? InstalledClientQueryError);
 
     private async Task<LocalInstallCheck> CheckLocalInstallAvailabilityAsync(System.Runtime.InteropServices.Architecture hostArchitecture)
     {
         var requiresExistingFramework = builtResourceMode == 1;
         var frameworkInstalled = !requiresExistingFramework;
         string? queryError = null;
+        InstalledClientPackage? installedClient = null;
+        string? installedClientQueryError = null;
+        try { installedClient = await LocalPackageInstaller.FindInstalledClientAsync(PackageSigning.GetOrCreateIdentity().Publisher); }
+        catch (Exception error) { installedClientQueryError = error.Message; }
         if (requiresExistingFramework && builtOutputs.Count > 0 && builtExistingResourceFrameworkName is { } frameworkName)
         {
             try
@@ -34,27 +40,41 @@ public sealed partial class MainWindow
         }
         var eligible = builtOutputs.Where(item => LocalPackageInstaller.CanInstall(item.Target, hostArchitecture,
             Environment.OSVersion.Version, requiresExistingFramework, frameworkInstalled)).ToArray();
-        return new(eligible, requiresExistingFramework, builtExistingResourceFrameworkName, frameworkInstalled, queryError);
+        if (installedClient is not null && Version.TryParse(PackageVersion.Text, out var builtVersion) && builtVersion <= installedClient.Version)
+            eligible = [];
+        return new(eligible, requiresExistingFramework, builtExistingResourceFrameworkName, frameworkInstalled, queryError,
+            installedClient, installedClientQueryError);
     }
 
     private string FormatLocalInstallAvailability(LocalInstallCheck check)
     {
         if (builtOutputs.Count == 0) return string.Empty;
+        var appStatus = check.InstalledClientQueryError is { } clientError
+            ? $"Windows could not check for an existing MCHorizonUWP installation: {clientError}"
+            : check.InstalledClient is { } installed
+                ? $"MCHorizonUWP {installed.Version} is installed for {DisplayInstalledArchitecture(installed.Architecture)}. A higher package version is required to update it."
+                : "No MCHorizonUWP package from this signing identity is installed for this Windows account.";
+        if (check.InstalledClient is { } current && Version.TryParse(PackageVersion.Text, out var candidate) && candidate > current.Version
+            && check.Eligible.Any(item => string.Equals(ArchitectureFor(item.Target), current.Architecture, StringComparison.OrdinalIgnoreCase)))
+            appStatus = $"MCHorizonUWP {current.Version} is installed for {DisplayInstalledArchitecture(current.Architecture)}. The matching package will update the same app identity; Windows normally preserves local app data during package updates.";
+        else if (check.InstalledClient is { } installedClient && Version.TryParse(PackageVersion.Text, out var nextVersion) && nextVersion > installedClient.Version
+            && check.Eligible.Count > 0)
+            appStatus = $"MCHorizonUWP {installedClient.Version} is installed for {DisplayInstalledArchitecture(installedClient.Architecture)}. A different architecture will be installed only after a data-compatibility warning.";
         if (check.RequiresExistingResourceFramework)
         {
             if (check.ExistingResourceFrameworkName is not { } frameworkName)
-                return "Install on this PC is unavailable because the required existing Horizon resource framework was not recorded. Rebuild and select the exact installed framework name.";
+                return appStatus + " Install is unavailable because the required existing Horizon resource framework was not recorded. Rebuild and select the exact installed framework name.";
             if (check.FrameworkQueryError is { } error)
-                return $"Install on this PC is unavailable because the builder could not verify {frameworkName}: {error}. This build references an existing framework and did not produce its APPX.";
+                return appStatus + $" Install is unavailable because the builder could not verify {frameworkName}: {error}. This build references an existing framework and did not produce its APPX.";
             if (!check.ExactResourceFrameworkInstalled)
-                return $"Install on this PC is unavailable because {frameworkName} from this signing identity is not installed for this Windows account. This build references an existing framework and did not produce its APPX. Install that exact framework on this PC or rebuild using separate or bundled resources.";
+                return appStatus + $" Install is unavailable because {frameworkName} from this signing identity is not installed for this Windows account. This build references an existing framework and did not produce its APPX. Install that exact framework on this PC or rebuild using separate or bundled resources.";
             if (check.Eligible.Count == 0)
-                return "The selected framework is installed, but none of the built architectures can be installed on this PC. Use the target device's installation guide.";
-            return $"The exact framework {frameworkName} is installed for this Windows account, so a compatible package can be installed here.";
+                return appStatus + " The selected framework is installed, but none of the built architectures can be installed on this PC. Use the target device's installation guide.";
+            return appStatus + $" The exact framework {frameworkName} is installed for this Windows account.";
         }
-        return check.Eligible.Count > 0
-            ? "The builder will install the client and the dependencies included in its architecture folder."
-            : "Install on this PC is unavailable for the selected architecture on this computer. Use the installation guide for the target device.";
+        return appStatus + (check.Eligible.Count > 0
+            ? " The builder will install the client and the dependencies included in its architecture folder."
+            : " Install on this PC is unavailable for the selected architecture or package version on this computer. Use the installation guide for the target device.");
     }
 
     private void UpdateFinishedOutputs()
@@ -123,15 +143,45 @@ public sealed partial class MainWindow
         _ => ArchitectureFor(target),
     };
 
+    private static string DisplayInstalledArchitecture(string architecture) => architecture.ToLowerInvariant() switch
+    {
+        "x64" => "x64",
+        "x86" => "x86",
+        "arm" => "ARM32",
+        "arm64" => "ARM64",
+        "neutral" => "neutral",
+        _ => architecture,
+    };
+
+    private string GetLocalInstallAction(LocalInstallCheck check)
+    {
+        if (check.InstalledClient is not { } installed || !Version.TryParse(PackageVersion.Text, out var candidate)
+            || candidate <= installed.Version) return "Install on this PC";
+        return check.Eligible.Any(item => string.Equals(ArchitectureFor(item.Target), installed.Architecture, StringComparison.OrdinalIgnoreCase))
+            ? "Upgrade on this PC"
+            : "Install on this PC";
+    }
+
     private void StartAnotherBuild_Click(object sender, RoutedEventArgs e)
     {
         if (buildActionRunning || navigationBusy) return;
+        packageVersionResolvedAgainstInstalled = false;
+        if (!packageVersionCustomized) SetSuggestedPackageVersion(LocalRecipe.PackageVersionFor(DateTimeOffset.UtcNow));
         wizardStep = 0;
         highestVisited = 0;
         completedPages = 0;
         lastRenderedStep = -1;
         UpdateWizard();
         PageScroller.ChangeView(null, 0, null, disableAnimation: true);
+    }
+
+    private void SetSuggestedPackageVersion(string version)
+    {
+        suggestedPackageVersion = version;
+        packageVersionUpdating = true;
+        PackageVersion.Text = version;
+        packageVersionUpdating = false;
+        packageVersionCustomized = false;
     }
 
     private void ExitBuilder_Click(object sender, RoutedEventArgs e) => Close();

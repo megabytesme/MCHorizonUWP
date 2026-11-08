@@ -51,7 +51,12 @@ public sealed partial class MainWindow : Window
         };
         ResourceMode.SelectionChanged += ResourceMode_SelectionChanged;
         ExistingFrameworkName.TextChanged += (_, _) => UpdateWizard();
-        PackageVersion.TextChanged += (_, _) => { UpdateBuildActions(); UpdateWizard(); };
+        PackageVersion.TextChanged += (_, _) =>
+        {
+            if (!packageVersionUpdating) packageVersionCustomized = !string.Equals(PackageVersion.Text, suggestedPackageVersion, StringComparison.Ordinal);
+            UpdateBuildActions();
+            UpdateWizard();
+        };
         AutoBuild.Checked += (_, _) => _ = MaybeAutoStartAsync();
         AutoBuild.Unchecked += (_, _) => { if (wizardStep == ReviewStep && readinessReady) ReadinessStatus.Text = "Ready to build"; };
         var defaultTarget = BuildSelection.DefaultTarget(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture);
@@ -63,7 +68,7 @@ public sealed partial class MainWindow : Window
         initializingArchitectures = false;
         BuildSpeedReview.SelectedIndex = 0;
         BuildSpeedBuild.SelectedIndex = 0;
-        PackageVersion.Text = LocalRecipe.DefaultPackageVersion;
+        SetSuggestedPackageVersion(LocalRecipe.PackageVersionFor(DateTimeOffset.UtcNow));
         UpdateSignInActions(busy: false);
         if (MinecraftSignIn.HasSavedSession)
             MinecraftSignInStatus.Text = "A saved Microsoft sign-in is available on this PC.";
@@ -181,6 +186,10 @@ public sealed partial class MainWindow : Window
     private bool autoStartScheduled;
     private bool initializingArchitectures = true;
     private bool synchronizingBuildSpeed;
+    private bool packageVersionUpdating;
+    private bool packageVersionCustomized;
+    private bool packageVersionResolvedAgainstInstalled;
+    private string suggestedPackageVersion = "";
     private bool cargoCompileStarted;
     private int lastRenderedStep = -1;
     private int highestVisited;
@@ -979,6 +988,16 @@ public sealed partial class MainWindow : Window
         Results.Children.Clear();
         try
         {
+            if (!packageVersionResolvedAgainstInstalled)
+            {
+                if (!packageVersionCustomized)
+                {
+                    var signingIdentity = PackageSigning.GetOrCreateIdentity();
+                    var installedClient = await LocalPackageInstaller.FindInstalledClientAsync(signingIdentity.Publisher);
+                    SetSuggestedPackageVersion(LocalRecipe.NextPackageVersion(DateTimeOffset.UtcNow, installedClient?.Version));
+                }
+                packageVersionResolvedAgainstInstalled = true;
+            }
             string? resources = null;
             string? minecraft = null;
             var selection = CurrentSelection();
@@ -1082,6 +1101,15 @@ public sealed partial class MainWindow : Window
         UpdateBuildActions();
         try
         {
+            var versionBeforeInstallCheck = PackageVersion.Text;
+            var installedClient = await LocalPackageInstaller.FindInstalledClientAsync(PackageSigning.GetOrCreateIdentity().Publisher);
+            if (!packageVersionCustomized)
+                SetSuggestedPackageVersion(LocalRecipe.NextPackageVersion(DateTimeOffset.UtcNow, installedClient?.Version));
+            else if (installedClient is not null && new Version(CurrentSelection().ValidatedPackageVersion) <= installedClient.Version)
+                throw new InvalidOperationException($"The installed Horizon package is version {installedClient.Version}. Choose a higher package version to make an in-place upgrade available.");
+            if (!string.Equals(versionBeforeInstallCheck, PackageVersion.Text, StringComparison.Ordinal))
+                BuildSummary.Text = BuildSummary.Text.Replace($"Package version: {versionBeforeInstallCheck}", $"Package version: {PackageVersion.Text}", StringComparison.Ordinal);
+            packageVersionResolvedAgainstInstalled = true;
             if (!minecraftOwnershipVerified) throw new InvalidOperationException("Sign in with an account that owns Minecraft: Java Edition before building.");
             string? resources = null;
             string? minecraft = null;
@@ -1348,9 +1376,15 @@ public sealed partial class MainWindow : Window
         var choices = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, SelectedIndex = 0 };
         foreach (var item in installable)
             choices.Items.Add(new ComboBoxItem { Content = $"{ArchitectureFor(item.Target)} — {Path.GetFileName(item.Output.Client)}", Tag = item.Output });
-        var defaultIndex = Array.FindIndex(installable.ToArray(), item => item.Target == BuildSelection.DefaultTarget(hostArchitecture));
+        var installedIndex = eligibility.InstalledClient is { } installed
+            ? Array.FindIndex(installable.ToArray(), item => string.Equals(ArchitectureFor(item.Target), installed.Architecture, StringComparison.OrdinalIgnoreCase))
+            : -1;
+        var defaultIndex = installedIndex >= 0 ? installedIndex
+            : Array.FindIndex(installable.ToArray(), item => item.Target == BuildSelection.DefaultTarget(hostArchitecture));
         if (defaultIndex >= 0) choices.SelectedIndex = defaultIndex;
         var installContent = new StackPanel { Spacing = 10 };
+        var installDescription = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        installContent.Children.Add(installDescription);
         installContent.Children.Add(new TextBlock { Text = "Windows will trust your local signing certificate and install the client and its required frameworks for your account. Windows may ask for administrator approval.", TextWrapping = TextWrapping.Wrap });
         if (installable.Count > 1)
         {
@@ -1364,6 +1398,30 @@ public sealed partial class MainWindow : Window
             Content = installContent,
             PrimaryButtonText = "Install", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close,
         };
+        void UpdateInstallPrompt()
+        {
+            var selected = installable[Math.Clamp(choices.SelectedIndex, 0, installable.Count - 1)];
+            if (eligibility.InstalledClient is not { } current)
+            {
+                dialog.Title = "Install Horizon on this PC?";
+                dialog.PrimaryButtonText = "Install";
+                installDescription.Text = "This Windows account does not have the matching MCHorizonUWP package installed.";
+            }
+            else if (string.Equals(ArchitectureFor(selected.Target), current.Architecture, StringComparison.OrdinalIgnoreCase))
+            {
+                dialog.Title = "Upgrade Horizon on this PC?";
+                dialog.PrimaryButtonText = "Upgrade";
+                installDescription.Text = $"This will update MCHorizonUWP {current.Version} with the same package identity and architecture. Windows normally preserves local app data during package updates; the new version is {PackageVersion.Text}.";
+            }
+            else
+            {
+                dialog.Title = "Change Horizon package architecture?";
+                dialog.PrimaryButtonText = "Install";
+                installDescription.Text = $"The current installation uses {DisplayInstalledArchitecture(current.Architecture)}, while this package uses {DisplayArchitecture(selected.Target)}. Windows will attempt a package update, but changing architecture can expose app-data or compatibility issues. Back up worlds before continuing.";
+            }
+        }
+        choices.SelectionChanged += (_, _) => UpdateInstallPrompt();
+        UpdateInstallPrompt();
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         var output = choices.SelectedItem is ComboBoxItem { Tag: SignedPackageOutput selectedOutput } ? selectedOutput : installable[0].Output;
         var latestEligibility = await CheckLocalInstallAvailabilityAsync(hostArchitecture);
@@ -1374,12 +1432,19 @@ public sealed partial class MainWindow : Window
             InstallLocalFinished.Visibility = Visibility.Collapsed;
             return;
         }
+        if (eligibility.InstalledClient?.Architecture != latestEligibility.InstalledClient?.Architecture
+            || eligibility.InstalledClient?.Version != latestEligibility.InstalledClient?.Version)
+        {
+            LocalInstallAvailability.Text = "The installed Horizon package changed while the install dialog was open. Review the current package status and try again.";
+            return;
+        }
         InstallLocal.IsEnabled = false;
         InstallLocalFinished.IsEnabled = false;
         try
         {
             await LocalPackageInstaller.InstallAsync(output, new Progress<string>(SetInstallStatus));
             SetInstallStatus("Horizon was installed for your Windows account.");
+            await UpdateLocalInstallVisibilityAsync(hostArchitecture);
         }
         catch (Exception error) { SetInstallStatus($"Installation did not complete: {error.Message}"); }
         finally { InstallLocal.IsEnabled = true; InstallLocalFinished.IsEnabled = true; }
@@ -1400,6 +1465,8 @@ public sealed partial class MainWindow : Window
     {
         var eligibility = await CheckLocalInstallAvailabilityAsync(hostArchitecture);
         var canInstall = eligibility.Eligible.Count > 0;
+        InstallLocal.Content = GetLocalInstallAction(eligibility);
+        InstallLocalFinished.Content = InstallLocal.Content;
         InstallLocal.Visibility = canInstall ? Visibility.Visible : Visibility.Collapsed;
         InstallLocalFinished.Visibility = canInstall ? Visibility.Visible : Visibility.Collapsed;
         LocalInstallAvailability.Text = FormatLocalInstallAvailability(eligibility);
