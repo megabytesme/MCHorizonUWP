@@ -1,0 +1,78 @@
+name: Builder release
+
+on:
+  push:
+    tags:
+      - "builder-v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: builder-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish the WinUI builder
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Check the public repository history
+        run: python tools/check_public_tree.py --history
+
+      - name: Run builder tests
+        run: dotnet run --project uwp/builder/Tests/Horizon.Builder.Tests.csproj -c Release
+
+      - name: Verify the release catalog signature
+        shell: pwsh
+        run: dotnet run --project tools/catalog-signer/CatalogSigner.csproj -c Release -- verify catalog/catalog-v1.json catalog/catalog-v1.sig uwp/builder/Core/Assets/catalog-public.der
+
+      - name: Publish the WinUI builder
+        shell: pwsh
+        run: ./uwp/builder/build.ps1 -Configuration Release -Publish
+
+      - name: Package the builder and its notices
+        shell: pwsh
+        run: |
+          $publish = Join-Path $env:GITHUB_WORKSPACE 'uwp/builder/App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/publish'
+          if (-not (Test-Path -LiteralPath (Join-Path $publish 'Horizon.Builder.App.exe'))) { throw 'The published builder executable is missing.' }
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'README.md') -Destination $publish -Force
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'LICENSE') -Destination $publish -Force
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'THIRD_PARTY_NOTICES.md') -Destination $publish -Force
+          Set-Content -LiteralPath (Join-Path $publish 'builder-version.txt') -Value $env:GITHUB_REF_NAME -Encoding UTF8
+          $archive = Join-Path $env:RUNNER_TEMP ($env:GITHUB_REF_NAME.Replace('builder-v', 'HorizonUWPBuilder-') + '.zip')
+          if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }
+          Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $archive -CompressionLevel Optimal
+          $checksum = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath ($archive + '.sha256') -Value "$checksum  $(Split-Path -Leaf $archive)" -Encoding ASCII
+          "BUILDER_ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "BUILDER_CHECKSUM=$($archive).sha256" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Create the GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @"
+          MCHorizonUWP Builder $($env:GITHUB_REF_NAME.Replace('builder-v', ''))
+
+          This release adds batch builds for x86, x64, ARM32 and ARM64, with target-specific progress and partial package recovery if a later architecture fails. Cargo build speed can be adjusted through the first Rust compile, and compiled Cargo outputs are cached between builds and architectures.
+
+          The welcome page prepares only the selected architecture dependencies. The signed release catalog is checked before building, and each resulting APPX includes its public certificate and installation guide.
+
+          Extract the ZIP and run Horizon.Builder.App.exe. See README.md and THIRD_PARTY_NOTICES.md for project and dependency information.
+          "@
+          $notesPath = Join-Path $env:RUNNER_TEMP 'builder-release-notes.md'
+          Set-Content -LiteralPath $notesPath -Value $notes -Encoding UTF8
+          gh release create $env:GITHUB_REF_NAME $env:BUILDER_ARCHIVE $env:BUILDER_CHECKSUM --repo $env:GITHUB_REPOSITORY --title "MCHorizonUWP Builder $($env:GITHUB_REF_NAME.Replace('builder-v', ''))" --notes-file $notesPath --verify-tag
