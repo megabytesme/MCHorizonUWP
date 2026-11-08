@@ -10,7 +10,11 @@ public sealed record NativeModCandidate(string Id, string Name, string Version, 
     string Url, long Size, string Sha256, string[] BrokenCommits, string RawProject, string RawVersion);
 
 public sealed record NativeModListing(string Id, string Name, string Summary, string Version, string[] Authors,
-    IReadOnlyList<NativeModCandidate> Versions);
+    IReadOnlyList<NativeModCandidate> Versions, IReadOnlyList<NativeModCandidate>? CompatibleVersions = null,
+    string CompatibilityMessage = "Compatibility has not been checked.")
+{
+    public bool IsCompatible => CompatibleVersions is { Count: > 0 };
+}
 
 public sealed record NativeModCatalog(byte[] OriginalIndex, IReadOnlyList<NativeModListing> Mods);
 

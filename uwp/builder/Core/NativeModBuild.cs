@@ -14,10 +14,11 @@ internal static class NativeModBuild
 
     internal static Task<string> ApplyAsync(string source, string workspace, IReadOnlyList<string> requested,
         string cargo, IReadOnlyDictionary<string, string> hostEnvironment, IProgress<string>? progress)
-        => ApplyAsync(source, workspace, requested, cargo, hostEnvironment, LocalRecipe.UpstreamNightlyCommit, progress);
+        => ApplyAsync(source, workspace, requested, cargo, hostEnvironment, LocalRecipe.UpstreamNightlyCommit, null, progress);
 
     internal static async Task<string> ApplyAsync(string source, string workspace, IReadOnlyList<string> requested,
-        string cargo, IReadOnlyDictionary<string, string> hostEnvironment, string targetCommit, IProgress<string>? progress)
+        string cargo, IReadOnlyDictionary<string, string> hostEnvironment, string targetCommit,
+        IReadOnlyDictionary<string, string>? expectedVersions, IProgress<string>? progress)
     {
         if (requested.Count == 0) return source;
         if (requested.Count > 100 || requested.Distinct(StringComparer.Ordinal).Count() != requested.Count)
@@ -38,7 +39,10 @@ internal static class NativeModBuild
             var listing = catalog.Mods.SingleOrDefault(mod => mod.Id == id)
                 ?? throw new InvalidDataException($"{id} is no longer available in Horizon's native-mod registry for Minecraft {LocalRecipe.MinecraftVersion}.");
             var compatible = new List<ResolvedNativeMod>();
-            foreach (var candidate in listing.Versions)
+            var candidates = listing.Versions.AsEnumerable();
+            if (expectedVersions is not null && expectedVersions.TryGetValue(id, out var expectedVersion))
+                candidates = candidates.Where(candidate => candidate.Version == expectedVersion);
+            foreach (var candidate in candidates)
             {
                 if (candidate.BrokenCommits.Contains(targetCommit, StringComparer.OrdinalIgnoreCase))
                 {
@@ -47,11 +51,8 @@ internal static class NativeModBuild
                 }
                 if (candidate.Url.Length == 0 || candidate.Size <= 0)
                     throw new InvalidDataException($"The registry entry for {listing.Name} {candidate.Version} is missing its download details.");
-                var bundlePath = Path.Combine(stager.Workspace, "candidate-" + candidate.Sha256.ToLowerInvariant() + ".hnmod");
                 progress?.Report($"Checking {listing.Name} {candidate.Version} against Horizon {targetCommit}.");
-                await transport.DownloadArtifactAsync(new CatalogArtifact(candidate.Url, candidate.Sha256), bundlePath);
-                if (new FileInfo(bundlePath).Length != candidate.Size)
-                    throw new InvalidDataException($"The downloaded {listing.Name} {candidate.Version} bundle has the wrong size.");
+                var bundlePath = await NativeModPreflight.EnsureBundleAsync(transport, candidate);
                 var metadata = ReadCompatibility(bundlePath, candidate);
                 var matchesHooks = metadata.Hooks is { } hooks && hooks > 0 && hooks <= availableHooks;
                 if (!matchesHooks && !metadata.Horizon.Equals(targetCommit, StringComparison.OrdinalIgnoreCase))
@@ -62,7 +63,9 @@ internal static class NativeModBuild
                 compatible.Add(new(candidate, bundlePath, metadata.Horizon, metadata.Mixins, metadata.Hooks));
             }
             if (compatible.Count == 0)
-                throw new InvalidOperationException($"No version of {listing.Name} is compatible with Horizon commit {targetCommit} and hook API {availableHooks}.");
+                throw new InvalidOperationException(expectedVersions is not null && expectedVersions.ContainsKey(id)
+                    ? $"The previously selected {listing.Name} version is no longer compatible with Horizon commit {targetCommit}. Reopen the mod picker to refresh compatibility."
+                    : $"No version of {listing.Name} is compatible with Horizon commit {targetCommit} and hook API {availableHooks}.");
             discovered.Add(id, compatible);
         }
 

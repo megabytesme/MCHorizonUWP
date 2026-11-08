@@ -156,12 +156,15 @@
             </StackPanel>
             <StackPanel x:Name="ModsPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Choose native mods" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />
-              <TextBlock Text="Native mods add features to the client. Choose trusted mods from Horizon’s signed native mod repository; compatibility is checked during the build." TextWrapping="Wrap" />
+              <TextBlock Text="Native mods add features to the client. Before opening the list, the builder checks every available release against the selected Horizon commit and hook API. Incompatible mods are shown disabled with a reason." TextWrapping="Wrap" />
               <CheckBox x:Name="NativeTouchMod" Content="Include native touch controls" IsChecked="True" />
               <TextBlock Text="The included touch controls currently work with the native Direct3D 11 backend." TextWrapping="Wrap" />
               <CheckBox x:Name="NativeDeviceVibration" Content="Include device vibration" IsChecked="True" />
               <Button x:Name="BrowseNativeMods" Content="Browse Horizon native mods…" Click="BrowseNativeMods_Click" />
-              <TextBlock x:Name="NativeModsStatus" Text="No Horizon repository mods selected." TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ProgressRing x:Name="NativeModsCompatibilityRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="NativeModsStatus" Text="Compatibility will be checked before the list opens." TextWrapping="Wrap" VerticalAlignment="Center" />
+              </StackPanel>
               <Button x:Name="ClearNativeMods" Content="Clear selected repository mods" Click="ClearNativeMods_Click" Visibility="Collapsed" HorizontalAlignment="Left" />
             </StackPanel>
             <StackPanel x:Name="PackageVersionPage" Spacing="14" Visibility="Collapsed">

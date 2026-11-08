@@ -11,15 +11,16 @@
       </StackPanel>
     </DataTemplate>
     <DataTemplate x:Key="ModCardTemplate" x:DataType="app:NativeModChoice">
-      <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8">
+      <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" IsEnabled="{x:Bind IsCompatible}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8">
         <Grid ColumnSpacing="8" RowSpacing="4" HorizontalAlignment="Stretch">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
           <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Bind Name}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" MinWidth="0" />
-          <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind LatestVersionLabel}" VerticalAlignment="Top" />
+          <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind VersionLabel, Mode=OneWay}" VerticalAlignment="Top" />
           <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{x:Bind Summary}" TextWrapping="Wrap" MinWidth="0" />
           <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{x:Bind AuthorsText}" TextWrapping="Wrap" MinWidth="0" />
           <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{x:Bind Id}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" MinWidth="0" />
+          <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Text="{x:Bind CompatibilityMessage}" TextWrapping="Wrap" MinWidth="0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </Grid>
       </CheckBox>
     </DataTemplate>
@@ -38,6 +39,7 @@
       <TextBlock x:Name="CompatibilityLabel" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
       <TextBox x:Name="SearchBox" PlaceholderText="Search native mods" TextChanged="SearchBox_TextChanged" />
       <TextBlock x:Name="CountLabel" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+      <TextBlock x:Name="SelectionCompatibilityLabel" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
     </StackPanel>
     <TextBlock x:Name="EmptyLabel" Grid.Row="1" Text="No native mods match this search." Visibility="Collapsed" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
     <SemanticZoom x:Name="ModsSemanticZoom" Grid.Row="2" IsZoomedInViewActive="True" MinHeight="360" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">

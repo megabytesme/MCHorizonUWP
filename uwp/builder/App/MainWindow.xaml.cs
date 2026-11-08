@@ -44,6 +44,13 @@ public sealed partial class MainWindow : Window
         };
         ReleaseSelection.SelectionChanged += (_, _) =>
         {
+            var currentCommit = SelectedHorizonCommit();
+            if (currentCommit is not null)
+            {
+                if (observedHorizonCommit is not null && !observedHorizonCommit.Equals(currentCommit, StringComparison.OrdinalIgnoreCase))
+                    ResetNativeModSelectionForHorizonChange();
+                observedHorizonCommit = currentCommit;
+            }
             UpdateBuildActions();
             UpdateWizard();
             if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
@@ -171,7 +178,10 @@ public sealed partial class MainWindow : Window
             await Windows.System.Launcher.LaunchUriAsync(update.ReleaseUri);
     }
     private IReadOnlyList<NativeModListing> nativeMods = [];
+    private NativeModPreflightResult? nativeModPreflight;
     private readonly HashSet<string> selectedNativeMods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> selectedNativeModVersions = new(StringComparer.Ordinal);
+    private string? observedHorizonCommit;
     private CancellationTokenSource? minecraftSignInCancellation;
     private CompatibilityCatalog? catalog;
     private bool buildActionRunning;
@@ -461,7 +471,7 @@ public sealed partial class MainWindow : Window
             try { return CurrentSelection(SelectedTargets().FirstOrDefault()).ValidatedExistingResourceFramework is not null; }
             catch (ArgumentException) { return false; }
         }
-        if (step == 5) return true;
+        if (step == 5) return NativeModSelectionReady();
         if (step == 6)
         {
             try { _ = CurrentSelection(SelectedTargets().FirstOrDefault()).ValidatedPackageVersion; return true; }
@@ -469,6 +479,31 @@ public sealed partial class MainWindow : Window
         }
         if (step == ReviewStep) return readinessReady;
         return false;
+    }
+
+    private bool NativeModSelectionReady()
+    {
+        if (selectedNativeMods.Count == 0) return true;
+        var commit = SelectedHorizonCommit();
+        if (nativeModPreflight is null || commit is null
+            || !nativeModPreflight.HorizonCommit.Equals(commit, StringComparison.OrdinalIgnoreCase)
+            || selectedNativeModVersions.Count != selectedNativeMods.Count
+            || selectedNativeMods.Any(id => !selectedNativeModVersions.ContainsKey(id))) return false;
+        var selected = new List<(string Id, NativeModListing Listing, NativeModCandidate Version)>();
+        foreach (var id in selectedNativeMods)
+        {
+            var listing = nativeModPreflight.Mods.SingleOrDefault(mod => mod.Id == id);
+            var version = listing?.CompatibleVersions?.FirstOrDefault(candidate => candidate.Version == selectedNativeModVersions[id]);
+            if (listing is null || !listing.IsCompatible || version is null) return false;
+            selected.Add((id, listing, version));
+        }
+        return selected.Select(item => MixinsRevision(item.Version)).Distinct(StringComparer.Ordinal).Count() == 1;
+    }
+
+    private static string MixinsRevision(NativeModCandidate candidate)
+    {
+        var parts = candidate.Api.Split('/');
+        return parts.Length == 3 ? parts[2] : "";
     }
 
     private void WizardBody_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -545,7 +580,25 @@ public sealed partial class MainWindow : Window
         ResourceMode.SelectedIndex == 0, NativeDeviceVibration.IsChecked == true,
         HorizonIdentity.ClientId, ReuseResourceFramework: ResourceMode.SelectedIndex == 1,
         ExistingResourceFramework: ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "",
-        RegistryNativeMods: selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal).ToArray());
+        RegistryNativeMods: selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
+        RegistryNativeModVersions: selectedNativeMods.Where(selectedNativeModVersions.ContainsKey)
+            .ToDictionary(id => id, id => selectedNativeModVersions[id], StringComparer.Ordinal));
+
+    private string? SelectedHorizonCommit()
+    {
+        if (ReleaseSelection?.SelectedItem is not ReleaseChoice selected || catalog is null) return null;
+        return catalog.Patches.SingleOrDefault(patch => patch.Version == selected.Patch)?.UpstreamCommit;
+    }
+
+    private void ResetNativeModSelectionForHorizonChange()
+    {
+        nativeModPreflight = null;
+        nativeMods = [];
+        selectedNativeMods.Clear();
+        selectedNativeModVersions.Clear();
+        NativeModsStatus.Text = "Horizon release changed. Mod compatibility will be checked before browsing.";
+        ClearNativeMods.Visibility = Visibility.Collapsed;
+    }
 
     private IReadOnlyList<TargetProfile> SelectedTargets()
     {
@@ -1004,6 +1057,7 @@ public sealed partial class MainWindow : Window
             var targets = SelectedTargets();
             if (targets.Count == 0) throw new InvalidOperationException("Select at least one target architecture.");
             var release = ReleaseSelection.SelectedItem as ReleaseChoice ?? throw new InvalidOperationException("Choose a compatible catalog release.");
+            if (!NativeModSelectionReady()) throw new InvalidOperationException("Reopen the native mod picker to check compatibility with the selected Horizon release.");
             var download = ResourceMode.SelectedIndex != 1;
             if (!download) LocalRecipe.ValidateResourceSelection(selection, resources, minecraft);
             var probe = new SystemProbe();
@@ -1030,13 +1084,14 @@ public sealed partial class MainWindow : Window
                     RecipeSteps.Children.Add(new TextBlock { Text = step.Name == "Snapshot pinned source" ? $"{architecture}: download and verify the selected release source" : $"{architecture}: {step.Name}", TextWrapping = TextWrapping.Wrap });
             }
             if (selection.RegistryNativeMods is { Count: > 0 } mods)
-                RecipeSteps.Children.Add(new TextBlock { Text = $"Selected native mods: {string.Join(", ", mods)}. Their compatibility is checked while building.", TextWrapping = TextWrapping.Wrap });
+                RecipeSteps.Children.Add(new TextBlock { Text = $"Selected compatible native mods: {string.Join(", ", mods.Select(id => $"{id} {selection.RegistryNativeModVersions![id]}"))}.", TextWrapping = TextWrapping.Wrap });
             RecipeSteps.Children.Add(new TextBlock { Text = "The client and any new resource framework will be signed with your local certificate. The public certificate and installation guide are included.", TextWrapping = TextWrapping.Wrap });
             var resourceChoice = ResourceMode.SelectedIndex switch { 0 => "Separate resource framework", 1 => "Existing resource framework", _ => "Resources bundled with the client" };
             var selectedMods = new List<string>();
             if (NativeTouchMod.IsChecked == true) selectedMods.Add("Touch controls");
             if (NativeDeviceVibration.IsChecked == true) selectedMods.Add("Device vibration");
-            selectedMods.AddRange(selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal));
+            selectedMods.AddRange(selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal)
+                .Select(id => $"{id} {selectedNativeModVersions.GetValueOrDefault(id, "version pending")}"));
             var modsSummary = selectedMods.Count == 0 ? "None" : string.Join(", ", selectedMods);
             var targetLabel = string.Join(", ", targets.Select(ArchitectureFor));
             BuildSummary.Text = $"Targets: {targetLabel}\nHorizon patch: {release.Patch}  ·  UWP client: {release.Client}\nResources: {resourceChoice}\nNative mods: {modsSummary}\nPackage version: {selection.PackageVersion}";
@@ -1474,13 +1529,21 @@ public sealed partial class MainWindow : Window
     private async void BrowseNativeMods_Click(object sender, RoutedEventArgs e)
     {
         BrowseNativeMods.IsEnabled = false;
-        NativeModsStatus.Text = "Loading Horizon’s signed native mod registry…";
+        NativeModsCompatibilityRing.Visibility = Visibility.Visible;
+        NativeModsCompatibilityRing.IsActive = true;
         try
         {
-            if (nativeMods.Count == 0) nativeMods = await NativeModIndex.FetchAsync();
-            var selectedRelease = ReleaseSelection.SelectedItem as ReleaseChoice;
-            var patch = selectedRelease is null ? null : catalog?.Patches.SingleOrDefault(item => item.Version == selectedRelease.Patch);
-            var targetCommit = patch?.UpstreamCommit ?? LocalRecipe.UpstreamNightlyCommit;
+            var targetCommit = SelectedHorizonCommit() ?? throw new InvalidOperationException("Choose a Horizon release before browsing native mods.");
+            NativeModsStatus.Text = "Checking every native-mod release for this Horizon commit…";
+            UpdateBuildActions();
+            var progress = new Progress<string>(message => NativeModsStatus.Text = message);
+            nativeModPreflight = await NativeModPreflight.ResolveAsync(targetCommit, progress);
+            nativeMods = nativeModPreflight.Mods;
+            var compatibleCount = nativeMods.Count(mod => mod.IsCompatible);
+            var incompatibleCount = nativeMods.Count - compatibleCount;
+            NativeModsStatus.Text = $"Compatibility checked for {nativeMods.Count} mods: {compatibleCount} have a compatible release; {incompatibleCount} will be shown disabled.";
+            if (selectedNativeMods.Count > 0 && !NativeModSelectionReady())
+                NativeModsStatus.Text += " Review the selections for this Horizon commit.";
             var picker = new NativeModsDialog(nativeMods, selectedNativeMods, targetCommit)
             {
                 Width = Math.Max(420, Math.Min(1000, WindowRoot.ActualWidth - 48)),
@@ -1497,31 +1560,47 @@ public sealed partial class MainWindow : Window
                 MaxWidth = Math.Min(1100, Math.Max(460, WindowRoot.ActualWidth - 32)),
                 MaxHeight = Math.Min(820, Math.Max(480, WindowRoot.ActualHeight - 32))
             };
+            dialog.IsPrimaryButtonEnabled = picker.HasCompatibleSelection;
+            picker.SelectionCompatibilityChanged += (_, _) => dialog.IsPrimaryButtonEnabled = picker.HasCompatibleSelection;
             if (await dialog.ShowAsync() == ContentDialogResult.Primary)
             {
                 selectedNativeMods.Clear();
                 selectedNativeMods.UnionWith(picker.SelectedIds);
+                selectedNativeModVersions.Clear();
+                foreach (var (id, version) in picker.SelectedVersions) selectedNativeModVersions[id] = version;
                 UpdateNativeModCount();
+                UpdateBuildActions();
+                UpdateWizard();
                 if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
             }
         }
-        catch (Exception error) { NativeModsStatus.Text = $"Could not load native mods: {error.Message}"; }
-        finally { BrowseNativeMods.IsEnabled = true; }
+        catch (Exception error) { NativeModsStatus.Text = $"Could not check native-mod compatibility: {error.Message}"; }
+        finally
+        {
+            NativeModsCompatibilityRing.IsActive = false;
+            NativeModsCompatibilityRing.Visibility = Visibility.Collapsed;
+            BrowseNativeMods.IsEnabled = true;
+            UpdateBuildActions();
+            UpdateWizard();
+        }
     }
 
     private void ClearNativeMods_Click(object sender, RoutedEventArgs e)
     {
         selectedNativeMods.Clear();
+        selectedNativeModVersions.Clear();
         UpdateNativeModCount();
+        UpdateBuildActions();
+        UpdateWizard();
         if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
     }
 
     private void UpdateNativeModCount()
     {
         var names = nativeMods.Where(mod => selectedNativeMods.Contains(mod.Id)).OrderBy(mod => mod.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(mod => mod.Name).ToArray();
+            .Select(mod => $"{mod.Name} {selectedNativeModVersions.GetValueOrDefault(mod.Id, "version pending")}").ToArray();
         NativeModsStatus.Text = names.Length == 0 ? "No Horizon repository mods selected."
-            : $"{names.Length} Horizon native mod(s) selected: {string.Join(", ", names)}";
+            : $"{names.Length} compatible Horizon native mod(s) selected: {string.Join(", ", names)}";
         ClearNativeMods.Visibility = names.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
     private void RenderSetupChecks(IReadOnlyList<SetupCheck> checks)

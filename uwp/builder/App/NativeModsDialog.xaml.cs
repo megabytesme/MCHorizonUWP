@@ -13,6 +13,8 @@ public sealed partial class NativeModsDialog : UserControl
     private readonly IReadOnlyList<NativeModChoice> choices;
     private string search = "";
     private int visibleCount;
+    private Dictionary<string, string> selectedVersions = new(StringComparer.Ordinal);
+    public event EventHandler? SelectionCompatibilityChanged;
 
     public NativeModsDialog(IReadOnlyList<NativeModListing> mods, IEnumerable<string> selectedIds, string horizonCommit)
     {
@@ -21,13 +23,16 @@ public sealed partial class NativeModsDialog : UserControl
         var selected = selectedIds.ToHashSet(StringComparer.Ordinal);
         choices = mods.OrderBy(mod => mod.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(mod => mod.Id, StringComparer.Ordinal)
-            .Select(mod => new NativeModChoice(mod, selected.Contains(mod.Id))).ToArray();
+            .Select(mod => new NativeModChoice(mod, selected.Contains(mod.Id) && mod.IsCompatible)).ToArray();
         foreach (var choice in choices) choice.PropertyChanged += Choice_PropertyChanged;
         ApplyFilter();
+        UpdateSelectedPlan();
     }
 
     public IReadOnlyList<string> SelectedIds => choices.Where(choice => choice.IsSelected)
         .Select(choice => choice.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+    public IReadOnlyDictionary<string, string> SelectedVersions => selectedVersions;
+    public bool HasCompatibleSelection { get; private set; } = true;
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -57,7 +62,63 @@ public sealed partial class NativeModsDialog : UserControl
     private void Choice_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(NativeModChoice.IsSelected))
+        {
             CountLabel.Text = $"{visibleCount} of {choices.Count} mods shown · {choices.Count(choice => choice.IsSelected)} selected";
+            UpdateSelectedPlan();
+        }
+    }
+
+    private void UpdateSelectedPlan()
+    {
+        var selected = choices.Where(choice => choice.IsSelected).ToArray();
+        selectedVersions = new(StringComparer.Ordinal);
+        if (selected.Length == 0)
+        {
+            HasCompatibleSelection = true;
+            SelectionCompatibilityLabel.Text = "Selected mods will use the newest versions compatible with this Horizon commit.";
+            foreach (var choice in choices) choice.SetCompatibleVersion();
+            SelectionCompatibilityChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        var common = selected[0].CompatibleVersions.Select(MixinsRevision).ToHashSet(StringComparer.Ordinal);
+        foreach (var choice in selected.Skip(1)) common.IntersectWith(choice.CompatibleVersions.Select(MixinsRevision));
+        if (common.Count == 0)
+        {
+            HasCompatibleSelection = false;
+            SelectionCompatibilityLabel.Text = "These selected mods do not share a compatible Horizon mixin-tool version. Remove a selected mod to continue.";
+            foreach (var choice in choices.Where(item => item.IsSelected)) choice.SetBuildVersion(null);
+            SelectionCompatibilityChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        HasCompatibleSelection = true;
+        var sharedMixins = common.Select(revision => (Revision: revision,
+                Score: selected.Sum(choice => IndexOfMixins(choice.CompatibleVersions, revision))))
+            .OrderBy(item => item.Score).ThenBy(item => item.Revision, StringComparer.Ordinal).First().Revision;
+        foreach (var choice in selected)
+        {
+            var version = choice.CompatibleVersions.First(candidate => MixinsRevision(candidate) == sharedMixins);
+            selectedVersions[choice.Id] = version.Version;
+            choice.SetBuildVersion(version);
+        }
+        foreach (var choice in choices.Where(item => !item.IsSelected))
+            choice.SetCompatibleVersion();
+        SelectionCompatibilityLabel.Text = $"Selected versions share Horizon mixin tool {sharedMixins}. Build details will list the exact releases.";
+        SelectionCompatibilityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static int IndexOfMixins(IReadOnlyList<NativeModCandidate> versions, string revision)
+    {
+        for (var index = 0; index < versions.Count; index++)
+            if (MixinsRevision(versions[index]) == revision) return index;
+        return int.MaxValue / 2;
+    }
+
+    private static string MixinsRevision(NativeModCandidate candidate)
+    {
+        var parts = candidate.Api.Split('/');
+        return parts.Length == 3 ? parts[2] : "";
     }
 
     private static string Letter(string name)
@@ -70,21 +131,30 @@ public sealed partial class NativeModsDialog : UserControl
 public sealed class NativeModChoice : INotifyPropertyChanged
 {
     private bool isSelected;
+    private string versionLabel;
+    private readonly string latestCompatibleVersionLabel;
     internal NativeModChoice(NativeModListing listing, bool selected)
     {
         Id = listing.Id;
         Name = listing.Name;
         Summary = listing.Summary;
-        Version = listing.Version;
+        CompatibleVersions = listing.CompatibleVersions ?? [];
+        IsCompatible = CompatibleVersions.Count > 0;
+        CompatibilityMessage = listing.CompatibilityMessage;
+        latestCompatibleVersionLabel = IsCompatible ? $"Compatible · {CompatibleVersions[0].Version}" : "Not compatible";
+        versionLabel = latestCompatibleVersionLabel;
         AuthorsText = listing.Authors.Length == 0 ? "" : "By " + string.Join(", ", listing.Authors);
-        isSelected = selected;
+        isSelected = selected && IsCompatible;
     }
 
     public string Id { get; }
     public string Name { get; }
     public string Summary { get; }
-    public string Version { get; }
-    public string LatestVersionLabel => "Latest " + Version;
+    public IReadOnlyList<NativeModCandidate> CompatibleVersions { get; }
+    public bool IsCompatible { get; }
+    public string CompatibilityMessage { get; }
+    public string VersionLabel => versionLabel;
+    public string LatestVersionLabel => IsCompatible ? "Latest " + CompatibleVersions[0].Version : "Not compatible";
     public string AuthorsText { get; }
     public bool IsSelected
     {
@@ -98,6 +168,21 @@ public sealed class NativeModChoice : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    internal void SetBuildVersion(NativeModCandidate? candidate)
+    {
+        var next = candidate is null ? latestCompatibleVersionLabel : $"Build · {candidate.Version}";
+        SetVersionLabel(next);
+    }
+
+    internal void SetCompatibleVersion() => SetVersionLabel(latestCompatibleVersionLabel);
+
+    private void SetVersionLabel(string next)
+    {
+        if (versionLabel == next) return;
+        versionLabel = next;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VersionLabel)));
+    }
 }
 
 public sealed class NativeModGroup(string key, IReadOnlyList<NativeModChoice> items)
