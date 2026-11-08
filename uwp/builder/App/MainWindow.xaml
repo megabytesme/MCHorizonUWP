@@ -231,19 +231,19 @@
               </Expander>
               <Expander Header="Install on Xbox One or Xbox Series" HorizontalAlignment="Stretch">
                 <StackPanel Spacing="8">
-                  <TextBlock Text="Build x64. Xbox sideloading requires Developer Mode and Xbox Device Portal; Retail Mode does not accept a private sideload. In Device Portal's Apps manager, upload the client APPX, its certificate, the Microsoft framework packages from Dependencies, and HorizonResources.appx when present. The selected Horizon client release must itself support Xbox; an x64 package alone does not guarantee compatibility. Install on this PC targets this Windows computer only." TextWrapping="Wrap" />
+                  <TextBlock Text="Build x64. Enable Developer Mode and use Xbox Device Portal; Retail Mode does not accept a private sideload. In Device Portal's Home deployment, provide the client APPX, Microsoft framework packages from Dependencies, and HorizonResources.appx when present. Keep HorizonUWP.cer with the package and install it on the Xbox if the portal asks for the signing certificate. The selected Horizon client release must itself support Xbox; an x64 package alone does not guarantee compatibility. Install on this PC targets this Windows computer only." TextWrapping="Wrap" />
                   <HyperlinkButton Content="Microsoft: deploy UWP apps to Xbox" NavigateUri="https://learn.microsoft.com/en-us/windows/uwp/apps-for-xbox/development-options" HorizontalAlignment="Left" />
                 </StackPanel>
               </Expander>
               <Expander Header="Install on Windows 10 Mobile" HorizontalAlignment="Stretch">
                 <StackPanel Spacing="8">
-                  <TextBlock Text="Build ARM32. On the phone, enable Developer Mode, Device discovery, and Device Portal, then pair the phone with a PC. In Device Portal's app manager, deploy HorizonUWP.appx with HorizonUWP.cer, the ARM framework packages from Dependencies, and HorizonResources.appx when present. Check the phone's deployment result. Windows 10 Mobile is a legacy platform, so portal features vary by OS build." TextWrapping="Wrap" />
+                  <TextBlock Text="Build ARM32. On the phone, enable Developer Mode, Device discovery, and Device Portal, then pair it with a PC. In Device Portal's Apps manager, install HorizonUWP.cer first, then deploy HorizonUWP.appx with the ARM framework packages from Dependencies and HorizonResources.appx when present. Check the phone's deployment result. Windows 10 Mobile is a legacy platform, so portal features vary by OS build." TextWrapping="Wrap" />
                   <HyperlinkButton Content="Microsoft: set up Device Portal on Windows 10 Mobile" NavigateUri="https://learn.microsoft.com/en-us/previous-versions/windows/uwp/debug-test-perf/device-portal-mobile" HorizontalAlignment="Left" />
                 </StackPanel>
               </Expander>
               <Expander Header="Install on HoloLens or another Windows Core OS device" HorizontalAlignment="Stretch">
                 <StackPanel Spacing="8">
-                  <TextBlock Text="Windows Core OS has no universal consumer sideload procedure; deployment depends on the specific device and its supported UWP APIs. For HoloLens, use its documented App Installer or Device Portal workflow: HoloLens 2 is ARM64 and first-generation HoloLens is x86. Device Portal requires the device's documented developer setup and the matching architecture package, certificate, and framework/resource dependencies. Other Core OS devices require an OEM-supported deployment method. Architecture alone does not guarantee app compatibility." TextWrapping="Wrap" />
+                  <TextBlock Text="Windows Core OS has no universal consumer sideload procedure; deployment depends on the specific device and its supported UWP APIs. For HoloLens, use its documented App Installer, Device Portal, provisioning package, or management workflow. Install HorizonUWP.cer on the device before sideloading. HoloLens 2 is ARM64 and first-generation HoloLens is x86. Include the matching architecture package and framework/resource dependencies. Other Core OS devices require an OEM-supported deployment method. Architecture alone does not guarantee app compatibility." TextWrapping="Wrap" />
                   <HyperlinkButton Content="Microsoft: deploy apps to HoloLens" NavigateUri="https://learn.microsoft.com/en-us/hololens/app-deploy-overview" HorizontalAlignment="Left" />
                 </StackPanel>
               </Expander>

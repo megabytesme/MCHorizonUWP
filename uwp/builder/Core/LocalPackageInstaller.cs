@@ -107,6 +107,14 @@ public static class LocalPackageInstaller
         var stderr = installer.StandardError.ReadToEndAsync();
         await installer.WaitForExitAsync();
         await Task.WhenAll(stdout, stderr);
-        if (installer.ExitCode != 0) throw new InvalidOperationException("Windows could not install the package. Open the included installation guide and check its dependencies.");
+        if (installer.ExitCode != 0)
+        {
+            var details = string.Join(Environment.NewLine, new[] { stderr.Result.Trim(), stdout.Result.Trim() }
+                .Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (details.Length > 4_000) details = details[^4_000..];
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(details)
+                ? $"Windows could not install the package (PowerShell exit code {installer.ExitCode}). Open the included installation guide and check its dependencies."
+                : $"Windows could not install the package (PowerShell exit code {installer.ExitCode}):{Environment.NewLine}{details}");
+        }
     }
 }
