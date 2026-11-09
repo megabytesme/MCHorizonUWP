@@ -198,7 +198,7 @@ def main():
     (args.output / f"horizon-uwp-{args.patch_version}.patch").write_bytes(patch)
     if client is not None:
         (args.output / f"uwp-client-{args.client_version}.zip").write_bytes(client)
-    (args.output / "catalog.UNSIGNED.json").write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+    (args.output / "catalog.UNSIGNED.json").write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"Prepared unsigned development artifacts from {revision} in {args.output}")
     print("No release or test evidence was published; authenticate the catalog before use.")
 
