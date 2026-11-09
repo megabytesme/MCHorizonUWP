@@ -13,6 +13,19 @@
         "url": "https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/92b0d873c46a920020150597410ab3b03b5451c3/patches/nightly-2026-11-03/horizon-uwp-0.1.1.patch",
         "sha256": "76b7dcee0ddad1bdf5d9a7da2461f7c528e24fa6a25d48773d27e30e81e26fa8"
       }
+    },
+    {
+      "version": "0.1.2",
+      "upstream_commit": "e797c725ad99ef311db216de7f41a2e6593353db",
+      "bridge": 1,
+      "upstream": {
+        "url": "https://github.com/horizon-rust/horizon/archive/e797c725ad99ef311db216de7f41a2e6593353db.zip",
+        "sha256": "1b63454061bce2f5e790342ae65c5553dcdeaef9e3b36fb1d0921a9a773b46a9"
+      },
+      "artifact": {
+        "url": "https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/378ae6839830a11ae5e22acbe50f9d5e649bd3fe/patches/main-2026-11-09/horizon-uwp-0.1.2.patch",
+        "sha256": "ca6a5f41955b0598daaf8f48ded916d9cb5990b9923ecdf47c232cead1d50f31"
+      }
     }
   ],
   "clients": [
@@ -66,6 +79,46 @@
       "builder": {
         "min_inclusive": "1.0.0",
         "max_exclusive": "1.0.1"
+      },
+      "architectures": [
+        "x86",
+        "x64",
+        "arm",
+        "arm64"
+      ]
+    },
+    {
+      "patch": {
+        "min_inclusive": "0.1.1",
+        "max_exclusive": "0.1.2"
+      },
+      "client": {
+        "min_inclusive": "0.1.3",
+        "max_exclusive": "0.1.4"
+      },
+      "builder": {
+        "min_inclusive": "1.0.1",
+        "max_exclusive": "1.0.2"
+      },
+      "architectures": [
+        "x86",
+        "x64",
+        "arm",
+        "arm64"
+      ]
+    },
+    {
+      "patch": {
+        "min_inclusive": "0.1.2",
+        "max_exclusive": "0.1.3"
+      },
+      "client": {
+        "min_inclusive": "0.1.3",
+        "max_exclusive": "0.1.4"
+      },
+      "builder": {
+        "min_inclusive": "1.0.1",
+        "max_exclusive": "1.0.2"
       },
       "architectures": [
         "x86",
