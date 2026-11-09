@@ -72,8 +72,8 @@ public static class LocalBuildRunner
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
         if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || release.Patch.Version != LocalRecipe.PatchVersion || release.Client.Version != LocalRecipe.ClientVersion
-            || !release.Patch.UpstreamCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
+            || release.Client.Version != LocalRecipe.ClientVersion || release.Patch.Bridge != release.Client.Bridge
+            || release.Patch.UpstreamCommit.Length != 40 || release.Patch.UpstreamCommit.Any(character => !Uri.IsHexDigit(character)))
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
     }
 
@@ -88,7 +88,7 @@ public static class LocalBuildRunner
             return jobs;
         }
 
-        var plan = LocalRecipe.Plan(selection);
+        var plan = LocalRecipe.Plan(selection, release?.Patch);
         if (release is null) await LocalRecipe.ValidateSourceAsync(source, probe);
         else if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The prepared release source is missing.");
         var existingFramework = selection.ValidatedExistingResourceFramework;
@@ -202,9 +202,11 @@ public static class LocalBuildRunner
             vcEnvironment["HORIZON_UWP_RUST_LLD"] = await LocalRecipe.FindRustLinkerAsync(probe);
         // Never inherit an unrelated client ID from the parent environment.
         vcEnvironment["HORIZON_MSA_CLIENT_ID"] = selection.ValidatedMicrosoftClientId ?? "";
-        vcEnvironment["HORIZON_VERSION"] = LocalRecipe.UpstreamReleaseVersion;
-        vcEnvironment["HORIZON_NIGHTLY"] = LocalRecipe.UpstreamNightly;
-        vcEnvironment["HORIZON_UPSTREAM_COMMIT"] = LocalRecipe.UpstreamNightlyCommit;
+        var upstreamCommit = release?.Patch.UpstreamCommit ?? LocalRecipe.UpstreamNightlyCommit;
+        var upstreamShortCommit = upstreamCommit[..7];
+        vcEnvironment["HORIZON_VERSION"] = release is null ? LocalRecipe.UpstreamReleaseVersion : "source-" + upstreamShortCommit;
+        vcEnvironment["HORIZON_NIGHTLY"] = release is null ? LocalRecipe.UpstreamNightly : "source " + upstreamShortCommit;
+        vcEnvironment["HORIZON_UPSTREAM_COMMIT"] = upstreamCommit;
         vcEnvironment["HORIZON_UWP_PORT_REF"] = release is null ? LocalRecipe.SourceCommit : "client-v" + release.Client.Version;
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";
@@ -316,18 +318,29 @@ public static class LocalBuildRunner
             framework = await ResourceFrameworkPacker.PackAsync(packageResources!, Path.Combine(root, "resource-framework"), progress, identity?.Publisher, compactSdk);
         }
         string? releaseNotes = null;
-        try { releaseNotes = await NightlyRelease.FetchPinnedNotesAsync(LocalRecipe.UpstreamNightlyDate, LocalRecipe.UpstreamNightlyCommit); }
-        catch (HttpRequestException) { /* Use the checked-in notes for this exact source pin below. */ }
-        if (string.IsNullOrWhiteSpace(releaseNotes))
+        var notesCommit = release?.Patch.UpstreamCommit ?? LocalRecipe.UpstreamNightlyCommit;
+        if (notesCommit.Equals(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
         {
-            var pinnedNotes = Path.Combine(snapshot, "uwp", "host", "Assets",
-                $"horizon-release-notes-{LocalRecipe.UpstreamNightlyDate}-{LocalRecipe.UpstreamNightlyShortCommit}.txt");
-            if (!File.Exists(pinnedNotes))
-                throw new FileNotFoundException("The release notes for the pinned Horizon nightly are unavailable.", pinnedNotes);
-            var fallbackNotes = await File.ReadAllTextAsync(pinnedNotes);
-            if (fallbackNotes.Length > 1024 * 1024 || !fallbackNotes.Contains(LocalRecipe.UpstreamNightlyCommit, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("The checked-in Horizon release notes do not match the pinned nightly.");
-            releaseNotes = fallbackNotes;
+            try { releaseNotes = await NightlyRelease.FetchPinnedNotesAsync(LocalRecipe.UpstreamNightlyDate, notesCommit); }
+            catch (HttpRequestException) { /* Use the checked-in notes for this exact source pin below. */ }
+            if (string.IsNullOrWhiteSpace(releaseNotes))
+            {
+                var pinnedNotes = Path.Combine(snapshot, "uwp", "host", "Assets",
+                    $"horizon-release-notes-{LocalRecipe.UpstreamNightlyDate}-{LocalRecipe.UpstreamNightlyShortCommit}.txt");
+                if (!File.Exists(pinnedNotes))
+                    throw new FileNotFoundException("The release notes for the pinned Horizon nightly are unavailable.", pinnedNotes);
+                var fallbackNotes = await File.ReadAllTextAsync(pinnedNotes);
+                if (fallbackNotes.Length > 1024 * 1024 || !fallbackNotes.Contains(notesCommit, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("The checked-in Horizon release notes do not match the pinned nightly.");
+                releaseNotes = fallbackNotes;
+            }
+        }
+        else
+        {
+            releaseNotes = $"<h1>Horizon source {notesCommit[..7]}</h1>" +
+                $"<p>This UWP build uses the Horizon upstream source commit <code>{notesCommit}</code>. " +
+                "This commit is not associated with a published Horizon nightly release.</p>" +
+                $"<p><a href=\"https://github.com/horizon-rust/horizon/commit/{notesCommit}\">View this Horizon commit</a></p>";
         }
         var releaseNotesPath = Path.Combine(root, "horizon-release-notes.txt");
         await File.WriteAllTextAsync(releaseNotesPath, releaseNotes, new System.Text.UTF8Encoding(false));

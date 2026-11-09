@@ -83,8 +83,9 @@ public static class LocalRecipe
         }
     }
 
-    public static LocalBuildPlan Plan(BuildSelection selection)
+    public static LocalBuildPlan Plan(BuildSelection selection, CatalogPatch? preparedPatch = null)
     {
+        var sourceCommit = preparedPatch?.UpstreamCommit ?? SourceCommit;
         var packageVersion = selection.ValidatedPackageVersion;
         var clientId = selection.ValidatedMicrosoftClientId;
         var existingFramework = selection.ValidatedExistingResourceFramework;
@@ -99,7 +100,7 @@ public static class LocalRecipe
         };
         var steps = new List<RecipeStep>
         {
-            new("Snapshot pinned source", "git", ["archive", "--format=tar", SourceCommit]),
+            new("Snapshot pinned source", "git", ["archive", "--format=tar", sourceCommit]),
             new("Prepare Rust source copy", "powershell", ["-NoProfile", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", RustToolchain]),
         };
         if (arm32) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
@@ -127,8 +128,11 @@ public static class LocalRecipe
         };
         package.AddRange(ResourceArguments(selection));
         steps.Add(new("Create unsigned client package", "powershell", package.AsReadOnly()));
+        var sourceDescription = preparedPatch is null
+            ? $"Based on Horizon nightly {UpstreamNightlyDate}, source {UpstreamNightlyShortCommit}; this is a UWP port, not an official Horizon binary."
+            : $"Based on Horizon upstream commit {preparedPatch.UpstreamCommit}; this is a UWP port, not an official Horizon binary.";
         var notes = new List<string> { "Build and staging occur in a new app-owned snapshot; the selected checkout is not modified.",
-            $"Based on Horizon nightly {UpstreamNightlyDate}, source {UpstreamNightlyShortCommit}; this is a UWP port, not an official Horizon binary.",
+            sourceDescription,
             "The renderer is checked on the device before launch; unavailable graphics devices are not offered.",
             "The resulting APPX requires matching dependencies and a user-controlled signing identity.",
             $"The isolated manifest will use package version {packageVersion}; choose a version newer than the target device's installed package.",
@@ -141,7 +145,7 @@ public static class LocalRecipe
         if (clientId is null) notes.Add("No Microsoft application ID was supplied; sign-in needs a build configured with an approved public client ID.");
         else notes.Add("Microsoft sign-in uses the configured public application ID and device-code flow; Xbox/Minecraft access depends on that registration.");
         if (arm32) notes.Add("ARM32 uses the offline TLS dependency override; account, skin and Minecraft session requests use the WinRT HTTPS adapter.");
-        return new(SourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
+        return new(sourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
     }
 
     public static async Task ValidateSourceAsync(string sourceDirectory, IProbe probe)

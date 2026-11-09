@@ -1698,6 +1698,14 @@ static async Task TestReleaseSource()
         var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = LocalRecipe.PatchVersion, UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
             prepared.Client with { Version = LocalRecipe.ClientVersion }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.DesktopX64, true));
+        var updatedRecipe = new PreparedRelease(recipe.SourceDirectory,
+            recipe.Patch with { Version = "0.1.2", UpstreamCommit = new string('b', 40) }, recipe.Client,
+            recipe.Compatibility, CatalogTrust.BuilderVersion, "x64");
+        LocalBuildRunner.ValidatePreparedRelease(updatedRecipe, new BuildSelection(TargetProfile.DesktopX64, true));
+        var updatedPlan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, true), updatedRecipe.Patch);
+        Require(updatedPlan.SourceCommit == new string('b', 40)
+            && updatedPlan.Notes.Any(note => note.Contains(new string('b', 40), StringComparison.Ordinal)),
+            "the recipe follows the upstream commit selected by the signed patch catalog");
         try { LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.WindowsMobile, true)); throw new Exception("wrong build architecture accepted"); }
         catch (InvalidOperationException) { }
         try { LocalBuildRunner.ValidatePreparedRelease(prepared, new BuildSelection(TargetProfile.DesktopX64, true)); throw new Exception("unknown recipe accepted"); }
