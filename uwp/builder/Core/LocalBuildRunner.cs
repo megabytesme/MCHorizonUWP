@@ -133,6 +133,8 @@ public static class LocalBuildRunner
             ClientToolchainBackport.Apply(snapshot, release.Client.Version);
         if (release is not null)
             ClientTlsBackport.Apply(snapshot, release.Client.Version);
+        if (release is not null)
+            ClientUwpSourceBackport.Apply(snapshot, release.Client.Version, release.Patch.UpstreamCommit);
         var cargo = probe.FindOnPath("cargo.exe")!;
         var python = probe.FindOnPath("python.exe")!;
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
@@ -243,7 +245,7 @@ public static class LocalBuildRunner
             vcEnvironment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var bridgeArguments = plan.Steps.Single(step => step.Name == "Build game bridge").Arguments
                 .Select(argument => argument == ".local/builder-target" ? SharedCargoTargetDirectory : argument).ToArray();
-            await RunProcess(cargo, snapshot, bridgeArguments, vcEnvironment, progress: progress);
+            await RunProcess(cargo, snapshot, bridgeArguments, vcEnvironment, progress: progress, captureFailureOutput: true);
         }
         catch (InvalidOperationException error)
         {

@@ -18,8 +18,9 @@ native-device-vibration-mod = ["horizon-client/native-device-vibration-mod"]
 uwp-dx12-renderer = ["wgpu/dx12"]
 uwp-audio = ["horizon-client/uwp-audio"]
 uwp-controller = ["horizon-client/uwp-controller"]
+heartbeat = ["horizon-client/heartbeat"]
 uwp-account = ["dep:horizon-account-core", "uwp-https"]
-xaml-shell = ["uwp-account"]
+xaml-shell = ["uwp-account", "heartbeat"]
 
 [dependencies]
 horizon-client = { path = "../../crates/horizon-client", default-features = false }

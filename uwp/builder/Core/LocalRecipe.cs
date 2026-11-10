@@ -17,7 +17,7 @@ public static class LocalRecipe
     public const string UpstreamNightlyCommit = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81";
     public const string UpstreamNightlyShortCommit = "f42ef42";
     public const string PatchVersion = "0.1.1";
-    public const string ClientVersion = "0.1.3";
+    public const string ClientVersion = "0.1.4";
     public const string DefaultPackageVersion = "2026.1105.14.0";
     public const string UpstreamReleaseVersion = "nightly-" + UpstreamNightlyDate;
     public const string UpstreamNightly = UpstreamNightlyDate + " " + UpstreamNightlyShortCommit;

@@ -56,6 +56,7 @@ impl Atlas {
                     HorizonBlend::Invert => Blend::Invert,
                     HorizonBlend::Additive => Blend::Additive,
                     HorizonBlend::Depth(rect) => Blend::Depth(rect),
+                    HorizonBlend::DepthGlint(rect) => Blend::DepthGlint(rect),
                     HorizonBlend::Vignette => Blend::Vignette,
                     HorizonBlend::EndPortal => Blend::EndPortal,
                     HorizonBlend::CitGlint(index) => Blend::CitGlint(index),
@@ -110,5 +111,22 @@ mod tests {
                     && (v.color[3] - 128.0 / 255.0).abs() < 1e-6)
         );
         assert!(converted.draws.iter().any(|draw| draw.page == 3));
+    }
+
+    #[test]
+    fn depth_glint_is_preserved_for_the_backend_to_report() {
+        let mut atlas = Atlas::new([4, 4], &vec![255; 64], 4).unwrap();
+        let mut batch = HudBatch::new([64, 64]);
+        batch.quad(
+            [[0.0, 0.0], [8.0, 0.0], [8.0, 8.0], [0.0, 8.0]],
+            [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]],
+            0xffffffff,
+        );
+        let rect = [1, 2, 3, 4];
+        batch.blend_since(0, HorizonBlend::DepthGlint(rect));
+
+        let converted = atlas.convert_horizon(&batch).unwrap();
+
+        assert!(converted.draws.iter().all(|draw| draw.blend == Blend::DepthGlint(rect)));
     }
 }

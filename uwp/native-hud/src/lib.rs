@@ -28,6 +28,9 @@ pub enum Blend {
     Invert,
     Additive,
     Depth([u32; 4]),
+    /// Depth-tested glint requires a dedicated pipeline, which the UWP D3D11
+    /// backend does not currently provide.
+    DepthGlint([u32; 4]),
     Vignette,
     EndPortal,
     /// Upstream CIT glint needs its own textures and blend pipeline.

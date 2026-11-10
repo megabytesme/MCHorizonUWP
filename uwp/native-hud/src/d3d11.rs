@@ -292,13 +292,18 @@ fn draw_pass(draw: &Draw) -> Option<DrawPass> {
         Blend::Invert => Some(DrawPass::OverlayInvert),
         Blend::Additive => Some(DrawPass::OverlayAdditive),
         Blend::Vignette => Some(DrawPass::OverlayVignette),
-        Blend::Depth(_) | Blend::EndPortal | Blend::CitGlint(_) => None,
+        Blend::Depth(_) | Blend::DepthGlint(_) | Blend::EndPortal | Blend::CitGlint(_) => None,
     }
 }
 
 fn same_mode(a: UnsupportedMode, b: UnsupportedMode) -> bool {
     a.sample == b.sample
-        && (a.blend == b.blend || matches!((a.blend, b.blend), (Blend::Depth(_), Blend::Depth(_))))
+        && (a.blend == b.blend
+            || matches!((a.blend, b.blend), (Blend::Depth(_), Blend::Depth(_)))
+            || matches!(
+                (a.blend, b.blend),
+                (Blend::DepthGlint(_), Blend::DepthGlint(_))
+            ))
 }
 
 fn partition_draws(draws: &[Draw]) -> (Vec<&Draw>, Vec<UnsupportedMode>) {

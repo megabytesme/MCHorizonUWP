@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / ".local" / "arm32-windows-sys"
 CARGO_HOME = Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo"))
 VERSIONS = ("0.52.0", "0.59.0", "0.60.2", "0.61.2")
+XXHASH_VERSION = "0.8.19"
 FILES = {
     "src/Windows/Win32/Networking/WinSock/mod.rs": ("WSADATA", "SERVENT"),
     "src/Windows/Win32/System/WindowsProgramming/mod.rs": ("DELAYLOAD_INFO",),
@@ -34,7 +35,8 @@ def find_source(version: str) -> Path | None:
 def fetch_missing(offline: bool) -> None:
     missing = [version for version in VERSIONS if find_source(version) is None]
     missing_ureq = offline and not list((CARGO_HOME / "registry" / "src").glob("*/ureq-2.12.1"))
-    if not missing and not missing_ureq:
+    missing_xxhash = offline and not list((CARGO_HOME / "registry" / "src").glob(f"*/xxhash-rust-{XXHASH_VERSION}"))
+    if not missing and not missing_ureq and not missing_xxhash:
         return
     # A scratch manifest lets Cargo download verified crates without changing
     # the game workspace's lockfile or installed tools.
@@ -46,6 +48,7 @@ def fetch_missing(offline: bool) -> None:
         manifest += f'{alias} = {{ package = "windows-sys", version = "={version}" }}\n'
     if offline:
         manifest += 'ureq = { version = "=2.12.1", default-features = false }\n'
+        manifest += f'xxhash-rust = {{ version = "={XXHASH_VERSION}", features = ["xxh3"] }}\n'
     (scratch / "Cargo.toml").write_text(manifest, encoding="utf-8")
     (scratch / "src").mkdir(exist_ok=True)
     (scratch / "src" / "lib.rs").write_text("", encoding="utf-8")
@@ -104,6 +107,37 @@ def prepare_offline_ureq() -> str:
     return f'ureq = {{ path = {json.dumps(target.as_posix())} }}'
 
 
+def prepare_arm32_xxhash() -> str:
+    """Use xxhash-rust's portable path on ARM32, where its NEON intrinsics are unstable."""
+    candidates = sorted((CARGO_HOME / "registry" / "src").glob(f"*/xxhash-rust-{XXHASH_VERSION}"))
+    if not candidates:
+        raise RuntimeError(f"xxhash-rust {XXHASH_VERSION} is not cached; run Cargo fetch first")
+    source = candidates[0]
+    target = OUTPUT / f"xxhash-rust-{XXHASH_VERSION}-arm32"
+    if not target.exists():
+        shutil.copytree(source, target)
+    source_manifest = (source / "Cargo.toml").read_text(encoding="utf-8")
+    manifest = target / "Cargo.toml"
+    current_manifest = manifest.read_text(encoding="utf-8")
+    if current_manifest != source_manifest:
+        raise RuntimeError("The local xxhash-rust manifest differs from the verified registry source")
+    source_file = source / "src" / "xxh3.rs"
+    target_file = target / "src" / "xxh3.rs"
+    original = source_file.read_text(encoding="utf-8")
+    patched = original.replace(
+        'target_feature = "neon"',
+        'all(target_feature = "neon", not(target_arch = "arm"))',
+    )
+    if patched == original:
+        raise RuntimeError("xxhash-rust has no NEON feature gates to prepare for ARM32")
+    current = target_file.read_text(encoding="utf-8")
+    if current not in (original, patched):
+        raise RuntimeError(f"Refusing to overwrite unexpected local changes in {target_file}")
+    if current != patched:
+        target_file.write_text(patched, encoding="utf-8", newline="\n")
+    return f'xxhash-rust = {{ path = {json.dumps(target.as_posix())} }}'
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline-arm32", action="store_true", help="Create a separate ARM32-only experimental override that rejects HTTPS")
@@ -127,7 +161,7 @@ def main() -> None:
     print(f"Prepared ARM32 windows-sys copies. Pass Cargo --config {config}")
     if args.offline_arm32:
         offline_config = OUTPUT / "patches-offline-arm32.toml"
-        offline_config.write_text("\n".join(lines + [prepare_offline_ureq()]) + "\n", encoding="utf-8")
+        offline_config.write_text("\n".join(lines + [prepare_offline_ureq(), prepare_arm32_xxhash()]) + "\n", encoding="utf-8")
         print(f"EXPERIMENTAL: HTTPS will fail; use only for ARM32 UWP. Pass Cargo --config {offline_config}")
 
 
