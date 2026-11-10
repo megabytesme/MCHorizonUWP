@@ -167,6 +167,25 @@ if (args.Length == 3 && args[0] == "--client-tls-backport-proof")
     return;
 }
 
+if (args.Length == 4 && args[0] == "--client-uwp-source-backport-proof")
+{
+    var source = Path.GetFullPath(args[1]);
+    ClientUwpSourceBackport.Apply(source, args[2], args[3]);
+    ClientUwpSourceBackport.Apply(source, args[2], args[3]);
+    var probe = File.ReadAllText(Path.Combine(source, "crates", "horizon-system", "src", "lib.rs"));
+    if (args[2] == "0.1.4" && args[3].Equals("e797c725ad99ef311db216de7f41a2e6593353db", StringComparison.OrdinalIgnoreCase))
+    {
+        Require(probe.Contains("#[cfg(all(windows, not(target_vendor = \"uwp\")))]", StringComparison.Ordinal)
+            && probe.Contains("#[cfg(all(windows, target_vendor = \"uwp\"))]", StringComparison.Ordinal),
+            "client backport separates desktop and UWP architecture probing");
+        var desktopProbe = probe.IndexOf("#[cfg(all(windows, not(target_vendor = \"uwp\")))]", StringComparison.Ordinal);
+        var moduleLookup = probe.IndexOf("GetModuleHandleA(c\"kernel32.dll\"", StringComparison.Ordinal);
+        Require(desktopProbe >= 0 && moduleLookup > desktopProbe, "desktop-only module lookup remains guarded out of UWP builds");
+    }
+    Console.WriteLine($"Client {args[2]} UWP source backport validation passed.");
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--private-git-proof")
 {
     var root = Path.GetFullPath(args[2]);
@@ -447,11 +466,135 @@ if (args.Length == 3 && args[0] == "--apply-native-mod")
     var environment = Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
         .ToDictionary(entry => (string)entry.Key, entry => (string)entry.Value!, StringComparer.OrdinalIgnoreCase);
     var cargo = new SystemProbe().FindOnPath("cargo.exe") ?? throw new Exception("Cargo was not found.");
+    var originalLib = await File.ReadAllTextAsync(Path.Combine(Path.GetFullPath(args[1]), "crates", "horizon-client", "src", "lib.rs"));
     var staged = await NativeModBuild.ApplyAsync(Path.GetFullPath(args[1]), workspace, ["zoom"], cargo, environment,
         new Progress<string>(Console.WriteLine));
     Require(File.ReadAllText(Path.Combine(staged, "crates", "horizon-client", "src", "game.rs")).Contains("official_zoom"), "registry mod applied to the game");
-    Require(File.ReadAllText(Path.Combine(staged, "crates", "horizon-client", "src", "lib.rs")).Contains("#![recursion_limit = \"256\"]"), "crate recursion setting restored");
+    Require(File.ReadAllText(Path.Combine(staged, "crates", "horizon-client", "src", "lib.rs")) == originalLib, "client crate root remains unchanged");
     Console.WriteLine("Verified Horizon registry Zoom mod applied to the UWP source.");
+    return;
+}
+
+if (args.Length == 5 && args[0] == "--apply-native-mods")
+{
+    var source = Path.GetFullPath(args[1]);
+    var workspace = Path.GetFullPath(args[2]);
+    if (Directory.Exists(workspace) || File.Exists(workspace)) throw new IOException("Choose a new test workspace.");
+    var selectedVersions = args[4].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(value => value.Split('=', 2))
+        .ToArray();
+    if (selectedVersions.Length == 0 || selectedVersions.Any(value => value.Length != 2))
+        throw new ArgumentException("Provide comma-separated modId=version entries.");
+    var selected = selectedVersions.Select(value => value[0]).ToArray();
+    var expectedVersions = selectedVersions.ToDictionary(value => value[0], value => value[1], StringComparer.Ordinal);
+    Directory.CreateDirectory(workspace);
+    SystemProbe.UsePrivateRustupForProcess();
+    SystemProbe.RefreshProcessPath();
+    var probe = new SystemProbe();
+    var toolchain = VisualCppInstallation.FindCompact(probe, "x64") ?? throw new Exception("The compact host C++ toolchain was not found.");
+    var compactSdk = PrivateWindowsSdk.FindReady(probe, ["x64"]) ?? throw new Exception("The compact Windows SDK was not found.");
+    var environment = new Dictionary<string, string>(CompactToolchain.Create(toolchain.Toolset, toolchain.Root,
+        compactSdk, "x64", Path.Combine(workspace, "test-linker")).Cargo, StringComparer.OrdinalIgnoreCase)
+    {
+        ["CARGO_TARGET_DIR"] = LocalBuildRunner.SharedCargoTargetDirectory,
+        ["CARGO_BUILD_JOBS"] = Math.Max(1, Environment.ProcessorCount).ToString(System.Globalization.CultureInfo.InvariantCulture)
+    };
+    var cargo = probe.FindOnPath("cargo.exe") ?? throw new Exception("Cargo was not found.");
+    var originalLib = await File.ReadAllTextAsync(Path.Combine(source, "crates", "horizon-client", "src", "lib.rs"));
+    var staged = await NativeModBuild.ApplyAsync(source, workspace, selected, cargo, environment, args[3], expectedVersions,
+        new Progress<string>(Console.WriteLine));
+    foreach (var id in selected)
+        Require(File.Exists(Path.Combine(workspace, "native-mixins", id, "horizon-mixin.toml")), $"{id} was staged");
+    Require(File.ReadAllText(Path.Combine(staged, "crates", "horizon-client", "src", "lib.rs")) == originalLib,
+        "client crate root remains unchanged after applying the selected mods");
+    Require(File.ReadAllText(Path.Combine(staged, "crates", "horizon-client", "src", "game.rs")).Contains("official_zoom"),
+        "the selected Zoom mod was applied to the game");
+    Console.WriteLine($"Applied and verified {selected.Length} pinned Horizon native mods for {args[3]}.");
+    return;
+}
+
+if (args.Length == 4 && args[0] == "--check-native-mod-targets")
+{
+    var resolver = NativeModTargetResolver.Create(Path.GetFullPath(args[1]));
+    var result = resolver.NormalizeBundle(Path.GetFullPath(args[2]), args[3]);
+    foreach (var remap in result.RemappedTargets) Console.WriteLine($"Remapped: {remap}");
+    Console.WriteLine("Every declared native-mod target resolves in the selected Horizon source.");
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--check-native-mod-preflight")
+{
+    var result = await NativeModPreflight.ResolveAsync(args[2], Path.GetFullPath(args[1]), new Progress<string>(Console.WriteLine));
+    var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["classic_zoom"] = "2.0.0", ["fps_overlay"] = "2.0.0", ["jei"] = "0.1.0",
+        ["keystrokes"] = "2.0.0", ["killc"] = "5.1.0", ["minimap"] = "2.0.0", ["recipes"] = "2.0.0",
+        ["serverify"] = "0.1.0", ["zoom"] = "2.0.0"
+    };
+    foreach (var (id, version) in expected)
+    {
+        var listing = result.Mods.Single(mod => mod.Id == id);
+        Require(listing.CompatibleVersions?.Any(candidate => candidate.Version == version) == true,
+            $"{listing.Name} {version} is visible as compatible: {listing.CompatibilityMessage}");
+        Console.WriteLine($"Compatible: {listing.Name} {version}");
+    }
+    var eatingAnimation = result.Mods.Single(mod => mod.Id == "eatinganimation");
+    Require(eatingAnimation.CompatibleVersions?.Any(candidate => candidate.Version == "0.1.1") != true,
+        "a native-mod struct literal missing fields from the selected Horizon source is excluded");
+    Require(eatingAnimation.CompatibleVersions?.Any(candidate => candidate.Version == "0.2.0") == true,
+        "a later release with a complete struct literal remains available when its API is compatible");
+    Require(eatingAnimation.CompatibilityMessage.Contains("omits Horizon fields", StringComparison.Ordinal),
+        "the disabled release explains the missing fields detected from source and bundle contents");
+    Console.WriteLine($"Preflight accepted {expected.Count} pinned mod versions and excluded source-incompatible native-mod releases for Horizon {result.HorizonCommit}.");
+    return;
+}
+
+if (args.Length == 5 && args[0] == "--build-native-mods-smoke")
+{
+    static async Task<string> HashFileAsync(string path)
+    {
+        await using var stream = File.OpenRead(path);
+        return Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(stream));
+    }
+
+    var upstreamArchive = Path.GetFullPath(args[1]);
+    var patchFile = Path.GetFullPath(args[2]);
+    var clientArchive = Path.GetFullPath(args[3]);
+    var resources = Path.GetFullPath(args[4]);
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed to assemble the signed release inputs.");
+    var workspace = Path.Combine(Path.GetTempPath(), "horizon-native-mods-smoke-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(workspace);
+    var source = Path.Combine(workspace, "source");
+    var upstream = new CatalogArtifact("https://example.test/native-mod-smoke/upstream", await HashFileAsync(upstreamArchive));
+    var patchArtifact = new CatalogArtifact("https://example.test/native-mod-smoke/patch", await HashFileAsync(patchFile));
+    var clientArtifact = new CatalogArtifact("https://example.test/native-mod-smoke/client", await HashFileAsync(clientArchive));
+    await SourceAssembler.AssembleAsync(upstreamArchive, upstream.Sha256, patchFile, patchArtifact.Sha256,
+        clientArchive, clientArtifact.Sha256, source, git);
+    var available = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["classic_zoom"] = "2.0.0", ["fps_overlay"] = "2.0.0", ["jei"] = "0.1.0",
+        ["keystrokes"] = "2.0.0", ["killc"] = "5.1.0", ["minimap"] = "2.0.0", ["recipes"] = "2.0.0",
+        ["serverify"] = "0.1.0", ["zoom"] = "2.0.0"
+    };
+    var requestedIds = Environment.GetEnvironmentVariable("HORIZON_NATIVE_MOD_SMOKE_IDS");
+    var expected = requestedIds is null
+        ? available
+        : requestedIds.Equals("none", StringComparison.OrdinalIgnoreCase)
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : requestedIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.Ordinal).ToDictionary(id => id,
+                    id => available.TryGetValue(id, out var version) ? version : throw new ArgumentException($"Unknown native-mod smoke id: {id}"),
+                    StringComparer.Ordinal);
+    var prepared = new PreparedRelease(source,
+        new CatalogPatch("0.1.2", "e797c725ad99ef311db216de7f41a2e6593353db", 1, upstream, patchArtifact),
+        new CatalogClient("0.1.4", 1, clientArtifact), new CompatibilityResult(true, false, false, "Pinned native-mod smoke test"),
+        CatalogTrust.BuilderVersion, "x64");
+    var nativeSmokeSelection = new BuildSelection(TargetProfile.DesktopX64, false, PackageVersion: "2026.1109.1.0",
+        MicrosoftClientId: HorizonIdentity.ClientId, RegistryNativeMods: expected.Keys.ToArray(), RegistryNativeModVersions: expected);
+    var result = await LocalBuildRunner.RunPreparedAsync(prepared, resources, nativeSmokeSelection, new SystemProbe(), new Progress<string>(Console.WriteLine));
+    Require(result.SignedOutput is { } signed && File.Exists(signed.Client) && File.Exists(signed.Certificate),
+        "the x64 package and public certificate were generated with all compatible pinned registry mods");
+    Console.WriteLine($"Built the signed x64 APPX with {expected.Count} compatible pinned native mods. Source-incompatible native-mod releases were excluded before application: {result.SignedOutput!.Client}");
     return;
 }
 
@@ -646,6 +789,13 @@ Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm64) == TargetProfile.SurfaceProX, "ARM64 default target");
 Require(BuildSelection.DefaultTarget(System.Runtime.InteropServices.Architecture.Arm) == TargetProfile.WindowsMobile, "ARM32 default target");
 Require(Guid.TryParse(HorizonIdentity.ClientId, out _), "Horizon public client ID has the expected format");
+var sourceProbeFixture = "#[cfg(windows)]\nfn emulating_on() -> Option<&'static str> { Some(\"desktop\") }\n\n#[cfg(target_os = \"macos\")]\nfn emulating_on() -> Option<&'static str> { Some(\"macos\") }\n";
+var uwpProbe = ClientUwpSourceBackport.Transform(sourceProbeFixture);
+Require(uwpProbe.Contains("#[cfg(all(windows, not(target_vendor = \"uwp\")))]", StringComparison.Ordinal)
+    && uwpProbe.Contains("#[cfg(all(windows, target_vendor = \"uwp\"))]", StringComparison.Ordinal)
+    && uwpProbe.Contains("fn emulating_on() -> Option<&'static str> { None }", StringComparison.Ordinal),
+    "UWP source backport avoids desktop-only architecture probing");
+Require(ClientUwpSourceBackport.Transform(uwpProbe) == uwpProbe, "UWP source backport is idempotent");
 var metadataProof = ReleaseMetadata.Create("0.1.0", "0.1.1", new string('A', 40));
 Require(metadataProof.SchemaVersion == 1 && metadataProof.UpstreamCommit == new string('a', 40), "release metadata normalizes catalog identity");
 Require(ReleaseMetadata.IsVersion("0.1.1") && !ReleaseMetadata.IsVersion("0.1"), "release metadata accepts three-part versions only");
@@ -909,6 +1059,7 @@ await TestReleaseSource();
 await TestBuilderUpdateChecker();
 await TestBuilderUpdatePreferences();
 await TestNativeBundleStager();
+TestNativeModTargetResolver();
 await TestMinecraftSignIn();
 await TestMinecraftAssetPrefetch();
 await TestMinecraftAssetHelperCache();
@@ -1023,6 +1174,20 @@ try { _ = CompatibilityCatalog.Parse(catalogJson.Replace("\"build_passed\": true
 catch (InvalidDataException) { }
 try { _ = CompatibilityCatalog.Parse(catalogJson.Replace("\"schema_version\": 1", "\"schema_version\": 1, \"schema_version\": 1")); throw new Exception("duplicate property accepted"); }
 catch (InvalidDataException) { }
+
+DirectoryInfo? repoRoot = new(AppContext.BaseDirectory);
+while (repoRoot is not null && !File.Exists(Path.Combine(repoRoot.FullName, "catalog", "catalog-v1.json"))) repoRoot = repoRoot.Parent;
+Require(repoRoot is not null, "repository catalog is available to builder tests");
+var publishedCatalog = CompatibilityCatalog.Parse(await File.ReadAllTextAsync(Path.Combine(repoRoot!.FullName, "catalog", "catalog-v1.json")));
+foreach (var architecture in new[] { "x86", "x64", "arm", "arm64" })
+{
+    Require(publishedCatalog.Check("0.1.1", "0.1.3", CatalogTrust.BuilderVersion, architecture).Allowed,
+        $"the current builder is compatible with patch 0.1.1 and client 0.1.3 for {architecture}");
+    Require(publishedCatalog.Check("0.1.2", "0.1.4", CatalogTrust.BuilderVersion, architecture).Allowed,
+        $"the current builder is compatible with patch 0.1.2 and client 0.1.4 for {architecture}");
+    Require(!publishedCatalog.Check("0.1.2", "0.1.3", CatalogTrust.BuilderVersion, architecture).Allowed,
+        $"the current builder rejects the incompatible patch 0.1.2 and client 0.1.3 pair for {architecture}");
+}
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
 Require(selection.ValidatedPackageVersion == LocalRecipe.DefaultPackageVersion, "default package version");
@@ -1423,6 +1588,34 @@ catch (InvalidOperationException error)
 Console.WriteLine("Setup checker tests passed.");
 
 static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }
+static void TestNativeModTargetResolver()
+{
+    var root = Path.Combine(Path.GetTempPath(), "HorizonNativeTargetResolverTest-" + Guid.NewGuid().ToString("N"));
+    var clientRoot = Path.Combine(root, "crates", "horizon-client");
+    var libraryRoot = Path.Combine(root, "crates", "horizon-client-lib");
+    Directory.CreateDirectory(Path.Combine(clientRoot, "src"));
+    Directory.CreateDirectory(libraryRoot);
+    File.WriteAllText(Path.Combine(clientRoot, "Cargo.toml"), "[package]\nname = \"horizon-client\"\n[lib]\npath = \"src/lib.rs\"\n");
+    File.WriteAllText(Path.Combine(clientRoot, "src", "lib.rs"), "pub use horizon_client_lib::*;\n");
+    File.WriteAllText(Path.Combine(libraryRoot, "Cargo.toml"), "[package]\nname = \"horizon-client-lib\"\n[lib]\npath = \"../horizon-client/src/client_lib.rs\"\n");
+    File.WriteAllText(Path.Combine(clientRoot, "src", "client_lib.rs"), "pub mod item_render;\n");
+    File.WriteAllText(Path.Combine(clientRoot, "src", "item_render.rs"), "pub struct ItemRenderer;\nimpl ItemRenderer { pub fn resolve(&self) {} }\n");
+    try
+    {
+        var resolver = NativeModTargetResolver.Create(root);
+        var normalized = resolver.NormalizeManifest("[[injection]]\ntarget = \"horizon_client::item_render::ItemRenderer::resolve\"\n");
+        Require(normalized.Manifest.Contains("horizon_client_lib::item_render::ItemRenderer::resolve", StringComparison.Ordinal),
+            "re-exported crate target follows its defining library crate");
+        Require(normalized.RemappedTargets.Count == 1, "crate target remap is reported");
+        try
+        {
+            resolver.NormalizeManifest("[[injection]]\ntarget = \"horizon_client::item_render::ItemRenderer::missing\"\n");
+            throw new Exception("missing native-mod target was accepted");
+        }
+        catch (InvalidDataException) { }
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
 static async Task TestMinecraftSignIn()
 {
     var root = Path.Combine(Path.GetTempPath(), "horizon-minecraft-session-test-" + Guid.NewGuid().ToString("N"));

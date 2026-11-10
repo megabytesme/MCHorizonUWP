@@ -28,6 +28,8 @@ internal static class NativeModBuild
         using var transport = new CatalogTransport();
         var stager = await NativeBundleStager.CreateAsync(transport, Path.Combine(workspace, "native-download"), RuntimeInformation.ProcessArchitecture);
         var catalog = await NativeModIndex.FetchCatalogAsync();
+        var targetResolver = NativeModTargetResolver.Create(source);
+        var sourceCompatibility = NativeModSourceCompatibility.Create(source);
         var hookText = await File.ReadAllTextAsync(Path.Combine(source, HooksFile));
         var hookMatch = Regex.Match(hookText, @"(?m)^pub\(crate\) const NATIVE_HOOKS_API: u32 = (\d+);\s*$");
         if (!hookMatch.Success || !int.TryParse(hookMatch.Groups[1].Value, out var availableHooks))
@@ -54,6 +56,12 @@ internal static class NativeModBuild
                 progress?.Report($"Checking {listing.Name} {candidate.Version} against Horizon {targetCommit}.");
                 var bundlePath = await NativeModPreflight.EnsureBundleAsync(transport, candidate);
                 var metadata = ReadCompatibility(bundlePath, candidate);
+                var sourceIssues = sourceCompatibility.CheckBundle(bundlePath, listing.Id);
+                if (sourceIssues.Count > 0)
+                {
+                    progress?.Report($"Skipping {listing.Name} {candidate.Version}: {string.Join(" ", sourceIssues)}");
+                    continue;
+                }
                 var matchesHooks = metadata.Hooks is { } hooks && hooks > 0 && hooks <= availableHooks;
                 if (!matchesHooks && !metadata.Horizon.Equals(targetCommit, StringComparison.OrdinalIgnoreCase))
                 {
@@ -85,7 +93,7 @@ internal static class NativeModBuild
         string? mixinsRevision = null;
         foreach (var bundle in bundles.Values.OrderBy(b => b.Id, StringComparer.Ordinal))
         {
-            var revision = ExtractBundle(bundle, mods, targetCommit, availableHooks);
+            var revision = ExtractBundle(bundle, mods, targetCommit, availableHooks, targetResolver, progress);
             if (mixinsRevision is not null && mixinsRevision != revision)
                 throw new InvalidOperationException("These selected mods require different versions of Horizon's mixin tool; choose compatible mods.");
             mixinsRevision = revision;
@@ -93,32 +101,27 @@ internal static class NativeModBuild
         if (mixinsRevision is null) throw new InvalidDataException("No native mods were staged.");
         var toolRoot = Path.Combine(workspace, "native-tool");
         progress?.Report("Building Horizon's native-mod transformation tool.");
+        var cargoEnvironment = new Dictionary<string, string>(hostEnvironment, StringComparer.OrdinalIgnoreCase)
+        {
+            ["RUSTUP_TOOLCHAIN"] = LocalRecipe.RustToolchain
+        };
         await LocalBuildRunner.RunProcess(cargo, workspace,
             ["+" + LocalRecipe.RustToolchain, "install", "--locked", "--git", "https://github.com/horizon-rust/horizon-mixins", "--rev", mixinsRevision,
-                "--root", toolRoot, "horizon-mixins-cli"], hostEnvironment, progress: progress);
+                "--root", toolRoot, "horizon-mixins-cli"], cargoEnvironment, progress: progress);
         var executable = Path.Combine(toolRoot, "bin", "horizon-mixins.exe");
         var staged = Path.Combine(workspace, "native-source");
         await File.WriteAllTextAsync(Path.Combine(source, ".horizon-revision"), targetCommit + "\n");
         var lib = Path.Combine(source, "crates", "horizon-client", "src", "lib.rs");
         var original = await File.ReadAllTextAsync(lib);
-        // The upstream transformer mistakes this built-in crate setting for an attribute macro.
-        // Remove it only while transforming, and restore it byte-for-byte in the staged output.
-        const string attribute = "#![recursion_limit = \"256\"]";
-        var index = original.IndexOf(attribute, StringComparison.Ordinal);
-        if (index < 0 || original.IndexOf(attribute, index + attribute.Length, StringComparison.Ordinal) >= 0)
-            throw new InvalidDataException("Unexpected client crate settings; cannot safely apply native mods.");
-        var stripped = original.Remove(index, attribute.Length);
-        try
-        {
-            await File.WriteAllTextAsync(lib, stripped, new UTF8Encoding(false));
-            progress?.Report("Applying the selected native mods to the release source.");
-            await LocalBuildRunner.RunProcess(executable, workspace, ["apply", "--workspace", source, "--mods", mods, "--out", staged], hostEnvironment);
-        }
-        finally { await File.WriteAllTextAsync(lib, original, new UTF8Encoding(false)); }
+        // Horizon now keeps only supported crate-level attributes in this root. Pass it
+        // through unchanged; requiring the removed recursion_limit attribute rejects
+        // current releases before the transformer can apply any mods.
+        progress?.Report("Applying the selected native mods to the release source.");
+        await LocalBuildRunner.RunProcess(executable, workspace, ["apply", "--workspace", source, "--mods", mods, "--out", staged],
+            cargoEnvironment, progress: progress, captureFailureOutput: true);
         var stagedLib = Path.Combine(staged, "crates", "horizon-client", "src", "lib.rs");
-        if (await File.ReadAllTextAsync(stagedLib) != stripped)
+        if (await File.ReadAllTextAsync(stagedLib) != original)
             throw new InvalidDataException("A native mod changes the client crate root; this combination is not supported yet.");
-        await File.WriteAllTextAsync(stagedLib, original, new UTF8Encoding(false));
         return staged;
     }
 
@@ -150,7 +153,8 @@ internal static class NativeModBuild
         return new(horizon, revision, hooks);
     }
 
-    private static string ExtractBundle(StagedNativeBundle bundle, string modsRoot, string targetCommit, int availableHooks)
+    private static string ExtractBundle(StagedNativeBundle bundle, string modsRoot, string targetCommit, int availableHooks,
+        NativeModTargetResolver targetResolver, IProgress<string>? progress)
     {
         using var zip = ZipFile.OpenRead(bundle.Path);
         var metadataEntries = zip.Entries.Where(e => e.FullName == "horizon-native.json").ToArray();
@@ -194,6 +198,10 @@ internal static class NativeModBuild
         }
         var manifestPath = Path.Combine(destination, "horizon-mixin.toml");
         var manifest = File.ReadAllText(manifestPath);
+        var targetNormalization = targetResolver.NormalizeManifest(manifest);
+        manifest = targetNormalization.Manifest;
+        foreach (var remap in targetNormalization.RemappedTargets)
+            progress?.Report($"Mapping {bundle.Id}'s re-exported crate target {remap} for this Horizon source.");
         if (Regex.IsMatch(manifest, @"(?im)^\s*\[\[?\s*post[-_]build\b"))
             throw new InvalidDataException($"{bundle.Id} requires a post-build step this builder does not yet support.");
         if (hasHooks)
@@ -205,6 +213,8 @@ internal static class NativeModBuild
                 + manifest[(matches[0].Index + matches[0].Length)..];
             File.WriteAllText(manifestPath, manifest, new UTF8Encoding(false));
         }
+        else if (targetNormalization.RemappedTargets.Count > 0)
+            File.WriteAllText(manifestPath, manifest, new UTF8Encoding(false));
         return revision;
     }
 }

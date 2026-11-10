@@ -1533,11 +1533,18 @@ public sealed partial class MainWindow : Window
         NativeModsCompatibilityRing.IsActive = true;
         try
         {
+            var release = ReleaseSelection.SelectedItem as ReleaseChoice
+                ?? throw new InvalidOperationException("Choose a Horizon release before browsing native mods.");
             var targetCommit = SelectedHorizonCommit() ?? throw new InvalidOperationException("Choose a Horizon release before browsing native mods.");
-            NativeModsStatus.Text = "Checking every native-mod release for this Horizon commit…";
+            NativeModsStatus.Text = "Preparing the selected Horizon source for compatibility checks…";
             UpdateBuildActions();
-            var progress = new Progress<string>(message => NativeModsStatus.Text = message);
-            nativeModPreflight = await NativeModPreflight.ResolveAsync(targetCommit, progress);
+            var progress = new Progress<string>(message =>
+            {
+                NativeModsStatus.Text = message;
+                BuilderActivityLog.Record("Native mod compatibility", message);
+            });
+            var prepared = await EnsurePreparedReleaseAsync(release, progress, CancellationToken.None);
+            nativeModPreflight = await NativeModPreflight.ResolveAsync(targetCommit, prepared.SourceDirectory, progress);
             nativeMods = nativeModPreflight.Mods;
             var compatibleCount = nativeMods.Count(mod => mod.IsCompatible);
             var incompatibleCount = nativeMods.Count - compatibleCount;
@@ -1569,6 +1576,12 @@ public sealed partial class MainWindow : Window
                 selectedNativeModVersions.Clear();
                 foreach (var (id, version) in picker.SelectedVersions) selectedNativeModVersions[id] = version;
                 UpdateNativeModCount();
+                if (picker.SkippedModNames.Count > 0)
+                {
+                    var skipped = string.Join(", ", picker.SkippedModNames);
+                    NativeModsStatus.Text += $" Skipped {skipped} before build because those releases do not share the selected mods' mixin-tool version.";
+                    BuilderActivityLog.Record("Native mod compatibility", $"Skipped {skipped} before build because no selected shared mixin-tool revision was available.");
+                }
                 UpdateBuildActions();
                 UpdateWizard();
                 if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();

@@ -14,6 +14,8 @@ public sealed partial class NativeModsDialog : UserControl
     private string search = "";
     private int visibleCount;
     private Dictionary<string, string> selectedVersions = new(StringComparer.Ordinal);
+    private bool updatingSelectedPlan;
+    private IReadOnlyList<string> skippedModNames = [];
     public event EventHandler? SelectionCompatibilityChanged;
 
     public NativeModsDialog(IReadOnlyList<NativeModListing> mods, IEnumerable<string> selectedIds, string horizonCommit)
@@ -32,6 +34,7 @@ public sealed partial class NativeModsDialog : UserControl
     public IReadOnlyList<string> SelectedIds => choices.Where(choice => choice.IsSelected)
         .Select(choice => choice.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray();
     public IReadOnlyDictionary<string, string> SelectedVersions => selectedVersions;
+    public IReadOnlyList<string> SkippedModNames => skippedModNames;
     public bool HasCompatibleSelection { get; private set; } = true;
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -61,7 +64,7 @@ public sealed partial class NativeModsDialog : UserControl
 
     private void Choice_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(NativeModChoice.IsSelected))
+        if (e.PropertyName == nameof(NativeModChoice.IsSelected) && !updatingSelectedPlan)
         {
             CountLabel.Text = $"{visibleCount} of {choices.Count} mods shown · {choices.Count(choice => choice.IsSelected)} selected";
             UpdateSelectedPlan();
@@ -72,6 +75,7 @@ public sealed partial class NativeModsDialog : UserControl
     {
         var selected = choices.Where(choice => choice.IsSelected).ToArray();
         selectedVersions = new(StringComparer.Ordinal);
+        skippedModNames = [];
         if (selected.Length == 0)
         {
             HasCompatibleSelection = true;
@@ -83,13 +87,24 @@ public sealed partial class NativeModsDialog : UserControl
 
         var common = selected[0].CompatibleVersions.Select(MixinsRevision).ToHashSet(StringComparer.Ordinal);
         foreach (var choice in selected.Skip(1)) common.IntersectWith(choice.CompatibleVersions.Select(MixinsRevision));
+        NativeModChoice[] skipped = [];
         if (common.Count == 0)
         {
-            HasCompatibleSelection = false;
-            SelectionCompatibilityLabel.Text = "These selected mods do not share a compatible Horizon mixin-tool version. Remove a selected mod to continue.";
-            foreach (var choice in choices.Where(item => item.IsSelected)) choice.SetBuildVersion(null);
-            SelectionCompatibilityChanged?.Invoke(this, EventArgs.Empty);
-            return;
+            var bestRevision = selected.SelectMany(choice => choice.CompatibleVersions.Select(MixinsRevision))
+                .Distinct(StringComparer.Ordinal)
+                .Select(revision => (Revision: revision,
+                    Coverage: selected.Count(choice => choice.CompatibleVersions.Any(candidate => MixinsRevision(candidate) == revision)),
+                    Score: selected.Sum(choice => IndexOfMixins(choice.CompatibleVersions, revision)),
+                    FirstSelectedIndex: IndexOfMixins(selected[0].CompatibleVersions, revision)))
+                .OrderByDescending(item => item.Coverage).ThenBy(item => item.Score).ThenBy(item => item.FirstSelectedIndex)
+                .First();
+            common.Add(bestRevision.Revision);
+            skipped = selected.Where(choice => !choice.CompatibleVersions.Any(candidate => MixinsRevision(candidate) == bestRevision.Revision)).ToArray();
+            skippedModNames = skipped.Select(choice => choice.Name).ToArray();
+            updatingSelectedPlan = true;
+            foreach (var choice in skipped) choice.IsSelected = false;
+            updatingSelectedPlan = false;
+            selected = selected.Except(skipped).ToArray();
         }
 
         HasCompatibleSelection = true;
@@ -103,8 +118,14 @@ public sealed partial class NativeModsDialog : UserControl
             choice.SetBuildVersion(version);
         }
         foreach (var choice in choices.Where(item => !item.IsSelected))
-            choice.SetCompatibleVersion();
-        SelectionCompatibilityLabel.Text = $"Selected versions share Horizon mixin tool {sharedMixins}. Build details will list the exact releases.";
+        {
+            if (skipped.Contains(choice)) choice.SetSkippedBuildVersion();
+            else choice.SetCompatibleVersion();
+        }
+        SelectionCompatibilityLabel.Text = skipped.Length == 0
+            ? $"Selected versions share Horizon mixin tool {sharedMixins}. Build details will list the exact releases."
+            : $"Using mixin tool {sharedMixins} for {selected.Length} mods. Skipped {string.Join(", ", skippedModNames)} because their releases require a different tool version.";
+        CountLabel.Text = $"{visibleCount} of {choices.Count} mods shown · {choices.Count(choice => choice.IsSelected)} selected";
         SelectionCompatibilityChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -176,6 +197,7 @@ public sealed class NativeModChoice : INotifyPropertyChanged
     }
 
     internal void SetCompatibleVersion() => SetVersionLabel(latestCompatibleVersionLabel);
+    internal void SetSkippedBuildVersion() => SetVersionLabel("Skipped · different mixin tool");
 
     private void SetVersionLabel(string next)
     {

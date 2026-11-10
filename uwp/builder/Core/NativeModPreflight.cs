@@ -15,10 +15,12 @@ public static class NativeModPreflight
     private sealed record BundleCompatibility(string Horizon, string Mixins, int? Hooks);
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> CacheGates = new(StringComparer.OrdinalIgnoreCase);
 
-    public static async Task<NativeModPreflightResult> ResolveAsync(string horizonCommit, IProgress<string>? progress = null,
+    public static async Task<NativeModPreflightResult> ResolveAsync(string horizonCommit, string sourceDirectory, IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
         if (!Regex.IsMatch(horizonCommit, "^[0-9a-f]{40}$")) throw new InvalidDataException("The selected Horizon release has an invalid commit.");
+        var targetResolver = NativeModTargetResolver.Create(sourceDirectory);
+        var sourceCompatibility = NativeModSourceCompatibility.Create(sourceDirectory);
         progress?.Report("Reading the selected Horizon release’s hook API…");
         var hookApi = await FetchHookApiAsync(horizonCommit, cancellationToken);
         progress?.Report("Loading Horizon’s current native-mod registry…");
@@ -48,11 +50,6 @@ public static class NativeModPreflight
                     reasons.Add($"{candidate.Version} has no usable compatibility metadata.");
                     continue;
                 }
-                if (indexedHorizon.Equals(horizonCommit, StringComparison.OrdinalIgnoreCase))
-                {
-                    compatible.Add(candidate);
-                    continue;
-                }
                 if (candidate.Url.Length == 0 || candidate.Size <= 0)
                 {
                     reasons.Add($"{candidate.Version} is missing its bundle download details.");
@@ -67,7 +64,23 @@ public static class NativeModPreflight
                     if (bundle.Horizon.Equals(horizonCommit, StringComparison.OrdinalIgnoreCase)
                         || bundle.Hooks is { } hooks && hooks <= hookApi)
                     {
-                        compatible.Add(candidate);
+                        try
+                        {
+                            var targets = targetResolver.NormalizeBundle(bundlePath, listing.Id);
+                            var sourceIssues = sourceCompatibility.CheckBundle(bundlePath, listing.Id);
+                            if (sourceIssues.Count > 0)
+                            {
+                                reasons.Add($"{candidate.Version} is incompatible with this Horizon source: {string.Join(" ", sourceIssues)}");
+                                continue;
+                            }
+                            compatible.Add(candidate);
+                            foreach (var remap in targets.RemappedTargets)
+                                progress?.Report($"{listing.Name} {candidate.Version}: mapping its re-exported crate target {remap}.");
+                        }
+                        catch (InvalidDataException error)
+                        {
+                            reasons.Add($"{candidate.Version} has targets that do not exist in this Horizon source: {error.Message}");
+                        }
                     }
                     else
                     {
@@ -76,16 +89,18 @@ public static class NativeModPreflight
                     }
                 }
                 catch (Exception error) when (error is InvalidDataException or JsonException or InvalidOperationException
-                    or KeyNotFoundException or FormatException or OverflowException)
+                    or KeyNotFoundException or FormatException or OverflowException or IOException or HttpRequestException)
                 {
                     reasons.Add($"{candidate.Version} has invalid compatibility metadata: {error.Message}");
                 }
             }
+            var skipped = reasons.Distinct(StringComparer.Ordinal).Take(3).ToArray();
+            var skippedText = skipped.Length == 0 ? "" : " Skipped incompatible releases: " + string.Join(" ", skipped);
             var message = compatible.Count > 0
-                ? $"Compatible with Horizon {horizonCommit}; newest supported version is {compatible[0].Version}."
+                ? $"Compatible with Horizon {horizonCommit}; newest supported version is {compatible[0].Version}.{skippedText}"
                 : listing.Versions.Count == 0
                     ? $"No Minecraft {LocalRecipe.MinecraftVersion} release is available."
-                    : $"No release supports Horizon commit {horizonCommit} and hook API {hookApi}. " + string.Join(" ", reasons.Distinct(StringComparer.Ordinal));
+                    : $"No release supports Horizon commit {horizonCommit} and hook API {hookApi}. " + string.Join(" ", skipped);
             resolved[index] = listing with { CompatibleVersions = compatible, CompatibilityMessage = message };
             var done = Interlocked.Increment(ref checkedCount);
             progress?.Report($"Checking mod compatibility: {done}/{catalog.Mods.Count} · {listing.Name}");
