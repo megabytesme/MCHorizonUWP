@@ -4,9 +4,10 @@ The signed, versioned release catalog tracks three independent release types:
 `builder-vX.Y.Z`, `client-vX.Y.Z` and `patch-vX.Y.Z`. The catalog implementation
 includes a parser, compatibility checker, P-256 signature verifier, HTTPS
 transport and an embedded public verification key. The builder selects catalog
-releases and passes verified inputs to the build runner. Client 0.1.3 and patch
-0.1.2 are the current production releases; Builder 1.0.1 is compatible with
-patches 0.1.1 and 0.1.2 on x86, x64, ARM32 and ARM64. Builder 1.0.0 remains
+releases and passes verified inputs to the build runner. Client 0.1.4 and patch
+0.1.2 are the current production releases; Builder 1.0.2 is compatible with
+patch 0.1.1 plus client 0.1.3, and patch 0.1.2 plus client 0.1.4, on x86, x64,
+ARM32 and ARM64. Builder 1.0.0 remains
 compatible with patch 0.1.1. Builder 0.1.6 through 0.1.10 remain
 available as beta releases. Client 0.1.2 remains listed so the Builder can
 identify it as incompatible; its prebuilt hosts omit the WinMD required to
@@ -18,12 +19,12 @@ explicit list of `x86`, `x64`, `arm` and/or `arm64` targets. Each patch pins
 an exact 40-hex upstream Horizon commit and a numbered bridge interface; each
 client declares its bridge interface. A combination is allowed only when
 both bridge numbers match and one rule matches all four dimensions.
-The current builder recipe supports client 0.1.3, which packages the WinMD
+The current builder recipe supports client 0.1.4, which packages the WinMD
 activation metadata and prebuilt host files for all four architectures. Patch
 0.1.2 pins Horizon main commit e797c725ad99ef311db216de7f41a2e6593353db; it is
-not a named nightly release. Builder 1.0.1 assembles that patch and the prior
-0.1.1 patch. Builder 1.0.0 and Builder 0.1.10 beta can still assemble patch
-0.1.1. The release notes distinguish compatibility from per-architecture build
+not a named nightly release. Builder 1.0.2 assembles that patch with client
+0.1.4 and the prior 0.1.1 patch with client 0.1.3. Older Builders retain their
+0.1.1 compatibility. The release notes distinguish compatibility from per-architecture build
 or device evidence.
 
 Artifacts have HTTPS URLs and SHA-256 digests. Catalog authenticity is a

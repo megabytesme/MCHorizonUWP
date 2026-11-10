@@ -44,6 +44,14 @@
         "url": "https://api.github.com/repos/megabytesme/MCHorizonUWP/releases/assets/723558634",
         "sha256": "1424f087aae9527573737fbb3325f9728040ed03d3b6301a37107ac44ede656f"
       }
+    },
+    {
+      "version": "0.1.4",
+      "bridge": 1,
+      "artifact": {
+        "url": "https://github.com/megabytesme/MCHorizonUWP/releases/download/client-v0.1.4/uwp-client-0.1.4.zip",
+        "sha256": "6bcdf11502135c5bb8f3c78f027d903e273abeb68584cd52f23fc6ff760b82a3"
+      }
     }
   ],
   "rules": [
@@ -98,7 +106,7 @@
       },
       "builder": {
         "min_inclusive": "1.0.1",
-        "max_exclusive": "1.0.2"
+        "max_exclusive": "1.0.3"
       },
       "architectures": [
         "x86",
@@ -113,12 +121,12 @@
         "max_exclusive": "0.1.3"
       },
       "client": {
-        "min_inclusive": "0.1.3",
-        "max_exclusive": "0.1.4"
+        "min_inclusive": "0.1.4",
+        "max_exclusive": "0.1.5"
       },
       "builder": {
-        "min_inclusive": "1.0.1",
-        "max_exclusive": "1.0.2"
+        "min_inclusive": "1.0.2",
+        "max_exclusive": "1.0.3"
       },
       "architectures": [
         "x86",

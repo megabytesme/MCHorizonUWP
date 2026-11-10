@@ -29,6 +29,14 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def same_text_content(left, right):
+    if left == right:
+        return True
+    if b"\0" in left or b"\0" in right:
+        return False
+    return left.replace(b"\r\n", b"\n") == right.replace(b"\r\n", b"\n")
+
+
 def verify_upstream(archive_path, repository, commit):
     tar_bytes = subprocess.check_output(["git", "-C", str(repository), "-c", "core.autocrlf=false", "archive", "--format=tar", commit])
     expected = {}
@@ -37,9 +45,9 @@ def verify_upstream(archive_path, repository, commit):
             if item.isdir():
                 continue
             if item.isfile():
-                expected[item.name] = digest(source.extractfile(item).read())
+                expected[item.name] = source.extractfile(item).read()
             elif item.issym():
-                expected[item.name] = digest(item.linkname.encode("utf-8"))
+                expected[item.name] = item.linkname.encode("utf-8")
             else:
                 raise ValueError(f"Unsupported upstream entry: {item.name}")
     found = {}
@@ -57,9 +65,14 @@ def verify_upstream(archive_path, repository, commit):
             name = "/".join(parts[1:])
             if name in found:
                 raise ValueError("Duplicate upstream ZIP entry")
-            found[name] = digest(source.read(item))
-    if found != expected:
-        raise ValueError("Upstream ZIP contents do not match the pinned Git commit")
+            found[name] = source.read(item)
+    missing = expected.keys() - found.keys()
+    extra = found.keys() - expected.keys()
+    different = [name for name, data in expected.items()
+                 if name in found and not same_text_content(found[name], data)]
+    if missing or extra or different:
+        samples = sorted(missing)[:2] + sorted(extra)[:2] + sorted(different)[:2]
+        raise ValueError("Upstream ZIP contents do not match the pinned Git commit: " + ", ".join(samples))
 
 
 def client_archive(revision, host_artifacts=None):
@@ -117,7 +130,7 @@ def main():
     parser.add_argument("--patch-version", default="0.1.0", help="Patch release version (three numeric components)")
     parser.add_argument("--patch-path", help="Committed patch path under patches/ (defaults to the known path for this version)")
     parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
-    parser.add_argument("--builder-version", default="1.0.1", help="Builder version for the candidate compatibility rule")
+    parser.add_argument("--builder-version", default="1.0.2", help="Builder version for the candidate compatibility rule")
     parser.add_argument("--patch-only", action="store_true", help="Prepare a patch and compatibility rule for an already released client")
     parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared four-architecture host kit to include in the client archive")
@@ -150,8 +163,8 @@ def main():
     if args.client_asset_id is not None and not re.fullmatch(r"[1-9][0-9]*", args.client_asset_id):
         raise ValueError("The GitHub client asset ID must be a positive decimal number")
     patch = git("show", f"{revision}:{patch_path}")
-    if not args.patch_only and args.client_version in ("0.1.2", "0.1.3") and args.host_artifacts is None:
-        raise ValueError(f"Client {args.client_version} requires --host-artifacts for the four prebuilt host kits")
+    if not args.patch_only and args.host_artifacts is None:
+        raise ValueError("Every client release requires --host-artifacts for the four prebuilt host kits")
     client = None if args.patch_only else client_archive(revision, args.host_artifacts)
     verify_upstream(args.upstream_archive, args.upstream_repo, upstream_commit)
     upstream_hash = digest(args.upstream_archive.read_bytes())

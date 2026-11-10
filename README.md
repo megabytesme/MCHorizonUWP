@@ -29,7 +29,7 @@ These are examples of devices that use each architecture. They do not mean MCHor
 
 ## Download
 
-See the [GitHub releases](https://github.com/megabytesme/MCHorizonUWP/releases) for downloads. Builder 1.0.1 is the current stable release; builder versions before 1.0.0 are beta releases.
+See the [GitHub releases](https://github.com/megabytesme/MCHorizonUWP/releases) for downloads. Builder 1.0.2 is the current stable release; builder versions before 1.0.0 are beta releases.
 
 ## Using the Builder
 
@@ -43,7 +43,7 @@ When a compatible client release is available, the wizard guides you through the
 6. Let the builder prepare missing dependencies, build the selected packages and sign them.
 7. Install the package on the current PC when supported, or follow the included guide to install it on another device.
 
-The signed catalog currently supports client 0.1.3 with Horizon patches 0.1.1 and 0.1.2 on Builder 1.0.1 for all four architectures. Minecraft resources are prepared locally after ownership is confirmed. Keep resource-containing packages private.
+The signed catalog supports client 0.1.3 with Horizon patch 0.1.1, and client 0.1.4 with patch 0.1.2, on Builder 1.0.2 for all four architectures. Before showing native mods, the builder checks each available mod release against the selected Horizon source and skips incompatible releases. Minecraft resources are prepared locally after ownership is confirmed. Keep resource-containing packages private.
 
 ## Releases
 
