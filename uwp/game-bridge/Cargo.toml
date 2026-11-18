@@ -40,16 +40,17 @@ raw-window-handle = "0.6.2"
 
 [patch.crates-io]
 gilrs-core = { path = "../../third_party/gilrs-core" }
-wgpu = { path = "C:/dev/personal/wgpu/wgpu" }
-wgpu-core = { path = "C:/dev/personal/wgpu/wgpu-core" }
-wgpu-core-deps-windows-linux-android = { path = "C:/dev/personal/wgpu/wgpu-core/platform-deps/windows-linux-android" }
-wgpu-core-deps-apple = { path = "C:/dev/personal/wgpu/wgpu-core/platform-deps/apple" }
-wgpu-core-deps-emscripten = { path = "C:/dev/personal/wgpu/wgpu-core/platform-deps/emscripten" }
-wgpu-hal = { path = "C:/dev/personal/wgpu/wgpu-hal" }
-wgpu-types = { path = "C:/dev/personal/wgpu/wgpu-types" }
-wgpu-naga-bridge = { path = "C:/dev/personal/wgpu/wgpu-naga-bridge" }
-naga = { path = "C:/dev/personal/wgpu/naga" }
-naga-types = { path = "C:/dev/personal/wgpu/naga-types" }
+# megabytesme/wgpu-dx11 (uwp branch)
+wgpu = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu-core = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu-core-deps-windows-linux-android = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu-core-deps-apple = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu-core-deps-emscripten = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu-hal = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu-types = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu-naga-bridge = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+naga = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+naga-types = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
 winit = { path = "../../third_party/winit" }
 parking_lot_core = { path = "../../third_party/parking_lot_core" }
 libmimalloc-sys = { path = "../../third_party/libmimalloc-sys" }
