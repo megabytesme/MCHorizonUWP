@@ -11,7 +11,7 @@ int _fltused = 0x9875;
 #pragma section(".CRT$XLZ", long, read)
 #pragma section(".tls", long, read, write)
 
-#if __SIZEOF_POINTER__ == 8
+#if defined(_WIN64)
 typedef unsigned long long horizon_tls_uintptr_t;
 #else
 typedef unsigned long horizon_tls_uintptr_t;

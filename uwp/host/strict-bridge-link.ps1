@@ -62,7 +62,8 @@ if (Select-String -LiteralPath "$outputPath.map" -Pattern 'dead-import-sentinels
     throw 'The game bridge uses an API that is unavailable to packaged applications.'
 }
 
-$stream = [IO.File]::OpenRead($outputPath)
+$stream = [IO.File]::Open($outputPath, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+    [IO.FileShare]::Read -bor [IO.FileShare]::Delete)
 $reader = [IO.BinaryReader]::new($stream)
 try {
     if ($reader.ReadUInt16() -ne 0x5a4d) { throw 'The linked game bridge is not a PE file.' }
@@ -72,6 +73,7 @@ try {
     $stream.Position = $pe
     if ($reader.ReadUInt32() -ne 0x4550) { throw 'The linked game bridge has an invalid PE signature.' }
     $actual = $reader.ReadUInt16()
+    $sectionCount = $reader.ReadUInt16()
     $stream.Position = $pe + 20
     $optionalHeaderSize = $reader.ReadUInt16()
     $expected = @{ X86 = 0x014c; X64 = 0x8664; ARM = 0x01c4; ARM64 = 0xaa64 }[$machine]
@@ -86,10 +88,14 @@ try {
         $directoryCountOffset = $optionalHeader + 92
         $directoriesOffset = $optionalHeader + 96
         $expectedTlsSize = 24
+        $stream.Position = $optionalHeader + 28
+        $imageBase = [uint64]$reader.ReadUInt32()
     } elseif ($magic -eq 0x20b) {
         $directoryCountOffset = $optionalHeader + 108
         $directoriesOffset = $optionalHeader + 112
         $expectedTlsSize = 40
+        $stream.Position = $optionalHeader + 24
+        $imageBase = $reader.ReadUInt64()
     } else {
         throw 'The linked game bridge has an unsupported PE optional-header format.'
     }
@@ -105,6 +111,41 @@ try {
     $tlsSize = $reader.ReadUInt32()
     if ($tlsRva -eq 0 -or $tlsSize -ne $expectedTlsSize) {
         throw 'The game bridge is missing the PE TLS directory required by Rust thread-local storage.'
+    }
+
+    $stream.Position = $optionalHeader + 56
+    $imageSize = [uint64]$reader.ReadUInt32()
+    $sections = $optionalHeader + $optionalHeaderSize
+    if ($sections + 40 * $sectionCount -gt $stream.Length) {
+        throw 'The linked game bridge has a truncated PE section table.'
+    }
+    $tlsOffset = $null
+    for ($section = 0; $section -lt $sectionCount; $section++) {
+        $stream.Position = $sections + $section * 40 + 12
+        $sectionRva = $reader.ReadUInt32()
+        $rawSize = $reader.ReadUInt32()
+        $rawStart = $reader.ReadUInt32()
+        $offset = [long]$tlsRva - $sectionRva
+        if ($offset -ge 0 -and $offset + $tlsSize -le $rawSize) {
+            $tlsOffset = $rawStart + $offset
+            break
+        }
+    }
+    if ($null -eq $tlsOffset -or $tlsOffset + $tlsSize -gt $stream.Length) {
+        throw 'The game bridge TLS directory is outside the file-backed sections.'
+    }
+    $stream.Position = $tlsOffset
+    $addresses = for ($field = 0; $field -lt 4; $field++) {
+        if ($magic -eq 0x20b) { $reader.ReadUInt64() } else { [uint64]$reader.ReadUInt32() }
+    }
+    $start, $end, $index, $callbacks = $addresses
+    $imageEnd = $imageBase + $imageSize
+    $pointerSize = if ($magic -eq 0x20b) { 8 } else { 4 }
+    if ($start -lt $imageBase -or $start -ge $imageEnd -or
+        $end -lt $start -or $end -gt $imageEnd -or
+        $index -lt $imageBase -or $index -gt $imageEnd - 4 -or
+        ($callbacks -ne 0 -and ($callbacks -lt $imageBase -or $callbacks -gt $imageEnd - $pointerSize))) {
+        throw 'The linked game bridge has invalid TLS addresses for its PE pointer width.'
     }
 } catch {
     Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
