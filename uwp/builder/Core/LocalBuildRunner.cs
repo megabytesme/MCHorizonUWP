@@ -72,7 +72,7 @@ public static class LocalBuildRunner
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
         if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || release.Client.Version != LocalRecipe.ClientVersion || release.Patch.Bridge != release.Client.Bridge
+            || release.Client.Version is not ("0.1.3" or "0.1.4" or LocalRecipe.ClientVersion) || release.Patch.Bridge != release.Client.Bridge
             || release.Patch.UpstreamCommit.Length != 40 || release.Patch.UpstreamCommit.Any(character => !Uri.IsHexDigit(character)))
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
     }
@@ -88,7 +88,7 @@ public static class LocalBuildRunner
             return jobs;
         }
 
-        var plan = LocalRecipe.Plan(selection, release?.Patch);
+        var plan = LocalRecipe.Plan(selection, release?.Patch, release?.Client.Version);
         if (release is null) await LocalRecipe.ValidateSourceAsync(source, probe);
         else if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The prepared release source is missing.");
         var existingFramework = selection.ValidatedExistingResourceFramework;
@@ -269,7 +269,9 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UWP_HTTP"] = "1";
         vcEnvironment["HORIZON_UWP_ACCOUNT"] = "1";
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
-        vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = "1";
+        var legacyNativeD3d11 = release?.Client.Version is "0.1.3" or "0.1.4";
+        vcEnvironment["HORIZON_UWP_NATIVE_D3D11"] = legacyNativeD3d11 ? "1" : "";
+        vcEnvironment["HORIZON_UWP_WGPU_D3D11"] = legacyNativeD3d11 ? "" : "1";
         vcEnvironment["HORIZON_UWP_TOUCH_MOD"] = selection.IncludesNativeTouchMod ? "1" : "";
         vcEnvironment["HORIZON_UWP_DX12"] = "1";
         vcEnvironment["HORIZON_UWP_ANGLE"] = angleBin is null ? "" : "1";

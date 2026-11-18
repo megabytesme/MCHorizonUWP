@@ -17,7 +17,7 @@ public static class LocalRecipe
     public const string UpstreamNightlyCommit = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81";
     public const string UpstreamNightlyShortCommit = "f42ef42";
     public const string PatchVersion = "0.1.1";
-    public const string ClientVersion = "0.1.4";
+    public const string ClientVersion = "0.1.5";
     public const string DefaultPackageVersion = "2026.1105.14.0";
     public const string UpstreamReleaseVersion = "nightly-" + UpstreamNightlyDate;
     public const string UpstreamNightly = UpstreamNightlyDate + " " + UpstreamNightlyShortCommit;
@@ -83,9 +83,10 @@ public static class LocalRecipe
         }
     }
 
-    public static LocalBuildPlan Plan(BuildSelection selection, CatalogPatch? preparedPatch = null)
+    public static LocalBuildPlan Plan(BuildSelection selection, CatalogPatch? preparedPatch = null, string? clientVersion = null)
     {
         var sourceCommit = preparedPatch?.UpstreamCommit ?? SourceCommit;
+        var features = selection.FeaturesForClient(clientVersion);
         var packageVersion = selection.ValidatedPackageVersion;
         var clientId = selection.ValidatedMicrosoftClientId;
         var existingFramework = selection.ValidatedExistingResourceFramework;
@@ -117,7 +118,7 @@ public static class LocalRecipe
             steps.Add(new("Prepare sound assets", "horizon-prepare", ["sounds", "--root", "<snapshot>", "--minecraft-dir", "<selected-installation>"]));
         }
         var cargo = new List<string>(prefix);
-        cargo.AddRange(["build", "--offline", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--features", string.Join(',', selection.Features),
+        cargo.AddRange(["build", "--offline", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--features", string.Join(',', features),
             "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", ".local/builder-target"]);
         steps.Add(new("Build game bridge", "cargo", cargo.AsReadOnly()));
         steps.Add(new("Strict-link host", "cmd", ["/d", "/c", "uwp/host/build-game.cmd", arch]));
@@ -145,7 +146,7 @@ public static class LocalRecipe
         if (clientId is null) notes.Add("No Microsoft application ID was supplied; sign-in needs a build configured with an approved public client ID.");
         else notes.Add("Microsoft sign-in uses the configured public application ID and device-code flow; Xbox/Minecraft access depends on that registration.");
         if (arm32) notes.Add("ARM32 uses the offline TLS dependency override; account, skin and Minecraft session requests use the WinRT HTTPS adapter.");
-        return new(sourceCommit, selection.RustTarget, selection.Features, steps.AsReadOnly(), notes.AsReadOnly());
+        return new(sourceCommit, selection.RustTarget, features, steps.AsReadOnly(), notes.AsReadOnly());
     }
 
     public static async Task ValidateSourceAsync(string sourceDirectory, IProbe probe)

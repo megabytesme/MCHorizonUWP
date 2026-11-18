@@ -17,6 +17,7 @@ PATCH_PATHS = {
     "0.1.0": "patches/nightly-2026-11-03/horizon-uwp.patch",
     "0.1.1": "patches/nightly-2026-11-03/horizon-uwp-0.1.1.patch",
     "0.1.2": "patches/main-2026-11-09/horizon-uwp-0.1.2.patch",
+    "0.1.3": "patches/main-2026-11-09/horizon-uwp-0.1.3.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -130,7 +131,7 @@ def main():
     parser.add_argument("--patch-version", default="0.1.0", help="Patch release version (three numeric components)")
     parser.add_argument("--patch-path", help="Committed patch path under patches/ (defaults to the known path for this version)")
     parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
-    parser.add_argument("--builder-version", default="1.0.2", help="Builder version for the candidate compatibility rule")
+    parser.add_argument("--builder-version", default="1.0.3", help="Builder version for the candidate compatibility rule")
     parser.add_argument("--patch-only", action="store_true", help="Prepare a patch and compatibility rule for an already released client")
     parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared four-architecture host kit to include in the client archive")

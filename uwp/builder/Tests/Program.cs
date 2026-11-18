@@ -124,7 +124,7 @@ if (args.Length == 7 && args[0] == "--compact-host-proof")
     {
         ["HORIZON_UWP_GAME_LIB"] = Path.GetFullPath(args[5]), ["HORIZON_UWP_BUILD_DIR"] = Path.Combine(root, "host"),
         ["HORIZON_UWP_XAML_SHELL"] = "1", ["HORIZON_UWP_ACCOUNT"] = "1", ["HORIZON_UWP_XAUDIO"] = "1",
-        ["HORIZON_UWP_HTTP"] = "1", ["HORIZON_UWP_NATIVE_D3D11"] = "1", ["HORIZON_UWP_TOUCH_MOD"] = "1",
+        ["HORIZON_UWP_HTTP"] = "1", ["HORIZON_UWP_WGPU_D3D11"] = "1", ["HORIZON_UWP_TOUCH_MOD"] = "1",
         ["HORIZON_UWP_DX12"] = "1", ["HORIZON_UWP_DEVICE_VIBRATION"] = "1"
     };
     await LocalBuildRunner.RunProcess(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
@@ -412,8 +412,9 @@ if (args.Length == 2 && args[0] == "--install-local-proof")
 {
     var directory = Path.GetFullPath(args[1]);
     var dependencies = Directory.GetFiles(Path.Combine(directory, "Dependencies"), "*.appx");
-    var output = new SignedPackageOutput(Path.Combine(directory, "HorizonUWP.appx"), Path.Combine(directory, "HorizonUWP.cer"), null,
-        Path.Combine(directory, "Install.md"), dependencies);
+    var resourcePath = Path.Combine(directory, "HorizonResources.appx");
+    var output = new SignedPackageOutput(Path.Combine(directory, "HorizonUWP.appx"), Path.Combine(directory, "HorizonUWP.cer"),
+        File.Exists(resourcePath) ? resourcePath : null, Path.Combine(directory, "Install.md"), dependencies);
     await LocalPackageInstaller.InstallAsync(output, new Progress<string>(Console.WriteLine));
     Console.WriteLine("Installed the signed synthetic package and its dependencies for the current user.");
     return;
@@ -598,10 +599,14 @@ if (args.Length == 5 && args[0] == "--build-native-mods-smoke")
     return;
 }
 
-if (args.Length == 3 && args[0] == "--verify-local-catalog")
+if ((args.Length == 3 || args.Length == 5) && args[0] == "--verify-local-catalog")
 {
     var candidateCatalog = CatalogSignature.Verify(await File.ReadAllBytesAsync(args[1]), await File.ReadAllBytesAsync(args[2]), CatalogTrust.PublicKey());
-    Require(candidateCatalog.Check(LocalRecipe.PatchVersion, LocalRecipe.ClientVersion, CatalogTrust.BuilderVersion, "x64").Allowed, "signed candidate catalog is readable");
+    var patchVer = args.Length == 5 ? args[3] : candidateCatalog.Patches.OrderByDescending(item => new Version(item.Version)).First().Version;
+    var clientVer = args.Length == 5 ? args[4] : LocalRecipe.ClientVersion;
+    foreach (var targetArch in new[] { "x86", "x64", "arm", "arm64" })
+        Require(candidateCatalog.Check(patchVer, clientVer, CatalogTrust.BuilderVersion, targetArch).Allowed,
+            $"signed candidate catalog allows {patchVer}/{clientVer} for {targetArch}");
     Console.WriteLine("The embedded key verified the candidate catalog.");
     return;
 }
@@ -689,6 +694,111 @@ if (args.Length == 5 && args[0] == "--build-split-candidate")
     var signed = result.SignedOutput ?? throw new Exception("The candidate package was not signed.");
     Require(File.Exists(signed.Client) && File.Exists(signed.Certificate) && File.Exists(signed.ResourceFramework), "signed candidate package set produced");
     Console.WriteLine($"Signed x64 candidate package set: {signed.Client}");
+    return;
+}
+
+if ((args.Length == 6 || args.Length == 7) && args[0] == "--build-all-candidates")
+{
+    static string InputHash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+    static void CopyTargetOutput(SignedPackageOutput signed, string destinationDirectory, string sharedFrameworkPath)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+        File.Copy(signed.Client, Path.Combine(destinationDirectory, "HorizonUWP.appx"), overwrite: true);
+        File.Copy(signed.Certificate, Path.Combine(destinationDirectory, "HorizonUWP.cer"), overwrite: true);
+        File.Copy(signed.InstallationGuide, Path.Combine(destinationDirectory, "Install.md"), overwrite: true);
+        File.Copy(signed.ResourceFramework ?? sharedFrameworkPath, Path.Combine(destinationDirectory, "HorizonResources.appx"), overwrite: true);
+        if (signed.Dependencies is { Count: > 0 })
+        {
+            var depDir = Path.Combine(destinationDirectory, "Dependencies");
+            Directory.CreateDirectory(depDir);
+            foreach (var dep in signed.Dependencies)
+                File.Copy(dep, Path.Combine(depDir, Path.GetFileName(dep)), overwrite: true);
+        }
+    }
+
+    var requested = args.Length == 7
+        ? args[6].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.OrdinalIgnoreCase)
+        : new HashSet<string>(["x64", "x86", "arm64", "arm"], StringComparer.OrdinalIgnoreCase);
+
+    var probe = new SystemProbe();
+    foreach (var depArch in new[] { "x64", "x86", "arm64", "arm" })
+    {
+        if (!requested.Contains(depArch)) continue;
+        if ((await DependencyProvisioner.MissingAsync(probe, depArch)).Count > 0)
+            await DependencyProvisioner.PrepareAsync(new ConsoleDependencyProgress(), depArch);
+    }
+
+    var git = probe.FindOnPath("git.exe") ?? throw new Exception("Git is needed for the candidate builds.");
+    var root = Path.Combine(Path.GetTempPath(), "horizon-all-candidates-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        const string horizonMainCommit = "e797c725ad99ef311db216de7f41a2e6593353db";
+        var source = Path.Combine(root, "source");
+        var upstream = new CatalogArtifact("https://example.test/source", InputHash(args[1]));
+        var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
+        var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
+        await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
+        var patchRecord = new CatalogPatch("0.1.3", horizonMainCommit, 1, upstream, patch);
+        var clientRecord = new CatalogClient(LocalRecipe.ClientVersion, 1, client);
+        var outputRoot = Path.GetFullPath(args[5]);
+        Directory.CreateDirectory(outputRoot);
+        var packageVersion = LocalRecipe.PackageVersionFor(DateTimeOffset.UtcNow);
+
+        string frameworkPath;
+        if (requested.Contains("x64"))
+        {
+            var x64Prepared = new PreparedRelease(source, patchRecord, clientRecord,
+                new CompatibilityResult(true, false, false, "Local multi-arch candidate proof"), CatalogTrust.BuilderVersion, "x64");
+            var x64Result = await LocalBuildRunner.RunPreparedAsync(x64Prepared, args[4],
+                new BuildSelection(TargetProfile.DesktopX64, true, PackageVersion: packageVersion, UseResourceFramework: true,
+                    NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId),
+                probe, new ConsoleProgress());
+            var x64Signed = x64Result.SignedOutput ?? throw new Exception("x64 candidate package was not signed.");
+            frameworkPath = x64Signed.ResourceFramework ?? throw new Exception("x64 candidate did not produce a resource framework.");
+            CopyTargetOutput(x64Signed, Path.Combine(outputRoot, "x64"), frameworkPath);
+            Console.WriteLine($"Built signed x64 candidate: {x64Signed.Client}");
+        }
+        else
+        {
+            frameworkPath = Path.Combine(outputRoot, "x64", "HorizonResources.appx");
+            if (!File.Exists(frameworkPath)) throw new FileNotFoundException("Existing x64 HorizonResources.appx is required when x64 is skipped.", frameworkPath);
+        }
+        string frameworkName;
+        using (var appx = System.IO.Compression.ZipFile.OpenRead(frameworkPath))
+        {
+            var manifestEntry = appx.Entries.FirstOrDefault(e => e.FullName.Equals("AppxManifest.xml", StringComparison.OrdinalIgnoreCase))
+                ?? throw new Exception("Missing AppxManifest.xml inside HorizonResources.appx.");
+            using var manifestStream = manifestEntry.Open();
+            var doc = System.Xml.Linq.XDocument.Load(manifestStream);
+            var ns = doc.Root!.Name.Namespace;
+            frameworkName = doc.Root.Element(ns + "Identity")?.Attribute("Name")?.Value
+                ?? throw new Exception("Missing Identity Name inside HorizonResources.appx.");
+        }
+
+        foreach (var (profile, arch, folder) in new[]
+        {
+            (TargetProfile.DesktopX86, "x86", "x86"),
+            (TargetProfile.SurfaceProX, "arm64", "arm64"),
+            (TargetProfile.WindowsMobile, "arm", "arm32"),
+        })
+        {
+            if (!requested.Contains(arch)) continue;
+            var prepared = new PreparedRelease(source, patchRecord, clientRecord,
+                new CompatibilityResult(true, false, false, "Local multi-arch candidate proof"), CatalogTrust.BuilderVersion, arch);
+            var result = await LocalBuildRunner.RunPreparedAsync(prepared, null,
+                new BuildSelection(profile, true, PackageVersion: packageVersion, NativeDeviceVibration: true,
+                    MicrosoftClientId: HorizonIdentity.ClientId, ReuseResourceFramework: true, ExistingResourceFramework: frameworkName),
+                probe, new ConsoleProgress());
+            var signed = result.SignedOutput ?? throw new Exception($"{arch} candidate package was not signed.");
+            CopyTargetOutput(signed, Path.Combine(outputRoot, folder), frameworkPath);
+            Console.WriteLine($"Built signed {arch} candidate: {signed.Client}");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
     return;
 }
 
@@ -1232,7 +1342,7 @@ Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("t
     && fetchStep.Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml"), "fetch uses target, host and overrides");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
-Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,uwp-dx12-renderer,native-touch-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell"), "touch and controller build features");
+Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,uwp-dx11-renderer,uwp-dx12-renderer,native-touch-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell"), "touch and controller build features");
 var withDevice = new BuildSelection(TargetProfile.WindowsMobile, true, NativeDeviceVibration: true);
 Require(withDevice.ModIds.Contains(BuildSelection.DeviceVibrationModId)
     && withDevice.Features.Contains("native-device-vibration-mod"), "device vibration is an optional native mod");
@@ -1272,14 +1382,15 @@ try { _ = LocalRecipe.Plan(reuse with { UseResourceFramework = true }); throw ne
 catch (ArgumentException) { }
 var arm64Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.SurfaceProX, false));
 Require(arm64Recipe.Target == "aarch64-uwp-windows-msvc"
-    && arm64Recipe.Features.Contains("uwp-dx12-renderer"), "ARM64 recipe includes the tablet target and DX12 renderer");
+    && arm64Recipe.Features.Contains("uwp-dx11-renderer")
+    && arm64Recipe.Features.Contains("uwp-dx12-renderer"), "ARM64 recipe includes the tablet target, wgpu D3D11, and DX12 renderer");
 var x86Recipe = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX86, false));
-Require(x86Recipe.Target == "i686-uwp-windows-msvc" && x86Recipe.Features.Contains("uwp-dx12-renderer")
-    && x86Recipe.Steps.Single(step => step.Name == "Strict-link host").Arguments.Contains("x86"), "x86 recipe includes the DX12 backend");
+Require(x86Recipe.Target == "i686-uwp-windows-msvc" && x86Recipe.Features.Contains("uwp-dx11-renderer") && x86Recipe.Features.Contains("uwp-dx12-renderer")
+    && x86Recipe.Steps.Single(step => step.Name == "Strict-link host").Arguments.Contains("x86"), "x86 recipe includes the wgpu D3D11 and DX12 backends");
 foreach (var target in Enum.GetValues<TargetProfile>())
 {
     var targetSelection = new BuildSelection(target, false);
-    Require(targetSelection.Features.Contains("uwp-dx12-renderer") && targetSelection.Features.Contains("native-d3d11"), $"both packaged renderers available in the {target} build");
+    Require(targetSelection.Features.Contains("uwp-dx12-renderer") && targetSelection.Features.Contains("uwp-dx11-renderer") && targetSelection.Features.Contains("native-d3d11"), $"packaged renderers available in the {target} build");
 }
 var missingToolchain = LocalRecipe.ToolchainBlockers(selection, new FakeProbe(), new RustToolchainFacts("rustc 1.98.0", false));
 Require(missingToolchain.Any(blocker => blocker.Contains("1.99.1")), "rust version pinned");
@@ -1348,10 +1459,11 @@ Require(new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "
 try { _ = new BuildSelection(TargetProfile.DesktopX64, false, MicrosoftClientId: "not-an-id").ValidatedMicrosoftClientId; throw new Exception("invalid client ID accepted"); }
 catch (ArgumentException) { }
 Require(selection.RustTarget == "thumbv7a-uwp-windows-msvc", "mobile target");
-Require(selection.Features.SequenceEqual(["native-d3d11", "uwp-dx12-renderer", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "native touch feature selection");
+Require(selection.Features.SequenceEqual(["native-d3d11", "uwp-dx11-renderer", "uwp-dx12-renderer", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "native touch feature selection");
+Require(selection.FeaturesForClient("0.1.4").SequenceEqual(["native-d3d11", "uwp-dx12-renderer", "native-touch-mod", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "legacy client 0.1.4 omits wgpu dx11 renderer");
 Require(selection.ModIds.SequenceEqual(["horizon_touch"]), "stable native touch mod ID");
 Require(new BuildSelection(TargetProfile.SurfaceProX, false).RustTarget == "aarch64-uwp-windows-msvc", "Pro X target");
-Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-dx12-renderer", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "touch can be omitted");
+Require(new BuildSelection(TargetProfile.DesktopX64, false).Features.SequenceEqual(["native-d3d11", "uwp-dx11-renderer", "uwp-dx12-renderer", "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell"]), "touch can be omitted");
 Require(new BuildSelection(TargetProfile.DesktopX64, false).ModIds.Count == 0, "omitted mod ID");
 try { _ = new BuildSelection((TargetProfile)99, false).RustTarget; throw new Exception("invalid target accepted"); }
 catch (ArgumentOutOfRangeException) { }

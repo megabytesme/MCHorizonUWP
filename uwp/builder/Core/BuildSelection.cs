@@ -70,8 +70,14 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     // fragments or paths are interpolated. Execution requires a verified recipe.
     public IReadOnlyList<string> Features => new[]
         { "native-d3d11",
+          "uwp-dx11-renderer",
           "uwp-dx12-renderer",
           IncludesNativeTouchMod ? "native-touch-mod" : null,
           NativeDeviceVibration ? "native-device-vibration-mod" : null, "uwp-audio", "uwp-https", "uwp-controller", "xaml-shell" }
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();
+
+    public IReadOnlyList<string> FeaturesForClient(string? clientVersion) =>
+        clientVersion is "0.1.3" or "0.1.4"
+            ? Features.Where(feature => feature != "uwp-dx11-renderer").ToArray()
+            : Features;
 }

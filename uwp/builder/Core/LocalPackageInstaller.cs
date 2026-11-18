@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using System.Xml;
+using System.Xml.Linq;
 
 namespace Horizon.Builder.Core;
 
@@ -143,13 +146,18 @@ public static class LocalPackageInstaller
         }
         var dependencies = output.Dependencies.Select(Path.GetFullPath).ToList();
         if (output.ResourceFramework is { } framework) dependencies.Add(Path.GetFullPath(framework));
-        var payload = JsonSerializer.Serialize(new { Client = Path.GetFullPath(output.Client), Dependencies = dependencies });
+        var dependencyEntries = dependencies.Select(path =>
+        {
+            var (name, publisher, architecture, version) = TryReadAppxIdentity(path);
+            return new { Path = path, Name = name, Publisher = publisher, Architecture = architecture, Version = version };
+        }).ToArray();
+        var payload = JsonSerializer.Serialize(new { Client = Path.GetFullPath(output.Client), Dependencies = dependencyEntries });
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
         var powershell = Path.Combine(system, "WindowsPowerShell", "v1.0", "powershell.exe");
         var start = new ProcessStartInfo(powershell) { UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-Command",
-            "$ErrorActionPreference='Stop'; $p=ConvertFrom-Json $env:HORIZON_UWP_INSTALL_PATHS; Add-AppxPackage -Path $p.Client -DependencyPath @($p.Dependencies)" })
+            "$ErrorActionPreference='Stop'; $p=ConvertFrom-Json $env:HORIZON_UWP_INSTALL_PATHS; $installed=@(Get-AppxPackage); $needed=@($p.Dependencies | Where-Object { $d=$_; if (-not $d.Name -or -not $d.Publisher -or -not $d.Version) { return $true }; $rv=[version]$d.Version; $m=$installed | Where-Object { $_.Name -ceq $d.Name -and $_.Publisher -ceq $d.Publisher -and [string]$_.Architecture -ieq $d.Architecture -and ([version]$_.Version -ge $rv) } | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1; if ($null -ne $m) { if ($d.Name -like 'Microsoft.UI.Xaml.*' -and $m.InstallLocation) { $mf=Join-Path $m.InstallLocation 'AppxManifest.xml'; if (Test-Path -LiteralPath $mf) { try { Add-AppxPackage -Register -DisableDevelopmentMode -Path $mf -ErrorAction Stop } catch { if ($_.Exception.Message -notmatch '0x80073D02') { throw } } } }; return $false }; return $true } | ForEach-Object { $_.Path }); if ($needed.Count -gt 0) { Add-AppxPackage -Path $p.Client -DependencyPath $needed } else { Add-AppxPackage -Path $p.Client }" })
             start.ArgumentList.Add(arg);
         start.Environment["HORIZON_UWP_INSTALL_PATHS"] = payload;
         progress?.Report("Installing the framework dependencies and client for your Windows account.");
@@ -166,6 +174,32 @@ public static class LocalPackageInstaller
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(details)
                 ? $"Windows could not install the package (PowerShell exit code {installer.ExitCode}). Open the included installation guide and check its dependencies."
                 : $"Windows could not install the package (PowerShell exit code {installer.ExitCode}):{Environment.NewLine}{details}");
+        }
+    }
+
+    private static (string? Name, string? Publisher, string? Architecture, string? Version) TryReadAppxIdentity(string path)
+    {
+        try
+        {
+            using var archive = ZipFile.OpenRead(path);
+            var manifest = archive.Entries.FirstOrDefault(entry =>
+                entry.FullName.Equals("AppxManifest.xml", StringComparison.OrdinalIgnoreCase));
+            if (manifest is null) return (null, null, null, null);
+            using var stream = manifest.Open();
+            var document = XDocument.Load(stream);
+            var identity = document.Root?.Element(document.Root.Name.Namespace + "Identity");
+            if (identity is null) return (null, null, null, null);
+            var name = (string?)identity.Attribute("Name");
+            var publisher = (string?)identity.Attribute("Publisher");
+            var architecture = (string?)identity.Attribute("ProcessorArchitecture");
+            var version = (string?)identity.Attribute("Version");
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(publisher) || !Version.TryParse(version, out _))
+                return (null, null, null, null);
+            return (name, publisher, string.IsNullOrWhiteSpace(architecture) ? "neutral" : architecture, version);
+        }
+        catch (Exception error) when (error is InvalidDataException or XmlException)
+        {
+            return (null, null, null, null);
         }
     }
 }
