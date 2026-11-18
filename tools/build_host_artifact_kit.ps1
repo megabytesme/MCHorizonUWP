@@ -74,7 +74,7 @@ try {
             'set HORIZON_UWP_ACCOUNT=1',
             'set HORIZON_UWP_XAUDIO=1',
             'set HORIZON_UWP_HTTP=1',
-            'set HORIZON_UWP_NATIVE_D3D11=1',
+            'set HORIZON_UWP_WGPU_D3D11=1',
             'set HORIZON_UWP_ANGLE=1',
             'set HORIZON_UWP_TOUCH_MOD=1',
             'set HORIZON_UWP_DX12=1',

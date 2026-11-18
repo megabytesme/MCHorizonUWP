@@ -425,6 +425,12 @@ unsigned default_renderer() {
     return 2;
 #elif defined(HORIZON_UWP_DEFAULT_RENDERER_ANGLE)
     return 1;
+#elif defined(HORIZON_UWP_NATIVE_D3D11)
+    return 0;
+#elif defined(HORIZON_UWP_WGPU_D3D11)
+    return 3;
+#elif defined(HORIZON_UWP_DX12)
+    return 2;
 #else
     return 0;
 #endif
