@@ -22,12 +22,14 @@ enum HorizonUwpEventKind : uint32_t {
     HORIZON_UWP_POINTER_WHEEL,
     HORIZON_UWP_MOUSE_DELTA,
     HORIZON_UWP_POINTER_CANCEL,
+    HORIZON_UWP_KEY_FLUSH,
 };
 
 enum HorizonUwpEventFlags : uint32_t {
     HORIZON_UWP_EXTENDED_KEY = 1,
     HORIZON_UWP_KEY_REPEAT = 2,
     HORIZON_UWP_HORIZONTAL_WHEEL = 4,
+    HORIZON_UWP_KEY_BATCHED = 8,
 };
 
 struct HorizonUwpEvent {
@@ -90,6 +92,7 @@ private:
     float scale_factor_ = 1.0f;
     float width_ = 0.0f;
     float height_ = 0.0f;
+    bool key_flush_scheduled_ = false;
     Windows::Foundation::EventRegistrationToken size_, dpi_, focus_, visibility_, close_;
     Windows::Foundation::EventRegistrationToken key_down_, key_up_, character_;
     Windows::Foundation::EventRegistrationToken pointer_move_, pointer_down_, pointer_up_, pointer_cancel_, pointer_wheel_;

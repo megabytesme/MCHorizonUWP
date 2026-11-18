@@ -114,12 +114,40 @@ void CoreWindowEvents::EmitKey(uint32_t kind, KeyEventArgs^ args) {
     auto status = args->KeyStatus; e.scan_code = status.ScanCode;
     if (status.IsExtendedKey) e.flags |= HORIZON_UWP_EXTENDED_KEY;
     if (status.WasKeyDown) e.flags |= HORIZON_UWP_KEY_REPEAT;
+    if (kind == HORIZON_UWP_KEY_DOWN) e.flags |= HORIZON_UWP_KEY_BATCHED;
     Emit(e);
 }
-void CoreWindowEvents::OnKeyDown(CoreWindow^, KeyEventArgs^ e) { EmitKey(HORIZON_UWP_KEY_DOWN, e); }
+void CoreWindowEvents::OnKeyDown(CoreWindow^ window, KeyEventArgs^ e) {
+    EmitKey(HORIZON_UWP_KEY_DOWN, e);
+    // CharacterReceived is raised separately on this dispatcher. Mark the end
+    // of the batch here so a game worker draining the queue early still waits
+    // for the key's text. The marker also completes keys without text.
+    if (key_flush_scheduled_) return;
+    key_flush_scheduled_ = true;
+    try {
+        Platform::WeakReference self(this);
+        window->Dispatcher->RunAsync(CoreDispatcherPriority::Low, ref new DispatchedHandler([self]() {
+            if (auto events = self.Resolve<CoreWindowEvents>()) {
+                events->key_flush_scheduled_ = false;
+                HorizonUwpEvent flush{};
+                flush.kind = HORIZON_UWP_KEY_FLUSH;
+                events->Emit(flush);
+            }
+        }));
+    } catch (Platform::Exception^) {
+        key_flush_scheduled_ = false;
+        HorizonUwpEvent flush{};
+        flush.kind = HORIZON_UWP_KEY_FLUSH;
+        Emit(flush);
+    }
+}
 void CoreWindowEvents::OnKeyUp(CoreWindow^, KeyEventArgs^ e) { EmitKey(HORIZON_UWP_KEY_UP, e); }
 void CoreWindowEvents::OnCharacter(CoreWindow^, CharacterReceivedEventArgs^ args) {
-    HorizonUwpEvent e{}; e.kind = HORIZON_UWP_CHARACTER; e.value = args->KeyCode; Emit(e);
+    HorizonUwpEvent e{}; e.kind = HORIZON_UWP_CHARACTER; e.value = args->KeyCode;
+    const auto status = args->KeyStatus;
+    e.scan_code = status.ScanCode;
+    if (status.IsExtendedKey) e.flags |= HORIZON_UWP_EXTENDED_KEY;
+    Emit(e);
 }
 void CoreWindowEvents::EmitPointer(uint32_t kind, PointerEventArgs^ args) {
     HorizonUwpEvent e{}; e.kind = kind;

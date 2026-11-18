@@ -18,6 +18,7 @@ PATCH_PATHS = {
     "0.1.1": "patches/nightly-2026-11-03/horizon-uwp-0.1.1.patch",
     "0.1.2": "patches/main-2026-11-09/horizon-uwp-0.1.2.patch",
     "0.1.3": "patches/main-2026-11-09/horizon-uwp-0.1.3.patch",
+    "0.1.4": "patches/main-2026-11-09/horizon-uwp-0.1.4.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 

@@ -9,12 +9,14 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <cstring>
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
 #include <wrl/client.h>
 #include <windows.applicationmodel.h>
+#include <windows.applicationmodel.datatransfer.h>
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
 #include <windows.system.h>
@@ -588,6 +590,67 @@ extern "C" int32_t __cdecl horizon_uwp_dispatch_ui_sync(
     catch (...) { return E_FAIL; }
 #endif
 }
+
+using ClipboardTextSink = void(__cdecl*)(void*, const wchar_t*, uint32_t);
+struct ClipboardRead {
+    HANDLE ready = CreateEventEx(nullptr, nullptr, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+    Platform::String^ text = nullptr;
+    bool succeeded = false;
+
+    ~ClipboardRead() { if (ready) CloseHandle(ready); }
+};
+
+extern "C" int __cdecl horizon_uwp_clipboard_get(ClipboardTextSink sink, void* context) {
+    using namespace Windows::ApplicationModel::DataTransfer;
+    using namespace Windows::Foundation;
+    if (!sink) return 0;
+    try {
+        auto request = std::make_shared<ClipboardRead>();
+        if (!request->ready) return 0;
+        auto begin = [](void* raw) {
+            auto request = *static_cast<std::shared_ptr<ClipboardRead>*>(raw);
+            auto content = Clipboard::GetContent();
+            if (!content || !content->Contains(StandardDataFormats::Text)) {
+                request->succeeded = true;
+                SetEvent(request->ready);
+                return;
+            }
+            content->GetTextAsync()->Completed = ref new AsyncOperationCompletedHandler<Platform::String^>(
+                [request](IAsyncOperation<Platform::String^>^ op, Windows::Foundation::AsyncStatus status) {
+                    try {
+                        if (status == Windows::Foundation::AsyncStatus::Completed) {
+                            request->text = op->GetResults();
+                            request->succeeded = true;
+                        }
+                    } catch (Platform::Exception^) {}
+                    SetEvent(request->ready);
+                });
+        };
+        if (FAILED(horizon_uwp_dispatch_ui_sync(begin, &request))) return 0;
+        // The XAML host's game loop runs on a worker. A standalone view owns
+        // its dispatcher and must never wait there for the WinRT completion.
+        const DWORD timeout = horizon_uwp_is_ui_thread() ? 0 : 250;
+        if (WaitForSingleObject(request->ready, timeout) != WAIT_OBJECT_0 || !request->succeeded) return 0;
+        if (request->text) sink(context, request->text->Data(), request->text->Length());
+        return 1;
+    } catch (...) {
+        return 0;
+    }
+}
+
+extern "C" void __cdecl horizon_uwp_clipboard_set(const wchar_t* text, uint32_t length) {
+    using namespace Windows::ApplicationModel::DataTransfer;
+    if (!text || !length) return;
+    struct ClipboardWrite { const wchar_t* text; uint32_t length; } value{text, length};
+    horizon_uwp_dispatch_ui_sync([](void* raw) {
+        const auto& value = *static_cast<ClipboardWrite*>(raw);
+        auto content = ref new DataPackage();
+        content->SetText(ref new Platform::String(value.text, value.length));
+        Clipboard::SetContent(content);
+        Clipboard::Flush();
+    }, &value);
+}
+
 extern "C" int __cdecl horizon_uwp_fatal_done() { return fatal_done.load() ? 1 : 0; }
 extern "C" void __cdecl horizon_uwp_fatal_begin(const uint8_t* text, size_t len) {
     try {
