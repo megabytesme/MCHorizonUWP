@@ -1,0 +1,197 @@
+diff --git a/wgpu-hal/src/dx11/buffer.rs b/wgpu-hal/src/dx11/buffer.rs
+index c8c83adb3..262f139df 100644
+--- a/wgpu-hal/src/dx11/buffer.rs
++++ b/wgpu-hal/src/dx11/buffer.rs
+@@ -47,11 +47,7 @@ impl BufferCpuShadowState {
+         }
+     }
+ 
+-    fn ensure_clean(
+-        &mut self,
+-        context: &ID3D11DeviceContext,
+-        raw: &ID3D11Buffer,
+-    ) -> Result<()> {
++    fn ensure_clean(&mut self, context: &ID3D11DeviceContext, raw: &ID3D11Buffer) -> Result<()> {
+         if !self.dirty_from_gpu {
+             return Ok(());
+         }
+@@ -164,6 +160,18 @@ impl BufferCpuShadow {
+         Some(copy)
+     }
+ 
++    fn copy_into_clean(&self, offset: usize, destination: &mut [u8]) -> bool {
++        let Some(end) = offset.checked_add(destination.len()) else {
++            return false;
++        };
++        let state = self.state.lock();
++        if state.dirty_from_gpu || end > state.bytes.len() {
++            return false;
++        }
++        destination.copy_from_slice(&state.bytes[offset..end]);
++        true
++    }
++
+     pub(super) fn mark_dirty_from_gpu(&self) {
+         let mut state = self.state.lock();
+         state.dirty_from_gpu = true;
+@@ -211,13 +219,18 @@ impl BufferCpuShadow {
+         let mut max_val = 0u32;
+         if count >= U32_MINMAX_BLOCK_ELEMENTS && state.u32_block_minmax.is_empty() {
+             let block_count = state.bytes.len() / U32_MINMAX_BLOCK_BYTES;
+-            if state.u32_block_minmax.try_reserve_exact(block_count).is_ok() {
++            if state
++                .u32_block_minmax
++                .try_reserve_exact(block_count)
++                .is_ok()
++            {
+                 state.u32_block_minmax.resize(block_count, None);
+             }
+         }
+         let block_count = state.u32_block_minmax.len();
+         if block_count != 0 {
+-            let first_aligned = (cursor + U32_MINMAX_BLOCK_BYTES - 1) & !(U32_MINMAX_BLOCK_BYTES - 1);
++            let first_aligned =
++                (cursor + U32_MINMAX_BLOCK_BYTES - 1) & !(U32_MINMAX_BLOCK_BYTES - 1);
+             let head_end = first_aligned.min(end_byte);
+             if cursor < head_end {
+                 let (hmin, hmax) = scan_u32_minmax(&state.bytes[cursor..head_end]);
+@@ -233,9 +246,8 @@ impl BufferCpuShadow {
+                 let (bmin, bmax) = match state.u32_block_minmax[block_idx] {
+                     Some(cached) => cached,
+                     None => {
+-                        let computed = scan_u32_minmax(
+-                            &state.bytes[cursor..cursor + U32_MINMAX_BLOCK_BYTES],
+-                        );
++                        let computed =
++                            scan_u32_minmax(&state.bytes[cursor..cursor + U32_MINMAX_BLOCK_BYTES]);
+                         state.u32_block_minmax[block_idx] = Some(computed);
+                         computed
+                     }
+@@ -641,6 +653,21 @@ impl NativeDevice {
+                     }
+                 }
+             } else {
++                // Core may add COPY_DST for initialization even to an upload-only
++                // MAP_WRITE | COPY_SRC buffer. Restrict this optimization to that
++                // usage family and never change MAP_READ synchronization.
++                let upload_uses = wgt::BufferUses::MAP_WRITE | wgt::BufferUses::COPY_SRC;
++                let allowed_uses = upload_uses | wgt::BufferUses::COPY_DST;
++                let copied = buffer.usage.contains(upload_uses)
++                    && allowed_uses.contains(buffer.usage)
++                    && buffer.cpu_shadow.as_ref().is_some_and(|cpu_shadow| {
++                        let destination =
++                            unsafe { core::slice::from_raw_parts_mut(pointer, length) };
++                        cpu_shadow.copy_into_clean(start as usize, destination)
++                    });
++                if copied {
++                    continue;
++                }
+                 let bytes = self.read_byte_buffer(buffer, start, length)?;
+                 unsafe {
+                     core::ptr::copy_nonoverlapping(bytes.as_ptr(), pointer, length);
+@@ -1113,10 +1140,8 @@ mod tests {
+             return Ok(());
+         };
+         let device = adapter.open_device(&FeatureLevel::ALL_DESCENDING)?;
+-        let buffer = device.create_buffer_with_usage(
+-            4096,
+-            wgt::BufferUses::INDEX | wgt::BufferUses::COPY_DST,
+-        )?;
++        let buffer = device
++            .create_buffer_with_usage(4096, wgt::BufferUses::INDEX | wgt::BufferUses::COPY_DST)?;
+         let shadow = buffer.cpu_shadow().expect("INDEX buffer gets CPU shadow");
+         let mut initial = Vec::with_capacity(4096);
+         for i in 0..1024u32 {
+@@ -1124,20 +1149,87 @@ mod tests {
+         }
+         device.write_byte_buffer(&buffer, 0, &initial)?;
+         let context = device.immediate_context();
+-        assert_eq!(shadow.u32_range_minmax(&context, &buffer.raw, 0, 1024)?, (10, 1033));
+-        assert_eq!(shadow.u32_range_minmax(&context, &buffer.raw, 512, 300)?, (138, 437));
++        assert_eq!(
++            shadow.u32_range_minmax(&context, &buffer.raw, 0, 1024)?,
++            (10, 1033)
++        );
++        assert_eq!(
++            shadow.u32_range_minmax(&context, &buffer.raw, 512, 300)?,
++            (138, 437)
++        );
+         drop(context);
+ 
+         device.write_byte_buffer(&buffer, 1020, &5000u32.to_ne_bytes())?;
+         device.write_byte_buffer(&buffer, 1024, &2u32.to_ne_bytes())?;
+         let context = device.immediate_context();
+-        assert_eq!(shadow.u32_range_minmax(&context, &buffer.raw, 0, 1024)?, (2, 5000));
+-        assert_eq!(shadow.u32_range_minmax(&context, &buffer.raw, 2048, 512)?, (522, 1033));
++        assert_eq!(
++            shadow.u32_range_minmax(&context, &buffer.raw, 0, 1024)?,
++            (2, 5000)
++        );
++        assert_eq!(
++            shadow.u32_range_minmax(&context, &buffer.raw, 2048, 512)?,
++            (522, 1033)
++        );
+         shadow.fill_zero(1020, 1028);
+-        assert_eq!(shadow.u32_range_minmax(&context, &buffer.raw, 1020, 2)?, (0, 0));
++        assert_eq!(
++            shadow.u32_range_minmax(&context, &buffer.raw, 1020, 2)?,
++            (0, 0)
++        );
+         assert!(shadow.copy_clean_slice(0, 8).is_some());
+         shadow.mark_dirty_from_gpu();
+         assert!(shadow.copy_clean_slice(0, 8).is_none());
+         Ok(())
+     }
++    #[test]
++    fn upload_mapping_uses_clean_shadow_and_falls_back_when_dirty() -> Result<()> {
++        let adapters = enumerate_native_adapters()?;
++        let Some(adapter) = adapters.iter().find(|adapter| !adapter.identity().software) else {
++            assert!(std::env::var_os("WGPU_DX11_REQUIRE_HARDWARE").is_none_or(|v| v != "1"));
++            return Ok(());
++        };
++        let levels: &[FeatureLevel] =
++            if std::env::var_os("WGPU_DX11_FORCE_FL9_1").is_some_and(|v| v == "1") {
++                &[FeatureLevel::L9_1]
++            } else {
++                &FeatureLevel::ALL_DESCENDING
++            };
++        let device = adapter.open_device(levels)?;
++        std::eprintln!("D3D11 upload mapping: {:?}", device.feature_level());
++        let upload = wgt::BufferUses::MAP_WRITE | wgt::BufferUses::COPY_SRC;
++        for usage in [upload, upload | wgt::BufferUses::COPY_DST] {
++            let buffer = device.create_buffer_with_usage(16, usage)?;
++            let initial: Vec<u8> = (0..16).collect();
++            device.write_byte_buffer(&buffer, 0, &initial)?;
++            let mapping = device.map_buffer_shadow(&buffer, 4..12).unwrap();
++            device.sync_buffer_shadow(&buffer, core::iter::once(0..16), false)?;
++            assert_eq!(
++                unsafe { core::slice::from_raw_parts(mapping.ptr.as_ptr(), 8) },
++                &initial[4..12]
++            );
++            assert_eq!(buffer.last_readback_staging_size(), 0);
++            unsafe {
++                core::ptr::copy_nonoverlapping([99u8, 100].as_ptr(), mapping.ptr.as_ptr().add(2), 2)
++            };
++            device.sync_buffer_shadow(&buffer, core::iter::once(6..8), true)?;
++            device.unmap_buffer_shadow(&buffer)?;
++            let mapping = device.map_buffer_shadow(&buffer, 4..12).unwrap();
++            device.sync_buffer_shadow(&buffer, core::iter::once(4..12), false)?;
++            let mut expected = initial;
++            expected[6..8].copy_from_slice(&[99, 100]);
++            assert_eq!(
++                unsafe { core::slice::from_raw_parts(mapping.ptr.as_ptr(), 8) },
++                &expected[4..12]
++            );
++            assert_eq!(buffer.last_readback_staging_size(), 0);
++            buffer.cpu_shadow().unwrap().mark_dirty_from_gpu();
++            device.sync_buffer_shadow(&buffer, core::iter::once(4..12), false)?;
++            assert_eq!(buffer.last_readback_staging_size(), 8);
++            assert_eq!(
++                unsafe { core::slice::from_raw_parts(mapping.ptr.as_ptr(), 8) },
++                &expected[4..12]
++            );
++            device.unmap_buffer_shadow(&buffer)?;
++        }
++        Ok(())
++    }
+ }
