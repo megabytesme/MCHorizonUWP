@@ -1,9 +1,20 @@
 # Renderer integration
 
-The current game uses the wgpu `gfx::Renderer`. On UWP it selects wgpu's GLES
-backend with ANGLE's D3D11 device. The native D3D11 work is a separate renderer,
-not another wgpu backend. It cannot be selected as a game renderer until it
-implements the same game-facing operations.
+Horizon's primary renderer is `gfx::Renderer` on top of `wgpu`. On UWP, the
+shell can select among:
+
+- `0`: Native Direct3D 11 (`HORIZON_UWP_NATIVE_D3D11`, standalone feature-level
+  `9_1` renderer outside `wgpu`).
+- `1`: ANGLE (`HORIZON_UWP_ANGLE`, `wgpu` GLES over D3D11).
+- `2`: Direct3D 12 (`HORIZON_UWP_DX12`, `wgpu` DX12).
+- `3`: Direct3D 11 (`HORIZON_UWP_WGPU_D3D11`, Cargo feature `uwp-dx11-renderer`
+  enabling the experimental `wgpu/dx11` feature-level `9_1` backend with
+  `WGPU_BACKEND=dx11` and `HORIZON_GRAPHICS_API=dx11`).
+
+When `HORIZON_UWP_WGPU_D3D11` is packaged, the XAML shell probes renderer `3`
+against the shared `SwapChainPanel` on startup without falling back to DX12,
+ANGLE, or WARP, and `horizon_uwp_run_prepared` configures `gfx::Renderer` to
+request `wgpu` DX11 at `FL9_1`.
 
 `presentation::PresentationBackend` defines the first shared boundary: frame
 submission, viewport size, resize, surface release/recreation and present

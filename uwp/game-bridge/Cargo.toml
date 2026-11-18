@@ -15,6 +15,7 @@ uwp-https = ["horizon-client/uwp-https", "dep:horizon-uwp-https-bridge"]
 native-d3d11-readback = ["horizon-client/native-d3d11-readback"]
 native-touch-mod = ["horizon-client/native-touch-mod"]
 native-device-vibration-mod = ["horizon-client/native-device-vibration-mod"]
+uwp-dx11-renderer = ["wgpu/dx11", "horizon-client/uwp-dx11-renderer"]
 uwp-dx12-renderer = ["wgpu/dx12"]
 uwp-audio = ["horizon-client/uwp-audio"]
 uwp-controller = ["horizon-client/uwp-controller"]
@@ -34,14 +35,24 @@ horizon-threads = { path = "../../crates/horizon-threads" }
 horizon-account-core = { path = "../../crates/horizon-account-core", optional = true }
 horizon-uwp-https-bridge = { path = "../https-bridge", optional = true }
 horizon-core = { path = "../../crates/horizon-core" }
-wgpu = { version = "30.0.1", default-features = false, features = ["std", "parking_lot", "gles"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "parking_lot", "gles", "wgsl"] }
 raw-window-handle = "0.6.2"
 
 [patch.crates-io]
 gilrs-core = { path = "../../third_party/gilrs-core" }
-wgpu-hal = { path = "../../third_party/wgpu-hal" }
+wgpu = { path = "C:/dev/personal/wgpu/wgpu" }
+wgpu-core = { path = "C:/dev/personal/wgpu/wgpu-core" }
+wgpu-core-deps-windows-linux-android = { path = "C:/dev/personal/wgpu/wgpu-core/platform-deps/windows-linux-android" }
+wgpu-core-deps-apple = { path = "C:/dev/personal/wgpu/wgpu-core/platform-deps/apple" }
+wgpu-core-deps-emscripten = { path = "C:/dev/personal/wgpu/wgpu-core/platform-deps/emscripten" }
+wgpu-hal = { path = "C:/dev/personal/wgpu/wgpu-hal" }
+wgpu-types = { path = "C:/dev/personal/wgpu/wgpu-types" }
+wgpu-naga-bridge = { path = "C:/dev/personal/wgpu/wgpu-naga-bridge" }
+naga = { path = "C:/dev/personal/wgpu/naga" }
+naga-types = { path = "C:/dev/personal/wgpu/naga-types" }
 winit = { path = "../../third_party/winit" }
 parking_lot_core = { path = "../../third_party/parking_lot_core" }
+libmimalloc-sys = { path = "../../third_party/libmimalloc-sys" }
 
 [profile.release]
 panic = "abort"

@@ -406,6 +406,15 @@ fn trace_renderer_probe(message: &str) {
     unsafe { horizon_uwp_trace_shell_event(message.as_ptr()) };
 }
 
+fn probe_label(renderer: u32) -> &'static str {
+    match renderer {
+        1 => "ANGLE",
+        2 => "DX12",
+        3 => "wgpu D3D11",
+        _ => "Unknown",
+    }
+}
+
 #[cfg(all(target_vendor = "uwp", feature = "xaml-shell"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn horizon_uwp_probe_renderer(
@@ -415,27 +424,21 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
     height: u32,
 ) -> i32 {
     install_panic_reporter();
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: instance creation starting"
-    } else {
-        "ANGLE probe: instance creation starting"
-    });
+    let label = probe_label(renderer);
+    trace_renderer_probe(&format!("{label} probe: instance creation starting"));
     let Some(surface_handle) = std::ptr::NonNull::new(surface_handle) else {
         return 0;
     };
     let (backend, expected_backend) = match renderer {
         1 => (wgpu::Backends::GL, wgpu::Backend::Gl),
         2 => (wgpu::Backends::DX12, wgpu::Backend::Dx12),
+        3 => (wgpu::Backends::DX11, wgpu::Backend::Dx11),
         _ => return 0,
     };
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
     descriptor.backends = backend;
     let instance = wgpu::Instance::new(descriptor);
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: instance created"
-    } else {
-        "ANGLE probe: instance created"
-    });
+    trace_renderer_probe(&format!("{label} probe: instance created"));
     let target = match renderer {
         1 => wgpu::SurfaceTargetUnsafe::RawHandle {
             raw_display_handle: Some(raw_window_handle::RawDisplayHandle::Windows(
@@ -455,40 +458,44 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
                 return 0;
             }
         }
+        3 => {
+            #[cfg(feature = "uwp-dx11-renderer")]
+            {
+                wgpu::SurfaceTargetUnsafe::SwapChainPanel(surface_handle.as_ptr())
+            }
+            #[cfg(not(feature = "uwp-dx11-renderer"))]
+            {
+                return 0;
+            }
+        }
         _ => return 0,
     };
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: surface creation starting"
-    } else {
-        "ANGLE probe: surface creation starting"
-    });
+    trace_renderer_probe(&format!("{label} probe: surface creation starting"));
     let Ok(surface) = (unsafe { instance.create_surface_unsafe(target) }) else {
         return 0;
     };
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: surface created"
-    } else {
-        "ANGLE probe: surface created"
-    });
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: adapter request starting"
-    } else {
-        "ANGLE probe: adapter request starting"
-    });
+    trace_renderer_probe(&format!("{label} probe: surface created"));
+    trace_renderer_probe(&format!("{label} probe: adapter request starting"));
     let Ok(adapter) = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         compatible_surface: Some(&surface),
         ..Default::default()
     })) else {
         return 0;
     };
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: adapter returned"
-    } else {
-        "ANGLE probe: adapter returned"
-    });
+    trace_renderer_probe(&format!("{label} probe: adapter returned"));
     let adapter_info = adapter.get_info();
     if adapter_info.backend != expected_backend {
         return 0;
+    }
+    if renderer == 3 {
+        if adapter_info.device_type == wgpu::DeviceType::Cpu {
+            trace_renderer_probe("wgpu D3D11 probe: software adapter is not supported");
+            return 0;
+        }
+        if !adapter_info.driver_info.contains("FL9_1") {
+            trace_renderer_probe("wgpu D3D11 probe: expected FL9_1 feature level");
+            return 0;
+        }
     }
     // On ARM32 Mobile, WARP passes device/presentation checks but exhausts
     // the process address space during game startup. Recheck on each launch
@@ -499,22 +506,14 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
         return 0;
     }
     let limits = adapter.limits();
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: device request starting"
-    } else {
-        "ANGLE probe: device request starting"
-    });
+    trace_renderer_probe(&format!("{label} probe: device request starting"));
     let Ok((device, queue)) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         required_limits: limits,
         ..Default::default()
     })) else {
         return 0;
     };
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: device returned"
-    } else {
-        "ANGLE probe: device returned"
-    });
+    trace_renderer_probe(&format!("{label} probe: device returned"));
     device.on_uncaptured_error(std::sync::Arc::new(|_| {}));
     let Some(configuration) = surface.get_default_config(&adapter, width.max(1), height.max(1))
     else {
@@ -524,33 +523,21 @@ pub unsafe extern "C" fn horizon_uwp_probe_renderer(
         trace_renderer_probe("DX12 probe: shader pipeline creation failed");
         return 0;
     }
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: surface configuration starting"
-    } else {
-        "ANGLE probe: surface configuration starting"
-    });
+    if renderer == 3 && !probe_dx11_pipeline(&device, configuration.format) {
+        trace_renderer_probe("wgpu D3D11 probe: shader pipeline creation failed");
+        return 0;
+    }
+    trace_renderer_probe(&format!("{label} probe: surface configuration starting"));
     surface.configure(&device, &configuration);
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: surface configured"
-    } else {
-        "ANGLE probe: surface configured"
-    });
+    trace_renderer_probe(&format!("{label} probe: surface configured"));
     let frame = match surface.get_current_texture() {
         wgpu::CurrentSurfaceTexture::Success(frame)
         | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
         _ => return 0,
     };
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: frame acquired"
-    } else {
-        "ANGLE probe: frame acquired"
-    });
+    trace_renderer_probe(&format!("{label} probe: frame acquired"));
     queue.present(frame);
-    trace_renderer_probe(if renderer == 2 {
-        "DX12 probe: frame presented"
-    } else {
-        "ANGLE probe: frame presented"
-    });
+    trace_renderer_probe(&format!("{label} probe: frame presented"));
     1
 }
 
@@ -612,6 +599,63 @@ fn probe_dx12_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> bo
     not(feature = "uwp-dx12-renderer")
 ))]
 fn probe_dx12_pipeline(_: &wgpu::Device, _: wgpu::TextureFormat) -> bool {
+    false
+}
+
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    feature = "uwp-dx11-renderer"
+))]
+fn probe_dx11_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> bool {
+    let oom = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+    let internal = device.push_error_scope(wgpu::ErrorFilter::Internal);
+    let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Horizon wgpu D3D11 FL9_1 probe"),
+        source: wgpu::ShaderSource::Wgsl(
+            "@vertex fn vs() -> @builtin(position) vec4f { return vec4f(0.0, 0.0, 0.0, 1.0); }\n\
+             @fragment fn fs() -> @location(0) vec4f { return vec4f(0.0, 0.0, 0.0, 1.0); }"
+                .into(),
+        ),
+    });
+    let _pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Horizon wgpu D3D11 FL9_1 probe"),
+        layout: None,
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs"),
+            compilation_options: Default::default(),
+            buffers: &[],
+        },
+        primitive: Default::default(),
+        depth_stencil: None,
+        multisample: Default::default(),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs"),
+            compilation_options: Default::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview_mask: None,
+        cache: None,
+    });
+    let validation_error = pollster::block_on(validation.pop());
+    let internal_error = pollster::block_on(internal.pop());
+    let oom_error = pollster::block_on(oom.pop());
+    validation_error.is_none() && internal_error.is_none() && oom_error.is_none()
+}
+
+#[cfg(all(
+    target_vendor = "uwp",
+    feature = "xaml-shell",
+    not(feature = "uwp-dx11-renderer")
+))]
+fn probe_dx11_pipeline(_: &wgpu::Device, _: wgpu::TextureFormat) -> bool {
     false
 }
 
@@ -877,11 +921,17 @@ pub unsafe extern "C" fn horizon_uwp_run_prepared(
     let (renderer_name, backend) = match renderer {
         1 => ("angle", "gl"),
         2 => ("dx12", "dx12"),
+        3 => ("wgpu-dx11", "dx11"),
         _ => ("d3d11", "gl"),
     };
     unsafe {
         std::env::set_var("HORIZON_UWP_RENDERER", renderer_name);
         std::env::set_var("WGPU_BACKEND", backend);
+        if renderer == 3 {
+            std::env::set_var("HORIZON_GRAPHICS_API", "dx11");
+        } else {
+            std::env::remove_var("HORIZON_GRAPHICS_API");
+        }
         let mut server = [0u8; 256];
         let length = horizon_uwp_page_selected_server(server.as_mut_ptr(), server.len());
         let address = server

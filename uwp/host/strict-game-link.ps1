@@ -20,12 +20,12 @@ if ($env:HORIZON_UWP_DEVICE_VIBRATION) { $objects += 'DeviceVibration.obj' }
     -LargeAddressAware:($env:GAME_MACHINE -eq 'X86')
 if (-not $?) { exit 1 }
 
-# The renderer is optional at runtime. A static D3D12 import would make the
-# whole app fail before the availability probe on devices without that DLL.
-if ($env:HORIZON_UWP_DX12) {
+# The renderer is optional at runtime. A static D3D12 or shader-compiler import
+# would make the whole app fail before the availability probe on devices without that DLL.
+if ($env:HORIZON_UWP_DX12 -or $env:HORIZON_UWP_WGPU_D3D11) {
     $imports = & dumpbin.exe /nologo /imports $output
     if ($LASTEXITCODE -ne 0) { throw 'Could not inspect UWP executable imports.' }
-    $forbidden = @('d3d12.dll')
+    $forbidden = @('d3d12.dll', 'd3dcompiler_47.dll')
     if ($env:GAME_MACHINE -eq 'ARM') {
         # Mobile builds target older Windows versions and use XAML surfaces;
         # desktop HWND queries and a static DXGI dependency are not needed.

@@ -122,7 +122,10 @@ extern "C" ptrdiff_t __cdecl horizon_uwp_server_status(const uint8_t*, size_t, u
 extern "C" ptrdiff_t __cdecl horizon_uwp_world_summary(const uint16_t*, size_t, uint8_t*, size_t);
 extern "C" int32_t __cdecl horizon_uwp_dispatch_ui_sync(void(__cdecl*)(void*), void*);
 extern "C" void __cdecl horizon_uwp_register_game_surface(void*);
-#ifdef HORIZON_UWP_NATIVE_D3D11
+#if defined(HORIZON_UWP_NATIVE_D3D11) || defined(HORIZON_UWP_ANGLE) || defined(HORIZON_UWP_DX12) || defined(HORIZON_UWP_WGPU_D3D11)
+#define HORIZON_UWP_HAS_SWAPCHAIN_PANEL 1
+#endif
+#ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
 extern "C" void* __cdecl horizon_uwp_acquire_game_swapchain_panel();
 extern "C" void __cdecl horizon_uwp_release_game_swapchain_panel(void*);
 #endif
@@ -181,7 +184,7 @@ ProgressRing^ game_loading_spinner;
 ColumnDefinition^ title_bar_left_padding;
 ColumnDefinition^ title_bar_right_padding;
 ContentControl^ content;
-#ifdef HORIZON_UWP_NATIVE_D3D11
+#ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
 SwapChainPanel^ game_surface;
 HRESULT detach_game_swapchain() {
     if (!game_surface) return S_OK;
@@ -271,9 +274,10 @@ Platform::String^ prompt_text = L"";
 unsigned prompt_kind = 0;
 unsigned displayed_generation = 0;
 char page_switch_error[256] = {};
+constexpr unsigned kRendererCount = 4;
 bool renderer_known = false;
 bool renderer_available = false;
-bool renderer_availability[3] = {};
+bool renderer_availability[kRendererCount] = {};
 std::atomic<unsigned> selected_renderer{0};
 Platform::String^ renderer_failure;
 TextBlock^ renderer_status;
@@ -396,6 +400,12 @@ bool renderer_packaged(unsigned renderer) {
 #else
             return false;
 #endif
+        case 3:
+#ifdef HORIZON_UWP_WGPU_D3D11
+            return true;
+#else
+            return false;
+#endif
         default: return false;
     }
 }
@@ -404,11 +414,14 @@ Platform::String^ renderer_label(unsigned renderer) {
         case 0: return L"Direct3D 11 (native, feature level 9_1)";
         case 1: return L"ANGLE (OpenGL ES 3.0)";
         case 2: return L"Direct3D 12";
+        case 3: return L"Direct3D 11 (wgpu, feature level 9_1)";
         default: return L"Unknown renderer";
     }
 }
 unsigned default_renderer() {
-#ifdef HORIZON_UWP_DEFAULT_RENDERER_DX12
+#ifdef HORIZON_UWP_DEFAULT_RENDERER_WGPU_D3D11
+    return 3;
+#elif defined(HORIZON_UWP_DEFAULT_RENDERER_DX12)
     return 2;
 #elif defined(HORIZON_UWP_DEFAULT_RENDERER_ANGLE)
     return 1;
@@ -1456,7 +1469,7 @@ void start_controller_navigation() {
         static ULONGLONG next_repeat = 0;
         static ULONGLONG test_cancel_at = 0;
         try {
-#ifdef HORIZON_UWP_NATIVE_D3D11
+#ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
             if (launcher_content && launcher_content->Visibility != Visibility::Visible) {
                 previous = 0; horizon_uwp_controller_navigation_stop(); return;
             }
@@ -2561,7 +2574,7 @@ void refresh() {
         launch_card->Children->Append(text(L"Launch settings", 18));
         auto renderers = ref new ComboBox(); renderers->Header = L"Renderer";
         int selected_index = -1;
-        for (unsigned id = 0; id != 3; ++id) {
+        for (unsigned id = 0; id != kRendererCount; ++id) {
             if (!renderer_packaged(id)) continue;
             auto item = ref new ComboBoxItem();
             item->Content = renderer_label(id);
@@ -2582,7 +2595,7 @@ void refresh() {
                 auto item = dynamic_cast<ComboBoxItem^>(renderers->SelectedItem);
                 if (!item || !item->Tag) return;
                 const unsigned id = safe_cast<IPropertyValue^>(item->Tag)->GetUInt32();
-                if (id > 2 || !renderer_availability[id]) return;
+                if (id >= kRendererCount || !renderer_availability[id]) return;
                 selected_renderer.store(id, std::memory_order_release);
                 renderer_available = true;
                 ApplicationData::Current->LocalSettings->Values->Insert(L"game-renderer", PropertyValue::CreateUInt32(id));
@@ -3162,11 +3175,11 @@ protected:
             try { saved_renderer = safe_cast<IPropertyValue^>(values->Lookup(L"game-renderer"))->GetUInt32(); }
             catch (Platform::Exception^) {}
         }
-        if (saved_renderer > 2 || !renderer_packaged(saved_renderer)) {
+        if (saved_renderer >= kRendererCount || !renderer_packaged(saved_renderer)) {
             saved_renderer = 0;
-            while (saved_renderer < 3 && !renderer_packaged(saved_renderer)) ++saved_renderer;
+            while (saved_renderer < kRendererCount && !renderer_packaged(saved_renderer)) ++saved_renderer;
         }
-        selected_renderer.store(saved_renderer < 3 ? saved_renderer : 0, std::memory_order_release);
+        selected_renderer.store(saved_renderer < kRendererCount ? saved_renderer : 0, std::memory_order_release);
         if (values->HasKey(L"live-tile-options")) {
             try { live_tile_options = safe_cast<IPropertyValue^>(values->Lookup(L"live-tile-options"))->GetUInt32() & 7; }
             catch (Platform::Exception^) { live_tile_options = 7; }
@@ -3351,7 +3364,7 @@ protected:
         page->Content = page_layout;
         apply_theme();
         PROBE_STAGE(L"Theme ready");
-#ifdef HORIZON_UWP_NATIVE_D3D11
+#ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
         shell_root = ref new Grid();
         shell_root->Children->Append(page);
         game_surface = ref new SwapChainPanel();
@@ -3420,7 +3433,7 @@ protected:
         const double scale = DisplayInformation::GetForCurrentView()->RawPixelsPerViewPixel;
         auto width = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Width * scale)));
         auto height = static_cast<unsigned>(std::max<double>(1.0, std::ceil(bounds.Height * scale)));
-#ifdef HORIZON_UWP_NATIVE_D3D11
+#ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
         shell_root->UpdateLayout();
         update_game_surface_metrics();
         if (game_surface && game_surface->ActualWidth > 0.0 && game_surface->ActualHeight > 0.0) {
@@ -3431,6 +3444,8 @@ protected:
                 height = static_cast<unsigned>(std::ceil(panel_height));
             }
         }
+#endif
+#ifdef HORIZON_UWP_NATIVE_D3D11
         horizon_uwp_trace_shell_event("D3D11 renderer probe starting");
         const auto d3d11_probe = probe_native_renderer();
         renderer_availability[0] = SUCCEEDED(d3d11_probe.result);
@@ -3472,18 +3487,38 @@ protected:
             horizon_uwp_release_game_swapchain_panel(dx12_panel);
         } else horizon_uwp_trace_shell_event("DX12 renderer probe could not acquire the XAML panel");
 #endif
+#ifdef HORIZON_UWP_WGPU_D3D11
+        horizon_uwp_trace_shell_event("wgpu D3D11 renderer probe starting");
+        auto wgpu_d3d11_panel = horizon_uwp_acquire_game_swapchain_panel();
+        if (wgpu_d3d11_panel) {
+            const bool wgpu_d3d11_probe_succeeded =
+                horizon_uwp_probe_renderer(wgpu_d3d11_panel, 3, width, height) != 0;
+            const HRESULT detach_result = detach_game_swapchain();
+            renderer_availability[3] = wgpu_d3d11_probe_succeeded && SUCCEEDED(detach_result);
+            horizon_uwp_trace_shell_event(renderer_availability[3]
+                ? "wgpu D3D11 renderer probe succeeded" : "wgpu D3D11 renderer probe failed");
+            if (FAILED(detach_result)) {
+                char detach_event[128];
+                sprintf_s(detach_event, "wgpu D3D11 renderer probe could not release its temporary swap chain (0x%08X)",
+                    static_cast<unsigned>(detach_result));
+                horizon_uwp_trace_shell_event(detach_event);
+            }
+            horizon_uwp_release_game_swapchain_panel(wgpu_d3d11_panel);
+        } else horizon_uwp_trace_shell_event("wgpu D3D11 renderer probe could not acquire the XAML panel");
+#endif
         char probe_event[160];
-        sprintf_s(probe_event, "renderer probes D3D11=%d ANGLE=%d DX12=%d",
+        sprintf_s(probe_event, "renderer probes D3D11=%d ANGLE=%d DX12=%d WGPU_D3D11=%d",
             renderer_availability[0] ? 1 : 0,
             renderer_availability[1] ? 1 : 0,
-            renderer_availability[2] ? 1 : 0);
+            renderer_availability[2] ? 1 : 0,
+            renderer_availability[3] ? 1 : 0);
         horizon_uwp_trace_shell_event(probe_event);
         renderer_known = true;
         unsigned chosen = selected_renderer.load(std::memory_order_acquire);
-        if (chosen > 2 || !renderer_availability[chosen]) {
+        if (chosen >= kRendererCount || !renderer_availability[chosen]) {
             chosen = 0;
-            while (chosen < 3 && !renderer_availability[chosen]) ++chosen;
-            if (chosen >= 3) {
+            while (chosen < kRendererCount && !renderer_availability[chosen]) ++chosen;
+            if (chosen >= kRendererCount) {
                 renderer_failure = L"No compatible packaged graphics backend could create a device and presentation surface.";
                 renderer_available = false;
                 selected_renderer.store(0, std::memory_order_release);
@@ -3735,7 +3770,7 @@ extern "C" size_t __cdecl horizon_uwp_page_selected_world(unsigned char* buffer,
 extern "C" int __cdecl horizon_uwp_page_selected_benchmark() {
     const bool run = quick_benchmark; quick_benchmark = false; return run ? 1 : 0;
 }
-#ifdef HORIZON_UWP_NATIVE_D3D11
+#ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
 extern "C" void* __cdecl horizon_uwp_acquire_game_swapchain_panel() {
     if (!game_surface) return nullptr;
     Microsoft::WRL::ComPtr<ISwapChainPanelNative> panel;
@@ -3836,7 +3871,7 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
     }
     try {
         const unsigned renderer = selected_renderer.load(std::memory_order_acquire);
-#ifdef HORIZON_UWP_NATIVE_D3D11
+#ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
         if (!game_surface || !shell_root) {
             strcpy_s(page_switch_error, "The shared Horizon game surface was not initialized.");
             return E_POINTER;
@@ -3848,9 +3883,9 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
         }
         if (show > 0) {
             horizon_uwp_set_game_surface_active(1);
-            // All three renderers present through the same XAML composition
+            // All four renderers present through the same XAML composition
             // panel, keeping the game viewport below the desktop title bar.
-            const bool panel_renderer = renderer <= 2;
+            const bool panel_renderer = renderer < kRendererCount;
             game_surface->Opacity = panel_renderer ? 1.0 : 0.0;
             game_surface->IsHitTestVisible = panel_renderer;
             update_game_surface_metrics();
@@ -3859,7 +3894,7 @@ extern "C" int32_t __cdecl horizon_uwp_page_show_game(int show) {
             if (game_loading_overlay) game_loading_overlay->Visibility = Visibility::Visible;
             if (game_loading_spinner) game_loading_spinner->IsActive = true;
         } else {
-            if (renderer <= 2) {
+            if (renderer < kRendererCount) {
                 const HRESULT detach = detach_game_swapchain();
                 if (FAILED(detach)) {
                     sprintf_s(page_switch_error, "Releasing the UWP game surface failed (0x%08X).",
