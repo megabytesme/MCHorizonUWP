@@ -865,12 +865,15 @@ if (args.Length == 4 && args[0] == "--signing-proof")
     return;
 }
 
-if (args.Length == 2 && args[0] == "--inspect-candidate-catalog")
+if (args.Length is 2 or 5 && args[0] == "--inspect-candidate-catalog")
 {
     var candidate = CompatibilityCatalog.Parse(await File.ReadAllTextAsync(args[1]));
+    var (patch, client, builder) = args.Length == 5
+        ? (args[2], args[3], args[4])
+        : ("0.1.0", "0.1.0", "0.1.0");
     foreach (var architecture in new[] { "x86", "x64", "arm", "arm64" })
     {
-        var result = candidate.Check("0.1.0", "0.1.0", "0.1.0", architecture);
+        var result = candidate.Check(patch, client, builder, architecture);
         Require(result.Allowed && !result.BuildVerified && !result.DeviceVerified, "candidate status is declared but unverified");
         Console.WriteLine($"{architecture}: compatible candidate, no build or device evidence");
     }
