@@ -65,3 +65,34 @@ The isolated process was stopped between runs after saving title evidence. The a
 Four focused Rust tests passed on desktop. They checked preserved table bytes and base audio, table selection for a mod without blocks, cache fingerprint changes after a same-size update with the original timestamp restored, and recovery from a failed generation before publishing a completed retry. The Nightly patch adds a full resource-layer test for resolving both vanilla and mod sound files through an overlay without either file materialized.
 
 The content hunks passed `git apply --check --whitespace=error-all` against the exact source. Builder's `--assemble-candidate` also assembled the pinned upstream ZIP, patch 0.1.6 and the previous 0.1.6 client bundle into a fresh source directory. A reverse-apply check with the Builder's line-ending configuration and comparison of the four resulting Rust files verified the staged content changes. The updated candidate preparation tool also reproduced the original 0.1.5 patch and 0.1.6 client bundle byte for byte.
+
+## Bounded copy and ARM32 table buffers
+
+Cold runs of the signed 0.1.6 candidate spent 122–138 seconds materializing the base directory. Each fresh generation now creates directories on the staging thread and queues up to 64 file paths for copy workers. UWP uses at most eight workers on x64 and ARM64 and four on x86, subject to Horizon's existing worker limit. ARM32 copies on the calling thread. Every worker finishes before registry rewrites start, and a copy error abandons the staged generation through the existing cleanup. The stamp and publication rules above continue to govern cache reuse, archive changes and interrupted installs.
+
+On Ben-Desktop, an optimized Rust 1.99.1 MSVC benchmark ran the 0.1.6 and candidate copy routines against the same installed framework resource directory and entity-only table selection. Every invocation created a fresh destination under `E:\Temp` and used the normal Windows filesystem cache. Each run copied 23,213 files and 242,683,397 bytes. I/O counters reported 23,310 read operations and 242,683,397 bytes read and written in every run.
+
+| Desktop process and copy path | Elapsed samples, s | Median, s | Median peak working set, bytes |
+| --- | --- | ---: | ---: |
+| x64 0.1.6 serial | 16.517, 24.226, 17.628 | 17.628 | 5,107,712 |
+| x64 candidate, four workers | 8.503, 9.125, 7.681 | 8.503 | 5,738,496 |
+| x64 candidate, eight workers | 7.232, 6.741, 7.013 | 7.013 | 6,197,248 |
+| x86 0.1.6 serial | 18.678, 27.460, 25.750 | 25.750 | 6,279,168 |
+| x86 candidate, four workers | 7.436, 8.645, 8.323 | 8.323 | 7,016,448 |
+
+Median elapsed copy time fell 60.2% on x64 and 67.7% on x86. These are desktop process measurements of the filesystem phase. The earlier signed AppContainer UI-ready numbers remain the in-game baseline, and the candidate still needs signed cold and warm UI-ready measurements.
+
+ARM32 now parses the JSON tree through a buffered reader and serializes rewritten JSON tables through a buffered writer. The change avoids a whole serialized file buffer on either side of the existing tree. The format-preserving entity registry path and binary NBT paths use their existing codecs. An optimized x86 desktop probe exercised the ARM32 buffer strategy with Horizon's ordered JSON representation, pinned serde and the framework's 55,723,036-byte `gameplay-facts.json`. The probe parsed and serialized the table without applying mod declarations. Both output files had SHA-256 `dc5b038007a46acbed8d93dbb8578a67d67a9bad56376af997d5d315076285cd`.
+
+| Desktop x86 JSON probe, median of three | Whole-file buffers | Streaming |
+| --- | ---: | ---: |
+| Parse, ms | 865 | 1,118 |
+| Parse and rewrite, ms | 2,039 | 1,638 |
+| Peak working set, bytes | 406,953,984 | 339,275,776 |
+| Peak committed bytes | 443,461,632 | 341,958,656 |
+
+The 32-bit process used 16.6% less peak working memory and 22.9% less peak commit for that table. This estimates the buffer change on a 32-bit process. The Lumia's startup memory and performance require a device run.
+
+The five focused Rust tests passed on both MSVC x64 and x86. They checked byte preservation and skipped audio, rewrite selection, queue disconnect after file failure, invalidation after a same-size archive change and successful retry after an interrupted generation. The content delta applied cleanly to the Builder-assembled 0.1.6 source and reverse-applied in check mode against the shared candidate. The two replacement file sections also passed the strict whitespace check against the pinned upstream source. [Content staging follow-up patch](../patches/nightly-2026-11-18/content-staging-followup.patch)
+
+The local evidence directory contains the CSVs and probe commands. Builds ran from the `E:\Temp\mchorizon-content-staging-20261119-transfer-bench` scratch directory with `build-bench.cmd x64 x86_64-pc-windows-msvc`, `build-bench.cmd x86 i686-pc-windows-msvc`, `run-tests.cmd` with the same architecture arguments and `build-table-bench.cmd`. [Raw samples and probe sources](../deliverables/nightly-2026-11-19/content-staging/bounded-copy)
