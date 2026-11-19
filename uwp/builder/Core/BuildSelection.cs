@@ -77,7 +77,10 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();
 
     public IReadOnlyList<string> FeaturesForClient(string? clientVersion) =>
-        clientVersion is "0.1.3" or "0.1.4"
-            ? Features.Where(feature => feature != "uwp-dx11-renderer").ToArray()
-            : Features;
+        clientVersion switch
+        {
+            "0.1.3" or "0.1.4" => Features.Where(feature => feature != "uwp-dx11-renderer").ToArray(),
+            NightlyUwp.ClientVersion => Features.Where(feature => feature != "native-d3d11").ToArray(),
+            _ => Features,
+        };
 }

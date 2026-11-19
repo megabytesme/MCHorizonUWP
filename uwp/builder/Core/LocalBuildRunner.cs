@@ -71,10 +71,20 @@ public static class LocalBuildRunner
         ArgumentNullException.ThrowIfNull(release);
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
-        if (!release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || release.Client.Version is not ("0.1.3" or "0.1.4" or LocalRecipe.ClientVersion) || release.Patch.Bridge != release.Client.Bridge
+        if (arch.Length == 0 || !release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
+            || release.Client.Version is not ("0.1.3" or "0.1.4" or LocalRecipe.ClientVersion or NightlyUwp.ClientVersion)
+            || release.Patch.Bridge != release.Client.Bridge
             || release.Patch.UpstreamCommit.Length != 40 || release.Patch.UpstreamCommit.Any(character => !Uri.IsHexDigit(character)))
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
+        if (NightlyUwp.Matches(release.Patch.UpstreamCommit))
+        {
+            if (release.Patch.Version != NightlyUwp.PatchVersion || release.Client.Version != NightlyUwp.ClientVersion)
+                throw new InvalidOperationException("This UWP Nightly requires its matching patch and client.");
+            if (selection.RegistryNativeMods is { Count: > 0 })
+                throw new InvalidOperationException(NightlyUwp.PublicNativeModsUnavailable);
+        }
+        else if (release.Client.Version == NightlyUwp.ClientVersion)
+            throw new InvalidOperationException("This client requires the matching UWP Nightly.");
     }
 
     private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,
@@ -92,7 +102,7 @@ public static class LocalBuildRunner
         if (release is null) await LocalRecipe.ValidateSourceAsync(source, probe);
         else if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The prepared release source is missing.");
         var existingFramework = selection.ValidatedExistingResourceFramework;
-        LocalRecipe.ValidateResourceSelection(selection, resources, minecraftDirectory);
+        LocalRecipe.ValidateResourceSelection(selection, resources, minecraftDirectory, release?.Patch.UpstreamCommit);
         var workspaceBase = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".huwp", "b");
         if (existingFramework is null)
         {
@@ -194,6 +204,9 @@ public static class LocalBuildRunner
             progress?.Report("Preparing the ARM32 offline dependency overrides.");
             await RunProcess(python, snapshot, ["uwp/arm32-deps/prepare.py", "--offline-arm32"],
                 new Dictionary<string, string> { ["RUSTUP_TOOLCHAIN"] = LocalRecipe.RustToolchain });
+            if (NightlyUwp.Matches(release?.Patch.UpstreamCommit))
+                File.Copy(Path.Combine(snapshot, "uwp", "arm32-deps", "Cargo.nightly-offline.lock"),
+                    Path.Combine(snapshot, "uwp", "game-bridge", "Cargo.lock"), overwrite: true);
         }
 
         progress?.Report(release is null ? "Preparing the Visual C++ environment." : "Preparing the compact Rust and Clang environment.");
@@ -209,6 +222,12 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_VERSION"] = release is null ? LocalRecipe.UpstreamReleaseVersion : "source-" + upstreamShortCommit;
         vcEnvironment["HORIZON_NIGHTLY"] = release is null ? LocalRecipe.UpstreamNightly : "source " + upstreamShortCommit;
         vcEnvironment["HORIZON_UPSTREAM_COMMIT"] = upstreamCommit;
+        if (NightlyUwp.Matches(upstreamCommit))
+        {
+            vcEnvironment["HORIZON_VERSION"] = "nightly-2026-11-18-" + upstreamShortCommit;
+            vcEnvironment["HORIZON_NIGHTLY"] = "2026-11-18 " + upstreamShortCommit;
+            vcEnvironment["HORIZON_GAME_BUILD_ID"] = NightlyUwp.GameBuildId(targetArchitecture);
+        }
         vcEnvironment["HORIZON_UWP_PORT_REF"] = release is null ? LocalRecipe.SourceCommit : "client-v" + release.Client.Version;
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
         vcEnvironment["RUSTC_BOOTSTRAP"] = "1";

@@ -3,9 +3,6 @@
 #[cfg(any(test, all(target_vendor = "uwp", feature = "uwp-account")))]
 mod account_client_id;
 
-#[cfg(target_vendor = "uwp")]
-#[global_allocator]
-static ALLOCATOR: horizon_threads::Allocator = horizon_threads::ALLOCATOR;
 
 #[cfg(all(target_vendor = "uwp", feature = "uwp-account"))]
 mod pregame;
@@ -802,7 +799,7 @@ pub unsafe extern "C" fn horizon_uwp_server_list_remove(
             Ok(address) => address,
             Err(_) => return -1,
         };
-    match horizon_protocol::servers::remove(&game_dir.join("servers.dat"), address) {
+    match horizon_protocol::servers::remove_where(&game_dir.join("servers.dat"), |_, ip| ip == address) {
         Ok(true) => 0,
         Ok(false) => 1,
         Err(_) => -1,
@@ -863,6 +860,16 @@ fn configure_isolated_test(game_dir: &std::path::Path) {
         unsafe {
             std::env::set_var("HORIZON_LAUNCHER_NO_SELF_UPDATE", "1");
             std::env::set_var("HORIZON_NO_AUDIO", "1");
+            if game_dir.join("strict-dx11-bench.enabled").is_file() {
+                std::env::set_var("WGPU_DX11_FORCE_FL9_1", "1");
+                std::env::set_var("WGPU_DX11_REQUIRE_HARDWARE", "1");
+            }
+            if game_dir.join("performance-trace.enabled").is_file() {
+                std::env::set_var("HORIZON_TRACE", game_dir.join("performance-trace.json"));
+            }
+            if game_dir.join("audio-test.enabled").is_file() {
+                std::env::remove_var("HORIZON_NO_AUDIO");
+            }
         }
     }
 }
@@ -966,6 +973,13 @@ pub extern "C" fn horizon_uwp_prepare_native_renderer() -> i32 {
     horizon_client::native_renderer::prepare_window_renderer_on_ui_thread()
 }
 
+// Keep the host-kit ABI stable. The wgpu renderer owns its own surface setup.
+#[cfg(all(target_vendor = "uwp", feature = "xaml-shell", not(feature = "native-d3d11")))]
+#[unsafe(no_mangle)]
+pub extern "C" fn horizon_uwp_prepare_native_renderer() -> i32 {
+    0x8000_4001_u32 as i32 // E_NOTIMPL
+}
+
 #[cfg(target_vendor = "uwp")]
 unsafe fn run(
     resources: *const u16,
@@ -994,8 +1008,6 @@ unsafe fn run(
     if !prepared {
         configure_isolated_test(&game_dir);
     }
-    horizon_client::logging::set_game_home(game_dir.clone());
-    horizon_client::logging::init(&game_dir, "Render thread");
     #[cfg(feature = "xaml-shell")]
     let selection = if prepared {
         PREPARED_SESSION
@@ -1018,7 +1030,7 @@ unsafe fn run(
             if let Some(name) = &selection.offline_name {
                 unsafe { std::env::set_var("HORIZON_PLAYER_NAME", name) };
             }
-            horizon_client::run_uwp_with_session(&resources, &game_dir, selection.session)
+            run_upstream(&resources, &game_dir, selection.session)
         }
         None => return 0,
     };
@@ -1026,12 +1038,12 @@ unsafe fn run(
     let result = match pregame::start() {
         Some(session) => {
             unsafe { horizon_uwp_discard_pregame_input() };
-            horizon_client::run_uwp_with_session(&resources, &game_dir, session)
+            run_upstream(&resources, &game_dir, session)
         }
         None => return 0,
     };
     #[cfg(not(feature = "uwp-account"))]
-    let result = horizon_client::run_uwp(&resources, &game_dir);
+    let result = run_upstream(&resources, &game_dir, None);
     horizon_client::logging::flush();
     match result {
         Ok(()) => 0,
@@ -1056,4 +1068,15 @@ unsafe fn run(
             1
         }
     }
+}
+
+#[cfg(target_vendor = "uwp")]
+fn run_upstream(
+    resources: &std::path::Path,
+    game_dir: &std::path::Path,
+    session: Option<horizon_client::auth::AuthSession>,
+) -> horizon_client::Result<()> {
+    let startup = horizon_client::entry::prepare_uwp(resources, game_dir)?;
+    horizon_client::game::set_uwp_session(session);
+    horizon_mod_host::start(startup)
 }

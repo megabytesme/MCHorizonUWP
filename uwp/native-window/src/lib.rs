@@ -1,15 +1,19 @@
-//! Creates the CoreWindow swap chain on the UI thread, then transfers its
-//! renderer once to the dedicated game thread.
+//! Coordinates the game view with the CoreWindow dispatcher.
 #![cfg(target_vendor = "uwp")]
 
+#[cfg(feature = "native-d3d11")]
 use horizon_uwp_d3d11::Renderer;
+#[cfg(feature = "native-d3d11")]
 use std::sync::Mutex;
+#[cfg(feature = "native-d3d11")]
 use std::{ffi::c_void, marker::PhantomData, rc::Rc};
+#[cfg(feature = "native-d3d11")]
 use windows::{
     Win32::Foundation::E_INVALIDARG,
     core::{Error, IUnknown, Interface, Result},
 };
 
+#[cfg(feature = "native-d3d11")]
 unsafe extern "C" {
     /// Returns a borrowed CoreWindow on the UI thread, or an agile proxy on
     /// the game thread. Surface creation still uses the UI-thread reference.
@@ -21,6 +25,9 @@ unsafe extern "C" {
         scale_y: *mut f64,
     );
     fn horizon_uwp_attach_game_swapchain(swap_chain: *mut c_void) -> i32;
+}
+
+unsafe extern "C" {
     fn horizon_uwp_game_menu_shown();
 }
 
@@ -29,14 +36,17 @@ pub fn game_menu_shown() {
     unsafe { horizon_uwp_game_menu_shown() }
 }
 
+#[cfg(feature = "native-d3d11")]
 static PREPARED_RENDERER: Mutex<Option<usize>> = Mutex::new(None);
 
 /// Renderer whose swap chain was created on the owning CoreWindow thread.
+#[cfg(feature = "native-d3d11")]
 pub struct NativeRenderer {
     renderer: Renderer,
     _thread_bound: PhantomData<Rc<()>>,
 }
 
+#[cfg(feature = "native-d3d11")]
 impl NativeRenderer {
     /// Create the base D3D11 renderer while called from the CoreWindow UI
     /// thread. The game thread consumes it after XAML resumes its dispatcher.

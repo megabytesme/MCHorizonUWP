@@ -13,12 +13,21 @@ import zipfile
 
 
 UPSTREAM = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81"
+NIGHTLY_UPSTREAM = "0b14f8acfd97fa2c750e42795249dcc981178ca4"
+NIGHTLY_UPSTREAM_ARCHIVE_SHA256 = "1a73fb817549e9b0ec8870b8aec7efd1ea4e274e8be7563411c053aee6ad48ef"
+NIGHTLY_PATCH = "0.1.5"
+NIGHTLY_CLIENT = "0.1.6"
+NIGHTLY_BUILDER = "1.0.4"
+WGPU_ARCHIVE_SHA256 = "4c8769b47eea565ca994d4699ff72e70f6647613b6205c8daa52f2b04a743eaa"
+WGPU_PATCH_PATH = "patches/wgpu-dx11/reuse-upload-buffer-shadow.patch"
+WGPU_PATCH_SHA256 = "ee0a57e971221a3b705ca8434b67ea2f2909fb8b3b21444163e0bf5be44046e4"
 PATCH_PATHS = {
     "0.1.0": "patches/nightly-2026-11-03/horizon-uwp.patch",
     "0.1.1": "patches/nightly-2026-11-03/horizon-uwp-0.1.1.patch",
     "0.1.2": "patches/main-2026-11-09/horizon-uwp-0.1.2.patch",
     "0.1.3": "patches/main-2026-11-09/horizon-uwp-0.1.3.patch",
     "0.1.4": "patches/main-2026-11-09/horizon-uwp-0.1.4.patch",
+    NIGHTLY_PATCH: "patches/nightly-2026-11-18/horizon-uwp-0.1.5.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -77,7 +86,7 @@ def verify_upstream(archive_path, repository, commit):
         raise ValueError("Upstream ZIP contents do not match the pinned Git commit: " + ", ".join(samples))
 
 
-def client_archive(revision, host_artifacts=None):
+def client_archive(revision, host_artifacts=None, wgpu_archive=None):
     archive = git("archive", "--format=tar", revision, "uwp", "LICENSE", "THIRD_PARTY_NOTICES.md")
     output = io.BytesIO()
     with tarfile.open(fileobj=io.BytesIO(archive)) as source, zipfile.ZipFile(
@@ -95,6 +104,15 @@ def client_archive(revision, host_artifacts=None):
             item.compress_type = zipfile.ZIP_DEFLATED
             item.external_attr = 0o100644 << 16
             result.writestr(item, source.extractfile(entry).read())
+        if wgpu_archive is not None:
+            wgpu_zip = wgpu_archive.read_bytes()
+            wgpu_patch = git("show", f"{revision}:{WGPU_PATCH_PATH}")
+            if digest(wgpu_zip) != WGPU_ARCHIVE_SHA256 or digest(wgpu_patch) != WGPU_PATCH_SHA256:
+                raise ValueError("The Nightly wgpu archive or patch does not match its pinned SHA-256")
+            for name, data in (("wgpu.zip", wgpu_zip), ("reuse-upload-buffer-shadow.patch", wgpu_patch)):
+                item = zipfile.ZipInfo(f"uwp/wgpu-dx11/{name}", (1980, 1, 1, 0, 0, 0))
+                item.external_attr = 0o100644 << 16
+                result.writestr(item, data)
         if host_artifacts is not None:
             root = Path(host_artifacts).resolve(strict=True)
             expected = ["README.txt"]
@@ -128,20 +146,33 @@ def client_archive(revision, host_artifacts=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--revision", default="HEAD", help="Committed repository revision")
-    parser.add_argument("--upstream-commit", default=UPSTREAM, help="Upstream Horizon commit pinned by the patch")
+    parser.add_argument("--upstream-commit", help="Upstream Horizon commit pinned by the patch")
     parser.add_argument("--patch-version", default="0.1.0", help="Patch release version (three numeric components)")
     parser.add_argument("--patch-path", help="Committed patch path under patches/ (defaults to the known path for this version)")
-    parser.add_argument("--client-version", default="0.1.0", help="Client release version (three numeric components)")
-    parser.add_argument("--builder-version", default="1.0.3", help="Builder version for the candidate compatibility rule")
+    parser.add_argument("--client-version", help="Client release version (three numeric components)")
+    parser.add_argument("--builder-version", help="Builder version for the candidate compatibility rule")
     parser.add_argument("--patch-only", action="store_true", help="Prepare a patch and compatibility rule for an already released client")
     parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
-    parser.add_argument("--host-artifacts", type=Path, help="Prepared four-architecture host kit to include in the client archive")
+    parser.add_argument("--host-artifacts", type=Path, help="Prepared host kit to include in the client archive")
+    parser.add_argument("--wgpu-archive", type=Path, help="Pinned wgpu codeload ZIP required by Nightly client 0.1.6")
     parser.add_argument("--catalog-input", type=Path, default=Path("catalog/catalog-v1.json"),
                         help="Existing signed catalog whose older entries and rules must be retained")
     parser.add_argument("--output", required=True, type=Path, help="New output directory")
     parser.add_argument("--upstream-archive", required=True, type=Path, help="Verified source ZIP for the pinned upstream commit")
     parser.add_argument("--upstream-repo", required=True, type=Path, help="Git repository containing the pinned upstream commit")
     args = parser.parse_args()
+    nightly = args.patch_version == NIGHTLY_PATCH
+    upstream_commit = (args.upstream_commit or (NIGHTLY_UPSTREAM if nightly else UPSTREAM)).lower()
+    client_version = args.client_version or (NIGHTLY_CLIENT if nightly else "0.1.0")
+    builder_version = args.builder_version or (NIGHTLY_BUILDER if nightly else "1.0.3")
+    if nightly:
+        if upstream_commit != NIGHTLY_UPSTREAM or client_version != NIGHTLY_CLIENT or builder_version != NIGHTLY_BUILDER:
+            raise ValueError("The UWP Nightly requires its pinned Horizon commit, client 0.1.6 and Builder 1.0.4")
+        if not args.patch_only and args.wgpu_archive is None:
+            raise ValueError("Preparing Nightly client 0.1.6 requires --wgpu-archive")
+    elif args.wgpu_archive is not None or upstream_commit == NIGHTLY_UPSTREAM or client_version == NIGHTLY_CLIENT:
+        raise ValueError("The Nightly source and wgpu inputs require patch 0.1.5")
+
     def upper_version(value):
         if not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", value):
             raise ValueError("Versions must have three numeric components without leading zeroes")
@@ -150,14 +181,13 @@ def main():
             raise ValueError("Version exceeds catalog numeric limits")
         return f"{major}.{minor}.{patch_number + 1}"
     patch_upper = upper_version(args.patch_version)
-    client_upper = upper_version(args.client_version)
-    builder_upper = upper_version(args.builder_version)
+    client_upper = upper_version(client_version)
+    builder_upper = upper_version(builder_version)
     patch_path = args.patch_path or PATCH_PATHS.get(args.patch_version)
     if (not patch_path or not patch_path.startswith("patches/") or "\\" in patch_path
             or ".." in Path(patch_path).parts or "." in Path(patch_path).parts):
         raise ValueError("Provide a supported patch version or a safe committed patch path under patches/.")
     revision = git("rev-parse", "--verify", args.revision + "^{commit}").decode().strip()
-    upstream_commit = args.upstream_commit.lower()
     if not re.fullmatch(r"[0-9a-f]{40}", upstream_commit):
         raise ValueError("Invalid upstream Horizon commit")
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
@@ -166,10 +196,12 @@ def main():
         raise ValueError("The GitHub client asset ID must be a positive decimal number")
     patch = git("show", f"{revision}:{patch_path}")
     if not args.patch_only and args.host_artifacts is None:
-        raise ValueError("Every client release requires --host-artifacts for the four prebuilt host kits")
-    client = None if args.patch_only else client_archive(revision, args.host_artifacts)
+        raise ValueError("Every client release requires --host-artifacts for its prebuilt hosts")
+    client = None if args.patch_only else client_archive(revision, args.host_artifacts, args.wgpu_archive)
     verify_upstream(args.upstream_archive, args.upstream_repo, upstream_commit)
     upstream_hash = digest(args.upstream_archive.read_bytes())
+    if nightly and upstream_hash != NIGHTLY_UPSTREAM_ARCHIVE_SHA256:
+        raise ValueError("Nightly release inputs require the verified GitHub codeload ZIP")
     catalog = json.loads(args.catalog_input.read_text(encoding="utf-8"))
     if catalog.get("schema_version") != 1:
         raise ValueError("The existing compatibility catalog has an unsupported schema")
@@ -194,25 +226,25 @@ def main():
     else:
         catalog["patches"].append(patch_entry)
     if args.patch_only:
-        if not any(item["version"] == args.client_version and item["bridge"] == patch_entry["bridge"]
+        if not any(item["version"] == client_version and item["bridge"] == patch_entry["bridge"]
                    for item in catalog["clients"]):
-            raise ValueError(f"Client {args.client_version} is not present in the input catalog")
+            raise ValueError(f"Client {client_version} is not present in the input catalog")
     else:
-        if any(item["version"] == args.client_version for item in catalog["clients"]):
-            raise ValueError(f"Client {args.client_version} already exists in the input catalog")
+        if any(item["version"] == client_version for item in catalog["clients"]):
+            raise ValueError(f"Client {client_version} already exists in the input catalog")
         client_url = (f"https://api.github.com/repos/megabytesme/MCHorizonUWP/releases/assets/{args.client_asset_id}"
                       if args.client_asset_id else
-                      f"{REPOSITORY}/releases/download/client-v{args.client_version}/uwp-client-{args.client_version}.zip")
-        catalog["clients"].append({"version": args.client_version, "bridge": 1,
+                      f"{REPOSITORY}/releases/download/client-v{client_version}/uwp-client-{client_version}.zip")
+        catalog["clients"].append({"version": client_version, "bridge": 1,
                                    "artifact": {"url": client_url, "sha256": digest(client)}})
     catalog["rules"].append({"patch": {"min_inclusive": args.patch_version, "max_exclusive": patch_upper},
-                             "client": {"min_inclusive": args.client_version, "max_exclusive": client_upper},
-                             "builder": {"min_inclusive": args.builder_version, "max_exclusive": builder_upper},
+                             "client": {"min_inclusive": client_version, "max_exclusive": client_upper},
+                             "builder": {"min_inclusive": builder_version, "max_exclusive": builder_upper},
                              "architectures": ["x86", "x64", "arm", "arm64"]})
     args.output.mkdir(parents=True, exist_ok=False)
     (args.output / f"horizon-uwp-{args.patch_version}.patch").write_bytes(patch)
     if client is not None:
-        (args.output / f"uwp-client-{args.client_version}.zip").write_bytes(client)
+        (args.output / f"uwp-client-{client_version}.zip").write_bytes(client)
     (args.output / "catalog.UNSIGNED.json").write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"Prepared unsigned development artifacts from {revision} in {args.output}")
     print("No release or test evidence was published; authenticate the catalog before use.")

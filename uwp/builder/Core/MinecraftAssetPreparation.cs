@@ -78,8 +78,7 @@ public static class MinecraftAssetPreparation
             throw new InvalidOperationException("Minecraft resource preparation failed." + (string.IsNullOrWhiteSpace(lastLine) ? "" : " " + lastLine));
         }
         var resources = Path.Combine(source, ".local", "horizon-client", LocalRecipe.MinecraftVersion);
-        if (!File.Exists(Path.Combine(resources, "horizon-resources.json")))
-            throw new InvalidDataException("Horizon did not produce the expected Minecraft resources.");
+        LocalRecipe.ValidateResources(resources, release.Patch.UpstreamCommit);
         return resources;
     }
 

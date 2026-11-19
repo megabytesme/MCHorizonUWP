@@ -47,7 +47,7 @@ public sealed partial class MainWindow : Window
             var currentCommit = SelectedHorizonCommit();
             if (currentCommit is not null)
             {
-                if (observedHorizonCommit is not null && !observedHorizonCommit.Equals(currentCommit, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(observedHorizonCommit, currentCommit, StringComparison.OrdinalIgnoreCase))
                     ResetNativeModSelectionForHorizonChange();
                 observedHorizonCommit = currentCommit;
             }
@@ -596,7 +596,10 @@ public sealed partial class MainWindow : Window
         nativeMods = [];
         selectedNativeMods.Clear();
         selectedNativeModVersions.Clear();
-        NativeModsStatus.Text = "Horizon release changed. Mod compatibility will be checked before browsing.";
+        var unavailable = NightlyUwp.Matches(SelectedHorizonCommit());
+        BrowseNativeMods.IsEnabled = !unavailable && !NativeModsCompatibilityRing.IsActive;
+        NativeModsStatus.Text = unavailable ? NightlyUwp.PublicNativeModsUnavailable
+            : "Horizon release changed. Mod compatibility will be checked before browsing.";
         ClearNativeMods.Visibility = Visibility.Collapsed;
     }
 
@@ -636,7 +639,8 @@ public sealed partial class MainWindow : Window
             foreach (var patch in catalog.Patches.OrderByDescending(item => new Version(item.Version)))
                 foreach (var client in catalog.Clients.OrderByDescending(item => new Version(item.Version)))
                 {
-                    var checks = architectures.Select(targetArch => catalog.Check(patch.Version, client.Version, CatalogTrust.BuilderVersion, targetArch)).ToArray();
+                    var checks = architectures.Select(targetArch => CatalogTrust.CheckRecipe(catalog,
+                        patch.Version, client.Version, CatalogTrust.BuilderVersion, targetArch)).ToArray();
                     if (checks.Length > 0 && checks.All(check => check.Allowed))
                     {
                         var combined = new CompatibilityResult(true, checks.All(check => check.BuildVerified), checks.All(check => check.DeviceVerified),
@@ -1199,8 +1203,8 @@ public sealed partial class MainWindow : Window
                 BuildProgressStatus.Text = $"Preparing {activeBuildArchitecture} package";
                 BuildProgressDetail.Text = $"Build {targets.ToList().IndexOf(target) + 1} of {targets.Count}";
                 var selection = CurrentSelection(target);
-                var compatibility = catalog?.Check(release.Patch, release.Client, CatalogTrust.BuilderVersion, activeBuildArchitecture)
-                    ?? throw new InvalidOperationException("The signed compatibility catalog is unavailable.");
+                var compatibility = CatalogTrust.CheckRecipe(catalog ?? throw new InvalidOperationException("The signed compatibility catalog is unavailable."),
+                    release.Patch, release.Client, CatalogTrust.BuilderVersion, activeBuildArchitecture);
                 if (!compatibility.Allowed) throw new InvalidOperationException($"The selected release is not compatible with {activeBuildArchitecture}.");
                 var targetRelease = release with { Architecture = activeBuildArchitecture, Compatibility = compatibility };
                 var prepared = sharedPreparedRelease is null
@@ -1528,6 +1532,7 @@ public sealed partial class MainWindow : Window
     }
     private async void BrowseNativeMods_Click(object sender, RoutedEventArgs e)
     {
+        if (NightlyUwp.Matches(SelectedHorizonCommit())) return;
         BrowseNativeMods.IsEnabled = false;
         NativeModsCompatibilityRing.Visibility = Visibility.Visible;
         NativeModsCompatibilityRing.IsActive = true;
@@ -1592,7 +1597,7 @@ public sealed partial class MainWindow : Window
         {
             NativeModsCompatibilityRing.IsActive = false;
             NativeModsCompatibilityRing.Visibility = Visibility.Collapsed;
-            BrowseNativeMods.IsEnabled = true;
+            BrowseNativeMods.IsEnabled = !NightlyUwp.Matches(SelectedHorizonCommit());
             UpdateBuildActions();
             UpdateWizard();
         }
