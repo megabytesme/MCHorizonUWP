@@ -234,3 +234,7 @@ BlueMap is licensed under the MIT license:
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 > THE SOFTWARE.
+
+## Wasmtime Pulley probe
+
+The standalone UWP experiment patches the Windows memory backend and platform configuration of Wasmtime 50.0.2. The patch uses AppContainer memory APIs, copies file-backed inputs into anonymous memory, and selects the interpreter on UWP. Wasmtime is licensed under Apache-2.0 with the LLVM exception. [Pinned upstream source](https://github.com/bytecodealliance/wasmtime/tree/f9a93b049a23bef9a33cfa3888f32af33a178749) · [License](uwp/code-generation-probe/wasmtime/LICENSE.wasmtime)

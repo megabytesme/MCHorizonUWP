@@ -1,0 +1,183 @@
+--- a/build.rs
++++ b/build.rs
+@@ -19,7 +19,9 @@
+ 
+     // Determine if the current host architecture is supported by Cranelift
+     // meaning that we might be executing native code.
+-    let has_host_compiler_backend = match target_arch.as_str() {
++    // UWP uses Pulley and explicit traps until native Windows unwind and
++    // exception handling have UWP-compatible implementations.
++    let has_host_compiler_backend = !cfg_is("target_vendor", "uwp") && match target_arch.as_str() {
+         "x86_64" | "riscv64" | "s390x" | "aarch64" => true,
+         _ => false,
+     };
+--- a/src/runtime/vm/sys/windows/mmap.rs
++++ b/src/runtime/vm/sys/windows/mmap.rs
+@@ -7,9 +7,13 @@
+ use std::os::windows::prelude::*;
+ use std::path::Path;
+ use std::ptr::{self, NonNull};
++#[cfg(not(target_vendor = "uwp"))]
+ use windows_sys::Win32::Foundation::*;
++#[cfg(not(target_vendor = "uwp"))]
+ use windows_sys::Win32::Storage::FileSystem::*;
+ use windows_sys::Win32::System::Memory::*;
++#[cfg(target_vendor = "uwp")]
++use super::uwp::{VirtualAllocFromApp as VirtualAlloc, VirtualFree, VirtualProtectFromApp as VirtualProtect};
+ 
+ /// Open a file so that it can be mmap'd for executing.
+ ///
+@@ -20,8 +24,13 @@
+ pub fn open_file_for_mmap(path: &Path) -> Result<File> {
+     OpenOptions::new()
+         .read(true)
+-        .access_mode(FILE_GENERIC_READ | FILE_GENERIC_EXECUTE)
+-        .share_mode(FILE_SHARE_READ)
++        .access_mode({
++            #[cfg(not(target_vendor = "uwp"))]
++            { FILE_GENERIC_READ | FILE_GENERIC_EXECUTE }
++            #[cfg(target_vendor = "uwp")]
++            { 0x80000000 }
++        })
++        .share_mode(1)
+         .open(path)
+         .context("failed to open file")
+ }
+@@ -29,6 +38,7 @@
+ #[derive(Debug)]
+ pub struct Mmap {
+     memory: SendSyncPtr<[u8]>,
++    #[cfg(not(target_vendor = "uwp"))]
+     is_file: bool,
+ }
+ 
+@@ -36,6 +46,7 @@
+     pub fn new_empty() -> Mmap {
+         Mmap {
+             memory: crate::vm::sys::empty_mmap(),
++            #[cfg(not(target_vendor = "uwp"))]
+             is_file: false,
+         }
+     }
+@@ -57,6 +68,7 @@
+         let memory = SendSyncPtr::new(NonNull::new(memory).unwrap());
+         Ok(Self {
+             memory,
++            #[cfg(not(target_vendor = "uwp"))]
+             is_file: false,
+         })
+     }
+@@ -77,10 +89,37 @@
+         let memory = SendSyncPtr::new(NonNull::new(memory).unwrap());
+         Ok(Self {
+             memory,
++            #[cfg(not(target_vendor = "uwp"))]
+             is_file: false,
+         })
+     }
+ 
++    #[cfg(target_vendor = "uwp")]
++    pub fn from_file(file: &File) -> Result<Self> {
++        let len = usize::try_from(file.metadata()?.len())
++            .map_err(|_| format_err!("file too large to copy into anonymous memory"))?;
++        if len == 0 {
++            return Ok(Self::new_empty());
++        }
++        let mut mapping = Self::new(HostAlignedByteCount::new_rounded_up(len)?)?;
++        let address = mapping.memory.as_ptr().cast::<u8>();
++        let buffer = unsafe { std::slice::from_raw_parts_mut(address, len) };
++        let mut copied = 0;
++        while copied < len {
++            let end = copied + (len - copied).min(1 << 30);
++            match file.seek_read(&mut buffer[copied..end], copied as u64) {
++                Ok(0) => bail!(io::Error::from(io::ErrorKind::UnexpectedEof)),
++                Ok(n) => copied += n,
++                Err(err) if err.kind() == io::ErrorKind::Interrupted => {}
++                Err(err) => return Err(err.into()),
++            }
++        }
++        let exact = std::ptr::slice_from_raw_parts_mut(address, len);
++        mapping.memory = SendSyncPtr::new(NonNull::new(exact).unwrap());
++        Ok(mapping)
++    }
++
++    #[cfg(not(target_vendor = "uwp"))]
+     pub fn from_file(file: &File) -> Result<Self> {
+         unsafe {
+             let len = file
+@@ -183,6 +222,12 @@
+         self.memory.as_ptr().len()
+     }
+ 
++    #[cfg(target_vendor = "uwp")]
++    pub unsafe fn make_executable(&self, _: Range<usize>, _: bool) -> Result<()> {
++        bail!("native Wasmtime code is unavailable in this Pulley-only UWP build")
++    }
++
++    #[cfg(not(target_vendor = "uwp"))]
+     pub unsafe fn make_executable(
+         &self,
+         range: Range<usize>,
+@@ -277,6 +322,7 @@
+             return;
+         }
+ 
++        #[cfg(not(target_vendor = "uwp"))]
+         if self.is_file {
+             let r = unsafe {
+                 UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS {
+@@ -284,9 +330,9 @@
+                 })
+             };
+             assert_ne!(r, 0);
+-        } else {
+-            let r = unsafe { VirtualFree(self.memory.as_ptr().cast(), 0, MEM_RELEASE) };
+-            assert_ne!(r, 0);
+-        }
++            return;
++        }
++        let r = unsafe { VirtualFree(self.memory.as_ptr().cast(), 0, MEM_RELEASE) };
++        assert_ne!(r, 0);
+     }
+ }
+--- a/src/runtime/vm/sys/windows/mod.rs
++++ b/src/runtime/vm/sys/windows/mod.rs
+@@ -6,6 +6,9 @@
+ #[cfg(has_native_signals)]
+ mod vectored_exceptions;
+ pub mod vm;
++
++#[cfg(target_vendor = "uwp")]
++mod uwp;
+ 
+ #[cfg(all(target_pointer_width = "64", has_host_compiler_backend))]
+ pub mod unwind64;
+--- /dev/null
++++ b/src/runtime/vm/sys/windows/uwp.rs
+@@ -0,0 +1,14 @@
++use core::ffi::c_void;
++use windows_sys::Win32::System::SystemInformation::SYSTEM_INFO;
++
++#[link(name = "WindowsApp")]
++unsafe extern "system" {
++    pub(super) fn VirtualAllocFromApp(
++        base: *const c_void, size: usize, allocation: u32, protection: u32
++    ) -> *mut c_void;
++    pub(super) fn VirtualProtectFromApp(
++        base: *const c_void, size: usize, protection: u32, old_protection: *mut u32
++    ) -> i32;
++    pub(super) fn VirtualFree(base: *mut c_void, size: usize, kind: u32) -> i32;
++    pub(super) fn GetSystemInfo(info: *mut SYSTEM_INFO);
++}
+--- a/src/runtime/vm/sys/windows/vm.rs
++++ b/src/runtime/vm/sys/windows/vm.rs
+@@ -5,6 +5,9 @@
+ use std::sync::Arc;
+ use windows_sys::Win32::System::Memory::*;
++#[cfg(not(target_vendor = "uwp"))]
+ use windows_sys::Win32::System::SystemInformation::*;
++#[cfg(target_vendor = "uwp")]
++use super::uwp::{GetSystemInfo, VirtualAllocFromApp as VirtualAlloc, VirtualFree};
+ 
+ pub use crate::runtime::vm::pagemap_disabled::{PageMap, reset_with_pagemap};
+ 

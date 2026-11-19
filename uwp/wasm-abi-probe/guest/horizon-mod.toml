@@ -1,0 +1,8 @@
+id = "uwp_wasm_hook_probe"
+name = "UWP Wasm Hook Probe"
+version = "0.1.0"
+description = "Draws a small magenta square with Horizon's client GUI hook."
+api = "0.2"
+side = "client"
+capabilities = ["registries"]
+wasm_memory_mib = 32
