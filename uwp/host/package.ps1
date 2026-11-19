@@ -15,7 +15,8 @@ param(
     [ValidateSet('2.7', '2.8')][string]$WinUIFramework,
     [string]$PackageVersion,
     [string]$ReleaseNotes,
-    [string]$ReleaseMetadataPath
+    [string]$ReleaseMetadataPath,
+    [string]$EmbeddedNativeMods
 )
 $ErrorActionPreference = 'Stop'
 if (-not $WinUIFramework) { $WinUIFramework = if ($Architecture -eq 'arm') { '2.7' } else { '2.8' } }
@@ -94,6 +95,14 @@ Copy-Item -LiteralPath $metadata -Destination (Join-Path $stage 'HorizonUWP.winm
 if ($GameBridge) {
     Assert-PEArchitecture $GameBridge $Architecture
     Copy-Item -LiteralPath $GameBridge -Destination (Join-Path $stage 'horizon_uwp_game_bridge.dll') -Force
+}
+if ($EmbeddedNativeMods) {
+    if (-not (Test-Path -LiteralPath (Join-Path $EmbeddedNativeMods 'build-record.json') -PathType Leaf)) {
+        throw 'Missing staged embedded native mod build record.'
+    }
+    $nativeStage = Join-Path $stage 'horizon-native-mods'
+    if (Test-Path -LiteralPath $nativeStage) { throw 'Native mod staging already exists; use a fresh OutputDirectory.' }
+    Copy-Item -LiteralPath $EmbeddedNativeMods -Destination $nativeStage -Recurse
 }
 $notesStage = Join-Path $stage 'horizon-release-notes.txt'
 if (Test-Path -LiteralPath $notesStage) { throw 'Release-note staging already exists; use a fresh OutputDirectory.' }
@@ -200,6 +209,12 @@ if ($ResourceFrameworkName) {
     $dependency.SetAttribute('Publisher', $manifestXml.Package.Identity.Publisher)
     $dependency.SetAttribute('MinVersion', '1.0.0.0')
     $manifestXml.Package.Dependencies.AppendChild($dependency) | Out-Null
+    $manifest = $manifestXml.OuterXml
+}
+if ($EmbeddedNativeMods) {
+    $manifestXml = [xml]$manifest
+    $manifestXml.Package.Properties.DisplayName = 'MCHorizonUWP Native Test'
+    $manifestXml.Package.Applications.Application.VisualElements.SetAttribute('DisplayName', 'MCHorizonUWP Native Test')
     $manifest = $manifestXml.OuterXml
 }
 Set-Content -Path (Join-Path $stage 'AppxManifest.xml') -Value $manifest -Encoding UTF8

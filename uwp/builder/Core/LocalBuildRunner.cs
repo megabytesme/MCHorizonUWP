@@ -72,19 +72,22 @@ public static class LocalBuildRunner
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
         if (arch.Length == 0 || !release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || release.Client.Version is not ("0.1.3" or "0.1.4" or LocalRecipe.ClientVersion or NightlyUwp.ClientVersion)
+            || (release.Client.Version is not ("0.1.3" or "0.1.4" or LocalRecipe.ClientVersion) && !NightlyUwp.IsClient(release.Client.Version))
             || release.Patch.Bridge != release.Client.Bridge
             || release.Patch.UpstreamCommit.Length != 40 || release.Patch.UpstreamCommit.Any(character => !Uri.IsHexDigit(character)))
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
         if (NightlyUwp.Matches(release.Patch.UpstreamCommit))
         {
-            if (release.Patch.Version != NightlyUwp.PatchVersion || release.Client.Version != NightlyUwp.ClientVersion)
+            if (!NightlyUwp.MatchesRecipe(release.Patch.Version, release.Client.Version))
                 throw new InvalidOperationException("This UWP Nightly requires its matching patch and client.");
             if (selection.RegistryNativeMods is { Count: > 0 })
                 throw new InvalidOperationException(NightlyUwp.PublicNativeModsUnavailable);
         }
-        else if (release.Client.Version == NightlyUwp.ClientVersion)
+        else if (NightlyUwp.IsClient(release.Client.Version))
             throw new InvalidOperationException("This client requires the matching UWP Nightly.");
+        if (selection.EmbedsNativeSources && (!NightlyUwp.Matches(release.Patch.UpstreamCommit)
+            || !NightlyUwp.SupportsNativeSource(release.Patch.Version, release.Client.Version)))
+            throw new InvalidOperationException("Native source builds require the 0.1.6 patch and 0.1.7 client for Horizon Nightly 2026-11-18.");
     }
 
     private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,
@@ -99,6 +102,9 @@ public static class LocalBuildRunner
         }
 
         var plan = LocalRecipe.Plan(selection, release?.Patch, release?.Client.Version);
+        var sourceMods = selection.TrustedNativeSourceFolders?.Select(Path.GetFullPath).ToArray() ?? [];
+        if (sourceMods.Length != 0 && release is null)
+            throw new InvalidOperationException("Native source builds require an authenticated release.");
         if (release is null) await LocalRecipe.ValidateSourceAsync(source, probe);
         else if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The prepared release source is missing.");
         var existingFramework = selection.ValidatedExistingResourceFramework;
@@ -209,6 +215,25 @@ public static class LocalBuildRunner
                     Path.Combine(snapshot, "uwp", "game-bridge", "Cargo.lock"), overwrite: true);
         }
 
+        string? embeddedNative = null;
+        if (sourceMods.Length != 0)
+        {
+            const string stager = "uwp/native-mod-probe/stage-source.py";
+            if (!File.Exists(Path.Combine(snapshot, stager)))
+                throw new InvalidOperationException("The selected client bundle predates the embedded native source prototype.");
+            var buildId = NightlyUwp.GameBuildId(targetArchitecture, release!.Patch.Version, release.Client.Version);
+            var stageArgs = new List<string> { "-I", stager, "--workspace", snapshot, "--architecture", targetArchitecture, "--game-build-id", buildId, "--trust-native-source" };
+            foreach (var folder in sourceMods)
+            {
+                stageArgs.Add("--source");
+                stageArgs.Add(folder);
+            }
+            progress?.Report($"Preparing {sourceMods.Length} trusted native source project(s).");
+            var nativePython = await PrivatePython.EnsureAsync(python, PrivatePython.Root, Path.Combine(root, "downloads"), requireToml: true);
+            await RunProcess(nativePython, snapshot, stageArgs, progress: progress, captureFailureOutput: true);
+            embeddedNative = Path.Combine(snapshot, "uwp", "game-bridge", "embedded-native", "horizon-native-mods");
+        }
+
         progress?.Report(release is null ? "Preparing the Visual C++ environment." : "Preparing the compact Rust and Clang environment.");
         var vcEnvironment = compact is null ? await VisualCppEnvironment(cmd, selection.Target, probe, splitRelease: false, unifiedRoot: null)
             : new Dictionary<string, string>(compact.Cargo, StringComparer.OrdinalIgnoreCase);
@@ -226,7 +251,7 @@ public static class LocalBuildRunner
         {
             vcEnvironment["HORIZON_VERSION"] = "nightly-2026-11-18-" + upstreamShortCommit;
             vcEnvironment["HORIZON_NIGHTLY"] = "2026-11-18 " + upstreamShortCommit;
-            vcEnvironment["HORIZON_GAME_BUILD_ID"] = NightlyUwp.GameBuildId(targetArchitecture);
+            vcEnvironment["HORIZON_GAME_BUILD_ID"] = NightlyUwp.GameBuildId(targetArchitecture, release!.Patch.Version, release.Client.Version);
         }
         vcEnvironment["HORIZON_UWP_PORT_REF"] = release is null ? LocalRecipe.SourceCommit : "client-v" + release.Client.Version;
         vcEnvironment["HORIZON_UWP_XAML_SHELL"] = "1";
@@ -370,7 +395,9 @@ public static class LocalBuildRunner
         progress?.Report("Packaging the unsigned client.");
         var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
-            "-IdentityName", identity is null ? "HorizonUWPPrototype" : "MCHorizonUWP", "-WinUIFramework", "2.7" };
+            "-IdentityName", embeddedNative is not null ? LocalPackageInstaller.NativeTestPackageName
+                : identity is null ? "HorizonUWPPrototype" : LocalPackageInstaller.ClientPackageName, "-WinUIFramework", "2.7" };
+        if (embeddedNative is not null) { packageArguments.Add("-EmbeddedNativeMods"); packageArguments.Add(embeddedNative); }
         if (gameBridge is not null) { packageArguments.Add("-GameBridge"); packageArguments.Add(gameBridge); }
         packageArguments.AddRange(LocalRecipe.ResourceArguments(selection, packageResources, framework?.Name));
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }

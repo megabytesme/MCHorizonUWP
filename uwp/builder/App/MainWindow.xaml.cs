@@ -51,6 +51,7 @@ public sealed partial class MainWindow : Window
                     ResetNativeModSelectionForHorizonChange();
                 observedHorizonCommit = currentCommit;
             }
+            UpdateNativeSourceAvailability();
             UpdateBuildActions();
             UpdateWizard();
             if (wizardStep == ReviewStep) _ = RefreshReadinessAsync();
@@ -180,6 +181,7 @@ public sealed partial class MainWindow : Window
     private IReadOnlyList<NativeModListing> nativeMods = [];
     private NativeModPreflightResult? nativeModPreflight;
     private readonly HashSet<string> selectedNativeMods = new(StringComparer.Ordinal);
+    private readonly HashSet<string> trustedNativeSources = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> selectedNativeModVersions = new(StringComparer.Ordinal);
     private string? observedHorizonCommit;
     private CancellationTokenSource? minecraftSignInCancellation;
@@ -582,7 +584,8 @@ public sealed partial class MainWindow : Window
         ExistingResourceFramework: ResourceMode.SelectedIndex == 1 ? ExistingFrameworkName.Text : "",
         RegistryNativeMods: selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
         RegistryNativeModVersions: selectedNativeMods.Where(selectedNativeModVersions.ContainsKey)
-            .ToDictionary(id => id, id => selectedNativeModVersions[id], StringComparer.Ordinal));
+            .ToDictionary(id => id, id => selectedNativeModVersions[id], StringComparer.Ordinal),
+        TrustedNativeSourceFolders: trustedNativeSources.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray());
 
     private string? SelectedHorizonCommit()
     {
@@ -596,12 +599,75 @@ public sealed partial class MainWindow : Window
         nativeMods = [];
         selectedNativeMods.Clear();
         selectedNativeModVersions.Clear();
+        trustedNativeSources.Clear();
+        packageVersionResolvedAgainstInstalled = false;
         var unavailable = NightlyUwp.Matches(SelectedHorizonCommit());
         BrowseNativeMods.IsEnabled = !unavailable && !NativeModsCompatibilityRing.IsActive;
         NativeModsStatus.Text = unavailable ? NightlyUwp.PublicNativeModsUnavailable
             : "Horizon release changed. Mod compatibility will be checked before browsing.";
         ClearNativeMods.Visibility = Visibility.Collapsed;
     }
+
+    private void UpdateNativeSourceAvailability()
+    {
+        var supported = NightlyUwp.Matches(SelectedHorizonCommit()) &&
+            ReleaseSelection.SelectedItem is ReleaseChoice release && NightlyUwp.SupportsNativeSource(release.Patch, release.Client);
+        NativeSourceOptions.Visibility = supported ? Visibility.Visible : Visibility.Collapsed;
+        if (!supported && trustedNativeSources.Count != 0)
+        {
+            trustedNativeSources.Clear();
+            packageVersionResolvedAgainstInstalled = false;
+        }
+        UpdateNativeSourceStatus();
+    }
+
+    private async void AddNativeSource_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            picker.FileTypeFilter.Add("*");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null) return;
+            if (!File.Exists(Path.Combine(folder.Path, "horizon-mod.toml")) ||
+                !File.Exists(Path.Combine(folder.Path, "Cargo.toml")))
+            {
+                NativeSourceStatus.Text = "Select the source folder containing horizon-mod.toml and Cargo.toml.";
+                return;
+            }
+            var dialog = new ContentDialog
+            {
+                XamlRoot = NativeSourceOptions.XamlRoot,
+                Title = "Trust this native source?",
+                Content = $"The mod in {folder.Path} will execute as native code inside the game. Select only code you trust. The Builder will create an isolated test package.",
+                PrimaryButtonText = "Trust source",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+            };
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                trustedNativeSources.Add(folder.Path);
+                packageVersionResolvedAgainstInstalled = false;
+                UpdateNativeSourceStatus();
+            }
+        }
+        catch (Exception error)
+        {
+            NativeSourceStatus.Text = $"Could not select native source. {error.Message}";
+        }
+    }
+
+    private void ClearNativeSource_Click(object sender, RoutedEventArgs e)
+    {
+        trustedNativeSources.Clear();
+        packageVersionResolvedAgainstInstalled = false;
+        UpdateNativeSourceStatus();
+    }
+
+    private void UpdateNativeSourceStatus() => NativeSourceStatus.Text = trustedNativeSources.Count == 0
+        ? "No native source projects selected."
+        : string.Join(Environment.NewLine, trustedNativeSources.OrderBy(path => path, StringComparer.OrdinalIgnoreCase));
 
     private IReadOnlyList<TargetProfile> SelectedTargets()
     {
@@ -1050,7 +1116,8 @@ public sealed partial class MainWindow : Window
                 if (!packageVersionCustomized)
                 {
                     var signingIdentity = PackageSigning.GetOrCreateIdentity();
-                    var installedClient = await LocalPackageInstaller.FindInstalledClientAsync(signingIdentity.Publisher);
+                    var installedClient = await LocalPackageInstaller.FindInstalledClientAsync(signingIdentity.Publisher,
+                        nativeTest: trustedNativeSources.Count != 0);
                     SetSuggestedPackageVersion(LocalRecipe.NextPackageVersion(DateTimeOffset.UtcNow, installedClient?.Version));
                 }
                 packageVersionResolvedAgainstInstalled = true;
@@ -1096,6 +1163,8 @@ public sealed partial class MainWindow : Window
             if (NativeDeviceVibration.IsChecked == true) selectedMods.Add("Device vibration");
             selectedMods.AddRange(selectedNativeMods.OrderBy(id => id, StringComparer.Ordinal)
                 .Select(id => $"{id} {selectedNativeModVersions.GetValueOrDefault(id, "version pending")}"));
+            selectedMods.AddRange(trustedNativeSources.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Select(path => Path.GetFileName(path)));
             var modsSummary = selectedMods.Count == 0 ? "None" : string.Join(", ", selectedMods);
             var targetLabel = string.Join(", ", targets.Select(ArchitectureFor));
             BuildSummary.Text = $"Targets: {targetLabel}\nHorizon patch: {release.Patch}  ·  UWP client: {release.Client}\nResources: {resourceChoice}\nNative mods: {modsSummary}\nPackage version: {selection.PackageVersion}";
@@ -1161,7 +1230,9 @@ public sealed partial class MainWindow : Window
         try
         {
             var versionBeforeInstallCheck = PackageVersion.Text;
-            var installedClient = await LocalPackageInstaller.FindInstalledClientAsync(PackageSigning.GetOrCreateIdentity().Publisher);
+            builtWithNativeSources = trustedNativeSources.Count != 0;
+            var installedClient = await LocalPackageInstaller.FindInstalledClientAsync(PackageSigning.GetOrCreateIdentity().Publisher,
+                nativeTest: builtWithNativeSources);
             if (!packageVersionCustomized)
                 SetSuggestedPackageVersion(LocalRecipe.NextPackageVersion(DateTimeOffset.UtcNow, installedClient?.Version));
             else if (installedClient is not null && new Version(CurrentSelection().ValidatedPackageVersion) <= installedClient.Version)

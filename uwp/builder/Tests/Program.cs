@@ -2047,6 +2047,20 @@ static async Task TestReleaseSource()
             recipe.Patch with { Version = NightlyUwp.PatchVersion, UpstreamCommit = NightlyUwp.UpstreamCommit },
             recipe.Client with { Version = NightlyUwp.ClientVersion }, recipe.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(nightlyRecipe, new BuildSelection(TargetProfile.DesktopX64, true));
+        var trustedSourceSelection = new BuildSelection(TargetProfile.DesktopX64, true,
+            TrustedNativeSourceFolders: [Path.Combine(root, "local-mod-source")]);
+        var nativeCandidate = new PreparedRelease(nightlyRecipe.SourceDirectory,
+            nightlyRecipe.Patch with { Version = NightlyUwp.CandidatePatchVersion },
+            nightlyRecipe.Client with { Version = NightlyUwp.CandidateClientVersion },
+            nightlyRecipe.Compatibility, CatalogTrust.BuilderVersion, "x64");
+        LocalBuildRunner.ValidatePreparedRelease(nativeCandidate, trustedSourceSelection);
+        LocalBuildRunner.ValidatePreparedRelease(nativeCandidate, new BuildSelection(TargetProfile.DesktopX64, true));
+        try
+        {
+            LocalBuildRunner.ValidatePreparedRelease(nightlyRecipe, trustedSourceSelection);
+            throw new Exception("the prior client accepted an embedded native source build");
+        }
+        catch (InvalidOperationException) { }
         var nightlyPlan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, true),
             nightlyRecipe.Patch, nightlyRecipe.Client.Version);
         Require(nightlyPlan.SourceCommit == NightlyUwp.UpstreamCommit, "Nightly recipe uses immutable upstream source");

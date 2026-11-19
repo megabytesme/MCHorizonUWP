@@ -14,6 +14,7 @@ public sealed record InstalledClientPackage(string Architecture, Version Version
 public static class LocalPackageInstaller
 {
     public const string ClientPackageName = "MCHorizonUWP";
+    public const string NativeTestPackageName = "MCHorizonUWP-NativeTest";
 
     public static bool CanInstall(TargetProfile target, Architecture machine, Version windows) => (machine, target) switch
     {
@@ -75,7 +76,7 @@ public static class LocalPackageInstaller
 
     /// <summary>Finds this builder's installed client package for the current Windows user.</summary>
     public static async Task<InstalledClientPackage?> FindInstalledClientAsync(string expectedPublisher,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool nativeTest = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedPublisher);
         if (!OperatingSystem.IsWindows()) return null;
@@ -91,7 +92,7 @@ public static class LocalPackageInstaller
         foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-Command",
             "$ErrorActionPreference='Stop'; $n=$env:HORIZON_CLIENT_PACKAGE_NAME; $expectedPublisher=$env:HORIZON_CLIENT_PUBLISHER; $p=@(Get-AppxPackage -Name $n -ErrorAction SilentlyContinue | Where-Object { $_.Name -ceq $n -and $_.Publisher -ceq $expectedPublisher } | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1); if ($p.Count -eq 0) { [Console]::Out.WriteLine('null') } else { [PSCustomObject]@{ architecture=[string]$p[0].Architecture; version=[string]$p[0].Version } | ConvertTo-Json -Compress }" })
             start.ArgumentList.Add(argument);
-        start.Environment["HORIZON_CLIENT_PACKAGE_NAME"] = ClientPackageName;
+        start.Environment["HORIZON_CLIENT_PACKAGE_NAME"] = nativeTest ? NativeTestPackageName : ClientPackageName;
         start.Environment["HORIZON_CLIENT_PUBLISHER"] = expectedPublisher;
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not query installed Horizon packages.");

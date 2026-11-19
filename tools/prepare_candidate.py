@@ -15,9 +15,10 @@ import zipfile
 UPSTREAM = "f42ef42ef6ceccb3c6a20bea2481d87949a51c81"
 NIGHTLY_UPSTREAM = "0b14f8acfd97fa2c750e42795249dcc981178ca4"
 NIGHTLY_UPSTREAM_ARCHIVE_SHA256 = "1a73fb817549e9b0ec8870b8aec7efd1ea4e274e8be7563411c053aee6ad48ef"
-NIGHTLY_PATCH = "0.1.5"
-NIGHTLY_CLIENT = "0.1.6"
-NIGHTLY_BUILDER = "1.0.4"
+NIGHTLY_RECIPES = {
+    "0.1.5": ("0.1.6", "1.0.4"),
+    "0.1.6": ("0.1.7", "1.0.5"),
+}
 WGPU_ARCHIVE_SHA256 = "4c8769b47eea565ca994d4699ff72e70f6647613b6205c8daa52f2b04a743eaa"
 WGPU_PATCH_PATH = "patches/wgpu-dx11/reuse-upload-buffer-shadow.patch"
 WGPU_PATCH_SHA256 = "ee0a57e971221a3b705ca8434b67ea2f2909fb8b3b21444163e0bf5be44046e4"
@@ -27,7 +28,8 @@ PATCH_PATHS = {
     "0.1.2": "patches/main-2026-11-09/horizon-uwp-0.1.2.patch",
     "0.1.3": "patches/main-2026-11-09/horizon-uwp-0.1.3.patch",
     "0.1.4": "patches/main-2026-11-09/horizon-uwp-0.1.4.patch",
-    NIGHTLY_PATCH: "patches/nightly-2026-11-18/horizon-uwp-0.1.5.patch",
+    "0.1.5": "patches/nightly-2026-11-18/horizon-uwp-0.1.5.patch",
+    "0.1.6": "patches/nightly-2026-11-18/horizon-uwp-0.1.6.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -154,24 +156,27 @@ def main():
     parser.add_argument("--patch-only", action="store_true", help="Prepare a patch and compatibility rule for an already released client")
     parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared host kit to include in the client archive")
-    parser.add_argument("--wgpu-archive", type=Path, help="Pinned wgpu codeload ZIP required by Nightly client 0.1.6")
+    parser.add_argument("--wgpu-archive", type=Path, help="Pinned wgpu codeload ZIP required by Nightly clients")
     parser.add_argument("--catalog-input", type=Path, default=Path("catalog/catalog-v1.json"),
                         help="Existing signed catalog whose older entries and rules must be retained")
     parser.add_argument("--output", required=True, type=Path, help="New output directory")
     parser.add_argument("--upstream-archive", required=True, type=Path, help="Verified source ZIP for the pinned upstream commit")
     parser.add_argument("--upstream-repo", required=True, type=Path, help="Git repository containing the pinned upstream commit")
     args = parser.parse_args()
-    nightly = args.patch_version == NIGHTLY_PATCH
+    nightly = NIGHTLY_RECIPES.get(args.patch_version)
     upstream_commit = (args.upstream_commit or (NIGHTLY_UPSTREAM if nightly else UPSTREAM)).lower()
-    client_version = args.client_version or (NIGHTLY_CLIENT if nightly else "0.1.0")
-    builder_version = args.builder_version or (NIGHTLY_BUILDER if nightly else "1.0.3")
+    default_client, default_builder = nightly or ("0.1.0", "1.0.3")
+    client_version = args.client_version or default_client
+    builder_version = args.builder_version or default_builder
     if nightly:
-        if upstream_commit != NIGHTLY_UPSTREAM or client_version != NIGHTLY_CLIENT or builder_version != NIGHTLY_BUILDER:
-            raise ValueError("The UWP Nightly requires its pinned Horizon commit, client 0.1.6 and Builder 1.0.4")
+        if upstream_commit != NIGHTLY_UPSTREAM or (client_version, builder_version) != nightly:
+            raise ValueError(f"Nightly patch {args.patch_version} requires its pinned source, "
+                             f"client {default_client} and Builder {default_builder}")
         if not args.patch_only and args.wgpu_archive is None:
-            raise ValueError("Preparing Nightly client 0.1.6 requires --wgpu-archive")
-    elif args.wgpu_archive is not None or upstream_commit == NIGHTLY_UPSTREAM or client_version == NIGHTLY_CLIENT:
-        raise ValueError("The Nightly source and wgpu inputs require patch 0.1.5")
+            raise ValueError("Preparing a Nightly client requires --wgpu-archive")
+    elif (args.wgpu_archive is not None or upstream_commit == NIGHTLY_UPSTREAM
+          or any(client_version == client for client, _ in NIGHTLY_RECIPES.values())):
+        raise ValueError("The Nightly source, client and wgpu inputs require a Nightly patch")
 
     def upper_version(value):
         if not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", value):

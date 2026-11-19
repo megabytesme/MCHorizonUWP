@@ -5,6 +5,8 @@ public static class NightlyUwp
     public const string UpstreamCommit = "0b14f8acfd97fa2c750e42795249dcc981178ca4";
     public const string PatchVersion = "0.1.5";
     public const string ClientVersion = "0.1.6";
+    public const string CandidatePatchVersion = "0.1.6";
+    public const string CandidateClientVersion = "0.1.7";
     internal const int ResourceSchema = 7;
     internal const int PrepareOutputVersion = 5;
     public const string PublicNativeModsUnavailable =
@@ -16,5 +18,14 @@ public static class NightlyUwp
 
     public static bool Matches(string? commit) => string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);
 
-    internal static string GameBuildId(string architecture) => $"mchorizonuwp-{ClientVersion}-patch-{PatchVersion}-{architecture}-{UpstreamCommit}";
+    internal static bool IsClient(string? version) => version is ClientVersion or CandidateClientVersion;
+
+    public static bool SupportsNativeSource(string patch, string client) =>
+        (patch, client) is (CandidatePatchVersion, CandidateClientVersion);
+
+    internal static bool MatchesRecipe(string patch, string client) =>
+        (patch, client) is (PatchVersion, ClientVersion) || SupportsNativeSource(patch, client);
+
+    internal static string GameBuildId(string architecture, string patch = PatchVersion, string client = ClientVersion) =>
+        $"mchorizonuwp-{client}-patch-{patch}-{architecture}-{UpstreamCommit}";
 }
