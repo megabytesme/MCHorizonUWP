@@ -174,8 +174,8 @@ world entry, audio and controller use remain unverified for this package.
 
 | Device | Deployment and execution | Remaining verification |
 | --- | --- | --- |
-| Surface Pro X | The isolated ARM64 package rendered both code hooks and the title UI on hardware DX12. The prior D3D11 package presented a 2048×1536 FIFO panorama and measured a 1,480,892,416-byte peak working set. | D3D11 title UI remains invisible. Real world entry, multiplayer, gameplay input, audio and suspend/resume remain unverified. [Surface device report](nightly-surface-2026-11-20.md) |
-| Lumia 950 XL | Windows Mobile 16241.1001 installed and ran isolated ARM32 1.0.0.4. After importing and restarting, the same signed game drew both hooks on the title and in an existing saved world opened from the launcher. | The title UI and in-world HUD remain visibly incomplete. The on-screen keyboard and content mods remain unverified. [Saved world screenshot](../deliverables/nightly-2026-11-20/lumia/20261120_0006.png) |
+| Surface Pro X | Signed ARM64 1.0.1.3 rendered the title and both code hooks on projected and physical D3D11 FL9_1. The projected path also rendered a saved world and HUD. The earlier 1.0.1.1 run verified both hooks on DX12. | Physical FL9_1 world entry, multiplayer, audio and suspend/resume remain unverified. [Surface UI follow-up](nightly-mobile-2026-11-20.md) |
+| Lumia 950 XL | Windows Mobile 16241.1001 ran the two hooks on the title and in a saved world. Signed ARM32 1.0.0.8 rendered the repaired title and HUD. The device user confirmed menu music, menu taps, touch movement and GameSir-to-touch HUD switching. The saved world stayed stable during the short 2-chunk retry. | The 32-chunk session lost the graphics device under memory pressure. The on-screen keyboard and content mods remain unverified. [Lumia UI and gameplay follow-up](nightly-mobile-2026-11-20.md) |
 
 The Lumia returned a legacy HTTP 204 response with a JSON status body while
 installation was running. A read of the same supported endpoint over TLS with
@@ -257,9 +257,9 @@ the launcher's Worlds and saves screen. The subsequent capture shows
 terrain, both mod markers, and fragmented HUD text. This package uses
 an embedded ARM32 native fixture. [Native-only screenshot](../deliverables/nightly-2026-11-20/lumia/20261120_0003.png) · [Both hooks at title](../deliverables/nightly-2026-11-20/lumia/20261120_0005.png) · [Both hooks in the saved world](../deliverables/nightly-2026-11-20/lumia/20261120_0006.png)
 
-The ARM UI follow-up records the two application changes, the signed
-diagnostic builds, and the remaining device tests.
-[ARM HUD investigation](nightly-arm-hud-2026-11-20.md)
+The ARM follow-up records the application patches, the surface depth-state
+fix in the wgpu fork, and the signed device checks.
+[ARM HUD investigation](nightly-arm-hud-2026-11-20.md) · [Verified ARM HUD repairs and mobile controls](nightly-mobile-2026-11-20.md)
 
 ## Content staging
 
@@ -360,7 +360,8 @@ The fresh full 0.1.8 Builder extraction hit disk error 112 on E:.
 - The Wasm agent adapted the pinned standard host and runtime, staged the
   Wasmtime source, prepared package validation fixtures and audited ARM32.
 - The native agent implemented the ABI loader, source validation, strict
-  mod DLL link and related-set packaging workflow.
+  mod DLL link and related-set packaging workflow. It also prepared the
+  native FL9_1 depth replay and analyzed the Lumia memory-pressure log.
 - The content agent implemented and measured staging and verified the ANGLE
   package imports and benchmark prerequisites.
 - The primary agent integrated the changes, coordinated builds, wired the

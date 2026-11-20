@@ -1,5 +1,11 @@
 # ARM D3D11 HUD investigation
 
+The signed device follow-up reproduced and fixed the remaining Surface
+D3D11 HUD failure. It also confirmed a readable title and saved-world HUD
+on Lumia 1.0.0.5. The follow-up records the fork commit, new Builder pin,
+regression matrix and subsequent Lumia startup issues.
+[Device follow-up](nightly-mobile-2026-11-20.md)
+
 The signed x64 and x86 clients showed the full title UI on hardware D3D11.
 On the Surface Pro X, hardware D3D11 drew the title panorama with the UI
 missing. Hardware DX12 on the same machine drew the menu and both mod

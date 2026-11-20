@@ -186,7 +186,7 @@ def main():
     parser.add_argument("--patch-only", action="store_true", help="Prepare a patch and compatibility rule for an already released client")
     parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared host kit to include in the client archive")
-    parser.add_argument("--wgpu-archive", type=Path, help="Pinned wgpu codeload ZIP required by Nightly clients")
+    parser.add_argument("--wgpu-archive", type=Path, help="Pinned wgpu source ZIP required by Nightly clients")
     parser.add_argument("--wasmtime-archive", type=Path, help="Pinned crates.io Wasmtime 50.0.2 archive")
     parser.add_argument("--wasm-standard-library", type=Path, help="Pinned Nightly Horizon Wasm standard library")
     parser.add_argument("--catalog-input", type=Path, default=Path("catalog/catalog-v1.json"),
