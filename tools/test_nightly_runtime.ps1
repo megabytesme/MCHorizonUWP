@@ -4,12 +4,14 @@ param(
     [Parameter(Mandatory)][string]$EvidenceDirectory,
     [string]$WasmFixture,
     [switch]$Native,
+    [switch]$DependentNative,
     [ValidateSet('enabled','disabled','re-enabled')][string[]]$States = @('enabled', 'disabled', 're-enabled'),
     [ValidateRange(30,600)][int]$TimeoutSeconds = 240
 )
 
 $ErrorActionPreference = 'Stop'
 if (-not $Native -and -not $WasmFixture) { throw 'Select at least one fixture.' }
+if ($DependentNative -and -not $Native) { throw 'The dependent fixture requires -Native.' }
 $package = @(Get-AppxPackage -Name $Identity | Where-Object { $_.Name -ceq $Identity -and [version]$_.Version -eq $Version })
 if ($package.Count -ne 1) { throw 'The exact signed test package is required.' }
 $package = $package[0]
@@ -30,7 +32,10 @@ $null = New-Item -ItemType Directory -Force -Path $game
 $hadConfig = Test-Path -LiteralPath $settings -PathType Leaf
 $oldConfig = if ($hadConfig) { ,([IO.File]::ReadAllBytes($settings)) } else { $null }
 $baseConfig = @(if (Test-Path -LiteralPath $settings) {
-    Get-Content -LiteralPath $settings | Where-Object { $_ -notmatch '^mod\.uwp_(wasm|native)_hook_probe:' }
+    Get-Content -LiteralPath $settings | Where-Object {
+        $_ -notmatch '^mod\.uwp_(wasm|native)_hook_probe:' -and
+        (-not $DependentNative -or $_ -notmatch '^mod\.uwp_native_after_probe:')
+    }
 })
 if ($WasmFixture) {
     $digest = (Get-FileHash -LiteralPath $WasmFixture -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -114,15 +119,17 @@ function Capture-Markers($Window, [string]$Path) {
         if ($visible -lt 8) { return $null }
         $image.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
         $cyan = 0
+        $green = 0
         $magenta = 0
         for ($y = 0; $y -lt [Math]::Min(300, $image.Height); $y++) {
             for ($x = [Math]::Max(0, ($image.Width - 300)); $x -lt $image.Width; $x++) {
                 $color = $image.GetPixel($x, $y)
                 if ($color.R -eq 0 -and $color.G -eq 255 -and $color.B -eq 255) { $cyan++ }
+                if ($color.R -eq 0 -and $color.G -eq 255 -and $color.B -eq 0) { $green++ }
                 if ($color.R -eq 255 -and $color.G -eq 0 -and $color.B -eq 255) { $magenta++ }
             }
         }
-        [pscustomobject]@{ Cyan = $cyan; Magenta = $magenta; Image = $Path }
+        [pscustomobject]@{ Cyan = $cyan; Green = $green; Magenta = $magenta; Image = $Path }
     } finally { $draw.Dispose(); $image.Dispose() }
 }
 
@@ -133,7 +140,8 @@ try {
         $enabled = $mode -ne 'disabled'
         $value = $enabled.ToString().ToLowerInvariant()
         $lines = @($baseConfig)
-        if ($Native) { $lines += "mod.uwp_native_hook_probe:$value" }
+        if ($DependentNative) { $lines += 'mod.uwp_native_hook_probe:true', "mod.uwp_native_after_probe:$value" }
+        elseif ($Native) { $lines += "mod.uwp_native_hook_probe:$value" }
         if ($WasmFixture) { $lines += "mod.uwp_wasm_hook_probe:$value" }
         [IO.File]::WriteAllLines($settings, [string[]]$lines, [Text.UTF8Encoding]::new($false))
         $begin = [DateTime]::UtcNow
@@ -167,11 +175,16 @@ try {
             if (-not $result) { throw 'The test window never showed a visible game frame.' }
             $case = [pscustomobject]@{
                 State = $mode; Package = $package.PackageFullName; Pid = $gamePid
-                Cyan = $result.Cyan; Magenta = $result.Magenta; Capture = $result.Image; Exit = $null
+                Cyan = $result.Cyan; Green = $result.Green; Magenta = $result.Magenta
+                Capture = $result.Image; Exit = $null
             }
             $results.Add($case)
-            if ($Native -and (($enabled -and $result.Cyan -lt 16) -or (-not $enabled -and $result.Cyan -ne 0))) {
+            $expectCyan = if ($DependentNative) { -not $enabled } else { $enabled }
+            if ($Native -and (($expectCyan -and $result.Cyan -lt 16) -or (-not $expectCyan -and $result.Cyan -ne 0))) {
                 throw "Native marker did not match $mode. Cyan pixels $($result.Cyan)."
+            }
+            if ($DependentNative -and (($enabled -and $result.Green -lt 16) -or (-not $enabled -and $result.Green -ne 0))) {
+                throw "Dependent native marker did not match $mode. Green pixels $($result.Green)."
             }
             if ($WasmFixture -and (($enabled -and $result.Magenta -lt 16) -or (-not $enabled -and $result.Magenta -ne 0))) {
                 throw "Wasm marker did not match $mode. Magenta pixels $($result.Magenta)."

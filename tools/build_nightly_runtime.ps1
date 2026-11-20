@@ -8,8 +8,11 @@ param(
     [string[]]$AdditionalFeatures = @(),
     [ValidateRange(1, 256)][int]$Jobs = [Environment]::ProcessorCount,
     [string]$PreparedRustSource,
+    [string]$ToolchainDirectory,
+    [string]$BridgeArchiveDirectory,
     [switch]$Check,
-    [switch]$NativeMods
+    [switch]$NativeMods,
+    [switch]$WithBridge
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,9 +55,14 @@ $features = @(
 ) + $AdditionalFeatures
 if ($features.Where({ $_ -cnotmatch '^[a-z][a-z0-9-]+$' })) { throw 'A Cargo feature name is invalid.' }
 $nativeModsRecord = $null
+$buildBridge = -not $NativeMods -or $WithBridge
+if ($WithBridge -and -not $NativeMods) { throw 'Use -WithBridge with -NativeMods.' }
+if ($BridgeArchiveDirectory -and ($Check -or $NativeMods)) {
+    throw 'An alternate archive directory requires a bridge-only release build.'
+}
 if ($NativeMods) {
-    if ($Architecture -eq 'arm' -or $AdditionalFeatures.Count) {
-        throw 'Build staged optional native mods for x64, x86 or ARM64 without game bridge feature switches.'
+    if ($Architecture -eq 'arm' -or ($AdditionalFeatures.Count -and -not $buildBridge)) {
+        throw 'Optional native mods require x64, x86 or ARM64. Bridge features require -WithBridge.'
     }
     $nativeRecordPath = "$source/uwp/game-bridge/packaged-native/build-record.json"
     $nativeModsRecord = Get-Content -Raw -LiteralPath $nativeRecordPath | ConvertFrom-Json
@@ -85,18 +93,27 @@ if ($Architecture -eq 'arm') {
     }
     $arguments += @('--config', $armConfig)
 }
-$command = if ($Check) { 'check' } else { 'build' }
+$command = if ($Check) { 'check' } elseif ($BridgeArchiveDirectory) { 'rustc' } else { 'build' }
 $arguments += @($command, '--locked', '--offline', '--manifest-path', 'uwp/game-bridge/Cargo.toml',
     '-Z', 'build-std=std,panic_abort', '--target', $target,
     '--release', '--target-dir', $targetDirectory)
 if ($NativeMods) {
     foreach ($mod in $nativeModsRecord.mods) { $arguments += @('-p', $mod.cargo_package) }
-} else {
-    $arguments += @('--features', ($features -join ','))
+}
+if ($buildBridge) {
+    if ($NativeMods) { $arguments += @('-p', 'horizon-uwp-game-bridge') }
+    $bridgeFeatures = if ($NativeMods) { $features.ForEach({ "horizon-uwp-game-bridge/$_" }) } else { $features }
+    $arguments += @('--features', ($bridgeFeatures -join ','))
 }
 
 $null = New-Item -ItemType Directory -Force -Path $output, "$output/temp"
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')
+$archiveOutput = $null
+if ($BridgeArchiveDirectory) {
+    $archiveOutput = Join-Path ([IO.Path]::GetFullPath($BridgeArchiveDirectory)) "bridge-$Architecture-$stamp"
+    $null = New-Item -ItemType Directory -Path $archiveOutput
+    $arguments += @('--', '-o', (Join-Path $archiveOutput 'bridge.lib'))
+}
 $log = Join-Path $output "cargo-$command-$stamp.log"
 $rustSource = if ($PreparedRustSource) { (Resolve-Path -LiteralPath $PreparedRustSource).Path } else { Join-Path $output 'rust-src' }
 if (-not (Test-Path -LiteralPath "$rustSource/library/Cargo.toml" -PathType Leaf)) {
@@ -120,14 +137,22 @@ $env:CFLAGS_x86_64_pc_windows_msvc = '-DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP'
 [Environment]::SetEnvironmentVariable("CC_${targetKey}", "$llvm/clang.exe")
 [Environment]::SetEnvironmentVariable("AR_${targetKey}", "$llvm/llvm-lib.exe")
 [Environment]::SetEnvironmentVariable("CFLAGS_${targetKey}", '-DWINAPI_FAMILY=WINAPI_FAMILY_APP')
-$hostLink = Join-Path $output 'lld-host.cmd'
-$uwpLink = Join-Path $output 'lld-uwp.cmd'
+$linkerDirectory = if ($ToolchainDirectory) { (Resolve-Path -LiteralPath $ToolchainDirectory).Path } else { $output }
+$hostLink = Join-Path $linkerDirectory 'lld-host.cmd'
+$uwpLink = Join-Path $linkerDirectory 'lld-uwp.cmd'
 $hostFlags = "`"/LIBPATH:$vc/lib/x64`" `"/LIBPATH:$sdk/Lib/$sdkVersion/ucrt/x64`" `"/LIBPATH:$sdk/Lib/$sdkVersion/um/x64`""
 $uwpFlags = "/APPCONTAINER /NODEFAULTLIB:kernel32.lib `"/LIBPATH:$kit/link`" `"/LIBPATH:$vc/lib/$Architecture/store`" `"/LIBPATH:$vc/lib/$Architecture`" `"/LIBPATH:$sdk/Lib/$sdkVersion/ucrt/$Architecture`" `"/LIBPATH:$sdk/Lib/$sdkVersion/um/$Architecture`""
-@('@echo off', 'setlocal DisableDelayedExpansion', "`"$lld`" -flavor link /NOLOGO $hostFlags %*", 'exit /b %ERRORLEVEL%') |
-    Set-Content -Encoding ascii -LiteralPath $hostLink
-@('@echo off', 'setlocal DisableDelayedExpansion', "`"$lld`" -flavor link /NOLOGO $uwpFlags %*", 'exit /b %ERRORLEVEL%') |
-    Set-Content -Encoding ascii -LiteralPath $uwpLink
+$hostScript = @('@echo off', 'setlocal DisableDelayedExpansion', "`"$lld`" -flavor link /NOLOGO $hostFlags %*", 'exit /b %ERRORLEVEL%')
+$uwpScript = @('@echo off', 'setlocal DisableDelayedExpansion', "`"$lld`" -flavor link /NOLOGO $uwpFlags %*", 'exit /b %ERRORLEVEL%')
+if ($ToolchainDirectory) {
+    if ((Get-Content -LiteralPath $hostLink) -join "`n" -ne ($hostScript -join "`n") -or
+        (Get-Content -LiteralPath $uwpLink) -join "`n" -ne ($uwpScript -join "`n")) {
+        throw 'The existing linker commands do not match this source and target.'
+    }
+} else {
+    $hostScript | Set-Content -Encoding ascii -LiteralPath $hostLink
+    $uwpScript | Set-Content -Encoding ascii -LiteralPath $uwpLink
+}
 $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $hostLink
 [Environment]::SetEnvironmentVariable("CARGO_TARGET_$($targetKey.ToUpperInvariant())_LINKER", $uwpLink)
 $env:CARGO_BUILD_JOBS = [string]$Jobs
@@ -158,6 +183,19 @@ try {
         Get-Content -LiteralPath $log -Tail 80 | Write-Host
         throw "Cargo exited with $code. See $log"
     }
+    if (-not $Check -and $buildBridge) {
+        $bridge = Join-Path $output 'horizon_uwp_game_bridge.dll'
+        $library = Join-Path $targetDirectory "$target/release/horizon_uwp_game_bridge.lib"
+        if ($archiveOutput) {
+            $archives = @(Get-ChildItem -LiteralPath $archiveOutput -Filter 'horizon_uwp_game_bridge-*.lib' -File)
+            if ($archives.Count -ne 1) { throw "Expected one game bridge archive in $archiveOutput." }
+            $library = $archives[0].FullName
+        }
+        & "$source/uwp/host/strict-bridge-link.ps1" -Architecture $Architecture -RustLibrary $library -HostKit $kit `
+            -MsvcToolsetRoot $vc -SdkRoot $sdk -RustLld $lld -SentinelObject "$kit/dead-import-sentinels.obj" -Output $bridge
+        $record.bridge_archive = $library
+        $record.bridge_sha256 = (Get-FileHash -LiteralPath $bridge).Hash.ToLowerInvariant()
+    }
     if (-not $Check -and $NativeMods) {
         $hashes = [ordered]@{}
         foreach ($mod in $nativeModsRecord.mods) {
@@ -168,12 +206,6 @@ try {
             $hashes[$mod.dll] = (Get-FileHash -LiteralPath $dll).Hash.ToLowerInvariant()
         }
         $record.native_dlls_sha256 = $hashes
-    } elseif (-not $Check) {
-        $bridge = Join-Path $output 'horizon_uwp_game_bridge.dll'
-        $library = Join-Path $targetDirectory "$target/release/horizon_uwp_game_bridge.lib"
-        & "$source/uwp/host/strict-bridge-link.ps1" -Architecture $Architecture -RustLibrary $library -HostKit $kit `
-            -MsvcToolsetRoot $vc -SdkRoot $sdk -RustLld $lld -SentinelObject "$kit/dead-import-sentinels.obj" -Output $bridge
-        $record.bridge_sha256 = (Get-FileHash -LiteralPath $bridge).Hash.ToLowerInvariant()
     }
     $record.result = 'passed'
 } finally {
