@@ -1,7 +1,6 @@
 // Native UWP XAML shell. Windows Mobile reuses the primary CoreWindow for the game.
 #using <Microsoft.UI.Xaml.winmd>
 #include <windows.h>
-#include <fileapifromapp.h>
 #include <d3d11_1.h>
 #include <dxgi1_2.h>
 #include <ppltasks.h>
@@ -3660,8 +3659,11 @@ extern "C" size_t __cdecl horizon_uwp_release_metadata(unsigned char* buffer, si
         auto installed = Windows::ApplicationModel::Package::Current->InstalledLocation->Path;
         std::wstring path(installed->Data(), installed->Length());
         path += L"\\HorizonRelease.json";
-        HANDLE file = CreateFileFromAppW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+        CREATEFILE2_EXTENDED_PARAMETERS parameters = {};
+        parameters.dwSize = sizeof(parameters);
+        parameters.dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+        parameters.dwFileFlags = FILE_FLAG_SEQUENTIAL_SCAN;
+        HANDLE file = CreateFile2(path.c_str(), GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, &parameters);
         if (file == INVALID_HANDLE_VALUE) return 0;
         LARGE_INTEGER size = {};
         if (!GetFileSizeEx(file, &size) || size.QuadPart <= 0 ||
