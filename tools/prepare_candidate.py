@@ -20,6 +20,7 @@ NIGHTLY_RECIPES = {
     "0.1.6": ("0.1.7", "1.0.5"),
     "0.1.7": ("0.1.8", "1.0.6"),
     "0.1.8": ("0.1.9", "1.0.6"),
+    "0.1.9": ("0.1.10", "1.0.6"),
 }
 WASMTIME_ARCHIVE_SHA256 = "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
 WASM_STANDARD_LIBRARY_SHA256 = "123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b"
@@ -36,6 +37,7 @@ PATCH_PATHS = {
     "0.1.6": "patches/nightly-2026-11-18/horizon-uwp-0.1.6.patch",
     "0.1.7": "patches/nightly-2026-11-18/horizon-uwp-0.1.7.patch",
     "0.1.8": "patches/nightly-2026-11-18/horizon-uwp-0.1.8.patch",
+    "0.1.9": "patches/nightly-2026-11-18/horizon-uwp-0.1.9.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -185,7 +187,7 @@ def main():
     client_version = args.client_version or default_client
     builder_version = args.builder_version or default_builder
     wasm_inputs = ()
-    if args.patch_version in ("0.1.7", "0.1.8") and not args.patch_only:
+    if args.patch_version in ("0.1.7", "0.1.8", "0.1.9") and not args.patch_only:
         if args.wasmtime_archive is None or args.wasm_standard_library is None:
             parser.error(f"Patch {args.patch_version} requires both pinned Wasm inputs")
         wasm_inputs = (

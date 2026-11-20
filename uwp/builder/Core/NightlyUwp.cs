@@ -5,8 +5,10 @@ public static class NightlyUwp
     public const string UpstreamCommit = "0b14f8acfd97fa2c750e42795249dcc981178ca4";
     public const string PatchVersion = "0.1.5";
     public const string ClientVersion = "0.1.6";
-    public const string CandidatePatchVersion = "0.1.8";
-    public const string CandidateClientVersion = "0.1.9";
+    public const string CandidatePatchVersion = "0.1.9";
+    public const string CandidateClientVersion = "0.1.10";
+    private const string LegacyRendererPatchVersion = "0.1.8";
+    private const string LegacyRendererClientVersion = "0.1.9";
     private const string CodeRuntimePatchVersion = "0.1.7";
     private const string CodeRuntimeClientVersion = "0.1.8";
     public const string EmbeddedPatchVersion = "0.1.6";
@@ -26,15 +28,17 @@ public static class NightlyUwp
     public static bool Matches(string? commit) => string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);
 
     internal static bool IsClient(string? version) =>
-        version is ClientVersion or EmbeddedClientVersion or CodeRuntimeClientVersion or CandidateClientVersion;
+        version is ClientVersion or EmbeddedClientVersion or CodeRuntimeClientVersion
+            or LegacyRendererClientVersion or CandidateClientVersion;
 
     public static bool SupportsNativeSource(string patch, string client) =>
         (patch, client) is (EmbeddedPatchVersion, EmbeddedClientVersion)
             or (CodeRuntimePatchVersion, CodeRuntimeClientVersion)
+            or (LegacyRendererPatchVersion, LegacyRendererClientVersion)
             or (CandidatePatchVersion, CandidateClientVersion);
 
     internal static bool UsesPackagedCodeRuntime(string? client, TargetProfile target) =>
-        (client is CodeRuntimeClientVersion or CandidateClientVersion)
+        (client is CodeRuntimeClientVersion or LegacyRendererClientVersion or CandidateClientVersion)
             && target is TargetProfile.DesktopX64 or TargetProfile.DesktopX86 or TargetProfile.SurfaceProX;
 
     internal static bool MatchesRecipe(string patch, string client) =>
