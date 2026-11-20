@@ -115,7 +115,8 @@ def stage(workspace, architecture, source_folders, game_build_id=None):
     expected = [f"mchorizonuwp-{client}-patch-{patch}-{architecture}-{UPSTREAM}"
                 for client, patch in (("0.1.6", "0.1.5"), ("0.1.7", "0.1.6"),
                                       ("0.1.8", "0.1.7"), ("0.1.9", "0.1.8"),
-                                      ("0.1.10", "0.1.9"))]
+                                      ("0.1.10", "0.1.9"), ("0.1.11", "0.1.10"),
+                                      ("0.1.12", "0.1.11"))]
     game_build_id = game_build_id or expected[0]
     if game_build_id not in expected:
         raise ValueError("Build identity does not match the pinned UWP Nightly and architecture")

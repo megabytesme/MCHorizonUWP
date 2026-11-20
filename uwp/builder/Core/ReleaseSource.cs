@@ -50,7 +50,7 @@ public static class ReleaseSource
         await transport.DownloadArtifactAsync(client.Artifact, clientFile, cancellationToken);
         var source = Path.Combine(root, "source");
         await SourceAssembler.AssembleAsync(upstreamFile, patch.Upstream.Sha256, patchFile, patch.Artifact.Sha256,
-            clientFile, client.Artifact.Sha256, source, git, patch.UpstreamCommit);
+            clientFile, client.Artifact.Sha256, source, git, patch.UpstreamCommit, client.Version);
         return new(source, patch, client, compatibility, builderVersion, architecture);
     }
 }

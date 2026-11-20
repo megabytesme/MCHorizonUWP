@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 pub const MOD_ID: &str = "horizon_touch";
+pub const DEBUG_OVERLAY_ID: i32 = 15;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Action {
     pub id: i32,
@@ -136,6 +137,7 @@ impl TouchModule {
             (12, w * 0.5 - s * 0.20 * k, h - s * 0.075 * k),
             (13, w * 0.5 + s * 0.20 * k, h - s * 0.075 * k),
             (21, s * 0.18 * k, h - s * 0.18 * k),
+            (DEBUG_OVERLAY_ID, s * 0.28 * k, s * 0.08 * k),
         ]
         .into_iter()
         .map(|(id, x, y)| Control {
@@ -196,9 +198,9 @@ impl TouchModule {
                         return Ok((false, actions));
                     }
                 } else {
-                    controls[..9]
+                    controls
                         .iter()
-                        .find(|c| hit(c, 1.25))
+                        .find(|c| c.id != 21 && hit(c, 1.25))
                         .map(|c| c.id)
                         .unwrap_or_else(|| {
                             if hit(&controls[9], 2.2)
@@ -210,10 +212,10 @@ impl TouchModule {
                             }
                         })
                 };
-                let held = matches!(role, 5 | 6 | 7 | 10 | 11)
+                let held = matches!(role, 5 | 6 | 7 | 10 | 11 | DEBUG_OVERLAY_ID)
                     && self.fingers.values().any(|f| f.role == role);
                 self.fingers.insert(id, Finger { role, x, y });
-                if (role <= 14) && !held {
+                if (role <= 14 || role == DEBUG_OVERLAY_ID) && !held {
                     emit(role, 1.0);
                 }
             }
@@ -309,6 +311,34 @@ mod tests {
             vec![Action { id: 14, value: 1.0 }]
         );
     }
+    #[test]
+    fn debug_overlay_claims_one_press_and_stays_out_of_inventory() {
+        let mut controls = TouchModule::new();
+        let (width, height) = (1000.0, 600.0);
+        let debug = controls
+            .draw(width, height)
+            .unwrap()
+            .into_iter()
+            .find(|control| control.id == DEBUG_OVERLAY_ID)
+            .unwrap();
+        let tap = |controls: &mut TouchModule, id, phase| {
+            controls
+                .touch(id, phase, debug.x, debug.y, width, height)
+                .unwrap()
+        };
+        assert_eq!(
+            tap(&mut controls, 1, 0),
+            (true, vec![Action { id: DEBUG_OVERLAY_ID, value: 1.0 }])
+        );
+        assert_eq!(tap(&mut controls, 2, 0), (true, vec![]));
+        assert_eq!(tap(&mut controls, 1, 1), (true, vec![]));
+        assert_eq!(tap(&mut controls, 1, 2), (true, vec![]));
+        assert_eq!(tap(&mut controls, 2, 3), (true, vec![]));
+
+        controls.set_context(true).unwrap();
+        assert_eq!(tap(&mut controls, 3, 0), (false, vec![]));
+    }
+
     #[test]
     fn gyro_axes_and_settings_match_screen_rotation() {
         assert_eq!(gyro_turn([1.0, 0.0], 0), [0.0, -1f32.to_degrees()]);

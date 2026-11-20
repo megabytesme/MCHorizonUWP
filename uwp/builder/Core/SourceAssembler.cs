@@ -12,7 +12,7 @@ public static class SourceAssembler
 
     public static async Task AssembleAsync(string upstreamZip, string expectedUpstreamHash, string patch,
         string expectedPatchHash, string clientZip, string expectedClientHash, string output, string git,
-        string? upstreamCommit = null)
+        string? upstreamCommit = null, string? clientVersion = null)
     {
         await VerifyAsync(upstreamZip, expectedUpstreamHash);
         await VerifyAsync(patch, expectedPatchHash);
@@ -27,22 +27,28 @@ public static class SourceAssembler
         if (NightlyUwp.Matches(upstreamCommit))
         {
             var bundle = Path.Combine(root, "uwp", "wgpu-dx11");
+            var fixedWgpu = NightlyUwp.UsesFixedWgpu(clientVersion);
             await StageNightlyWgpuAsync(root, Path.Combine(bundle, "wgpu.zip"),
-                Path.Combine(bundle, "reuse-upload-buffer-shadow.patch"), git);
+                fixedWgpu ? null : Path.Combine(bundle, "reuse-upload-buffer-shadow.patch"), git,
+                fixedWgpu ? NightlyUwp.FixedWgpuArchiveHash : NightlyUwp.WgpuArchiveHash);
         }
     }
 
-    internal static async Task StageNightlyWgpuAsync(string source, string archive, string patch, string git)
+    internal static async Task StageNightlyWgpuAsync(string source, string archive, string? patch, string git,
+        string expectedArchiveHash = NightlyUwp.WgpuArchiveHash)
     {
-        await VerifyAsync(archive, NightlyUwp.WgpuArchiveHash);
-        await VerifyAsync(patch, NightlyUwp.WgpuPatchHash);
+        await VerifyAsync(archive, expectedArchiveHash);
+        if (patch is not null) await VerifyAsync(patch, NightlyUwp.WgpuPatchHash);
         var destination = Path.Combine(Path.GetFullPath(source), "third_party", "wgpu-dx11");
         if (Directory.Exists(destination) || File.Exists(destination))
             throw new IOException("The Nightly wgpu source destination already exists.");
         Directory.CreateDirectory(destination);
         Extract(archive, destination, upstream: true);
-        await ApplyPatchAsync(git, destination, patch, check: true);
-        await ApplyPatchAsync(git, destination, patch, check: false);
+        if (patch is not null)
+        {
+            await ApplyPatchAsync(git, destination, patch, check: true);
+            await ApplyPatchAsync(git, destination, patch, check: false);
+        }
     }
 
     private static async Task VerifyAsync(string path, string expected)
