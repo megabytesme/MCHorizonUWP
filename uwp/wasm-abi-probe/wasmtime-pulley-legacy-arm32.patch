@@ -39,3 +39,41 @@ diff --git a/src/runtime/vm/sys/windows/uwp.rs b/src/runtime/vm/sys/windows/uwp.
 +unsafe extern "system" {
      pub(super) fn GetSystemInfo(info: *mut SYSTEM_INFO);
  }
+diff --git a/Cargo.toml b/Cargo.toml
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -414,7 +414,8 @@
+ optional = true
+ package = "wasmtime-internal-jit-debug"
+ 
+-[dependencies.wasmtime-jit-icache-coherence]
++# ARM32 UWP uses Pulley and never publishes native code.
++[target.'cfg(not(all(target_vendor = "uwp", target_arch = "arm")))'.dependencies.wasmtime-jit-icache-coherence]
+ version = "=50.0.2"
+ optional = true
+ package = "wasmtime-internal-jit-icache-coherence"
+@@ -501,7 +502,7 @@
+ version = "0.6.5"
+ optional = true
+ 
+-[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
++[target.'cfg(all(target_os = "windows", not(all(target_vendor = "uwp", target_arch = "arm"))))'.dependencies.windows-sys]
+ version = "0.61.2"
+ features = [
+     "Win32_Foundation",
+@@ -511,6 +512,15 @@
+     "Win32_System_SystemInformation",
+     "Win32_Storage_FileSystem",
+     "Win32_Security",
++]
++optional = true
++
++# The ARM32 interpreter uses only virtual memory and system page-size bindings.
++[target.'cfg(all(target_vendor = "uwp", target_arch = "arm"))'.dependencies.windows-sys]
++version = "0.61.2"
++features = [
++    "Win32_System_Memory",
++    "Win32_System_SystemInformation",
+ ]
+ optional = true
+ 
