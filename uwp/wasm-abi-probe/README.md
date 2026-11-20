@@ -27,6 +27,12 @@ The upstream fixture driver `crates/horizon-mod-wasm/tests/real_member.rs` shows
 
 `stock-host-test.rs` is a lower-layer desktop test for the built guest. Copy it to `crates/horizon-mod-wasm/tests/uwp_wasm_gui_probe.rs` in a disposable source assembly and set `HORIZON_WASM_STD` and `HORIZON_WASM_FIXTURE` to the two built files. Run `cargo +1.99.1 test --offline --locked -p horizon-mod-wasm --test uwp_wasm_gui_probe -- --ignored --nocapture` on the Builder PC. The test uses Horizon's generated runtime and checks that ten dispatches produce the expected draw commands on a guest-sized worker. It uses the desktop engine configuration unless the disposable runtime is separately configured for Pulley.
 
+## Trap control
+
+Pass `-Fixture Trap` to `build-guest.ps1` to build the independent standard client mod `uwp_wasm_trap_probe.hmod`. Its ordinary `gui_render_post` hook executes a Wasm `unreachable` instruction. In an isolated test profile, enable it beside the original visual fixture. A successful control records a Wasmtime fault for the trap owner, stops its group and continues drawing the original magenta hook.
+
+The pinned mod tool built and checked the trap package with API 0.2. The recorded package is 2,637,031 bytes, SHA-256 `5db570be385710be06dc536503beb17fca2bccee92f3e889eb84d75067d80b48`. The standard library and original visual fixture retain the hashes above.
+
 ## Stock desktop client proof
 
 The exact desktop build of Horizon `0b14f8acfd97fa2c750e42795249dcc981178ca4` loaded the package through its stock Wasm host on Windows x64. The executable's SHA-256 is `089a49e06d4103aeb8ad8006e39a85b36997293e86ff205f10174e71959522dd`. The game used the standard desktop Wasmtime configuration and an offscreen DirectX 12 renderer.
@@ -35,14 +41,36 @@ Two fresh game profiles used the same package and shared Wasm std with `mod.uwp_
 
 The enabled run reported 115 ms to read packages, 1,329 ms to compile modules, 11 ms to link and 1 ms to instantiate. Title capture took 75.106 seconds enabled and 9.357 seconds disabled, including resource startup. The screenshots, control reports, logs and pixel analysis are in the local evidence folder under `desktop-stock-abi`.
 
-## Engine integration requirements
+## UWP engine candidate
 
-The existing UWP build refuses Wasm packages. An experimental engine package would use the stock `horizon_mod_wasm::load_installed` and `initialize` paths, preserve the existing registration order and seal, and use the validated UWP Wasmtime Pulley configuration with explicit traps. The stock loader reads the shared standard-library member beside `HorizonUWP.exe` and the enabled `.hmod` under the isolated game's `horizon-mods` directory. Compile the guest on the Builder PC.
+Use an isolated source assembly with the exact 0.1.6 UWP patch and the current client files. Stage the pinned Wasmtime registry archive, then enable the UWP bridge feature. For an assembly whose engine patch already contains the integration, pass `-VendorOnly`.
 
-The exact x64 UWP host executable's PE stack reserve is 8 MiB. `uwp/host/App.cpp` calls the bridge from a WinRT thread-pool worker. That worker has no explicit guest-stack reservation in the host code. The stock Horizon runtime checks for 136 MiB on x64 before instantiation and guest entry. An engine proof needs a verified, appropriately sized game worker with the host's required thread context. The existing guest guard remains in effect. The Windows SDK 19041 WindowsApp import library contains `GetCurrentThreadStackLimits`.
+```powershell
+& uwp/wasm-abi-probe/stage-runtime.ps1 -Workspace $assembly -WasmtimeArchive $wasmtimeCrate
+& tools/build_nightly_runtime.ps1 -Source $assembly -Output $build -TargetDirectory $target -Architecture x64 -AdditionalFeatures uwp-wasm
+```
 
-A standalone Windows x64 executable linked with the UWP host's 8 MiB reservation reproduced the stock guard refusal on its main thread. A thread created with the existing `horizon_guest_stack::builder()` reported 142,606,336 bytes and passed the same guard. This exercised the exact stack policy on desktop Windows. The stack reservation of the live WinRT worker remains unmeasured.
+Use the packaged game bridge produced by the strict link. Place the verified `horizon-wasm-std.wasm` beside `HorizonUWP.exe` in the signed package. Import `uwp_wasm_hook_probe.hmod` through the launcher or put it in the isolated profile's normal `game/horizon-mods` directory. Set `mod.uwp_wasm_hook_probe:true` in that game's `horizon-mods.txt`. After the GUI hook renders, set it to `false` and restart the same package for the control.
 
-The signed Wasmtime Pulley proof covers a standalone core module in x64 AppContainer. It establishes runtime compilation, execution, a bounded memory configuration and a fuel trap in that test. The desktop title test exercises the generated `horizon.host` ABI through the stock mod loader. A UWP game proof still needs shared module linking, generated imports, inventory validation, epoch-based deadlines and a title capture with the package enabled and disabled inside AppContainer.
+The feature uses Horizon's existing `load_installed` and `initialize` paths, shared Wasm Rust library, dependency resolution and registration seal. The patched Wasmtime 50.0.2 engine defaults to the host pointer-width Pulley target. It compiles Wasm to interpreter bytecode in process and keeps explicit bounds checks and Horizon's epoch deadlines. It uses anonymous non-executable memory and does not declare the AppContainer `codeGeneration` capability.
 
-The stock Windows loader disables serialized module caching and compiles modules in process. Its compiler-child deadline is Unix-only. The standalone fuel trap is evidence for guest execution limits. A compatible experimental engine still needs its epoch-based call limits checked separately from compilation time and persistent cache behavior.
+The UWP runtime reserves a 2 MiB interpreter stack and bounds declared linear memory to 128 MiB per group on 64-bit targets or 64 MiB on 32-bit targets. The game worker uses an 8 MiB native host stack for synchronous host calls. Existing 32-bit host worker limits still apply. Desktop Cranelift runs guest code on the native host thread with a 136 MiB reservation. The Windows loader keeps serialized caching disabled and compiles modules in process without the Unix compiler-child deadline.
+
+Locked Cargo metadata resolved the patched runtime for x64, x86 and ARM64. The ARM32 offline lock accepts the same source override when staged after the ARM32 dependency overrides. Compilation, strict link, package installation and hook execution are separate verification steps.
+
+### Lumia experimental import profile
+
+The stock UWP Wasm feature uses `GetCurrentThreadStackLimits`, which first appears in the UWP 16299 API-set list. The installed ARM Store SDK 15063 has no import object for it. Its FromApp memory imports also use older API-set names. [Windows UWP API versions](https://learn.microsoft.com/en-us/uwp/win32-and-com/win32-apis)
+
+The optional legacy patches keep the Windows 10 Mobile package minimum. They select exact import contracts from the SDK 15063 ARM `WindowsApp.lib` and check a stack reservation through `VirtualQuery`. The guard walks regions with the same allocation base and requires at least 8 MiB. [VirtualQuery](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualquery)
+
+| ARM import | SDK 15063 | SDK 19041 |
+| --- | --- | --- |
+| `VirtualAllocFromApp`, `VirtualProtectFromApp` | `api-ms-win-core-memory-l1-1-5.dll` | `api-ms-win-core-memory-l1-1-3.dll` |
+| `VirtualFree`, `VirtualQuery` | `api-ms-win-core-memory-l1-1-2.dll` | `api-ms-win-core-memory-l1-1-0.dll` |
+| `GetSystemInfo` | `api-ms-win-core-sysinfo-l1-2-1.dll` | `api-ms-win-core-sysinfo-l1-1-0.dll` |
+| `GetCurrentThreadStackLimits` | Absent | `api-ms-win-core-processthreads-l1-1-1.dll` |
+
+Apply `horizon-uwp-wasm-legacy-arm32.patch` from the assembled engine root and `wasmtime-pulley-legacy-arm32.patch` from `third_party/wasmtime-50.0.2`, after Wasmtime staging. Use a separate ARM32 snapshot with the offline overrides and the staged lockfile. Check the resulting PE import table against the 15063 contracts before packaging and verify on the Lumia.
+
+The patched stack guard compiled on `thumbv7a-uwp-windows-msvc`. A small ARM32 AppContainer DLL linked the actual guard with the existing product sentinel and imported the SDK 15063 `VirtualQuery` contract. A separate ARM32 AppContainer import witness selected the legacy Wasmtime APIs even with the modern Store import library on the link line. Full game strict link and runtime on Windows 10 Mobile remain pending. The Builder's Windows Mobile profile keeps the established static native fallback.

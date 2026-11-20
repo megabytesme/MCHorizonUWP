@@ -81,7 +81,9 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
         clientVersion switch
         {
             "0.1.3" or "0.1.4" => Features.Where(feature => feature != "uwp-dx11-renderer").ToArray(),
-            NightlyUwp.ClientVersion or NightlyUwp.CandidateClientVersion => Features.Where(feature => feature != "native-d3d11").ToArray(),
+            _ when NightlyUwp.UsesPackagedCodeRuntime(clientVersion, Target) =>
+                Features.Where(feature => feature != "native-d3d11").Concat(["uwp-wasm", "uwp-native-mods"]).ToArray(),
+            _ when NightlyUwp.IsClient(clientVersion) => Features.Where(feature => feature != "native-d3d11").ToArray(),
             _ => Features,
         };
 }

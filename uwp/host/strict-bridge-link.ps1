@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory)][string]$SdkRoot,
     [Parameter(Mandatory)][string]$RustLld,
     [Parameter(Mandatory)][string]$SentinelObject,
-    [Parameter(Mandatory)][string]$Output
+    [Parameter(Mandatory)][string]$Output,
+    [switch]$NativeMod
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,7 +25,11 @@ $hostImport = Join-Path $hostKit 'HorizonUWPHost.lib'
 $tlsObject = Join-Path $hostKit 'link\tls_index.obj'
 $targetMsvcRuntime = Join-Path $msvc "lib\$sdkArchitecture\store"
 $hostMsvcRuntime = Join-Path $msvc 'lib\x64'
-$bridgeExports = Join-Path $PSScriptRoot 'game-bridge-exports.def'
+$bridgeExports = if ($NativeMod) {
+    Join-Path $PSScriptRoot '..\native-mod-probe\packaged-native-exports.def'
+} else {
+    Join-Path $PSScriptRoot 'game-bridge-exports.def'
+}
 $runtime = @('libcmt.lib', 'tls_index.obj')
 
 foreach ($path in @($rust, $linker, $hostImport, $bridgeExports, $sentinel,
@@ -52,7 +57,9 @@ $arguments = @(
     "/LIBPATH:$sdk\Lib\10.0.19041.0\ucrt\$sdkArchitecture",
     "/LIBPATH:$sdk\Lib\10.0.19041.0\um\$sdkArchitecture",
     "/OUT:$outputPath", "/IMPLIB:$outputPath.lib", "/MAP:$outputPath.map", "/DEF:$bridgeExports",
-    $tlsObject, $rust, $hostImport, $sentinel,
+    $tlsObject, $rust,
+    $(if (-not $NativeMod) { $hostImport }),
+    $sentinel,
     'WindowsApp.lib', 'ntdll.lib', 'd3d11.lib', 'd3d12.lib', 'dxgi.lib', 'xaudio2.lib', 'iphlpapi.lib'
 )
 & $linker @arguments
@@ -155,4 +162,5 @@ if (Select-String -LiteralPath "$outputPath.map" -Pattern 'atexit:api-ms-win-crt
     Remove-Item -LiteralPath $outputPath -Force
     throw 'The linked game bridge imports the unavailable UCRT atexit entry point.'
 }
-Write-Host "Strict UWP bridge link succeeded for $Architecture."
+$kind = if ($NativeMod) { 'native mod' } else { 'bridge' }
+Write-Host "Strict UWP $kind link succeeded for $Architecture."

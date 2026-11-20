@@ -107,6 +107,8 @@ public static class LocalRecipe
         };
         if (arm32) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
         var prefix = new List<string> { "+" + RustToolchain };
+        if (NightlyUwp.UsesPackagedCodeRuntime(clientVersion, selection.Target))
+            prefix.AddRange(["--config", NightlyUwp.WasmtimeConfig]);
         if (arm32) prefix.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
         var fetch = new List<string>(prefix);
         fetch.AddRange(["fetch", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--target", selection.RustTarget,

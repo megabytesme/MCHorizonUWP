@@ -1,0 +1,41 @@
+diff --git a/src/runtime/vm/sys/windows/uwp.rs b/src/runtime/vm/sys/windows/uwp.rs
+--- a/src/runtime/vm/sys/windows/uwp.rs
++++ b/src/runtime/vm/sys/windows/uwp.rs
+@@ -1,7 +1,13 @@
+ use core::ffi::c_void;
+ use windows_sys::Win32::System::SystemInformation::SYSTEM_INFO;
+ 
+-#[link(name = "WindowsApp")]
++// ARM32 Windows Mobile predates the import remapping in the 16299 SDK.
++// Keep the loader contract emitted by the ARM WindowsApp library in SDK 15063.
++#[cfg_attr(
++    target_arch = "arm",
++    link(name = "api-ms-win-core-memory-l1-1-5.dll", kind = "raw-dylib", modifiers = "+verbatim")
++)]
++#[cfg_attr(not(target_arch = "arm"), link(name = "WindowsApp"))]
+ unsafe extern "system" {
+     pub(super) fn VirtualAllocFromApp(
+         base: *const c_void, size: usize, allocation: u32, protection: u32
+@@ -9,6 +15,22 @@
+     pub(super) fn VirtualProtectFromApp(
+         base: *const c_void, size: usize, protection: u32, old_protection: *mut u32
+     ) -> i32;
++}
++
++#[cfg_attr(
++    target_arch = "arm",
++    link(name = "api-ms-win-core-memory-l1-1-2.dll", kind = "raw-dylib", modifiers = "+verbatim")
++)]
++#[cfg_attr(not(target_arch = "arm"), link(name = "WindowsApp"))]
++unsafe extern "system" {
+     pub(super) fn VirtualFree(base: *mut c_void, size: usize, kind: u32) -> i32;
++}
++
++#[cfg_attr(
++    target_arch = "arm",
++    link(name = "api-ms-win-core-sysinfo-l1-2-1.dll", kind = "raw-dylib", modifiers = "+verbatim")
++)]
++#[cfg_attr(not(target_arch = "arm"), link(name = "WindowsApp"))]
++unsafe extern "system" {
+     pub(super) fn GetSystemInfo(info: *mut SYSTEM_INFO);
+ }

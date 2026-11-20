@@ -77,36 +77,7 @@ def rust_string(value):
     return json.dumps(value, ensure_ascii=False)
 
 
-def stage(workspace, architecture, source_folders, game_build_id=None):
-    bridge = workspace / "uwp/game-bridge"
-    host = workspace / "crates/horizon-mod-host/src"
-    output = bridge / "embedded-native"
-    snapshots = output / "horizon-native-mods"
-    if output.exists():
-        raise ValueError("Native sources already staged. Start from a fresh authenticated Builder snapshot.")
-    expected = [f"mchorizonuwp-{client}-patch-{patch}-{architecture}-{UPSTREAM}"
-                for client, patch in (("0.1.6", "0.1.5"), ("0.1.7", "0.1.6"))]
-    game_build_id = game_build_id or expected[0]
-    if game_build_id not in expected:
-        raise ValueError("Build identity does not match the pinned UWP Nightly and architecture")
-    checked = [read_source(folder) for folder in source_folders]
-    ids = [manifest["id"] for _, manifest, _ in checked]
-    names = [package["name"] for package, _, _ in checked]
-    lock_path = bridge / "Cargo.lock"
-    lock = lock_path.read_text(encoding="utf-8")
-    known = {package["name"] for package in tomllib.loads(lock)["package"]}
-    if len(ids) != len(set(ids)) or len(names) != len(set(names)) or known.intersection(names):
-        raise ValueError("Duplicate native mod ID, duplicate Cargo package, or a collision with a game dependency")
-    blocks = re.split(r"(?=^\[\[package\]\]$)", lock, flags=re.MULTILINE)
-    bridge_block = next(block for block in blocks[1:] if block.startswith('[[package]]\nname = "horizon-uwp-game-bridge"\n'))
-    prefix, dependencies = bridge_block.split("dependencies = [\n")
-    native_deps = [' "horizon-mod-api",\n', *(f' "{name}",\n' for name in names)]
-    dep_lines, tail = dependencies.split("]\n", 1)
-    blocks[blocks.index(bridge_block)] = prefix + "dependencies = [\n" + "".join(
-        sorted(dep_lines.splitlines(keepends=True) + native_deps)
-    ) + "]\n" + tail
-    host_path = host / "uwp.rs"
-    platform = host_path.read_text(encoding="utf-8")
+def install_embedded_host_start(platform):
     platform = replace_once(
         platform,
         "pub fn start(startup: horizon_client::entry::Startup) -> horizon_client::Result<()> {",
@@ -131,6 +102,42 @@ pub fn start_with_native(
         """        native,
         |_, _| (crate::embedded_host::install(built, factories, order), ()),""",
     )
+    return platform
+
+
+def stage(workspace, architecture, source_folders, game_build_id=None):
+    bridge = workspace / "uwp/game-bridge"
+    host = workspace / "crates/horizon-mod-host/src"
+    output = bridge / "embedded-native"
+    snapshots = output / "horizon-native-mods"
+    if output.exists():
+        raise ValueError("Native sources already staged. Start from a fresh authenticated Builder snapshot.")
+    expected = [f"mchorizonuwp-{client}-patch-{patch}-{architecture}-{UPSTREAM}"
+                for client, patch in (("0.1.6", "0.1.5"), ("0.1.7", "0.1.6"), ("0.1.8", "0.1.7"))]
+    game_build_id = game_build_id or expected[0]
+    if game_build_id not in expected:
+        raise ValueError("Build identity does not match the pinned UWP Nightly and architecture")
+    checked = [read_source(folder) for folder in source_folders]
+    ids = [manifest["id"] for _, manifest, _ in checked]
+    names = [package["name"] for package, _, _ in checked]
+    lock_path = bridge / "Cargo.lock"
+    lock = lock_path.read_text(encoding="utf-8")
+    known = {package["name"] for package in tomllib.loads(lock)["package"]}
+    if len(ids) != len(set(ids)) or len(names) != len(set(names)) or known.intersection(names):
+        raise ValueError("Duplicate native mod ID, duplicate Cargo package, or a collision with a game dependency")
+    blocks = re.split(r"(?=^\[\[package\]\]$)", lock, flags=re.MULTILINE)
+    bridge_block = next(block for block in blocks[1:] if block.startswith('[[package]]\nname = "horizon-uwp-game-bridge"\n'))
+    prefix, dependencies = bridge_block.split("dependencies = [\n")
+    native_deps = [' "horizon-mod-api",\n', *(f' "{name}",\n' for name in names)]
+    dep_lines, tail = dependencies.split("]\n", 1)
+    blocks[blocks.index(bridge_block)] = prefix + "dependencies = [\n" + "".join(
+        sorted(dep_lines.splitlines(keepends=True) + native_deps)
+    ) + "]\n" + tail
+    host_path = host / "uwp.rs"
+    platform = host_path.read_text(encoding="utf-8")
+    integrated_host = "pub fn start_with_native(" in platform
+    if not integrated_host:
+        platform = install_embedded_host_start(platform)
     bridge_lib = bridge / "src/lib.rs"
     source = replace_once(
         bridge_lib.read_text(encoding="utf-8"),
@@ -190,12 +197,13 @@ pub fn start(startup: horizon_client::entry::Startup) -> horizon_client::Result<
     lock_path.write_text(blocks[0] + "".join(sorted(
         (block.rstrip() + "\n\n" for block in blocks[1:]), key=lambda block: block.splitlines()[1],
     )).rstrip() + "\n", encoding="utf-8")
-    host_path.write_text(platform, encoding="utf-8")
-    with (host / "lib.rs").open("a", encoding="utf-8") as metadata:
-        metadata.write('\n#[cfg(target_vendor = "uwp")]\nmod embedded_host;\n'
-                       '#[cfg(target_vendor = "uwp")]\npub use embedded_host::HookFactory;\n'
-                       '#[cfg(target_vendor = "uwp")]\npub use uwp::start_with_native;\n')
-    (host / "embedded_host.rs").write_bytes(Path(__file__).with_name("embedded_host.rs").read_bytes())
+    if not integrated_host:
+        host_path.write_text(platform, encoding="utf-8")
+        with (host / "lib.rs").open("a", encoding="utf-8") as metadata:
+            metadata.write('\n#[cfg(target_vendor = "uwp")]\nmod embedded_host;\n'
+                           '#[cfg(target_vendor = "uwp")]\npub use embedded_host::HookFactory;\n'
+                           '#[cfg(target_vendor = "uwp")]\npub use uwp::start_with_native;\n')
+        (host / "embedded_host.rs").write_bytes(Path(__file__).with_name("embedded_host.rs").read_bytes())
     record = {"architecture": architecture, "rust_target": TARGETS[architecture], "rust_toolchain": "1.99.1",
               "horizon": UPSTREAM, "mixins": MIXINS, "game_build_id": game_build_id,
               "cargo_lock_sha256": hashlib.sha256(lock_path.read_bytes()).hexdigest(), "mods": records}

@@ -92,3 +92,45 @@ Separately packaged native DLLs and Builder-embedded mods have different update 
 The pinned Desktop Windows launcher builds API-only Rust DLLs from shared SDK metadata. Its desktop game uses the system allocator. The UWP bridge uses Horizon's game allocator. A UWP DLL route must agree on the compiler, API closure, type layout, and allocator before handing ownership of `Vec<ModEntry>` or `Box<dyn Hooks>` to the host. A PowerPC Builder can reuse the source selection, pin check and static hook factories with its own target SDK and game linker.
 
 The upstream native library host validates the artifact hash and its `horizon_native_build` identity before calling `horizon_native_mod_v1`. The returned `NativeMod` supplies hook factories, an inventory, API-point listeners and patch install functions. A UWP loader can reuse this contract with package-graph discovery and process-lifetime module handles. Parts and registrations then use the installed API tables. Typed `[[inject]]` listeners need the pinned point catalog and the existing `horizon_mod_point_emit::api` generator plus dependency-ordered registration. Source-level mixins compile modified engine functions and have a larger build and verification scope. The current hook-only Builder profile validates these boundaries by accepting the common typed API and refusing declarations that need the additional generators.
+
+## Executable native modpacks
+
+The opt-in `uwp-native-mods` host searches the current process package graph for `<main identity>.NativeMods`. It checks the related-set and optional package flags, the publisher ID shared with the main package and the target architecture. The signed modpack carries the original Horizon manifests and source snapshots. Before loading any module, the host validates the standard native package manifest, Horizon API line 0.2, the pinned game and mixin revisions, the exact UWP game build ID, and the DLL hash. It also refuses DLL name collisions within the package graph and compares the loaded module's path to the validated modpack path.
+
+The host initializes each library's allocator with callbacks into the game allocator before calling the existing `horizon_native_mod_v1` entry point. The library returns the normal `NativeMod` inventory and typed hook factory, and the host uses Horizon's mod dispatch and dependency resolver. The loaded DLLs stay resident for the life of the app. A restart after changing `horizon-mods.txt` determines which DLLs are opened. A disabled mod stays in the installed package inventory.
+
+The Builder profile requires explicit trust in each mod's Rust source. Select API-only hook projects for the pinned Nightly with no custom build files or third-party dependencies. The DLLs use the same Rust compiler, Horizon source closure and game heap as the host. The first profile compiles the API crate into each DLL, so native code needing process-wide API crate statics needs a shared SDK library. Native mixins, patched game internals and typed injection entries are outside the profile. The separate executable modpack path applies to x64, x86 and ARM64. The Builder's source embedding path remains available on ARM32 Windows Mobile at its existing minimum OS.
+
+For a command-line build, use an authenticated Nightly source assembly with the updated UWP host and strict link kit. The build directory needs room for the complete game even though mod-only updates can reuse the existing game bridge.
+
+```powershell
+python -I uwp/native-mod-probe/stage-packaged.py --workspace $assembly --architecture x64 `
+    --game-build-id 'mchorizonuwp-0.1.8-patch-0.1.7-x64-0b14f8acfd97fa2c750e42795249dcc981178ca4' `
+    --trust-native-source --source uwp/native-mod-probe/hook-source
+& tools/build_nightly_runtime.ps1 -Source $assembly -Output $nativeOutput `
+    -TargetDirectory $cargoTarget -Architecture x64 -NativeMods -PreparedRustSource $rustSource
+& uwp/native-mod-probe/package-modpack.ps1 -MainAppx $signedBaseGame `
+    -StagedSources "$assembly/uwp/game-bridge/packaged-native" -DllDirectory $nativeOutput `
+    -OutputDirectory $relatedSet -Version 1.0.0.2 -SdkRoot $sdkRoot `
+    -SigningThumbprint $testCertificate.Thumbprint -VerifyTrustedChain
+```
+
+The base game must include `uwp-native-mods` and use the same build identity and signer. The package script keeps the game EXE and bridge DLL bytes, sets the related-set package version and adds the external bundle reference. It records the binary and package SHA-256 values. Use the same two-bundle installation after a modpack update. Windows requires related-set authoring when replacing executable optional packages. The base and optional package are signed again, and the user installs the new related set and restarts. Game code compiles only when the game itself changes.
+
+```powershell
+Add-AppxPackage -Path "$relatedSet/main.appxbundle" -ExternalPackages "$relatedSet/optional.appxbundle"
+```
+
+The x64 fixture compiled with pinned Rust 1.99.1 against the locked source assembly. Dumpbin confirmed the AppContainer machine type and the two standard Horizon native exports plus the UWP allocator bootstrap. Both 1.0.1.1 bundles passed SignTool verification. The signed main bundle declares the optional bundle as external and contains the same EXE and bridge bytes as the 1.0.1.0 base APPX.
+
+| x64 file | SHA-256 |
+| --- | --- |
+| Main related-set bundle 1.0.1.1 | `4b29a6fe433b58d4afa777cce55772e802fd262b5aa5cc5025a7f44ebda7be48` |
+| Optional modpack bundle 1.0.1.1 | `6a596627b31698cbeda9b947b8e8fc372260068c69f7ea3e030cc8bb72fc8fcf` |
+| Packaged native hook DLL | `44147ac0b0ade0625a2abee045add38e3ae980f1b719578d1407e9f2d508912d` |
+| Main EXE | `e6c705d8aa60aa0f3bac21f7acfba834483266ec5dbca1d0e48182dc1101c52b` |
+| Main game bridge | `65f49f8b20428ef30f88ea2c9818f9dc427eca463752e06eaf94210db955a057` |
+
+The related-set client logged `Packaged native mod: uwp_native_hook_probe 0.1.0` and rendered 6,400 cyan pixels on the RTX 3090 Ti through wgpu D3D11. The disabled launch omitted the native load and rendered the title with zero cyan pixels. Re-enabling the mod and launching a new process restored all 6,400 pixels. All three captures used the same signed 1.0.1.1 related set and logged a rendered game frame. The processes exited after each test. The main bundle, external bundle, export and import inspection and package hashes are under `E:/Temp/mchorizon-mod-runtime-mission/x64-native`. The comparable title captures and logs are in `E:/Temp/mchorizon-mod-runtime-mission/x64/related-set-proof` for the enabled runs and `E:/Temp/mchorizon-mod-runtime-mission/x64/related-set-disabled-title` for the disabled run.
+
+The additional standard fixture in `uwp/native-mod-probe/hook-after-source` declares a required `uwp_native_hook_probe = "=0.1.0"` dependency. Pass both source folders to `stage-packaged.py` to build a two-mod pack. The dependent comes first in the package record and draws green at the same coordinates. Horizon's dependency order should draw it after the cyan hook. With only the dependent enabled, the current host returns Horizon's missing required code dependency error before publishing the dispatch table. Game startup then stops with that error.

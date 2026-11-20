@@ -1,0 +1,7 @@
+[package]
+name = "mod-uwp-native-after-probe"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }

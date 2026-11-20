@@ -22,6 +22,8 @@ uwp-controller = ["horizon-client/uwp-controller"]
 heartbeat = ["horizon-client/heartbeat"]
 uwp-account = ["dep:horizon-account-core", "uwp-https"]
 xaml-shell = ["uwp-account", "heartbeat"]
+uwp-wasm = ["horizon-mod-host/uwp-wasm"]
+uwp-native-mods = ["horizon-mod-host/uwp-native-mods"]
 
 [dependencies]
 horizon-client = { path = "../../crates/horizon-client", default-features = false }

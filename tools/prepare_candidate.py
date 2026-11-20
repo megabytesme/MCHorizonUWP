@@ -18,7 +18,10 @@ NIGHTLY_UPSTREAM_ARCHIVE_SHA256 = "1a73fb817549e9b0ec8870b8aec7efd1ea4e274e8be75
 NIGHTLY_RECIPES = {
     "0.1.5": ("0.1.6", "1.0.4"),
     "0.1.6": ("0.1.7", "1.0.5"),
+    "0.1.7": ("0.1.8", "1.0.6"),
 }
+WASMTIME_ARCHIVE_SHA256 = "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
+WASM_STANDARD_LIBRARY_SHA256 = "123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b"
 WGPU_ARCHIVE_SHA256 = "4c8769b47eea565ca994d4699ff72e70f6647613b6205c8daa52f2b04a743eaa"
 WGPU_PATCH_PATH = "patches/wgpu-dx11/reuse-upload-buffer-shadow.patch"
 WGPU_PATCH_SHA256 = "ee0a57e971221a3b705ca8434b67ea2f2909fb8b3b21444163e0bf5be44046e4"
@@ -30,6 +33,7 @@ PATCH_PATHS = {
     "0.1.4": "patches/main-2026-11-09/horizon-uwp-0.1.4.patch",
     "0.1.5": "patches/nightly-2026-11-18/horizon-uwp-0.1.5.patch",
     "0.1.6": "patches/nightly-2026-11-18/horizon-uwp-0.1.6.patch",
+    "0.1.7": "patches/nightly-2026-11-18/horizon-uwp-0.1.7.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -88,7 +92,7 @@ def verify_upstream(archive_path, repository, commit):
         raise ValueError("Upstream ZIP contents do not match the pinned Git commit: " + ", ".join(samples))
 
 
-def client_archive(revision, host_artifacts=None, wgpu_archive=None):
+def client_archive(revision, host_artifacts=None, wgpu_archive=None, wasm_inputs=()):
     archive = git("archive", "--format=tar", revision, "uwp", "LICENSE", "THIRD_PARTY_NOTICES.md")
     output = io.BytesIO()
     with tarfile.open(fileobj=io.BytesIO(archive)) as source, zipfile.ZipFile(
@@ -115,6 +119,14 @@ def client_archive(revision, host_artifacts=None, wgpu_archive=None):
                 item = zipfile.ZipInfo(f"uwp/wgpu-dx11/{name}", (1980, 1, 1, 0, 0, 0))
                 item.external_attr = 0o100644 << 16
                 result.writestr(item, data)
+        for name, path, checksum in wasm_inputs:
+            data = path.read_bytes()
+            if digest(data) != checksum:
+                raise ValueError(f"{name} does not match the pinned Nightly SHA-256")
+            item = zipfile.ZipInfo(f"uwp/wasm-abi-probe/{name}", (1980, 1, 1, 0, 0, 0))
+            item.compress_type = zipfile.ZIP_DEFLATED
+            item.external_attr = 0o100644 << 16
+            result.writestr(item, data)
         if host_artifacts is not None:
             root = Path(host_artifacts).resolve(strict=True)
             expected = ["README.txt"]
@@ -157,6 +169,8 @@ def main():
     parser.add_argument("--client-asset-id", help="GitHub release asset ID; uses the binary API endpoint instead of the release-download redirect")
     parser.add_argument("--host-artifacts", type=Path, help="Prepared host kit to include in the client archive")
     parser.add_argument("--wgpu-archive", type=Path, help="Pinned wgpu codeload ZIP required by Nightly clients")
+    parser.add_argument("--wasmtime-archive", type=Path, help="Pinned crates.io Wasmtime 50.0.2 archive")
+    parser.add_argument("--wasm-standard-library", type=Path, help="Pinned Nightly Horizon Wasm standard library")
     parser.add_argument("--catalog-input", type=Path, default=Path("catalog/catalog-v1.json"),
                         help="Existing signed catalog whose older entries and rules must be retained")
     parser.add_argument("--output", required=True, type=Path, help="New output directory")
@@ -168,6 +182,16 @@ def main():
     default_client, default_builder = nightly or ("0.1.0", "1.0.3")
     client_version = args.client_version or default_client
     builder_version = args.builder_version or default_builder
+    wasm_inputs = ()
+    if args.patch_version == "0.1.7" and not args.patch_only:
+        if args.wasmtime_archive is None or args.wasm_standard_library is None:
+            parser.error("Patch 0.1.7 requires both pinned Wasm inputs")
+        wasm_inputs = (
+            ("wasmtime-50.0.2.crate", args.wasmtime_archive, WASMTIME_ARCHIVE_SHA256),
+            ("horizon-wasm-std.wasm", args.wasm_standard_library, WASM_STANDARD_LIBRARY_SHA256),
+        )
+    elif args.wasmtime_archive is not None or args.wasm_standard_library is not None:
+        parser.error("Wasm inputs are only accepted when building the 0.1.8 client archive")
     if nightly:
         if upstream_commit != NIGHTLY_UPSTREAM or (client_version, builder_version) != nightly:
             raise ValueError(f"Nightly patch {args.patch_version} requires its pinned source, "
@@ -202,7 +226,7 @@ def main():
     patch = git("show", f"{revision}:{patch_path}")
     if not args.patch_only and args.host_artifacts is None:
         raise ValueError("Every client release requires --host-artifacts for its prebuilt hosts")
-    client = None if args.patch_only else client_archive(revision, args.host_artifacts, args.wgpu_archive)
+    client = None if args.patch_only else client_archive(revision, args.host_artifacts, args.wgpu_archive, wasm_inputs)
     verify_upstream(args.upstream_archive, args.upstream_repo, upstream_commit)
     upstream_hash = digest(args.upstream_archive.read_bytes())
     if nightly and upstream_hash != NIGHTLY_UPSTREAM_ARCHIVE_SHA256:

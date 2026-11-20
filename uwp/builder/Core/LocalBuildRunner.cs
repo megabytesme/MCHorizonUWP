@@ -87,7 +87,7 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("This client requires the matching UWP Nightly.");
         if (selection.EmbedsNativeSources && (!NightlyUwp.Matches(release.Patch.UpstreamCommit)
             || !NightlyUwp.SupportsNativeSource(release.Patch.Version, release.Client.Version)))
-            throw new InvalidOperationException("Native source builds require the 0.1.6 patch and 0.1.7 client for Horizon Nightly 2026-11-18.");
+            throw new InvalidOperationException("Native source builds require a compatible Horizon Nightly 2026-11-18 patch and client.");
     }
 
     private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,
@@ -215,23 +215,42 @@ public static class LocalBuildRunner
                     Path.Combine(snapshot, "uwp", "game-bridge", "Cargo.lock"), overwrite: true);
         }
 
+        var packagedCode = NightlyUwp.UsesPackagedCodeRuntime(release?.Client.Version, selection.Target);
+        if (packagedCode)
+        {
+            var git = probe.FindOnPath("git.exe") ?? throw new InvalidOperationException("Git is required to stage Wasmtime.");
+            progress?.Report("Staging the pinned Wasmtime runtime for the Horizon mod host.");
+            await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                "uwp/wasm-abi-probe/stage-runtime.ps1", "-Workspace", snapshot,
+                "-WasmtimeArchive", Path.Combine(snapshot, NightlyUwp.WasmtimeArchive), "-VendorOnly", "-Git", git],
+                progress: progress, captureFailureOutput: true);
+        }
+
         string? embeddedNative = null;
+        PackagedNativeBuild? nativeModpack = null;
         if (sourceMods.Length != 0)
         {
-            const string stager = "uwp/native-mod-probe/stage-source.py";
-            if (!File.Exists(Path.Combine(snapshot, stager)))
-                throw new InvalidOperationException("The selected client bundle predates the embedded native source prototype.");
             var buildId = NightlyUwp.GameBuildId(targetArchitecture, release!.Patch.Version, release.Client.Version);
-            var stageArgs = new List<string> { "-I", stager, "--workspace", snapshot, "--architecture", targetArchitecture, "--game-build-id", buildId, "--trust-native-source" };
-            foreach (var folder in sourceMods)
-            {
-                stageArgs.Add("--source");
-                stageArgs.Add(folder);
-            }
             progress?.Report($"Preparing {sourceMods.Length} trusted native source project(s).");
             var nativePython = await PrivatePython.EnsureAsync(python, PrivatePython.Root, Path.Combine(root, "downloads"), requireToml: true);
-            await RunProcess(nativePython, snapshot, stageArgs, progress: progress, captureFailureOutput: true);
-            embeddedNative = Path.Combine(snapshot, "uwp", "game-bridge", "embedded-native", "horizon-native-mods");
+            if (packagedCode)
+            {
+                nativeModpack = await PackagedNativeBuild.StageAsync(snapshot, nativePython, targetArchitecture, buildId, sourceMods, progress);
+            }
+            else
+            {
+                const string stager = "uwp/native-mod-probe/stage-source.py";
+                if (!File.Exists(Path.Combine(snapshot, stager)))
+                    throw new InvalidOperationException("The selected client bundle predates embedded native source support.");
+                var stageArgs = new List<string> { "-I", stager, "--workspace", snapshot, "--architecture", targetArchitecture, "--game-build-id", buildId, "--trust-native-source" };
+                foreach (var folder in sourceMods)
+                {
+                    stageArgs.Add("--source");
+                    stageArgs.Add(folder);
+                }
+                await RunProcess(nativePython, snapshot, stageArgs, progress: progress, captureFailureOutput: true);
+                embeddedNative = Path.Combine(snapshot, "uwp", "game-bridge", "embedded-native", "horizon-native-mods");
+            }
         }
 
         progress?.Report(release is null ? "Preparing the Visual C++ environment." : "Preparing the compact Rust and Clang environment.");
@@ -328,6 +347,9 @@ public static class LocalBuildRunner
         var hostBuildEnvironment = new Dictionary<string, string>(vcEnvironment, StringComparer.OrdinalIgnoreCase);
         if (compact is not null) foreach (var (key, value) in compact.Host) hostBuildEnvironment[key] = value;
         if (release is not null) hostBuildEnvironment["USERPROFILE"] = WinUiBootstrap.PrivateProfile;
+        if (nativeModpack is not null)
+            await nativeModpack.BuildAsync(cargo, powershell, compactSdk!, msvcToolset!, selection.RustTarget,
+                vcEnvironment, hostBuildEnvironment, progress);
         string executable;
         string? gameBridge = null;
         if (release is null)
@@ -395,10 +417,15 @@ public static class LocalBuildRunner
         progress?.Report("Packaging the unsigned client.");
         var packageArguments = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "uwp/host/package.ps1", "-Architecture", arch,
             "-Executable", executable, "-OutputDirectory", packageDir,
-            "-IdentityName", embeddedNative is not null ? LocalPackageInstaller.NativeTestPackageName
+            "-IdentityName", sourceMods.Length != 0 ? LocalPackageInstaller.NativeTestPackageName
                 : identity is null ? "HorizonUWPPrototype" : LocalPackageInstaller.ClientPackageName, "-WinUIFramework", "2.7" };
         if (embeddedNative is not null) { packageArguments.Add("-EmbeddedNativeMods"); packageArguments.Add(embeddedNative); }
         if (gameBridge is not null) { packageArguments.Add("-GameBridge"); packageArguments.Add(gameBridge); }
+        if (packagedCode)
+        {
+            packageArguments.Add("-WasmStandardLibrary");
+            packageArguments.Add(Path.Combine(snapshot, NightlyUwp.WasmStandardLibrary));
+        }
         packageArguments.AddRange(LocalRecipe.ResourceArguments(selection, packageResources, framework?.Name));
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
         packageArguments.Add("-ReleaseNotes"); packageArguments.Add(releaseNotesPath);
@@ -421,6 +448,9 @@ public static class LocalBuildRunner
             Directory.CreateDirectory(signedOutputRoot);
             signed = await PackageOutput.CreateAsync(package, framework?.Package, identity, signTool,
                 Path.Combine(signedOutputRoot, SignedOutputDirectoryName(arch)), dependencies);
+            if (nativeModpack is not null)
+                signed = signed with { NativeModpack = await nativeModpack.PackageAsync(powershell, compactSdk!, signed, identity,
+                    new Version(selection.ValidatedPackageVersion), progress) };
         }
         return new(root, package, packageResources is null ? null : LocalRecipe.SoundWarning(packageResources), framework?.Package, signed);
     }

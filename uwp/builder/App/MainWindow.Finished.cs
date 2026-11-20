@@ -44,7 +44,8 @@ public sealed partial class MainWindow
                 queryError = error.Message;
             }
         }
-        var eligible = builtOutputs.Where(item => LocalPackageInstaller.CanInstall(item.Target, hostArchitecture,
+        var eligible = builtOutputs.Where(item => (item.Output.NativeModpack is null || Environment.OSVersion.Version.Build >= 16299)
+            && LocalPackageInstaller.CanInstall(item.Target, hostArchitecture,
             Environment.OSVersion.Version, requiresExistingFramework, frameworkInstalled)).ToArray();
         if (installedClient is not null && Version.TryParse(PackageVersion.Text, out var builtVersion) && builtVersion <= installedClient.Version)
             eligible = [];
@@ -94,6 +95,11 @@ public sealed partial class MainWindow
             var details = new StackPanel { Spacing = 8 };
             AddOutputPath(details, "Output folder", directory);
             AddOutputPath(details, "Client APPX", output.Client);
+            if (output.NativeModpack is { } modpack)
+            {
+                AddOutputPath(details, "Client related-set bundle", modpack.MainBundle);
+                AddOutputPath(details, "Executable native modpack", modpack.OptionalBundle);
+            }
             AddOutputPath(details, "Public signing certificate", output.Certificate);
             AddOutputPath(details, "Installation guide", output.InstallationGuide);
 

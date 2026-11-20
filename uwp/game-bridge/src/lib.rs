@@ -1076,6 +1076,63 @@ fn run_upstream(
     game_dir: &std::path::Path,
     session: Option<horizon_client::auth::AuthSession>,
 ) -> horizon_client::Result<()> {
+    #[cfg(feature = "uwp-wasm")]
+    {
+        // The outer WinRT pool worker has no stack reservation guarantee.
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .name("Horizon game".into())
+                .stack_size(horizon_mod_host::UWP_WASM_HOST_STACK)
+                .spawn_scoped(scope, move || {
+                    let _apartment = GameApartment::initialize()?;
+                    start_upstream(resources, game_dir, session)
+                        .map_err(|error| std::io::Error::other(error.to_string()))
+                })?
+                .join()
+                .map_err(|_| std::io::Error::other("Horizon game worker failed"))??;
+            Ok(())
+        })
+    }
+    #[cfg(not(feature = "uwp-wasm"))]
+    start_upstream(resources, game_dir, session)
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "uwp-wasm"))]
+struct GameApartment;
+
+#[cfg(all(target_vendor = "uwp", feature = "uwp-wasm"))]
+impl GameApartment {
+    fn initialize() -> std::io::Result<Self> {
+        // SAFETY: called on the new worker before WinRT work, with RO_INIT_MULTITHREADED.
+        let result = unsafe { RoInitialize(1) };
+        if result < 0 {
+            return Err(std::io::Error::from_raw_os_error(result));
+        }
+        Ok(Self)
+    }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "uwp-wasm"))]
+impl Drop for GameApartment {
+    fn drop(&mut self) {
+        // SAFETY: balances successful RoInitialize on this same worker.
+        unsafe { RoUninitialize() };
+    }
+}
+
+#[cfg(all(target_vendor = "uwp", feature = "uwp-wasm"))]
+#[link(name = "WindowsApp")]
+unsafe extern "system" {
+    fn RoInitialize(kind: i32) -> i32;
+    fn RoUninitialize();
+}
+
+#[cfg(target_vendor = "uwp")]
+fn start_upstream(
+    resources: &std::path::Path,
+    game_dir: &std::path::Path,
+    session: Option<horizon_client::auth::AuthSession>,
+) -> horizon_client::Result<()> {
     let startup = horizon_client::entry::prepare_uwp(resources, game_dir)?;
     horizon_client::game::set_uwp_session(session);
     horizon_mod_host::start(startup)
