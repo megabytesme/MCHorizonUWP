@@ -292,9 +292,13 @@ The pinned x64 ANGLE build produced `libEGL.dll`, `libGLESv2.dll` and
 `z.dll`. The related three imports resolve inside the signed package. The
 package uses the same strict-linked game bridge as the prior UWP DX12/DX11
 comparison and the ANGLE-enabled host. The isolated package installed with
-status Ok. Hardware ES3 gameplay and matched foreground measurements are
-pending. The earlier background comparisons remain diagnostic.
-[Graphics evidence and benchmark setup](nightly-graphics-2026-11-19.md)
+status Ok. Hardware ES3 then rendered the matched multiplayer scene with
+its HUD. The four-backend foreground run used the same world, camera and
+1800×1350 SDR surface at 60 Hz. Raw DXGI events measured the app's calls to
+Present after PresentMon produced no CSV. These observations measure app
+cadence and process load. Display scanout and dropped-frame attribution
+remain unmeasured.
+[Four-backend desktop report](nightly-desktop-graphics-2026-11-20.md)
 
 ## Build and workspace
 
