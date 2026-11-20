@@ -23,11 +23,12 @@ NIGHTLY_RECIPES = {
     "0.1.9": ("0.1.10", "1.0.6"),
     "0.1.10": ("0.1.11", "1.0.6"),
     "0.1.11": ("0.1.12", "1.0.6"),
+    "0.1.12": ("0.1.13", "1.0.6"),
 }
 WASMTIME_ARCHIVE_SHA256 = "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
 WASM_STANDARD_LIBRARY_SHA256 = "123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b"
 WGPU_ARCHIVE_SHA256 = "4c8769b47eea565ca994d4699ff72e70f6647613b6205c8daa52f2b04a743eaa"
-FIXED_WGPU_PATCH_VERSION = "0.1.11"
+FIXED_WGPU_PATCH_VERSIONS = ("0.1.11", "0.1.12")
 FIXED_WGPU_ARCHIVE_SHA256 = "8de8795116083533812728a855144a5f5e229d0562ef07990393bc5124c48c2e"
 WGPU_PATCH_PATH = "patches/wgpu-dx11/reuse-upload-buffer-shadow.patch"
 WGPU_PATCH_SHA256 = "ee0a57e971221a3b705ca8434b67ea2f2909fb8b3b21444163e0bf5be44046e4"
@@ -44,6 +45,7 @@ PATCH_PATHS = {
     "0.1.9": "patches/nightly-2026-11-18/horizon-uwp-0.1.9.patch",
     "0.1.10": "patches/nightly-2026-11-18/horizon-uwp-0.1.10.patch",
     "0.1.11": "patches/nightly-2026-11-18/horizon-uwp-0.1.11.patch",
+    "0.1.12": "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -199,7 +201,7 @@ def main():
     client_version = args.client_version or default_client
     builder_version = args.builder_version or default_builder
     wasm_inputs = ()
-    if args.patch_version in ("0.1.7", "0.1.8", "0.1.9", "0.1.10", "0.1.11") and not args.patch_only:
+    if args.patch_version in ("0.1.7", "0.1.8", "0.1.9", "0.1.10", *FIXED_WGPU_PATCH_VERSIONS) and not args.patch_only:
         if args.wasmtime_archive is None or args.wasm_standard_library is None:
             parser.error(f"Patch {args.patch_version} requires both pinned Wasm inputs")
         wasm_inputs = (
@@ -244,7 +246,7 @@ def main():
         raise ValueError("Every client release requires --host-artifacts for its prebuilt hosts")
     client = None if args.patch_only else client_archive(
         revision, args.host_artifacts, args.wgpu_archive, wasm_inputs,
-        fixed_wgpu=args.patch_version == FIXED_WGPU_PATCH_VERSION
+        fixed_wgpu=args.patch_version in FIXED_WGPU_PATCH_VERSIONS
     )
     verify_upstream(args.upstream_archive, args.upstream_repo, upstream_commit)
     upstream_hash = digest(args.upstream_archive.read_bytes())

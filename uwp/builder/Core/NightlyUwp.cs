@@ -5,8 +5,10 @@ public static class NightlyUwp
     public const string UpstreamCommit = "0b14f8acfd97fa2c750e42795249dcc981178ca4";
     public const string PatchVersion = "0.1.5";
     public const string ClientVersion = "0.1.6";
-    public const string CandidatePatchVersion = "0.1.11";
-    public const string CandidateClientVersion = FixedWgpuClientVersion;
+    public const string CandidatePatchVersion = "0.1.12";
+    public const string CandidateClientVersion = StreamingAudioClientVersion;
+    private const string StreamingAudioClientVersion = "0.1.13";
+    private const string FixedWgpuPatchVersion = "0.1.11";
     private const string FixedWgpuClientVersion = "0.1.12";
     private const string MobileControlsPatchVersion = "0.1.10";
     private const string MobileControlsClientVersion = "0.1.11";
@@ -36,7 +38,8 @@ public static class NightlyUwp
 
     internal static bool IsClient(string? version) =>
         version is ClientVersion or EmbeddedClientVersion or CodeRuntimeClientVersion
-            or LegacyRendererClientVersion or ArmHudClientVersion or MobileControlsClientVersion or CandidateClientVersion;
+            or LegacyRendererClientVersion or ArmHudClientVersion or MobileControlsClientVersion
+            or FixedWgpuClientVersion or CandidateClientVersion;
 
     public static bool SupportsNativeSource(string patch, string client) =>
         (patch, client) is (EmbeddedPatchVersion, EmbeddedClientVersion)
@@ -44,14 +47,15 @@ public static class NightlyUwp
             or (LegacyRendererPatchVersion, LegacyRendererClientVersion)
             or (ArmHudPatchVersion, ArmHudClientVersion)
             or (MobileControlsPatchVersion, MobileControlsClientVersion)
+            or (FixedWgpuPatchVersion, FixedWgpuClientVersion)
             or (CandidatePatchVersion, CandidateClientVersion);
 
     internal static bool UsesPackagedCodeRuntime(string? client, TargetProfile target) =>
         (client is CodeRuntimeClientVersion or LegacyRendererClientVersion or ArmHudClientVersion
-            or MobileControlsClientVersion or CandidateClientVersion)
+            or MobileControlsClientVersion or FixedWgpuClientVersion or CandidateClientVersion)
             && target is TargetProfile.DesktopX64 or TargetProfile.DesktopX86 or TargetProfile.SurfaceProX;
 
-    internal static bool UsesFixedWgpu(string? client) => client == FixedWgpuClientVersion;
+    internal static bool UsesFixedWgpu(string? client) => client is FixedWgpuClientVersion or StreamingAudioClientVersion;
 
     internal static bool MatchesRecipe(string patch, string client) =>
         (patch, client) is (PatchVersion, ClientVersion) || SupportsNativeSource(patch, client);

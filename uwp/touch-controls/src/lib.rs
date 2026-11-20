@@ -4,6 +4,8 @@ use std::collections::HashMap;
 
 pub const MOD_ID: &str = "horizon_touch";
 pub const DEBUG_OVERLAY_ID: i32 = 15;
+pub const MOVE_CONTROL_ID: i32 = 21;
+pub const MOVE_HALF_EXTENT: f32 = 1.7;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Action {
     pub id: i32,
@@ -136,7 +138,7 @@ impl TouchModule {
             (11, s * 0.26 * k, h - s * 0.43 * k),
             (12, w * 0.5 - s * 0.20 * k, h - s * 0.075 * k),
             (13, w * 0.5 + s * 0.20 * k, h - s * 0.075 * k),
-            (21, s * 0.18 * k, h - s * 0.18 * k),
+            (MOVE_CONTROL_ID, s * 0.18 * k, h - s * 0.18 * k),
             (DEBUG_OVERLAY_ID, s * 0.28 * k, s * 0.08 * k),
         ]
         .into_iter()
@@ -181,6 +183,7 @@ impl TouchModule {
             return Err("invalid input".into());
         }
         let controls = self.geometry(w, h);
+        let movement = &controls[9];
         let mut actions = Vec::new();
         let mut emit = |id, value| actions.push(Action { id, value });
         match phase {
@@ -200,13 +203,15 @@ impl TouchModule {
                 } else {
                     controls
                         .iter()
-                        .find(|c| c.id != 21 && hit(c, 1.25))
+                        .find(|c| c.id != MOVE_CONTROL_ID && hit(c, 1.25))
                         .map(|c| c.id)
                         .unwrap_or_else(|| {
-                            if hit(&controls[9], 2.2)
-                                && !self.fingers.values().any(|f| f.role == 21)
+                            let extent = movement.radius * MOVE_HALF_EXTENT;
+                            if (x - movement.x).abs() <= extent
+                                && (y - movement.y).abs() <= extent
+                                && !self.fingers.values().any(|f| f.role == MOVE_CONTROL_ID)
                             {
-                                21
+                                MOVE_CONTROL_ID
                             } else {
                                 20
                             }
@@ -215,7 +220,11 @@ impl TouchModule {
                 let held = matches!(role, 5 | 6 | 7 | 10 | 11 | DEBUG_OVERLAY_ID)
                     && self.fingers.values().any(|f| f.role == role);
                 self.fingers.insert(id, Finger { role, x, y });
-                if (role <= 14 || role == DEBUG_OVERLAY_ID) && !held {
+                if role == MOVE_CONTROL_ID {
+                    let [side, forward] = movement_axis(movement, x, y);
+                    emit(1, side);
+                    emit(2, forward);
+                } else if (role <= 14 || role == DEBUG_OVERLAY_ID) && !held {
                     emit(role, 1.0);
                 }
             }
@@ -223,17 +232,10 @@ impl TouchModule {
                 let Some(f) = self.fingers.get_mut(&id) else {
                     return Ok((false, actions));
                 };
-                if f.role == 21 {
-                    let c = &controls[9];
-                    let mut vx = (x - c.x) / (c.radius * 1.8);
-                    let mut vy = (c.y - y) / (c.radius * 1.8);
-                    let len = (vx * vx + vy * vy).sqrt();
-                    if len > 1.0 {
-                        vx /= len;
-                        vy /= len;
-                    }
-                    emit(1, -vx);
-                    emit(2, vy);
+                if f.role == MOVE_CONTROL_ID {
+                    let [side, forward] = movement_axis(movement, x, y);
+                    emit(1, side);
+                    emit(2, forward);
                 } else if f.role == 20 {
                     emit(3, (x - f.x) * 1200.0 / w.min(h) * self.touch.sensitivity);
                     emit(4, (y - f.y) * 1200.0 / w.min(h) * self.touch.sensitivity);
@@ -245,7 +247,7 @@ impl TouchModule {
                 let Some(f) = self.fingers.remove(&id) else {
                     return Ok((false, actions));
                 };
-                if f.role == 21 {
+                if f.role == MOVE_CONTROL_ID {
                     emit(1, 0.0);
                     emit(2, 0.0);
                 } else if matches!(f.role, 5 | 6 | 7 | 10 | 11)
@@ -263,6 +265,14 @@ impl TouchModule {
         }
         Ok((true, actions))
     }
+}
+
+fn movement_axis(control: &Control, x: f32, y: f32) -> [f32; 2] {
+    let size = control.radius * MOVE_HALF_EXTENT;
+    let side = (control.x - x) / size;
+    let forward = (control.y - y) / size;
+    let magnitude = (side * side + forward * forward).sqrt().max(1.0);
+    [side / magnitude, forward / magnitude]
 }
 
 #[cfg(test)]
@@ -337,6 +347,28 @@ mod tests {
 
         controls.set_context(true).unwrap();
         assert_eq!(tap(&mut controls, 3, 0), (false, vec![]));
+    }
+
+    #[test]
+    fn movement_starts_on_press_at_the_drawn_corner_and_stops_on_release() {
+        let mut controls = TouchModule::new();
+        let (width, height) = (1000.0, 600.0);
+        let movement = controls.draw(width, height).unwrap().into_iter()
+            .find(|control| control.id == MOVE_CONTROL_ID).unwrap();
+        let inset = movement.radius * MOVE_HALF_EXTENT * 0.99;
+        let (_, actions) = controls
+            .touch(1, 0, movement.x - inset, movement.y - inset, width, height)
+            .unwrap();
+        assert_eq!(actions.len(), 2);
+        assert_eq!((actions[0].id, actions[1].id), (1, 2));
+        assert!(actions[0].value > 0.7 && actions[1].value > 0.7);
+        let (_, actions) = controls
+            .touch(1, 1, movement.x + inset, movement.y, width, height).unwrap();
+        assert!(actions[0].value < -0.98);
+        assert_eq!(actions[1].value, 0.0);
+        let (_, actions) = controls
+            .touch(1, 2, movement.x + inset, movement.y, width, height).unwrap();
+        assert_eq!(actions, [Action { id: 1, value: 0.0 }, Action { id: 2, value: 0.0 }]);
     }
 
     #[test]
