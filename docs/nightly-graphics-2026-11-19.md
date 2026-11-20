@@ -4,9 +4,9 @@ Horizon `0b14f8acfd97fa2c750e42795249dcc981178ca4` was the comparison baseline. 
 
 | Test | Native Horizon DX12 | UWP DX12 | UWP wgpu D3D11 | UWP ANGLE GLES3 |
 | --- | --- | --- | --- | --- |
-| Status | Running but not comparable | Running but not comparable | Running but not comparable | Not implemented in a verified Nightly package |
-| Runtime | Exact Nightly built and joined the scratch server on hardware DX12 | Signed Nightly rendered the title, a new survival world, and the multiplayer world on hardware DX12 | Earlier signed Nightly gameplay verified on the same RTX 3090 Ti | ANGLE-enabled native host strict-linked. The original Nightly package lacked the x64 ANGLE runtime and selector. |
-| Capture | Three background diagnostics, unsuitable for comparison | Three background diagnostics with the game menu and F3 overlay visible, unsuitable for comparison | Earlier Nightly FIFO capture, unsuitable for comparison | Full-game path awaits ANGLE runtime validation |
+| Status | Gameplay verified | Gameplay verified | Gameplay verified | Signed x64 test package installed |
+| Runtime | Exact Nightly built and joined the scratch server on hardware DX12 | Signed Nightly rendered the title, a new survival world, and the multiplayer world on hardware DX12 | Earlier signed Nightly gameplay verified on the same RTX 3090 Ti | ANGLE-enabled host strict-linked. Installed x64 EGL, GLES and zlib files verified. Activation and game rendering pending. |
+| Capture | Three background diagnostics, unsuitable for comparison | Three background diagnostics with the game menu and F3 overlay visible, unsuitable for comparison | Earlier Nightly FIFO capture, unsuitable for comparison | Pending hardware GLES3 gameplay |
 
 ## UWP DX12 on Ben-Desktop
 
@@ -50,6 +50,45 @@ The process snapshots show the busiest thread's observed CPU time. A named-threa
 
 The pinned HAL uses `LoadPackagedLibrary` to load `libEGL.dll`, selects EGL's ANGLE D3D11 platform and gives `eglCreateWindowSurface` the host's WinRT window handle. The host passes the XAML SwapChainPanel and supplies `EGLRenderSurfaceSizeProperty` in physical pixels. The shell's ANGLE selector is compiled with `HORIZON_UWP_ANGLE=1`. The package needs architecture-matched `libEGL.dll`, `libGLESv2.dll` and any runtime dependencies, with redistribution notices. The Builder checks for those files before enabling the host selector. [Pinned runtime recipe](../uwp/angle-arm32/README.md) · [Microsoft vcpkg ANGLE port](https://vcpkg.io/en/package/angle.html)
 
-The x64 package initially contained neither ANGLE DLL. The local vcpkg binary cache provided chromium_7258#2 for `arm64-uwp-local` only. The same pinned version, source `d9fc4a372074b1079c193c422fc4a180e79b6636`, downloaded for the x64 UWP triplet after selecting the installed MSVC Store environment with `vcvarsall.bat x64 store 10.0.26100.0` and explicit vcpkg chainload toolchains. The ANGLE-enabled host reused the original strict game bridge and passed `strict-prebuilt-host-link.ps1`. Its executable SHA-256 is `72064fabf0a87e4e71234b46aed501c060e5a520dcf027d9dc935fd121482e63`. The recorded vcpkg run ended at the Python setup step because it used `--only-downloads`. The remaining steps are to build the DLLs, inspect their PE imports and architecture, sign a test APPX, and verify a hardware ES3 world and resizing before measuring. Earlier probes reached shader compilation and presentation on x64 and ARM64. The ARM64 probe reported 2,048 texture array layers on GLES 3.0 and unavailable compute/storage buffers. An earlier ARM32 Lumia package reached a world on Windows Mobile build 16241 before a render-pipeline failure. Hardware exposing only GLES 2 cannot satisfy wgpu's GLES 3 requirement. [Earlier probe record](../uwp/wgpu-angle-probe/README.md)
+Earlier ANGLE probes reached shader compilation and presentation on x64 and ARM64. The ARM64 probe reported 2,048 texture array layers on GLES 3.0 and unavailable compute/storage buffers. An earlier ARM32 Lumia package reached a world on Windows Mobile build 16241 before a render-pipeline failure. Hardware exposing only GLES 2 cannot satisfy wgpu's GLES 3 requirement. [Earlier probe record](../uwp/wgpu-angle-probe/README.md)
 
 The scratch dedicated server shut down after saving the test world. The loopback exemption for `MCHorizonUWP.NightlyGraphics` was removed and its absence verified.
+
+## Signed x64 ANGLE package
+
+Ben-Desktop built ANGLE chromium_7258#2 from `d9fc4a372074b1079c193c422fc4a180e79b6636` with vcpkg `817892b0ecbc6af994dd6df999c73faf795adbf2`, VS 2022 Store MSVC 14.44.35207 and SDK 10.0.26100.0. The successful `angle-build.cmd` run in `E:\Temp\mchorizon-mod-runtime-mission\angle` used the release-only `x64-uwp-graphics` triplet with WindowsStore and dynamic CRT/library linkage. Vcpkg reported 6.7 minutes and package ABI `ec0aa934b4536945134026153644d3496ad733be968c4ac9697adf4cdbb0a47d`. The build kit and log include the host triplet, Python setup and package source revisions. [Build and import evidence](../deliverables/nightly-2026-11-19/graphics-angle)
+
+The new ANGLE package declares `MCHorizonUWP.NightlyGraphicsANGLE` 1.0.1.0 and the same neutral resource framework as the DX12 comparison. It uses the original strict game bridge `05b14fee7cb59c84a87a0bf72ce2d24b80adc869adccc515d865507b77c2cf4d` and the strict-linked ANGLE host `72064fabf0a87e4e71234b46aed501c060e5a520dcf027d9dc935fd121482e63`. SignTool `verify /pa /v` passed with zero warnings. Windows reported the installed x64 package as `Ok`. The manifest's 10.0.15063.0 minimum does not establish ANGLE runtime support on older Windows builds.
+
+| File | SHA-256 |
+| --- | --- |
+| `HorizonUWP-x64.appx` | `b097055a3bf4c39c18b59d2ba252dc754c9671aae815dcd122a06d5890f5a4b6` |
+| `libEGL.dll` | `45e766c3bca08f1e82c33e2c3e1447f38e21b0e061c5d76755d1987abaa3f49e` |
+| `libGLESv2.dll` | `d06a223b1e3a9077a58191847b77c5814bdedd3e8c15c0f90770d0892028aa31` |
+| `z.dll` | `2be65de4d1b4ab34231386d0e048d76ec9a546c0b3174559fbae16a16a64b1c5` |
+
+`dumpbin /headers /imports` confirmed all three runtime DLLs are x64 AppContainer images. `libEGL.dll` imports the packaged `libGLESv2.dll`, which imports the packaged `z.dll`, D3D11, DXGI and D3DCompiler 47. The imported C++ runtime uses the App variants provided by the installed x64 VCLibs dependency. The package carries the ANGLE and zlib notices. Staged and installed host, bridge and ANGLE DLL hashes match. Package activation, loaded driver identity, hardware GLES3 gameplay and resize remain to be observed.
+
+## Matched foreground capture prerequisites
+
+The preserved scratch executable, detached source, resource framework, two signed UWP identities, PresentMon 2.6.0 and NVIDIA sampler passed a noninteractive preflight. Ben-Desktop reported an RTX 3090 Ti with driver 621.01. Port 25567 was free and neither isolated UWP package had a loopback exemption. The native client from the previous test still had a window, so the preflight preserved its process and generated the matched inputs separately. The old server queue ends with `stop`. The preparation script backs up and replaces it once the scratch clients are closed. [Preflight record and prepared inputs](../deliverables/nightly-2026-11-19/graphics-angle)
+
+Use the saved seed-1234 scratch world with the same dedicated server for all four runs. The prepared profiles use FIFO, VSync on, a frame cap of 260 (unlimited in this Nightly), 100% SDR resolution and `pauseOnLostFocus:false`. FIFO is the common presentation mode advertised by the pinned D3D11, D3D12 and GLES backends. Record the actual presentation mode and swap chain for each pass. The older captures used the separate Immediate/Mailbox configuration.
+
+During an approved foreground window, close the previously running scratch client, stage the prepared profiles and start the pinned server. Use an elevated shell to grant loopback temporarily to the two isolated package families and remove the added entries after all captures. Keep each client on the same 240 Hz monitor and use the logged physical 1800×1350 surface for validation. Configure the scratch client before launch.
+
+```powershell
+$scratch = Join-Path $env:TEMP 'horizon-nightly-graphics-20261119-123308'
+.\tools\prepare_nightly_graphics.ps1 -ScratchRoot $scratch -Prepare
+& (Join-Path $scratch 'Start-Bench.ps1') -Role Server
+```
+
+- For Native DX12, use `Start-Bench.ps1 -Role Native` and the `NightlyBench` player name. For UWP, open the correct isolated package, choose Direct3D 12, Direct3D 11 (wgpu, feature level 9_1), or ANGLE (OpenGL ES 3.0), then join `127.0.0.1:25567`. Record the UWP player's name from the scratch server's join message. Keep a single benchmark client connected.
+- Verify ANGLE's first game frame, live world and resize. The game log must identify `backend=Gl`, OpenGL ES 3.x, ANGLE with a D3D11 renderer on the RTX 3090 Ti and hardware rendering. Keep the shell probe log and world screenshot with the game log. Return to 1800×1350 for measurement.
+- Keep the player motionless with the same loaded chunks and clear the debug and pause overlays. Use the capture script from the game foreground. It checks the expected adapter and FIFO surface, teleports the named player to the saved camera pose, waits 45 seconds, checks the server's pose confirmation, then records display modes, a world screenshot and three PresentMon runs of 60 seconds each. The capture aborts if the client loses foreground at a check. It never requests foreground focus. Discard interrupted passes and preserve application and displayed cadence as separate metrics.
+
+```powershell
+.\tools\capture_nightly_graphics.ps1 -ScratchRoot $scratch -GamePid $gamePid -Backend uwp-angle -PlayerName $player
+```
+
+The capture backend values are `native-dx12`, `uwp-dx12`, `uwp-dx11` and `uwp-angle`. The script uses the retained PresentMon, CPU and GPU collector in the scratch root and writes fresh timestamped evidence. The existing diagnostic CSV summarizer was rerun successfully. The foreground capture script passed PowerShell syntax validation and awaits a live approved run.
