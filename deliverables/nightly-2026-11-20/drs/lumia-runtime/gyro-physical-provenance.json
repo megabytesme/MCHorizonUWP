@@ -1,0 +1,19 @@
+{
+  "identity": "MCHorizonUWP.NightlyNov20.GyroTrace.arm",
+  "version": "1.0.0.0",
+  "appx_sha256": "317D6FE89F9E8DAA2C1C7E613CA330A9B31985A9A3313ADB2A3744EE30A2456B",
+  "bridge_sha256": "A90587D188B2113FAC8D1FEDCC4F6C5FE075D0AD293F4448D50426556F048017",
+  "native_build_id": "mchorizonuwp-0.1.15-patch-0.1.13-arm-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "host_sha256": "CF77F2B590904D3E398A0853BBC807C770D144427B650C593A79A45B3D31DFB6",
+  "activation_utc": "2026-11-21T02:56:28.6740418Z",
+  "launch_pid": 6692,
+  "driver_feature_level": "0xB100 (D3D11 FL11_1)",
+  "game_surface": [
+    2561,
+    1439
+  ],
+  "physical_observation_utc": "2026-11-21T03:09Z",
+  "physical_yaw_pitch_observed": true,
+  "motion_csv_available": false,
+  "keyboard_or_controller_rotation_used": false
+}
