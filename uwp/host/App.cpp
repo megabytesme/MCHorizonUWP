@@ -14,6 +14,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
+#include "ScreenshotStorage.h"
 #include <wrl/client.h>
 #include <windows.applicationmodel.h>
 #include <windows.applicationmodel.core.h>
@@ -548,6 +549,12 @@ static void show_fatal(Platform::String^ text) {
             });
     } catch (...) { fatal_done.store(true); }
 }
+extern "C" int32_t __cdecl horizon_uwp_publish_screenshot(
+    const wchar_t* staged_path, uint32_t staged_length,
+    const wchar_t* file_name, uint32_t name_length) {
+    return horizon_uwp::publish_screenshot(staged_path, staged_length, file_name, name_length);
+}
+
 extern "C" int __cdecl horizon_uwp_is_ui_thread() {
     const DWORD owner = current_window_thread.load(std::memory_order_acquire);
     return owner && owner == GetCurrentThreadId();
