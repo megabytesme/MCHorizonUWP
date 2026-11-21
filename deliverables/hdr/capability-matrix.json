@@ -34,14 +34,16 @@
       "device": "Surface Pro X / Qualcomm Adreno 680",
       "driver": "27.20.2160.0",
       "os": "Windows build 26320",
-      "display": "LGD0555 internal 2880x1920",
-      "status": "signed_surface_install_and_native_display_probe_verified",
-      "blocker": "Surface internal display reports SDR-only. An external HDR display is needed for physical HDR presentation.",
+      "display": "LGD0555 internal 2880x1920, 8-bit SDR, HDR unsupported",
+      "status": "signed_surface_sdr_startup_verified_world_blocked",
+      "blocker": "Windows suspended the game in locked session 1 before a world frame. The internal display is SDR-only and physical HDR requires an external HDR display.",
       "evidence": [
         "../../docs/hdr-dx12-validation.md",
         "arm64/package.json",
         "arm64/dxgi-native.log",
-        "arm64/status.json"
+        "arm64/status.json",
+        "arm64/locked-game-attempt.json",
+        "arm64/README.md"
       ]
     },
     {
@@ -102,6 +104,33 @@
       "evidence": [
         "../../docs/hdr-lumia-capabilities.md"
       ]
+    },
+    {
+      "backend": "D3D11",
+      "architecture": "arm64",
+      "device": "Surface Pro X / Qualcomm Adreno 680",
+      "driver": "27.20.2160.0",
+      "os": "Windows build 26320",
+      "native_level": "11_1",
+      "product_projection": "FL9_1",
+      "status": "native_probe_verified_product_sdr",
+      "blocker": "Native FP16 composition is accepted on the higher device level. Current product projection and SDR-only panel rule out HDR. Candidate D3D11 gameplay awaits an unlocked console.",
+      "evidence": [
+        "arm64/dxgi-native.log",
+        "../../docs/hdr-dx11-validation.md"
+      ]
+    },
+    {
+      "backend": "ANGLE",
+      "architecture": "arm",
+      "device": "Lumia 950 XL / Qualcomm Adreno 430",
+      "os": "Windows 10 Mobile 16241.1001",
+      "status": "current_hdr_unsupported",
+      "blocker": "Current Windows Mobile color contract predates the WinRT HDR query, and prior ANGLE gameplay reached a render-pipeline error. Device Portal retries timed out.",
+      "evidence": [
+        "../../docs/hdr-lumia-capabilities.md",
+        "../../docs/hdr-angle-validation.md"
+      ]
     }
   ],
   "color_vectors": {
@@ -114,6 +143,12 @@
     "hdrcapture": "RGB16 BT.2020/PQ with ICC and cLLI",
     "sdrcapture": "RGBA8",
     "physical_f2": "Unverified on the candidate while Windows PickerHost held the foreground.",
-    "monitor_move": "The SDR U32J59x became inactive before gameplay. A same-monitor Windows HDR off/on transition passed."
+    "monitor_move": "The SDR U32J59x became inactive before gameplay. A same-monitor Windows HDR off/on transition passed.",
+    "adaptive_and_suspend_resume": "x64/gameplay/adaptive-plm/result.json",
+    "remaining": [
+      "Real two-monitor transition with both outputs attached",
+      "Direct F2 input on the current candidate",
+      "Forced device-loss recovery and measured memory regression"
+    ]
   }
 }

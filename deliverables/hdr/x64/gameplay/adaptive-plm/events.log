@@ -1,0 +1,23 @@
+[07:45:39] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 129 ms, modules 1978 ms, linking 22 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms
+[07:46:06] [Horizon game/INFO]: Horizon renderer: HDR on: scRGB (Rgba16Float), 160/450 nits
+[07:46:06] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[07:46:06] [Horizon game/INFO]: Horizon renderer: HDR output presented its first frame
+[07:46:06] [Horizon game/INFO]: Horizon: first frame after 8120 ms
+[07:46:23] [Screenshot writer/INFO]: Saved HDR screenshot to C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.HdrDev.x64_4pd4jeb6snrqw\LocalState\game\screenshots\2026-11-21_07.46.23-hdr.png
+[07:46:23] [Horizon game/INFO]: Saved screenshot to C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.HdrDev.x64_4pd4jeb6snrqw\LocalState\game\screenshots\2026-11-21_07.46.23.png
+2026-11-21T07:45:36.955Z tid=112064 DXGI color configure: desc_hr=0x00000000 format=87 alpha=0 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:40.107Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.189Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.194Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.198Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.202Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=790 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.207Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.217Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.221Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.225Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.231Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:47.364Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:45:55.861Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:46:06.787Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:46:24.333Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:46:24.339Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1098 height=730 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000

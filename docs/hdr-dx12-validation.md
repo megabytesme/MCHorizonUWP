@@ -36,7 +36,13 @@ The game saved RGBA8 SDR PNGs and RGB16 HDR PNGs tagged BT.2020/PQ, with the pin
 
 The U32J59x was inactive by the time the signed matrix ran. On the remaining PG32UCDM, the test temporarily disabled Windows HDR while the world was running, then restored the original setting. The same process switched from DXGI format 10 and space 1 in view kind 2 to format 87 and space 0 in view kind 0. It returned to format 10 and space 1 after restoration. All three calls succeeded and held PRESENT support. The test also verified that the OS HDR setting was back on afterward. [Mode transition receipt](../deliverables/hdr/x64/gameplay/mode-transition/result.json)
 
+An On run with adaptive resolution enabled and a 240 FPS target presented HDR and saved both PNGs. Windows PLMDebug reported the isolated package suspended. After resuming it, the same process resized the live game panel and successfully reapplied scRGB with the HDR view active. The harness released the debug reference on exit. The test exercised the adaptive rendering path and lifecycle. It did not measure scale convergence or trigger GPU device loss. [Adaptive and lifecycle receipt](../deliverables/hdr/x64/gameplay/adaptive-plm/result.json) · [Windows lifecycle debugging](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/plmdebug)
+
 The current-build screenshot fixture exercised the game's screenshot path under AppContainer. A foreground Windows file picker blocked the direct F2 run.
+
+## Surface Pro X
+
+The strict ARM64 release built, signed and installed on the physical Adreno 680 Surface. Its internal panel reported 8-bit SDR only. The native DXGI probe accepted FP16/scRGB and RGB10/PQ formats on the same machine, which confirms that swapchain-format support alone cannot establish HDR output. The signed game's startup configured BGRA8/sRGB with an SDR view. Windows suspended the 31-thread game process in the locked console before a world frame. [Signed ARM64 APPX](../deliverables/hdr/arm64/HorizonUWP-HDR-arm64.appx) · [Surface build, transfer and hardware record](../deliverables/hdr/arm64/README.md) · [Locked activation receipt](../deliverables/hdr/arm64/locked-game-attempt.json)
 
 ## Official Windows comparison
 

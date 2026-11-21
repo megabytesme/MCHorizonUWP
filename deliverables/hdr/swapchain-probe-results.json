@@ -344,7 +344,21 @@
       "sdr_fallback": "2026-11-21T07:40:49.981Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=455.00 min_nits=0.0000",
       "restored_hdr": "2026-11-21T07:40:50.716Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
       "display_setting_restored": true,
-      "receipt": "x64/gameplay/mode-transition/result.json"
+      "receipt": "x64/gameplay/mode-transition/result.json",
+      "resumed_hdr": "2026-11-21T07:46:24.339Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1098 height=730 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+      "resume_receipt": "x64/gameplay/adaptive-plm/result.json"
+    },
+    {
+      "architecture": "arm64",
+      "package": "MCHorizonUWP.HdrDev.arm64_1.0.0.0_arm64__4pd4jeb6snrqw",
+      "package_receipt": "arm64/package.json",
+      "display": "Surface LGD0555 internal",
+      "hardware": "Qualcomm Adreno 680",
+      "startup_probe": "2026-11-21T07:44:01.334Z tid=8620 DXGI color configure: desc_hr=0x00000000 format=87 alpha=0 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=100.00 min_nits=0.0000",
+      "world_present_verified": false,
+      "blocker": "Session 1 locked",
+      "receipt": "arm64/locked-game-attempt.json",
+      "native_probe": "arm64/dxgi-native.log"
     }
   ]
 }
