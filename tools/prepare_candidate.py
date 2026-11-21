@@ -21,7 +21,9 @@ NOV20_INITIAL_PATCH = "0.1.13"
 NOV20_DRS_PATCH = "0.1.14"
 NOV20_PATCH = "0.1.15"
 HDR_PATCH = "0.1.16"
-NOV20_PATCHES = (NOV20_INITIAL_PATCH, NOV20_DRS_PATCH, NOV20_PATCH, HDR_PATCH)
+CLASSIC_PACK_GUARD_PATCH = "0.1.17"
+HDR_PATCHES = (HDR_PATCH, CLASSIC_PACK_GUARD_PATCH)
+NOV20_PATCHES = (NOV20_INITIAL_PATCH, NOV20_DRS_PATCH, NOV20_PATCH, *HDR_PATCHES)
 NOV20_INITIAL_RECIPE = ("0.1.14", "1.0.7")
 NOV20_WASM_STANDARD_LIBRARY_SHA256 = "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f"
 NIGHTLY_RECIPES = {
@@ -37,6 +39,7 @@ NIGHTLY_RECIPES = {
     NOV20_DRS_PATCH: ("0.1.16", "1.0.8"),
     NOV20_PATCH: ("0.1.17", "1.0.9"),
     HDR_PATCH: ("0.1.18", "1.0.10"),
+    CLASSIC_PACK_GUARD_PATCH: ("0.1.18", "1.0.10"),
 }
 WASMTIME_ARCHIVE_SHA256 = "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
 WASM_STANDARD_LIBRARY_SHA256 = "123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b"
@@ -65,6 +68,7 @@ PATCH_PATHS = {
     NOV20_DRS_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.14.patch",
     NOV20_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.15.patch",
     HDR_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.16.patch",
+    CLASSIC_PACK_GUARD_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.17.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -277,7 +281,7 @@ def main():
     client = None if args.patch_only else client_archive(
         revision, args.host_artifacts, args.wgpu_archive, wasm_inputs,
         fixed_wgpu=args.patch_version in FIXED_WGPU_PATCH_VERSIONS,
-        hdr_wgpu=args.patch_version == HDR_PATCH
+        hdr_wgpu=args.patch_version in HDR_PATCHES
     )
     verify_upstream(args.upstream_archive, args.upstream_repo, upstream_commit)
     upstream_hash = digest(args.upstream_archive.read_bytes())

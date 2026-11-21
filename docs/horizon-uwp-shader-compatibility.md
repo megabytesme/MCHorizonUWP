@@ -112,6 +112,12 @@ Get-FileHash -Algorithm SHA256 -LiteralPath $archive
 
 The matrix enumerates 46 stable case IDs with a named fixture or fixture recipe, limiting layer, positive expected result and relevant control. When a recipe uses a fixture variant, check it in the SDK or classic translation path before attempting the draw. Record temporary source or archive hashes alongside the PNG and active-stage log. Each profile cell keeps its existing evidence status unless an exact-profile result covers that row's requested operation. [Case matrix](../deliverables/feature-audit/shader-pack-tests.csv) · [Pinned post-test files](https://github.com/horizon-rust/horizon/tree/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-shaders/tests/packs/post-test)
 
+### Signed x64 D3D11 classic pack fallback
+
+The earlier atlas failure reproduced on the signed HDR rollback package. The signed x64 guard package with local patch `0.1.17` and client `0.1.18` used the validated wgpu HDR overlay. It reported the compatibility refusal for `audit_post_only`, drew the stock world, saved a fresh SDR F2 image and exited cleanly in the same process. The physical RTX 3090 Ti used the product's FL9_1 compatibility renderer.
+
+On the same APPX, D3D12 compiled and ran the fixture's `composite` pass and saved its output. A separate no-pack run presented FP16/scRGB and produced the normal SDR and HDR screenshot pair. The APPX SHA-256 is `b0deb7fbe9dea9861137d60babc43b890b5477c1b65f24f22c5219d3c01d55a4`. [Guard source patch](../patches/nightly-2026-11-20/horizon-uwp-0.1.17.patch)
+
 ## Native Shader API 0.2
 
 The schema and Naga checks build engine-composed WGSL. Runtime uses wgpu pipelines, bind groups and explicit world-pass hooks. Runtime pipeline construction catches internal and validation errors, including a device refusing a layout or translation. API 0.1, `[motion]` and BT.2020 primaries are refused as game-runtime capabilities. The latter two can pass the SDK check. The pack can use separate engine/pack alpha coverage and fog, gamma or linear intermediate blending, and the resources declared for its stage. Float frames fall back where required by the device. [API contract and runtime gaps](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/api/shaders.md#L168-L225) · [Native backend validation](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-client-render/src/gfx/native_pack.rs#L267-L304)

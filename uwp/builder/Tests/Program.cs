@@ -2071,6 +2071,9 @@ static async Task TestReleaseSource()
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, NightlyUwp.HdrClient)
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.HdrPatch, NightlyUwp.November20Client)
             && NightlyUwp.UsesFixedWgpu(NightlyUwp.HdrClient), "HDR recipe is paired and uses the fixed wgpu base");
+        Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.ClassicPackGuardPatch, NightlyUwp.HdrClient)
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.ClassicPackGuardPatch, NightlyUwp.November20Client),
+            "The classic shader pack guard uses the existing HDR client bundle");
         Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.14")
             && NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.15")
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, "0.1.14")

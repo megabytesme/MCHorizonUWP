@@ -8,6 +8,7 @@ public static class NightlyUwp
     public const string November20Patch = "0.1.15";
     public const string HdrPatch = "0.1.16";
     public const string HdrClient = "0.1.18";
+    public const string ClassicPackGuardPatch = "0.1.17";
     internal const string HdrWgpuPatchHash = "4c31f9349e28d294fa6d1663a6c4d3cacc134a9a4c8b1e2aea63688230e0c934";
     public const string November20Client = "0.1.17";
     private const string November20InitialPatch = "0.1.13";
@@ -55,7 +56,7 @@ public static class NightlyUwp
         (patch, client) is (November20InitialPatch, November20InitialClient or November20RuntimeClient)
             or (November20DrsPatch, November20DrsClient)
             or (November20Patch, November20Client)
-            or (HdrPatch, HdrClient);
+            or (HdrPatch or ClassicPackGuardPatch, HdrClient);
 
     public static bool Matches(string? commit) =>
         IsNovember20(commit) || string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);
