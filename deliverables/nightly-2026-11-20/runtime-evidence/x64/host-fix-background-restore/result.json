@@ -1,0 +1,61 @@
+﻿{
+    "Name":  "MCHorizonUWP.NightlyNov20.HostFix.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.HostFix.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.HostFix.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "Pid":  23184,
+    "BeginUtc":  "2026-11-21T03:06:57.3915698Z",
+    "Mode":  "World",
+    "Backend":  "Dx11",
+    "Scale":  50,
+    "Hooks":  "Enabled",
+    "Trial":  "Background",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  false,
+    "MinimizedUtc":  "2026-11-21T03:07:00.1580974Z",
+    "RestoredUtc":  "2026-11-21T03:07:06.5935178Z",
+    "Renderer":  "[03:07:16] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+    "FirstFrame":  "[03:07:37] [Horizon game/INFO]: Horizon: first frame after 17135 ms",
+    "StartupObservedMs":  40815,
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-030656-940-x64-Dx11-World-Enabled-50\\world.png",
+                    "Width":  1560,
+                    "Height":  1080,
+                    "Cyan":  4096,
+                    "Magenta":  4096,
+                    "SceneColors":  2240
+                },
+    "NativeLoad":  "[03:06:59] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[03:07:07] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 376 ms, modules 8034 ms, linking 19 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe"
+                                ],
+    "DebugCapture":  {
+                         "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-030656-940-x64-Dx11-World-Enabled-50\\f3.png",
+                         "Width":  1560,
+                         "Height":  1080,
+                         "Cyan":  4096,
+                         "Magenta":  4096,
+                         "SceneColors":  1996
+                     },
+    "ResolutionEvidence":  [
+                               "[03:07:37] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%",
+                               "[03:08:00] [Horizon game/INFO]: Horizon renderer: FL9_1 world 770x510, output 1539x1020, selected scale 50%"
+                           ],
+    "RenderArea":  {
+                       "World":  [
+                                     770,
+                                     510
+                                 ],
+                       "Output":  [
+                                      1539,
+                                      1020
+                                  ]
+                   },
+    "Exit":  "closed"
+}
