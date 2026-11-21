@@ -19,6 +19,7 @@ horizon_uwp_dispatch_ui_sync
 horizon_uwp_fatal_begin
 horizon_uwp_fatal_done
 horizon_uwp_game_menu_shown
+horizon_uwp_get_advanced_color
 horizon_uwp_get_metrics
 horizon_uwp_get_surface_metrics
 horizon_uwp_gyro_available
@@ -56,6 +57,7 @@ horizon_uwp_pick_files
 horizon_uwp_pick_save_folder
 horizon_uwp_pop_event
 horizon_uwp_pump_events
+horizon_uwp_record_swapchain_color
 horizon_uwp_register_game_surface
 horizon_uwp_release_angle_window_properties
 horizon_uwp_release_game_swapchain_panel

@@ -25,6 +25,17 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.ui.viewmanagement.h>
 #include <windows.ui.popups.h>
 
+// The legacy CoreWindow-only host has no active-view color watcher.
+#ifndef HORIZON_UWP_XAML_SHELL
+extern "C" int32_t __cdecl horizon_uwp_get_advanced_color(float* white, float* peak, float* minimum) {
+    if (white) *white = 0;
+    if (peak) *peak = 0;
+    if (minimum) *minimum = 0;
+    return -1;
+}
+extern "C" void __cdecl horizon_uwp_record_swapchain_color(void*, int32_t, int32_t) {}
+#endif
+
 static Windows::UI::Core::CoreWindow^ current_window;
 static std::atomic<DWORD> current_window_thread{0};
 #ifdef HORIZON_UWP_ACCOUNT

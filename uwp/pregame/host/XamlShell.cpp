@@ -2,7 +2,7 @@
 #using <Microsoft.UI.Xaml.winmd>
 #include <windows.h>
 #include <d3d11_1.h>
-#include <dxgi1_2.h>
+#include <dxgi1_4.h>
 #include <ppltasks.h>
 #include <windows.applicationmodel.h>
 #include <windows.applicationmodel.activation.h>
@@ -174,6 +174,57 @@ std::atomic<int> choice{-1};
 std::atomic<unsigned> prompt_generation{0};
 std::atomic<unsigned> skin_generation{0};
 CoreDispatcher^ dispatcher;
+struct ViewColor {
+    int32_t kind = -1;
+    float white = 0;
+    float peak = 0;
+    float minimum = 0;
+};
+std::mutex view_color_mutex;
+ViewColor view_color;
+
+float valid_nits(float nits) {
+    return std::isfinite(nits) && nits >= 0 ? nits : 0;
+}
+
+void update_view_color(DisplayInformation^ display) {
+    ViewColor next;
+    try {
+        auto info = display->GetAdvancedColorInfo();
+        if (info) {
+            next.kind = static_cast<int32_t>(info->CurrentAdvancedColorKind);
+            next.white = valid_nits(info->SdrWhiteLevelInNits);
+            next.peak = valid_nits(info->MaxLuminanceInNits);
+            next.minimum = valid_nits(info->MinLuminanceInNits);
+        }
+    } catch (Platform::Exception^) { next = {}; }
+    std::lock_guard<std::mutex> lock(view_color_mutex);
+    view_color = next;
+}
+
+// DisplayInformation belongs to the window's apartment. The render worker reads
+// only the cached values, including while the XAML dispatcher is suspended.
+void watch_view_color(Window^ window) {
+    using Windows::Foundation::Metadata::ApiInformation;
+    try {
+        if (!ApiInformation::IsMethodPresent(L"Windows.Graphics.Display.DisplayInformation", L"GetAdvancedColorInfo") ||
+            !ApiInformation::IsEventPresent(L"Windows.Graphics.Display.DisplayInformation", L"AdvancedColorInfoChanged")) {
+            horizon_uwp_trace_shell_event("Advanced Color unavailable for this Windows view");
+            return;
+        }
+        auto display = DisplayInformation::GetForCurrentView();
+        display->AdvancedColorInfoChanged += ref new TypedEventHandler<DisplayInformation^, Platform::Object^>(
+            [](DisplayInformation^ sender, Platform::Object^) { update_view_color(sender); });
+        window->VisibilityChanged += ref new WindowVisibilityChangedEventHandler(
+            [display](Platform::Object^, VisibilityChangedEventArgs^ args) {
+                if (args->Visible) update_view_color(display);
+            });
+        update_view_color(display);
+    } catch (Platform::Exception^ error) {
+        trace_platform_error("Advanced Color query registration", error);
+    }
+}
+
 Page^ page;
 Grid^ shell_root;
 Grid^ app_title_bar;
@@ -3436,6 +3487,7 @@ protected:
         window->Content = shell_root;
 #endif
         window->Activate();
+        watch_view_color(window);
 #ifdef HORIZON_UWP_TOUCH_MOD
         try {
             auto display = DisplayInformation::GetForCurrentView();
@@ -3806,6 +3858,38 @@ extern "C" size_t __cdecl horizon_uwp_page_selected_world(unsigned char* buffer,
 extern "C" int __cdecl horizon_uwp_page_selected_benchmark() {
     const bool run = quick_benchmark; quick_benchmark = false; return run ? 1 : 0;
 }
+// -1 unavailable, 0 SDR, 1 wide gamut SDR, 2 HDR. All luminances are in nits.
+extern "C" int32_t __cdecl horizon_uwp_get_advanced_color(float* white, float* peak, float* minimum) {
+    std::lock_guard<std::mutex> lock(view_color_mutex);
+    if (white) *white = view_color.white;
+    if (peak) *peak = view_color.peak;
+    if (minimum) *minimum = view_color.minimum;
+    return view_color.kind;
+}
+
+// DXGI has no color-space getter. The caller supplies the HRESULT from the
+// SetColorSpace1 it just attempted, including after ResizeBuffers.
+extern "C" void __cdecl horizon_uwp_record_swapchain_color(void* raw, int32_t space, int32_t set_hr) {
+    if (!raw) return;
+    Microsoft::WRL::ComPtr<IDXGISwapChain3> chain;
+    const HRESULT query = reinterpret_cast<IUnknown*>(raw)->QueryInterface(IID_PPV_ARGS(&chain));
+    if (FAILED(query)) return;
+    DXGI_SWAP_CHAIN_DESC1 desc{};
+    const HRESULT desc_hr = chain->GetDesc1(&desc);
+    UINT flags = 0;
+    const HRESULT check_hr = chain->CheckColorSpaceSupport(static_cast<DXGI_COLOR_SPACE_TYPE>(space), &flags);
+    float white, peak, minimum;
+    const auto kind = horizon_uwp_get_advanced_color(&white, &peak, &minimum);
+    char detail[364];
+    sprintf_s(detail, "DXGI color configure: desc_hr=0x%08X format=%u alpha=%u width=%u height=%u "
+        "space=%d set_hr=0x%08X check_hr=0x%08X support=0x%X view_kind=%d "
+        "white_nits=%.2f peak_nits=%.2f min_nits=%.4f",
+        static_cast<unsigned>(desc_hr), static_cast<unsigned>(desc.Format), static_cast<unsigned>(desc.AlphaMode),
+        desc.Width, desc.Height, space, static_cast<unsigned>(set_hr), static_cast<unsigned>(check_hr),
+        flags, kind, white, peak, minimum);
+    horizon_uwp_trace_shell_event(detail);
+}
+
 #ifdef HORIZON_UWP_HAS_SWAPCHAIN_PANEL
 extern "C" void* __cdecl horizon_uwp_acquire_game_swapchain_panel() {
     if (!game_surface) return nullptr;
