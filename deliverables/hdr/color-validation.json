@@ -1,0 +1,605 @@
+{
+  "engine_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "wgsl_git_blobs": {
+    "crates/horizon-shader-api/packs/horizon_hdr/hdr_look.wgsl": "5674f4daeb4d49039b838519b650083770ac3cb8",
+    "crates/horizon-client-render/src/hdr_light.wgsl": "784e6e44988db3dd8efb8e1c257d1f7543fbf2d1",
+    "crates/horizon-client-render/src/hdr.wgsl": "d18f6cd305ef13561ec29624e5a56cf6865a70ca"
+  },
+  "test_backend": {
+    "vendor": "10.0.26100.9818",
+    "architecture": "",
+    "device": "Microsoft Basic Render Driver",
+    "description": "",
+    "stackgroup_min_size": 4,
+    "stackgroup_max_size": 128,
+    "vendor_id": 5140,
+    "device_id": 140,
+    "adapter_type": "CPU",
+    "backend_type": "D3D12"
+  },
+  "wgpu_python": "0.33.0",
+  "scope": "offscreen software shader readback",
+  "references": [
+    "https://www.itu.int/rec/R-REC-BT.2100",
+    "https://www.itu.int/rec/R-REC-BT.2087"
+  ],
+  "passed": true,
+  "vectors": [
+    {
+      "case": "black",
+      "target": "rgba16float",
+      "expected": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "actual": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "tolerance": 1e-05,
+      "passed": true
+    },
+    {
+      "case": "near black",
+      "target": "rgba16float",
+      "expected": [
+        0.00012505054473876953,
+        0.00012505054473876953,
+        0.00012505054473876953
+      ],
+      "actual": [
+        0.00012493133544921875,
+        0.00012493133544921875,
+        0.00012493133544921875
+      ],
+      "tolerance": 1e-05,
+      "passed": true
+    },
+    {
+      "case": "80 nit grey",
+      "target": "rgba16float",
+      "expected": [
+        0.99951171875,
+        0.99951171875,
+        0.99951171875
+      ],
+      "actual": [
+        0.99951171875,
+        0.99951171875,
+        0.99951171875
+      ],
+      "tolerance": 0.0009760856628417969,
+      "passed": true
+    },
+    {
+      "case": "paper white",
+      "target": "rgba16float",
+      "expected": [
+        2.537109375,
+        2.537109375,
+        2.537109375
+      ],
+      "actual": [
+        2.537109375,
+        2.537109375,
+        2.537109375
+      ],
+      "tolerance": 0.0024776458740234375,
+      "passed": true
+    },
+    {
+      "case": "400 nit grey",
+      "target": "rgba16float",
+      "expected": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "actual": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "tolerance": 0.0048828125,
+      "passed": true
+    },
+    {
+      "case": "peak",
+      "target": "rgba16float",
+      "expected": [
+        12.5,
+        12.5,
+        12.5
+      ],
+      "actual": [
+        12.4921875,
+        12.4921875,
+        12.4921875
+      ],
+      "tolerance": 0.01220703125,
+      "passed": true
+    },
+    {
+      "case": "above peak",
+      "target": "rgba16float",
+      "expected": [
+        12.5,
+        12.5,
+        12.5
+      ],
+      "actual": [
+        12.4921875,
+        12.4921875,
+        12.4921875
+      ],
+      "tolerance": 0.01220703125,
+      "passed": true
+    },
+    {
+      "case": "red",
+      "target": "rgba16float",
+      "expected": [
+        2.537109375,
+        0.0,
+        0.0
+      ],
+      "actual": [
+        2.537109375,
+        0.0,
+        0.0
+      ],
+      "tolerance": 0.0024776458740234375,
+      "passed": true
+    },
+    {
+      "case": "green",
+      "target": "rgba16float",
+      "expected": [
+        0.0,
+        2.537109375,
+        0.0
+      ],
+      "actual": [
+        0.0,
+        2.537109375,
+        0.0
+      ],
+      "tolerance": 0.0024776458740234375,
+      "passed": true
+    },
+    {
+      "case": "blue",
+      "target": "rgba16float",
+      "expected": [
+        0.0,
+        0.0,
+        2.537109375
+      ],
+      "actual": [
+        0.0,
+        0.0,
+        2.537109375
+      ],
+      "tolerance": 0.0024776458740234375,
+      "passed": true
+    },
+    {
+      "case": "opaque HUD at 50%",
+      "target": "rgba16float",
+      "expected": [
+        1.2685546875,
+        1.2685546875,
+        1.2685546875
+      ],
+      "actual": [
+        1.2685546875,
+        1.2685546875,
+        1.2685546875
+      ],
+      "tolerance": 0.0012388229370117188,
+      "passed": true
+    },
+    {
+      "case": "calibrated black",
+      "target": "rgba16float",
+      "expected": [
+        0.0006251335144042969,
+        0.0006251335144042969,
+        0.0006251335144042969
+      ],
+      "actual": [
+        0.0006246566772460938,
+        0.0006246566772460938,
+        0.0006246566772460938
+      ],
+      "tolerance": 1e-05,
+      "passed": true
+    },
+    {
+      "case": "black slider",
+      "target": "rgba16float",
+      "expected": [
+        0.0012502670288085938,
+        0.0012502670288085938,
+        0.0012502670288085938
+      ],
+      "actual": [
+        0.0012493133544921875,
+        0.0012493133544921875,
+        0.0012493133544921875
+      ],
+      "tolerance": 1e-05,
+      "passed": true
+    },
+    {
+      "case": "peak slider",
+      "target": "rgba16float",
+      "expected": [
+        5.625,
+        5.625,
+        5.625
+      ],
+      "actual": [
+        5.625,
+        5.625,
+        5.625
+      ],
+      "tolerance": 0.0054931640625,
+      "passed": true
+    },
+    {
+      "case": "paper slider",
+      "target": "rgba16float",
+      "expected": [
+        2.3125,
+        2.3125,
+        2.3125
+      ],
+      "actual": [
+        2.3125,
+        2.3125,
+        2.3125
+      ],
+      "tolerance": 0.00225830078125,
+      "passed": true
+    },
+    {
+      "case": "black",
+      "target": "rgb10a2unorm",
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "actual": [
+        0,
+        0,
+        0
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "near black",
+      "target": "rgb10a2unorm",
+      "expected": [
+        22,
+        22,
+        22
+      ],
+      "actual": [
+        22,
+        22,
+        22
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "80 nit grey",
+      "target": "rgb10a2unorm",
+      "expected": [
+        497,
+        497,
+        497
+      ],
+      "actual": [
+        497,
+        497,
+        497
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "paper white",
+      "target": "rgb10a2unorm",
+      "expected": [
+        594,
+        594,
+        594
+      ],
+      "actual": [
+        594,
+        594,
+        594
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "400 nit grey",
+      "target": "rgb10a2unorm",
+      "expected": [
+        668,
+        668,
+        668
+      ],
+      "actual": [
+        668,
+        668,
+        668
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "peak",
+      "target": "rgb10a2unorm",
+      "expected": [
+        769,
+        769,
+        769
+      ],
+      "actual": [
+        769,
+        769,
+        769
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "above peak",
+      "target": "rgb10a2unorm",
+      "expected": [
+        769,
+        769,
+        769
+      ],
+      "actual": [
+        769,
+        769,
+        769
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "red",
+      "target": "rgb10a2unorm",
+      "expected": [
+        545,
+        335,
+        225
+      ],
+      "actual": [
+        545,
+        335,
+        225
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "green",
+      "target": "rgb10a2unorm",
+      "expected": [
+        479,
+        585,
+        355
+      ],
+      "actual": [
+        479,
+        585,
+        355
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "blue",
+      "target": "rgb10a2unorm",
+      "expected": [
+        296,
+        202,
+        582
+      ],
+      "actual": [
+        296,
+        202,
+        582
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "opaque HUD at 50%",
+      "target": "rgb10a2unorm",
+      "expected": [
+        521,
+        521,
+        521
+      ],
+      "actual": [
+        521,
+        521,
+        521
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "calibrated black",
+      "target": "rgb10a2unorm",
+      "expected": [
+        47,
+        47,
+        47
+      ],
+      "actual": [
+        47,
+        47,
+        47
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "black slider",
+      "target": "rgb10a2unorm",
+      "expected": [
+        64,
+        64,
+        64
+      ],
+      "actual": [
+        64,
+        64,
+        64
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "peak slider",
+      "target": "rgb10a2unorm",
+      "expected": [
+        681,
+        681,
+        681
+      ],
+      "actual": [
+        681,
+        681,
+        681
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "paper slider",
+      "target": "rgb10a2unorm",
+      "expected": [
+        584,
+        584,
+        584
+      ],
+      "actual": [
+        584,
+        584,
+        584
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "Color Boost BT.2020 red",
+      "target": "rgba16float",
+      "expected": [
+        4.21484375,
+        -0.316162109375,
+        -0.046173095703125
+      ],
+      "actual": [
+        4.2109375,
+        -0.31591796875,
+        -0.04608154296875
+      ],
+      "tolerance": 0.00390625,
+      "passed": true
+    },
+    {
+      "case": "Color Boost BT.2020 red",
+      "target": "rgb10a2unorm",
+      "expected": [
+        594,
+        0,
+        0
+      ],
+      "actual": [
+        594,
+        0,
+        0
+      ],
+      "tolerance": 1,
+      "passed": true
+    },
+    {
+      "case": "Horizon look 1000 nit scene on 450 nit display",
+      "target": "rgba16float",
+      "expected": [
+        1.435546875,
+        1.435546875,
+        1.435546875
+      ],
+      "actual": [
+        1.435546875,
+        1.435546875,
+        1.435546875
+      ],
+      "tolerance": 0.003,
+      "passed": true
+    },
+    {
+      "case": "classic pack output pass at paper white",
+      "target": "rgba16float",
+      "expected": [
+        2.537109375,
+        2.537109375,
+        2.537109375
+      ],
+      "actual": [
+        2.537109375,
+        2.537109375,
+        2.537109375
+      ],
+      "tolerance": 0.002,
+      "passed": true
+    },
+    {
+      "case": "vanilla tone curve at 1x headroom",
+      "target": "rgba16float",
+      "expected": [
+        1,
+        0.5,
+        0.25
+      ],
+      "actual": [
+        1.0,
+        0.5,
+        0.25
+      ],
+      "tolerance": 0.0005,
+      "passed": true
+    },
+    {
+      "case": "SDR screenshot highlight",
+      "target": "rgba8unorm",
+      "expected": [
+        255,
+        128,
+        64
+      ],
+      "actual": [
+        255,
+        128,
+        64
+      ],
+      "tolerance": 1,
+      "passed": true
+    }
+  ]
+}

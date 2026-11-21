@@ -1,0 +1,56 @@
+{
+  "hdr_encoder_fixture": {
+    "source": "HdrScreenshot::save and hdr_icc.rs from 0a875da91dbb0fdcb7ba8c42c11341aa229af51a, png 0.18.1, five synthetic 16-bit neutral PQ codes 0/16384/32768/49152/65535",
+    "result": {
+      "file": "official-encoder-fixture.png",
+      "sha256": "036b824ed1dcf483b36370fdf48466d793bd1948f372e2444cda9207b101a079",
+      "kind": "hdr",
+      "size": [
+        5,
+        1
+      ],
+      "bits_per_channel": 16,
+      "png_color_type": 2,
+      "cICP": [
+        9,
+        16,
+        0,
+        1
+      ],
+      "max_cll_nits": 10000.0,
+      "max_fall_nits": 2216.1777,
+      "icc_sha256": "8114d1a9e2f58514a86d350b198158bd9d87db4dcc033366c76ee16028dacce2",
+      "mastering_display": null
+    }
+  },
+  "previous_lumia_signed_0_1_17": {
+    "file": "v17-modded-game-screenshot.png",
+    "sha256": "804f0c16fc5282f87c810746eb784bbc01d2b8c3f646133bc69cc0e15ba3f057",
+    "kind": "sdr",
+    "size": [
+      2561,
+      1439
+    ],
+    "bits_per_channel": 8,
+    "png_color_type": 6
+  },
+  "synthetic_mDCV_chunk": {
+    "chromaticity": [
+      0.708,
+      0.292,
+      0.17,
+      0.797,
+      0.131,
+      0.046,
+      0.3127,
+      0.329
+    ],
+    "max_nits": 1000.0,
+    "min_nits": 0.005
+  },
+  "rejection_tests": {
+    "corrupt_IDAT_crc": "Bad b'IDAT' CRC",
+    "truncated_file": "Truncated chunk header",
+    "wrong_transfer_with_valid_CRC": "Expected BT.2020, PQ, identity matrix, full range"
+  }
+}
