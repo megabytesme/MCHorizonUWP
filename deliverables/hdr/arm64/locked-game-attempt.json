@@ -1,0 +1,25 @@
+{
+  "package": "MCHorizonUWP.HdrDev.arm64_1.0.0.0_arm64__4pd4jeb6snrqw",
+  "package_sha256": "666ac947b355daf873a41e6ecf52cf29576e5f5793132925d44568731f163ebf",
+  "requested_hdr": "Auto",
+  "backend": "Dx12",
+  "started_utc": "2026-11-21T07:43:51.9339622Z",
+  "ended_utc": "2026-11-21T07:46:37.575975Z",
+  "WTS_state": "Session 1 locked",
+  "process_id": 18388,
+  "native_threads_observed": 31,
+  "suspended_threads_observed": 31,
+  "thread_observation_utc": "2026-11-21T07:46:04Z",
+  "game_world_proven": false,
+  "error": "Timed out waiting for game-rendered SDR world.",
+  "wasm_fixture_sha256": "57144EC183896C6B553E1A407FC7D7CE92D308C8043B5396289C40075CD1E456",
+  "lifecycle": [
+    "2026-11-21T07:44:01.334Z tid=8620 DXGI color configure: desc_hr=0x00000000 format=87 alpha=0 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=100.00 min_nits=0.0000",
+    "2026-11-21T07:44:03.536Z tid=8620 starting game view with renderer 2",
+    "2026-11-21T07:44:03.545Z tid=12428 game worker entering the Rust bridge"
+  ],
+  "game": [
+    "[07:44:03] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da"
+  ],
+  "next_action": "Unlock Ben-Tablet interactive session 1 to allow the signed UWP game to render. Repeat On/Auto and record the actual world surface, HUD and screenshots."
+}

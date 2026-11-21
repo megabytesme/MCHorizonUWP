@@ -1,0 +1,23 @@
+﻿{
+    "case":  "InstallProbe",
+    "utc":  "2026-11-21T07:42:02.2781854Z",
+    "host":  "BEN-TABLET",
+    "passed":  true,
+    "resourceFramework":  "Horizon.Asset.26-3.98ccbead789d397639d5badd0bb805_1.0.0.0_neutral__4pd4jeb6snrqw",
+    "appxSha256":  "666AC947B355DAF873A41E6ECF52CF29576E5F5793132925D44568731F163EBF",
+    "package":  "MCHorizonUWP.HdrDev.arm64_1.0.0.0_arm64__4pd4jeb6snrqw",
+    "hostSha256":  "9176BDAF1B3DB1B3203A84923E464604A801A88C2778131AE6CA5A18872FCAD8",
+    "bridgeSha256":  "A59B9DFC95CE59CAD0B0EB10BB0E756A35F8B76C0B13BD61EA609B446A9C4377",
+    "os":  {
+               "Caption":  "Microsoft Windows 11 Pro Insider Preview",
+               "Version":  "10.0.26320",
+               "BuildNumber":  "26320"
+           },
+    "gpu":  {
+                "Name":  "Qualcomm(R) Adreno(TM) 680 GPU",
+                "DriverVersion":  "27.20.2160.0",
+                "CurrentHorizontalResolution":  2880,
+                "CurrentVerticalResolution":  1920
+            },
+    "endUtc":  "2026-11-21T07:42:19.4085568Z"
+}

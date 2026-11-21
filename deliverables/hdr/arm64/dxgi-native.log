@@ -1,0 +1,26 @@
+﻿activeTargetsQuery=0
+target=0 nameStatus=0 name="" colorStatus=0 hdrSupported=0 hdrUserEnabled=0 advancedColorActive=0 activeColorMode=0 bitsPerChannel=8 whiteStatus=0 sdrWhiteNits=80.000
+adapter="Qualcomm(R) Adreno(TM) 680 GPU" vendor=0x4D4F4351 device=0x41333430
+output="\\.\DISPLAY1" attached=1 bitsPerChannel=8 colorSpace=0 min=0.0000 max=100.000 maxFull=100.000 red=0.6396,0.3301 green=0.2998,0.5996 blue=0.1504,0.0596 white=0.3135,0.3291
+D3D11 level=0xB100 device=0x00000000
+D3D11-FL11_1 format=BGRA8/sRGB query=0x00000000 flags=0x33FEF3F3 texture2d=1 sample=1 rtv=1 blend=1 display=1
+D3D11-FL11_1 format=BGRA8/sRGB alpha=3 create=0x00000000 desc=0x00000000 actualFormat=87 actualAlpha=3 colorInterface=0x00000000 colorSpace=0 check=0x00000000 support=0x3 set=0x00000000 metadataInterface=0x00000000 buffer=0x00000000 rtv=0x00000000
+D3D11-FL11_1 format=FP16/scRGB query=0x00000000 flags=0x12FEF3F3 texture2d=1 sample=1 rtv=1 blend=1 display=1
+D3D11-FL11_1 format=FP16/scRGB alpha=3 create=0x00000000 desc=0x00000000 actualFormat=10 actualAlpha=3 colorInterface=0x00000000 colorSpace=1 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000 buffer=0x00000000 rtv=0x00000000 staging=0x00000000 map=0x00000000 halfPixel=B400,3C00,4400,3C00
+D3D11-FL11_1 format=RGB10/PQ query=0x00000000 flags=0x13FEF3F3 texture2d=1 sample=1 rtv=1 blend=1 display=1
+D3D11-FL11_1 format=RGB10/PQ alpha=3 create=0x00000000 desc=0x00000000 actualFormat=24 actualAlpha=3 colorInterface=0x00000000 colorSpace=12 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000 buffer=0x00000000 rtv=0x00000000
+D3D11 level=0x9100 device=0x00000000
+D3D11-FL9_1 format=BGRA8/sRGB query=0x00000000 flags=0x312EF3E0 texture2d=1 sample=1 rtv=1 blend=1 display=1
+D3D11-FL9_1 format=BGRA8/sRGB alpha=3 create=0x00000000 desc=0x00000000 actualFormat=87 actualAlpha=3 colorInterface=0x00000000 colorSpace=0 check=0x00000000 support=0x3 set=0x00000000 metadataInterface=0x00000000 buffer=0x00000000 rtv=0x00000000
+D3D11-FL9_1 format=FP16/scRGB query=0x80004005 flags=0x0 texture2d=0 sample=0 rtv=0 blend=0 display=0
+D3D11-FL9_1 format=FP16/scRGB alpha=3 create=0x80070057
+D3D11-FL9_1 format=RGB10/PQ query=0x80004005 flags=0x0 texture2d=0 sample=0 rtv=0 blend=0 display=0
+D3D11-FL9_1 format=RGB10/PQ alpha=3 create=0x80070057
+D3D12 device=0x00000000
+D3D12 queue=0x00000000
+D3D12 format=BGRA8/sRGB alpha=3 create=0x00000000 desc=0x00000000 actualFormat=87 actualAlpha=3 colorInterface=0x00000000 colorSpace=0 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000
+D3D12 format=BGRA8/sRGB alpha=1 create=0x00000000 desc=0x00000000 actualFormat=87 actualAlpha=1 colorInterface=0x00000000 colorSpace=0 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000
+D3D12 format=FP16/scRGB alpha=3 create=0x00000000 desc=0x00000000 actualFormat=10 actualAlpha=3 colorInterface=0x00000000 colorSpace=1 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000
+D3D12 format=FP16/scRGB alpha=1 create=0x00000000 desc=0x00000000 actualFormat=10 actualAlpha=1 colorInterface=0x00000000 colorSpace=1 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000
+D3D12 format=RGB10/PQ alpha=3 create=0x00000000 desc=0x00000000 actualFormat=24 actualAlpha=3 colorInterface=0x00000000 colorSpace=12 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000
+D3D12 format=RGB10/PQ alpha=1 create=0x00000000 desc=0x00000000 actualFormat=24 actualAlpha=1 colorInterface=0x00000000 colorSpace=12 check=0x00000000 support=0x1 set=0x00000000 metadataInterface=0x00000000
