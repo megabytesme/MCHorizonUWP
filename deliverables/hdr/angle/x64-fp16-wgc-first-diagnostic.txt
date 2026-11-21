@@ -1,0 +1,7 @@
+wgc_step=activate
+probe_pid=109560
+capture_hwnd=000000000022001C class=Windows.UI.Core.CoreWindow
+wgc_step=create_item
+wgc_step=create_d3d_device
+wgc_step=create_pool
+WGC failed 0x80070057: The parameter is incorrect.
