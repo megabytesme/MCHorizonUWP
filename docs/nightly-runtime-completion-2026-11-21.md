@@ -10,7 +10,7 @@ Initial product worktree `codex/nightly-2026-11-20` started at `15625f842f81b13c
 | Gyroscope aiming and controls | Sensor path, motion evidence and input checks | Compiled the host report-order and orientation-generation fix on all four architectures. Four focused Rust tests passed against the pinned mod API. The optional mod trace records before/after yaw and pitch once enabled. |
 | Surface Pro X | Signed D3D11 and D3D12 interactive play | D3D11 at 67% rendered a saved world and both mod markers. The first D3D12 capture showed real world geometry under the terrain-loading screen. It was captured before both markers appeared. |
 | Desktop graphics, mods and multiplayer | Stalled startup, repeated launches, hooks and dedicated-server join | Suspended thread snapshots put the render worker in the XAML swapchain-attachment handoff and the XAML owner in a synchronous SecondaryTile activation call. |
-| Builder and release checks | Immutable source and local candidate | Added a compatible 0.1.15 client and Builder 1.0.8 recipe on the same verified patch 0.1.13. The Builder test suite passed. Older November 20 package inputs still resolve to the original SDK identity. |
+| Builder and release checks | Immutable source and local candidate | Builder 1.0.8 accepts the new patch 0.1.14/client 0.1.16 recipe. The 0.1.15 diagnostic client uses patch 0.1.13. Clean source assembly, locked Cargo metadata and all four catalog compatibility entries passed. |
 
 ## Surface gameplay
 
@@ -47,3 +47,28 @@ Every capture showed actual saved-world play. The installed native and Wasm pack
 At the pinned upstream revision, the engine seal, point table and platform provider are process globals. The old XAML return-to-home flow cleared a host flag and queued another game within the same process. The second engine startup would try to install its already-installed registration provider. The host now completes view and input cleanup, holds its launch guard, and requests a fresh launcher process on Windows versions that support the restart API. The legacy ARM32 route closes after Quit Game so the next activation starts with a new process. Both retain the ordinary in-game return-to-title behavior until the player quits the game. The modern route falls back to closing if Windows rejects the restart. [WinRT restart API](https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.core.coreapplication.requestrestartasync?view=winrt-19041)
 
 The scoped quit lifecycle change strict-linked in x64 and ARM32 host builds before integration with the remaining runtime changes. Physical restart verification uses the signed package and records both process identities.
+
+## Runtime source fixes and reproducible candidate
+
+The renderer's world handoff now releases the previous FL9_1 tiled HUD atlas after the existing queue wait and before uploading its replacement. A 2048 × 2048 RGBA atlas tile consumes 16 MiB. The original path released the single-texture atlas, which the FL9_1 tiled path does not allocate. The recorded Lumia run demonstrated an out-of-memory error during a world texture upload at 16 MiB block textures and later reached the world using 4 MiB with a warm cache. The new patch addresses the overlapping startup allocation. That change needs a separate physical acceptance run.
+
+The UWP screenshot publisher moves an already encoded temporary file into the destination on the same volume with replacement disabled. A collision test retained the original destination bytes and kept the staged file available for cleanup. An unclaimed destination received the complete bytes and removed the temporary path. [Windows collision result](../deliverables/nightly-2026-11-20/runtime-0.1.16/source-checks/screenshot-move-contract.json)
+
+GPU timing now rejects zero-duration whole frames, reversed or invalid timestamp pairs and impossible spans. The UWP renderer uses measured frame pressure after three consecutive rejected whole-frame readbacks, returns to GPU timing after three valid readbacks, and resets the old measurement window on source change. Missing query results and per-pass-only faults do not change DRS timing source. The 20 isolated timing and controller tests passed. The Adreno 680 needs a follow-up run of the corrected binaries. [Timing tests](../deliverables/nightly-2026-11-20/runtime-0.1.16/source-checks/timestamp-fallback-tests.log)
+
+The local development export used product commit `726ef25154dd9ef2998ea725f02dea83157ef9d8` and the immutable Horizon ZIP with SHA-256 `abd6a91c41407522f9b0ec43d16555f46cd76832625645658bee57e2ab49da3d`. The patched source assembled in a new directory. All four unsigned catalog compatibility rows accepted patch 0.1.14, client 0.1.16 and Builder 1.0.8. The clean source resolved Cargo metadata with the locked offline inputs. The signed public catalog stays separate. [Builder files and hashes](../deliverables/nightly-2026-11-20/runtime-0.1.16/builder-candidate/) · [Immutable tool inputs](../deliverables/nightly-2026-11-20/runtime-0.1.16/source-checks/immutable-inputs.sha256)
+
+```powershell
+& ./tools/build_host_artifact_kit.ps1 -OutputDirectory $HostKit
+python tools/prepare_candidate.py --revision 726ef25154dd9ef2998ea725f02dea83157ef9d8 `
+  --patch-version 0.1.14 --client-version 0.1.16 --builder-version 1.0.8 `
+  --upstream-repo $HorizonGit --upstream-archive $HorizonZip --wgpu-archive $WgpuZip `
+  --host-artifacts $HostKit --wasmtime-archive $WasmtimeCrate --wasm-standard-library $WasmStandardLibrary `
+  --output $Candidate
+dotnet run --project uwp/builder/Tests/Horizon.Builder.Tests.csproj -c Release
+dotnet run --project uwp/builder/Tests/Horizon.Builder.Tests.csproj -c Release --no-build -- `
+  --assemble-candidate $HorizonZip "$Candidate/horizon-uwp-0.1.14.patch" `
+  "$Candidate/uwp-client-0.1.16.zip" $CleanAssembly 0a875da91dbb0fdcb7ba8c42c11341aa229af51a 0.1.16
+```
+
+Use the existing locked release build and strict package scripts with `-PatchVersion 0.1.14 -ClientVersion 0.1.16 -UpstreamCommit 0a875da91dbb0fdcb7ba8c42c11341aa229af51a`. Optional native packages are staged from trusted sources using each architecture's matching build identity. ARM32 embeds those sources and uses the legacy Wasmtime link profile. [Build and staging procedure](nightly-cross-architecture-2026-11-20.md)

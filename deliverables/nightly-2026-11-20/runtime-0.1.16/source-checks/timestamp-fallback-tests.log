@@ -1,0 +1,24 @@
+
+running 20 tests
+test a_corrupt_pair_invalidates_the_batch ... ok
+test a_frame_spans_its_first_stamp_to_its_last_whole_pair ... ok
+test a_pass_of_separate_passes_is_the_sum_of_its_parts ... ok
+test an_unstamped_part_loses_only_its_own_time ... ok
+test disjoint_clock_values_and_empty_frames_are_untimed ... ok
+test dynamic_resolution::tests::paused_and_stalled_frames_do_not_carry_the_pressure_window_forward ... ok
+test dynamic_resolution::tests::switching_away_from_gpu_timing_preserves_scale_but_drops_old_samples ... ok
+test parts_chain_inside_their_pass_and_the_next_pass_counts_from_its_end ... ok
+test sustained_bad_readbacks_switch_timing_source_and_valid_readbacks_recover ... ok
+test dynamic_resolution::tests::nothing_changes_at_or_above_100_or_without_gpu_times ... ok
+test dynamic_resolution::tests::it_starts_at_the_floor_and_climbs_while_there_is_room ... ok
+test dynamic_resolution::tests::a_frame_near_the_target_stays_put ... ok
+test overlapping_passes_cost_from_the_previous_end ... ok
+test dynamic_resolution::tests::reset_goes_back_to_the_floor ... ok
+test dynamic_resolution::tests::frame_pressure_keeps_reductions_only_when_active_cost_falls ... ok
+test dynamic_resolution::tests::frame_pressure_warms_up_and_scales_up_when_active_work_fits ... ok
+test dynamic_resolution::tests::a_slow_frame_steps_down_but_never_below_the_floor ... ok
+test timestamp_pairs_reject_invalid_readback ... ok
+test dynamic_resolution::tests::a_slow_scene_still_steps_down ... ok
+test dynamic_resolution::tests::the_gentle_pace_takes_big_steps_and_long_rests ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
