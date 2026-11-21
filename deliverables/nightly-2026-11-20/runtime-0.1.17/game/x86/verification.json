@@ -1,0 +1,33 @@
+{
+  "architecture": "x86",
+  "name": "MCHorizonUWP.Nov20.normal.x86",
+  "version": "1.0.2.0",
+  "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "build_id": "mchorizonuwp-0.1.17-patch-0.1.15-x86-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "bridge_sha256": "99c2418d664ed749ac45ccc4731660d0a5b3a52e1074c73a62c0e5e9c2677274",
+  "native_dlls_sha256": {
+    "horizon_uwp_mod_horizon_gyro_aim.dll": "f61ae7c7e6ec7b906dc73484e969bcc52f1af9fd46df488970ee485827948383",
+    "horizon_uwp_mod_uwp_native_after_probe.dll": "4243fc910828951f687f98ef2cca7b3dccd42d1c5c8f0dd491334bcd93e76b98",
+    "horizon_uwp_mod_uwp_native_hook_probe.dll": "3ded8fe49e7de80ee3a38e8cee54f84f1fa02ee83ee0adb33f57b1ed0f691fc3"
+  },
+  "packages": [
+    {
+      "name": "HorizonUWP-x86.appx",
+      "role": "game",
+      "bytes": 48732758,
+      "sha256": "36d514e3f1325804c2ddb7654f0950c4c5508e680406b40eaa6049706b49f95c"
+    },
+    {
+      "name": "main.appxbundle",
+      "role": "main",
+      "bytes": 48734268,
+      "sha256": "23e777effbe7a801613594ed3e05932e25b94dbb68e29dd2c4e0cafb50062258"
+    },
+    {
+      "name": "optional.appxbundle",
+      "role": "native_mods",
+      "bytes": 88392,
+      "sha256": "50f7bc5e131a7f614c385d54d811ac2d1ea174422463e7827f13ca7b5a68425d"
+    }
+  ]
+}
