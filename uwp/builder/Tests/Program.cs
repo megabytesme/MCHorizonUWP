@@ -2067,9 +2067,11 @@ static async Task TestReleaseSource()
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.CandidatePatchVersion, NightlyUwp.CandidateClientVersion),
             "Nightly recipes reject source and SDK mismatches");
         var november20Arm = new BuildSelection(TargetProfile.WindowsMobile, true);
-        Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, "0.1.14")
-            && !NightlyUwp.MatchesRecipe(NightlyUwp.UpstreamCommit, NightlyUwp.November20Patch, "0.1.14")
-            && NightlyUwp.GameBuildId("arm", NightlyUwp.November20Patch, "0.1.14").EndsWith(NightlyUwp.November20Commit, StringComparison.Ordinal)
+        Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.14")
+            && NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.15")
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, "0.1.14")
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.UpstreamCommit, "0.1.13", "0.1.14")
+            && NightlyUwp.GameBuildId("arm", "0.1.13", "0.1.14").EndsWith(NightlyUwp.November20Commit, StringComparison.Ordinal)
             && november20Arm.FeaturesForClient("0.1.14").Contains("uwp-wasm"),
             "the initial November 20 client keeps its immutable source, SDK and legacy Wasm profile");
         Require(november20Arm.FeaturesForClient(NightlyUwp.November20Client).Contains("uwp-wasm")
