@@ -1,0 +1,179 @@
+[02:56:18] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[02:56:18] [Horizon game/INFO]: Embedded native mod: horizon_gyro_aim 0.1.1
+[02:56:18] [Horizon game/INFO]: Embedded native mod: uwp_native_hook_probe 0.1.0
+[02:56:18] [Horizon game/INFO]: Embedded native mod: uwp_native_after_probe 0.1.0
+[02:56:18] [Horizon game/WARN]: wasm module cache disabled: folder C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.GyroTrace.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[02:57:02] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 2070 ms, modules 40026 ms, linking 196 ms, instantiation 8 ms, subscriptions 1 ms, initialization 1 ms
+[02:57:02] [Horizon game/INFO]: Horizon renderer: asking DirectX 11 for a graphics device
+[02:57:02] [Horizon game/WARN]: [wgpu_core::instance] DX11 is experimental and exposes a restricted FL9_1 graphics backend with constrained owner-thread HWND and CoreWindow surfaces
+[02:57:02] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[02:57:02] [Horizon game/INFO]: Horizon renderer: requesting the device (driver D3D11 FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53) with features [] and the adapter's limits (buffers up to 4294967291 bytes, storage bindings up to 0 bytes, 6 texture layers)
+[02:57:02] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (2561x1439 Bgra8Unorm, Fifo)
+[02:57:02] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[02:57:02] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[02:57:02] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 140 ms
+[02:58:33] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[02:58:35] [Horizon game/INFO]: Horizon renderer: acquiring the first frame
+[02:58:35] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[02:58:35] [Horizon game/INFO]: Horizon renderer: submitting the first frame
+[02:58:35] [Horizon game/INFO]: Horizon renderer: presenting the first frame
+[02:58:35] [Horizon game/INFO]: Horizon: loading screen shown after 93858 ms
+[02:59:32] [resource-loader/INFO]: Horizon: copied 23219 prepared files (248353373 bytes) for mod staging in 149818 ms
+[02:59:34] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.GyroTrace.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\3afeafc7b7869e80
+[02:59:34] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[02:59:47] [resource-loader/INFO]: Horizon: UI bundle ready after 166150 ms
+[02:59:47] [Horizon game/INFO]: Horizon: loading the title artwork after 166171 ms
+[02:59:48] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[03:00:15] [resource-loader/INFO]: Horizon: block sprites: 1301 layers at 16 px (largest 64 px, budget 4 MiB)
+[03:00:23] [resource-loader/INFO]: load core tables: 201.97s
+[03:00:32] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[03:00:35] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[03:00:36] [resource-loader/INFO]: load pack tables: 214.89s
+[03:00:36] [resource-loader/INFO]: Horizon: core-ready after 215294 ms
+[03:00:37] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 681 ms
+[03:00:38] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[03:00:48] [world-rest-loader/INFO]: load items: 226.57s
+[03:00:48] [World data preload/INFO]: Horizon: worldgen data loaded in 24.829523802s
+[03:00:56] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 33005 ms
+[03:01:06] [world-rest-loader/INFO]: Horizon: resources loaded in 245.2s; 35723 block states, 1658 items, 67 biomes; 1 worker threads
+[03:01:06] [world-rest-loader/INFO]: Horizon: rest-ready after 245165 ms
+[03:01:06] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[03:06:39] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[03:06:41] [Horizon game/INFO]: Horizon: world renderer ready after 579583 ms
+[03:06:41] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)
+[03:06:42] [Horizon game/INFO]: Horizon: waiting for world resources
+[03:06:42] [Horizon game/INFO]: Horizon: world resources joined after 2 ms
+[03:06:42] [Horizon game/INFO]: Horizon: startup handoff 365391 ms (renderer 363563 ms, start_game 957 ms)
+[03:06:43] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[03:06:43] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1440x2560, output 1440x2560, selected scale 100%
+[03:06:43] [Horizon game/INFO]: Horizon: profiling the client to C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.GyroTrace.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json
+[03:06:43] [Horizon game/INFO]: Horizon: first frame after 1885 ms
+[03:06:43] [Horizon game/INFO]: Controller connected: GameSir X2 Type-C
+[03:06:44] [World initialization/INFO]: Horizon: live features ready in 994.422552ms
+[03:06:48] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:06:48] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x9b3066a0
+[03:06:48] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio
+[03:06:59] [Services keys/ERROR]: Horizon: Failed to request Minecraft Services public key
+[03:07:05] [Server thread/INFO]: Horizon: profiling the server thread to C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.GyroTrace.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json
+[03:07:06] [Horizon game/INFO]: Horizon renderer: FL9_1 world 720x1280, output 1440x2560, selected scale 50%
+[03:07:14] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:07:14] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xfd54d806
+[03:07:39] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:07:39] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x686f5acc
+[03:07:54] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:07:54] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x42016f1e
+[03:08:32] [Server thread/INFO]: Saving and pausing game...
+[03:08:36] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Access is denied. (0x8007000E)
+[03:08:36] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 1281x720 unavailable (Out of Memory); drawing at 2561x1439
+[03:08:36] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 50%
+[03:08:49] [Horizon game/INFO]: Controller disconnected: GameSir X2 Type-C
+[03:08:53] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:08:53] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xcd002f70
+[03:08:55] [Horizon game/INFO]: Controller connected: GameSir X2 Type-C
+[03:09:07] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:09:07] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x2d71a8cd
+[03:09:07] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:09:07] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x5add74ad
+[03:09:08] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:09:08] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x7ceca852
+[03:09:08] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:09:08] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x7f3958c8
+[03:09:08] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:09:08] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x2c146bab
+[03:09:17] [Server thread/INFO]: Saving and pausing game...
+[03:10:02] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1409x791, output 2561x1439, selected scale 55%
+[03:10:03] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1537x863, output 2561x1439, selected scale 60%
+[03:10:03] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1665x935, output 2561x1439, selected scale 65%
+[03:10:03] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1793x1007, output 2561x1439, selected scale 70%
+[03:10:03] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2049x1151, output 2561x1439, selected scale 80%
+[03:10:03] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2433x1367, output 2561x1439, selected scale 95%
+[03:10:03] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2689x1511, output 2561x1439, selected scale 105%
+[03:10:03] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 3073x1727 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:03] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 120%
+[03:10:04] [Horizon game/INFO]: Horizon renderer: FL9_1 world 3329x1871, output 2561x1439, selected scale 130%
+[03:10:04] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Access is denied. (0x8007000E)
+[03:10:04] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:04] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 3585x2015 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:04] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 140%
+[03:10:04] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 3970x2230 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:04] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 155%
+[03:10:04] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4226x2374 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:04] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 165%
+[03:10:04] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4482x2518 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:04] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 175%
+[03:10:04] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:04] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:04] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4866x2734 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:04] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 190%
+[03:10:04] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:04] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:04] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 5122x2878 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:04] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 200%
+[03:10:10] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:10] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:10] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4994x2806 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:10] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 195%
+[03:10:10] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:10] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:10] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4866x2734 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:10] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 190%
+[03:10:11] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4738x2662 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:11] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 185%
+[03:10:11] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4610x2590 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:11] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 180%
+[03:10:11] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 4354x2446 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:11] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 170%
+[03:10:11] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 3970x2230 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:11] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 155%
+[03:10:11] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 3713x2087 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:11] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 145%
+[03:10:11] [Horizon game/INFO]: Horizon renderer: FL9_1 world 3329x1871, output 2561x1439, selected scale 130%
+[03:10:11] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:11] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:10:11] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 3073x1727 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:11] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 120%
+[03:10:12] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2945x1655, output 2561x1439, selected scale 115%
+[03:10:13] [Horizon game/WARN]: Horizon renderer: FL9_1 scaled world 2817x1583 unavailable (Out of Memory); drawing at 2561x1439
+[03:10:14] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 110%
+[03:10:14] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2689x1511, output 2561x1439, selected scale 105%
+[03:10:16] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[03:10:23] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2433x1367, output 2561x1439, selected scale 95%
+[03:10:23] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2177x1223, output 2561x1439, selected scale 85%
+[03:10:23] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2049x1151, output 2561x1439, selected scale 80%
+[03:10:23] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1793x1007, output 2561x1439, selected scale 70%
+[03:10:23] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1409x791, output 2561x1439, selected scale 55%
+[03:10:23] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1281x720, output 2561x1439, selected scale 50%
+[03:11:00] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:00] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x1dabf1bc
+[03:11:01] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:01] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xb10a579f
+[03:11:09] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:09] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xa3db80de
+[03:11:11] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:11] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xebb5529
+[03:11:12] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:12] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xb254e92
+[03:11:13] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:13] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x2a6dfd75
+[03:11:13] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:13] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x7981898
+[03:11:15] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:15] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x6417ebf6
+[03:11:25] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:25] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xe2230a1
+[03:11:29] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:29] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xc37ca348
+[03:11:46] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:11:46] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xd5f9887f
+[03:11:49] [Server thread/INFO]: Saving and pausing game...
+[03:12:12] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Access is denied. (0x8007000E)
+[03:12:19] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1921x1079, output 2561x1439, selected scale 75%
+[03:12:19] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:12:26] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[03:12:26] [Horizon game/ERROR]: [wgpu_hal::dx11::hal_device] D3D11 device failure: Not enough storage is available to complete this operation. (0x8007000E)
+[03:12:27] [Horizon game/WARN]: Horizon renderer: the graphics device was lost (Unknown: Out of memory)
+[03:12:27] [Horizon game/WARN]: Horizon: rebuilding the renderer after graphics device loss
+[03:12:27] [Horizon game/ERROR]: [wgpu_hal::dx11::surface] D3D11 surface error: The application made a call that is invalid. Either the parameters of the call or the state of some object was incorrect.
+Enable the D3D debug layer in order to see details via debug messages. (0x887A0001)
+[03:12:27] [Horizon game/ERROR]: [wgpu_hal::dx11::surface] D3D11 surface could not be unconfigured: Other reason: D3D11 window swapchain operation failed
+[03:12:27] [Horizon game/ERROR]: [wgpu_core::hub] Leaking 1 orphaned queues because idle completion was not confirmed
