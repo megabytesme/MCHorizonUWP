@@ -1238,17 +1238,20 @@
           "x86_angle": "X",
           "arm64_dx11_fl91": "I",
           "arm64_dx12": "L",
-          "arm32_dx11_fl91": "I",
+          "arm32_dx11_fl91": "L",
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "FL9_1 uses labeled frame pressure when GPU timestamps are unavailable, with bounded scale floor, warm-up, settled samples and confirmation of a scale trial. Ten controller tests and a sizing test passed. No sustained adaptive workload test on a physical game candidate is recorded here.",
+        "qualification": "FL9_1 uses labeled frame pressure when GPU timestamps are unavailable, with bounded scale floor, warm-up, settled samples and confirmation of a scale trial. Ten controller tests and a sizing test passed. Signed Lumia gameplay produced a real scale change, native-resolution HUD and usable timing data. The interactive run included movement and an orientation change. Matched comparisons and target tracking across different scene loads remain open.",
         "component_verification": {
           "rules": "Warm-up, measured-pressure hysteresis, hold for CPU-bound work, confirmed and rejected reductions, stall and interrupted-window handling",
-          "arm64_dx12_initial": "On client 0.1.14 the three hardware Adreno 680 F3 captures stayed at 100 percent, reporting 619135574736896 ms across three GPU passes. This is an invalid measurement."
+          "arm64_dx12_initial": "On client 0.1.14 the three hardware Adreno 680 F3 captures stayed at 100 percent, reporting 619135574736896 ms across three GPU passes. This is an invalid measurement.",
+          "arm32_dx11_fl91": "Signed client 0.1.16, 50 percent floor and 30 FPS target. Frame pressure selected 55 percent with 20.4 ms active frame pressure, 11.4 ms CPU and 8.0 ms renderer wait. World color and depth were 1409 x 791 against 2561 x 1439 output. The HUD and both mod markers were visible. GPU time was unavailable."
         },
         "evidence": [
           "docs/nightly-drs-2026-11-20.md",
+          "docs/nightly-lumia-drs-2026-11-21.md",
+          "deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-adaptive-world-screen.png",
           "deliverables/nightly-2026-11-20/drs/evidence/controller-tests.log",
           "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-adaptive-timestamp-control/adaptive-f3-scale.png"
         ]
@@ -1701,7 +1704,7 @@
       "id": "screenshots",
       "category": "Graphics",
       "official_behavior": "F2, screenshot quality, world icon capture and new mod screenshot request",
-      "uwp_behavior_and_root_cause": "UWP tests used tool-assisted offscreen screenshot and Device Portal system screenshots. This does not prove F2 writes a user-accessible PNG or that the new hook works. Swapchain readback and staging are backend dependent.",
+      "uwp_behavior_and_root_cause": "UWP tests used offscreen and Device Portal system screenshots. A signed Lumia client reached the mod screenshot request and reported access denied. A signed storage probe narrowed the problem to resolving opened file and folder handles, then verified a direct same-folder move using the validated paths.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -1725,7 +1728,9 @@
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "docs/nightly-desktop-graphics-2026-11-20.md",
         "docs/nightly-arm-hud-2026-11-20.md",
-        "docs/nightly-mobile-2026-11-20.md"
+        "docs/nightly-mobile-2026-11-20.md",
+        "deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-fixed-75-screenshot-error.png",
+        "deliverables/nightly-2026-11-20/drs/lumia-runtime/screenshot-storage-probe-lumia.txt"
       ]
     },
     {
@@ -7561,9 +7566,9 @@
   },
   "runtime_followup": {
     "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
-    "builder": "1.0.8",
-    "patch": "0.1.14",
-    "client": "0.1.16",
+    "builder": "1.0.9",
+    "patch": "0.1.15",
+    "client": "0.1.17",
     "report": "docs/nightly-runtime-completion-2026-11-21.md",
     "status_scope": "Individual updates specify the tested diagnostic or game package. The final recipe's clean assembly passed."
   }
