@@ -35892,7 +35892,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:56",
         "product:deliverables/feature-audit/renderer-features.csv:61"
       ],
-      "test_method": "Capture sustained scale trajectory, timing source, frame intervals, floor and recovery.",
+      "test_method": "Use targetFps:60 with resolutionScale:67. Compare dynamicResolution:false/true after a reproducible load increase and decrease. Log timing source, chosen scale each frame and fixed-size HUD. Repeat after reopen.",
       "root_cause": null,
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -36506,7 +36506,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:175",
         "product:deliverables/feature-audit/renderer-features.csv:176"
       ],
-      "test_method": "Capture presentation timestamps and label generated frames. Verify Off, 2× interpolation, cadence, resize and HDR/pack interactions.",
+      "test_method": "Run a pack-off moving landmark with frameGeneration:off and frameGeneration:fsr3.1. Log effective frame generation and paired real/generated present IDs. Record actual drop, refusal or fallback when enabling a pack, then restart in the chosen mode.",
       "root_cause": "Compatibility renderer forces frame generation off. ANGLE has independent GLES surface and compute limitations.",
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -36776,7 +36776,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:91",
         "product:deliverables/feature-audit/renderer-features.csv:92"
       ],
-      "test_method": "Compare default and exercised values on a fixed fixture, observe the effect, and reopen the same profile to check persistence.",
+      "test_method": "Use a pack-off SDR moving-edge scene at resolutionScale:100. Compare fxaa:false/true with taa:false and msaa4x:false. Reopen and record both selection and the effective edge resolve or compatibility bypass.",
       "root_cause": "Compatibility path forces the post antialiasing setting off.",
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -37190,7 +37190,7 @@
         "uwp:crates/horizon-client-render/src/gfx.rs:2509"
       ],
       "evidence": [],
-      "test_method": "Record OS HDR state, accepted format/color space, measured nits and visual change under Auto and manual On.",
+      "test_method": "Compare hdr:false, true and auto on the exact same DX12 candidate with system HDR off and on. Require effective surface color space, world/HUD levels, screenshot metadata and the setting after restart. For gated profiles capture the fallback.",
       "root_cause": "D3D11 compatibility and GLES do not expose the required presentation route. DX12 Auto has no HDR display state in the WinRT panel path.",
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "HDR",
@@ -38874,7 +38874,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:159",
         "product:deliverables/feature-audit/renderer-features.csv:160"
       ],
-      "test_method": "Compare default and exercised values on a fixed fixture, observe the effect, and reopen the same profile to check persistence.",
+      "test_method": "Compare msaa4x:false/true in pack-off SDR with fxaa:false and taa:false. Record actual sample count, resolve target and thin geometry coverage. On gated profiles capture the unavailable control or fallback.",
       "root_cause": "Device/backend/terrain sample and resolve gates.",
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -39601,7 +39601,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:507",
         "product:deliverables/feature-audit/renderer-features.csv:508"
       ],
-      "test_method": "Compare default and exercised values on a fixed fixture, observe the effect, and reopen the same profile to check persistence.",
+      "test_method": "Compare presentMode:auto, fifo and one supported non-FIFO selection with VSync off. Record requested and effective modes and actual cadence. Recheck after restart and with VSync restored.",
       "root_cause": null,
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "Horizon"
@@ -40016,7 +40016,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:39",
         "product:deliverables/feature-audit/renderer-features.csv:40"
       ],
-      "test_method": "At matched camera and output size, log color/depth and output dimensions, compare HUD pixels, then resize and repeat.",
+      "test_method": "Hold a fixed output and dynamicResolution:false. Compare resolutionScale:100 and 67; log color/depth sizes and measure HUD bounds. Restart at 67 and repeat the same scene.",
       "root_cause": null,
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -40165,7 +40165,7 @@
       "evidence": [
         "product:deliverables/feature-audit/renderer-features.csv:561"
       ],
-      "test_method": "Compare default and exercised values on a fixed fixture, observe the effect, and reopen the same profile to check persistence.",
+      "test_method": "On the same SDR world use screenshotQuality:1 and 2. Trigger F2 or the same game screenshot action for both. Record effective output dimensions, unique filenames, readability and the persisted selection.",
       "root_cause": null,
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "Horizon"
@@ -40552,7 +40552,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:107",
         "product:deliverables/feature-audit/renderer-features.csv:108"
       ],
-      "test_method": "Compare default and exercised values on a fixed fixture, observe the effect, and reopen the same profile to check persistence.",
+      "test_method": "Use a slow fixed-rate pan of a thin diagonal, with fxaa:false, msaa4x:false and frameGeneration:off. Compare taa:false/true before and after a camera cut. Log history use and repeat after restart.",
       "root_cause": "Compatibility path forces the post antialiasing setting off.",
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -40707,7 +40707,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:81",
         "product:deliverables/feature-audit/renderer-features.csv:77"
       ],
-      "test_method": "Capture sustained scale trajectory, timing source, frame intervals, floor and recovery.",
+      "test_method": "With dynamicResolution:true, compare targetFps:30 and 60 under matched GPU load and the same resolutionScale floor. Log the actual timing source and scale transitions, then reopen and exercise the alternate target.",
       "root_cause": null,
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -41088,7 +41088,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:123",
         "product:deliverables/feature-audit/renderer-features.csv:124"
       ],
-      "test_method": "Compare default and exercised values on a fixed fixture, observe the effect, and reopen the same profile to check persistence.",
+      "test_method": "Compare upscaling:native, quality and performance with taa:true and a fixed output. Record internal and output sizes, actual temporal resolve and moving-edge pixels. Restart with the same selection.",
       "root_cause": "Compatibility scaler has its own blit and ignores TAA upscaling and sharpness.",
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -41246,7 +41246,7 @@
         "product:deliverables/feature-audit/renderer-features.csv:139",
         "product:deliverables/feature-audit/renderer-features.csv:140"
       ],
-      "test_method": "Compare default and exercised values on a fixed fixture, observe the effect, and reopen the same profile to check persistence.",
+      "test_method": "With an eligible TAA upscaler and fixed internal scale, compare upscalingSharpness:0, 85 and 100 in the same frame. Record edge contrast across a flat boundary and prove selection after reopening.",
       "root_cause": "Compatibility scaler has its own blit and ignores TAA upscaling and sharpness.",
       "recommendation": "Capture a focused settings A/B on the relevant signed profile.",
       "owner": "MCHorizonUWP"
@@ -107459,7 +107459,7 @@
       "evidence": [
         "Source only"
       ],
-      "test_method": "Change the value in an isolated profile, restart, and observe the stated behavior.",
+      "test_method": "In the same pack-off scene compare enableVsync:true/false, presentMode:auto, and a stable display mode. Record effective present mode and repeatable timing with actual scan/present evidence across restart.",
       "root_cause": null,
       "recommendation": "Verify the consumer and outcome in a signed build.",
       "official_ui_label_key": "options.vsync",
@@ -108382,7 +108382,7 @@
       "evidence": [
         "Source only"
       ],
-      "test_method": "Change the value in an isolated profile, restart, and observe the stated behavior.",
+      "test_method": "Compare the in-game fullscreen setting false/true and the host window control separately. Record CoreWindow or SwapChainPanel size, resize events, monitor identity and actual mode before and after reopening.",
       "root_cause": "The game-facing UWP windowing API has no fullscreen transition or mode enumeration.",
       "recommendation": "Implement or disable the in-game window controls. Verify actual monitor mode transitions.",
       "official_ui_label_key": "options.fullscreen",
@@ -120840,7 +120840,7 @@
       "evidence": [
         "Source only"
       ],
-      "test_method": "Change the value in an isolated profile, restart, and observe the stated behavior.",
+      "test_method": "Open the same menu over a fixed world view at menuBackgroundBlurriness:0, 5 and 10. Exclude HUD/menu pixels and compare background edge contrast. Preserve persisted choice and log whether the backdrop copy path ran.",
       "root_cause": "Menu blur requires the source copy path, which the compatibility and GLES surfaces lack.",
       "recommendation": "Verify the consumer and outcome in a signed build.",
       "official_ui_label_key": "options.accessibility.menu_background_blurriness",

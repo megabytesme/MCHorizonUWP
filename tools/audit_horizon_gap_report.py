@@ -56,6 +56,13 @@ CLASSES = {
     "?": "not tested",
 }
 OFFICIAL_LIMITS = {"H", "S", "U", "B", "X"}
+SHARED_SHADER_LIMITS = {
+    "classic.geometry": "P",
+    "classic.tessellation": "U",
+    "native.bt2020": "U",
+    "native.entity": "P",
+    "native.motion": "U",
+}
 
 
 def profile_details(profile, official=False):
@@ -82,10 +89,14 @@ def as_text(value):
     return str(value) if value is not None else ""
 
 
-def classify(status, official):
+def classify(status, official, matrix, identifier):
     if status not in STATUS:
         raise ValueError(f"Unknown matrix status {status!r}")
-    return "official upstream limitation" if official and status in OFFICIAL_LIMITS else CLASSES[status]
+    upstream_limit = official and status in OFFICIAL_LIMITS
+    shared_shader_limit = matrix == "shader" and SHARED_SHADER_LIMITS.get(identifier) == status
+    if upstream_limit or shared_shader_limit:
+        return "official upstream limitation"
+    return CLASSES[status]
 
 
 def gap(matrix, identifier, profile, status, owner, finding, refs, repro, acceptance, official=False):
@@ -94,7 +105,7 @@ def gap(matrix, identifier, profile, status, owner, finding, refs, repro, accept
         "matrix": matrix, "id": identifier,
         "profile": f"official/{profile}" if official else profile,
         "architecture": architecture, "backend": backend, "feature_level": feature_level,
-        "status": status, "classification": classify(status, official), "repair_owner": owner,
+        "status": status, "classification": classify(status, official, matrix, identifier), "repair_owner": owner,
         "observed_or_blocker": finding,
         "source_and_evidence": refs,
         "reproduction": " ".join((setup, repro)).strip(),

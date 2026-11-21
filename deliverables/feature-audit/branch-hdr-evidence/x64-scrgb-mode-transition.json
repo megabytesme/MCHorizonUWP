@@ -1,0 +1,37 @@
+{
+  "package": "MCHorizonUWP.HdrDev.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+  "pid": 85640,
+  "started": "2026-11-21T07:40:28.2707859Z",
+  "mode": "Auto",
+  "backend": "Dx12",
+  "scale": 100,
+  "antiAlias": "None",
+  "shaderPack": "",
+  "requestedDisplay": "\\\\.\\DISPLAY2",
+  "expectedHdr": true,
+  "captureMethod": "Wasm screenshot fixture",
+  "wasmFixtureSha256": "57144EC183896C6B553E1A407FC7D7CE92D308C8043B5396289C40075CD1E456",
+  "checks": {
+    "renderer": "[07:40:39] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "swapchain": "2026-11-21T07:40:41.948Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+    "firstHdrFrame": "[07:40:41] [Horizon game/INFO]: Horizon renderer: HDR output presented its first frame",
+    "capture": [
+      {
+        "original": "2026-11-21_07.40.48.png",
+        "sha256": "DCB9A6A8FE2550268FDB2C67E7AF8C4ABADB67FB8390B3FE5073E276AAC7A6F9",
+        "name": "world-sdr.png"
+      },
+      {
+        "original": "2026-11-21_07.40.48-hdr.png",
+        "sha256": "A3B9F25FAF4A0B6BAF3E72C25625AA7006F4FEF03BA2CED48FFBB01CCDEA57A0",
+        "name": "world-hdr.png"
+      }
+    ],
+    "fallback": "2026-11-21T07:40:49.981Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=455.00 min_nits=0.0000",
+    "recoveredHdr": "2026-11-21T07:40:50.716Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000"
+  },
+  "modeTransitionMonitor": "PG32UCDM",
+  "passed": true,
+  "displayHdrRestored": true,
+  "closed": true
+}

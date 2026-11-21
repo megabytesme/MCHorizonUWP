@@ -4602,10 +4602,10 @@
       "broken": 13,
       "driver, hardware or OS limited": 73,
       "intentionally capability-gated": 937,
-      "missing implementation": 2518,
+      "missing implementation": 2509,
       "not tested": 17700,
-      "not tested in full": 212,
-      "official upstream limitation": 26,
+      "not tested in full": 202,
+      "official upstream limitation": 45,
       "stub": 334
     }
   }

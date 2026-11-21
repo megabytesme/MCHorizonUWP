@@ -1,0 +1,16 @@
+{
+  "application": "MCHorizonUWP.HdrDev.x64",
+  "version": "1.0.0.0",
+  "architecture": "x64",
+  "patch": "0.1.16",
+  "client": "0.1.18",
+  "filename": "HorizonUWP-HDR-x64.appx",
+  "package_sha256": "772d298e03ab22abc31e75a80d79c4de2cec5b836ffe6e0240eb16a60dfa3f5b",
+  "bridge_sha256": "d29cd8bde0f7ceeb2720b540d6cea908c81bd19e22c07606f5bdb3e2a4de02e2",
+  "host_sha256": "936369d1676fb1fab76b9a52c900c712164d50e930807e8b6216eb58b5883746",
+  "engine_product_commit": "9ec7803fc0c585717b16c8e6ac0224ca9585473e",
+  "host_product_commit": "da3b6df642d9f81e594c468d8005216cfa5355d7",
+  "wgpu_fork_commit": "432a009d8d44aa2b5988668bb9620d975a275a00",
+  "signature": "SignTool verify /pa succeeded",
+  "resource_framework": "Horizon.Asset.26-3.98ccbead789d397639d5badd0bb805"
+}

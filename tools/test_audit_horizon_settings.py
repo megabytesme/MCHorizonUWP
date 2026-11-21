@@ -42,6 +42,21 @@ class AuditSchemaTests(unittest.TestCase):
         self.assertEqual(settings[1]["official_ui_label"], "Missing")
         self.assertEqual(next(iter(coverage.values())), ["options.fov"])
 
+    def test_offline_fixture_receipt_covers_each_native_fixture(self):
+        fixture_root = audit.ROOT / "tools/feature-audit-fixtures/native"
+        receipt_path = audit.ROOT / audit.OUTPUT / "shader-evidence/followup-offline.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        captured = {entry["fixture"]: entry for entry in receipt["native"]}
+        actual = {manifest.parent.name for manifest in fixture_root.glob("*/horizon-shaders.toml")}
+        self.assertEqual(set(captured), actual)
+        self.assertFalse(receipt["runtime_verified"])
+        for name, item in captured.items():
+            if name == "audit_invalid":
+                self.assertTrue(item["exit_code_nonzero"])
+                self.assertIn("post.wgsl:2:12", item["diagnostic"])
+            else:
+                self.assertRegex(item["sha256"], r"^[a-f0-9]{64}$")
+
     def test_official_hdr_receipt_is_the_pinned_windows_run(self):
         from audit_horizon_evidence import OFFICIAL_HDR, PIN
 
