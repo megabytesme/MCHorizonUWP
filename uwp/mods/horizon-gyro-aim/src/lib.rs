@@ -1,7 +1,9 @@
 use mod_api::{
-    self, ClientHost, ClientStoppingEvent, GuiRenderPostEvent, Hooks, Registrar,
-    RegistrationContext, RenderFramePreEvent, SettingSpec,
+    self, ClientHost, ClientStoppingEvent, ConfigPath, EntityRef, GuiRenderPostEvent, Hooks,
+    Registrar, RegistrationContext, RenderFramePreEvent, SettingSpec,
 };
+use std::collections::VecDeque;
+use std::fmt::Write;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -9,6 +11,84 @@ const ID: &str = "horizon_gyro_aim";
 const MAX_SAMPLE_GAP: Duration = Duration::from_millis(240);
 const CALIBRATION_TIME: f32 = 0.65;
 const CALIBRATION_MAX_SPEED: f32 = 6.0;
+const TRACE_ROWS: usize = 360;
+const TRACE_PERIOD_MS: u128 = 200;
+
+#[derive(Clone, Copy)]
+struct MotionFrame {
+    sample: [f32; 2],
+    rotation: i32,
+    interval: Duration,
+    delta: [f32; 2],
+    before: Option<[f32; 2]>,
+    accepted: bool,
+}
+
+struct MotionTrace {
+    started: Instant,
+    next_row_ms: u128,
+    next_save_ms: u128,
+    rows: VecDeque<String>,
+}
+
+impl MotionTrace {
+    fn new(now: Instant) -> Self {
+        Self {
+            started: now,
+            next_row_ms: 0,
+            next_save_ms: 0,
+            rows: VecDeque::new(),
+        }
+    }
+
+    fn record(
+        &mut self,
+        now: Instant,
+        host: &dyn ClientHost,
+        player: EntityRef,
+        sensor_active: bool,
+        frame: Option<MotionFrame>,
+    ) {
+        let elapsed_ms = now.saturating_duration_since(self.started).as_millis();
+        if elapsed_ms < self.next_row_ms {
+            return;
+        }
+        self.next_row_ms = elapsed_ms + TRACE_PERIOD_MS;
+        if self.rows.len() == TRACE_ROWS {
+            self.rows.pop_front();
+        }
+        let after = player.rotation(host).unwrap_or([f32::NAN; 2]);
+        let before = frame.and_then(|frame| frame.before).unwrap_or(after);
+        let [sensor_x, sensor_y] = frame.map_or([f32::NAN; 2], |frame| frame.sample);
+        let [yaw_delta, pitch_delta] = frame.map_or([0.0; 2], |frame| frame.delta);
+        let orientation = frame.map_or(-1, |frame| frame.rotation >> 2);
+        let interval_ms = frame.map_or(0, |frame| frame.interval.as_millis());
+        let accepted = frame.is_some_and(|frame| frame.accepted);
+        self.rows.push_back(format!(
+            "{elapsed_ms},{},{},{},{},{sensor_active},{orientation},{interval_ms},{sensor_x:.6},{sensor_y:.6},{yaw_delta:.4},{pitch_delta:.4},{:.4},{:.4},{accepted},{:.4},{:.4}",
+            host.setting_bool("enabled").unwrap_or(false),
+            host.playing(),
+            host.window_focused(),
+            host.observed_screen_id().is_some(),
+            before[0], before[1], after[0], after[1],
+        ));
+        if elapsed_ms >= self.next_save_ms {
+            self.next_save_ms = elapsed_ms + 1000;
+            self.save(host);
+        }
+    }
+
+    fn save(&self, host: &dyn ClientHost) {
+        let mut csv = String::from("elapsed_ms,enabled,playing,focused,screen_open,sensor_active,orientation_flags,frame_interval_ms,sensor_x_rad,sensor_y_rad,requested_yaw_deg,requested_pitch_deg,before_yaw_deg,before_pitch_deg,accepted,after_yaw_deg,after_pitch_deg
+");
+        for row in &self.rows {
+            let _ = writeln!(csv, "{row}");
+        }
+        if let Ok(path) = ConfigPath::new("motion.csv") {
+            let _ = host.data_files().write(&path, csv.as_bytes());
+        }
+    }
+}
 
 #[derive(Default)]
 struct GyroAim(Mutex<State>);
@@ -21,6 +101,7 @@ struct State {
     last_orientation: Option<i32>,
     unavailable_since: Option<Instant>,
     motion: Motion,
+    trace: Option<MotionTrace>,
 }
 
 impl State {
@@ -146,6 +227,107 @@ fn screen_axes([x, y]: [f32; 2], rotation: i32) -> [f32; 2] {
     [-up.to_degrees(), -right.to_degrees()]
 }
 
+impl State {
+    fn aim(
+        &mut self,
+        host: &mut dyn ClientHost,
+        player: Option<EntityRef>,
+        now: Instant,
+    ) -> Option<MotionFrame> {
+        if !host.on(ID)
+            || !host.playing()
+            || !host.window_focused()
+            || host.is_paused()
+            || host.observed_screen_id().is_some()
+            || !host.setting_bool("enabled").unwrap_or(false)
+        {
+            self.stop();
+            return None;
+        }
+        let Some(player) = player else {
+            self.stop();
+            return None;
+        };
+        if host.camera_entity() != Some(player) {
+            self.stop();
+            return None;
+        }
+
+        let calibrate = host.setting_bool("calibrate").unwrap_or(false);
+        if !calibrate
+            && self.motion.calibration.is_none()
+            && host.setting_bool("using_item").unwrap_or(false)
+            && host.local_item_use().is_none()
+        {
+            self.stop();
+            return None;
+        }
+
+        self.start(now);
+        if !self.active {
+            return None;
+        }
+        if calibrate {
+            host.set_setting(ID, "calibrate", "false");
+            self.motion.reset();
+            self.motion.calibration = Some(Calibration::default());
+        }
+        if self.previous_sample.is_some_and(|previous| {
+            now.saturating_duration_since(previous) < Duration::from_millis(1)
+        }) {
+            return None;
+        }
+        let Some((sample, rotation)) = sensor::take() else {
+            if self
+                .previous_sample
+                .is_some_and(|previous| now.saturating_duration_since(previous) > MAX_SAMPLE_GAP)
+            {
+                self.previous_sample = None;
+                self.motion.reset();
+            }
+            return None;
+        };
+        let previous = self.previous_sample.replace(now).unwrap_or(now);
+        let orientation = rotation >> 2;
+        if self
+            .last_orientation
+            .replace(orientation)
+            .is_some_and(|previous| previous != orientation)
+        {
+            self.motion.bias = [0.0; 2];
+            self.motion.reset();
+            return None;
+        }
+        let dt = now.saturating_duration_since(previous);
+        if dt.is_zero() || dt > MAX_SAMPLE_GAP {
+            self.motion.reset();
+            return None;
+        }
+        let delta = self.motion.turn(
+            screen_axes(sample, rotation),
+            dt.as_secs_f32(),
+            Settings::read(host),
+        );
+        let before = if delta != [0.0; 2] {
+            player.rotation(host)
+        } else {
+            None
+        };
+        let accepted = before.is_some_and(|[yaw, pitch]| {
+            host.set_local_rotation(yaw + delta[0], pitch + delta[1])
+                .is_ok()
+        });
+        Some(MotionFrame {
+            sample,
+            rotation,
+            interval: dt,
+            delta,
+            before,
+            accepted,
+        })
+    }
+}
+
 #[mod_api::horizon_mod]
 impl Hooks for GyroAim {
     fn register(&self, registrar: &mut dyn Registrar, _: &RegistrationContext) {
@@ -159,6 +341,7 @@ impl Hooks for GyroAim {
             SettingSpec::range("deadzone", "Gyro deadzone (degrees/s)", 0.0, 8.0, 0.25, 1.0),
             SettingSpec::toggle("using_item", "Gyro only while using an item", false),
             SettingSpec::toggle("calibrate", "Calibrate gyro when play resumes", false),
+            SettingSpec::toggle("capture_diagnostics", "Capture gyro diagnostics", false),
         ] {
             let _ = registrar.register_setting(setting);
         }
@@ -169,85 +352,19 @@ impl Hooks for GyroAim {
             .0
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if !host.on(ID)
-            || !host.playing()
-            || !host.window_focused()
-            || host.is_paused()
-            || host.observed_screen_id().is_some()
-            || !host.setting_bool("enabled").unwrap_or(false)
-        {
-            state.stop();
-            return;
-        }
-        let Some(player) = host.local_player().map(|player| player.entity()) else {
-            state.stop();
-            return;
-        };
-        if host.camera_entity() != Some(player) {
-            state.stop();
-            return;
-        }
-
-        let calibrate = host.setting_bool("calibrate").unwrap_or(false);
-        if !calibrate
-            && state.motion.calibration.is_none()
-            && host.setting_bool("using_item").unwrap_or(false)
-            && host.local_item_use().is_none()
-        {
-            state.stop();
-            return;
-        }
-
         let now = Instant::now();
-        state.start(now);
-        if !state.active {
-            return;
-        }
-        if calibrate {
-            host.set_setting(ID, "calibrate", "false");
-            state.motion.reset();
-            state.motion.calibration = Some(Calibration::default());
-        }
-        if state.previous_sample.is_some_and(|previous| {
-            now.saturating_duration_since(previous) < Duration::from_millis(1)
-        }) {
-            return;
-        }
-        let Some((sample, rotation)) = sensor::take() else {
-            if state
-                .previous_sample
-                .is_some_and(|previous| now.saturating_duration_since(previous) > MAX_SAMPLE_GAP)
-            {
-                state.previous_sample = None;
-                state.motion.reset();
+        let player = host.local_player().map(|player| player.entity());
+        let frame = state.aim(host, player, now);
+        if let Some(player) = player {
+            if host.setting_bool("capture_diagnostics").unwrap_or(false) {
+                let active = state.active;
+                state
+                    .trace
+                    .get_or_insert_with(|| MotionTrace::new(now))
+                    .record(now, host, player, active, frame);
+            } else if let Some(trace) = state.trace.take() {
+                trace.save(host);
             }
-            return;
-        };
-        let previous = state.previous_sample.replace(now).unwrap_or(now);
-        let orientation = rotation >> 2;
-        if state
-            .last_orientation
-            .replace(orientation)
-            .is_some_and(|previous| previous != orientation)
-        {
-            state.motion.bias = [0.0; 2];
-            state.motion.reset();
-            return;
-        }
-        let dt = now.saturating_duration_since(previous);
-        if dt.is_zero() || dt > MAX_SAMPLE_GAP {
-            state.motion.reset();
-            return;
-        }
-        let [yaw_delta, pitch_delta] = state.motion.turn(
-            screen_axes(sample, rotation),
-            dt.as_secs_f32(),
-            Settings::read(host),
-        );
-        if (yaw_delta != 0.0 || pitch_delta != 0.0)
-            && let Some([yaw, pitch]) = player.rotation(host)
-        {
-            let _ = host.set_local_rotation(yaw + yaw_delta, pitch + pitch_delta);
         }
     }
 
@@ -277,12 +394,12 @@ impl Hooks for GyroAim {
         };
         if let Some((key, fallback)) = status {
             let translated = host.translate(key);
-            event.batch.text(
-                translated.as_deref().unwrap_or(fallback),
-                [8.0, 8.0],
-                0xffff_ffff,
-                true,
-            );
+            let label = translated.as_deref().unwrap_or(fallback);
+            let [width, height] = event.batch.size();
+            let x = ((width - event.batch.text_width(label)) * 0.5).max(0.0);
+            event
+                .batch
+                .text(label, [x, (height - 56.0).max(4.0)], 0xffff_ffff, true);
         }
     }
 
@@ -341,6 +458,14 @@ mod tests {
         let angles = [90_f32.to_radians(), 45_f32.to_radians()];
         assert_eq!(screen_axes(angles, 1), [-90.0, 45.0]);
         assert_eq!(screen_axes(angles, 3), [90.0, -45.0]);
+    }
+
+    #[test]
+    fn display_aligned_samples_are_not_rotated_again_in_either_landscape() {
+        let angles = [45_f32.to_radians(), -90_f32.to_radians()];
+        for orientation in [1, 4] {
+            assert_eq!(screen_axes(angles, orientation << 2), [90.0, -45.0]);
+        }
     }
 
     #[test]
