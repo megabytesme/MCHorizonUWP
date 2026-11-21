@@ -1,0 +1,60 @@
+[04:42:05] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[04:42:05] [Horizon game/INFO]: Embedded native mod: horizon_gyro_aim 0.1.1
+[04:42:05] [Horizon game/INFO]: Embedded native mod: uwp_native_hook_probe 0.1.0
+[04:42:05] [Horizon game/INFO]: Embedded native mod: uwp_native_after_probe 0.1.0
+[04:42:05] [Horizon game/WARN]: wasm module cache disabled: folder C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsCold.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[04:42:55] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 1821 ms, modules 46394 ms, linking 188 ms, instantiation 7 ms, subscriptions 0 ms, initialization 1 ms
+[04:42:55] [Horizon game/INFO]: Horizon renderer: asking DirectX 11 for a graphics device
+[04:42:55] [Horizon game/WARN]: [wgpu_core::instance] DX11 is experimental and exposes a restricted FL9_1 graphics backend with constrained owner-thread HWND and CoreWindow surfaces
+[04:42:55] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[04:42:55] [Horizon game/INFO]: Horizon renderer: requesting the device (driver D3D11 FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53) with features [] and the adapter's limits (buffers up to 4294967291 bytes, storage bindings up to 0 bytes, 6 texture layers)
+[04:42:55] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (2561x1439 Bgra8Unorm, Fifo)
+[04:42:55] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[04:42:55] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[04:42:56] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 169 ms
+[04:42:56] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[04:42:57] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsCold.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\d0941030c7ffaf21
+[04:42:57] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[04:43:14] [resource-loader/INFO]: Horizon: UI bundle ready after 19390 ms
+[04:43:23] [load-render/INFO]: Horizon: block sprites: 1301 layers at 16 px (largest 64 px, budget 4 MiB)
+[04:43:27] [resource-loader/INFO]: load core tables: 32.19s
+[04:43:34] [World data preload/INFO]: Horizon: worldgen data loaded in 7.679838177s
+[04:43:36] [resource-loader/INFO]: load pack tables: 41.37s
+[04:43:36] [resource-loader/INFO]: Horizon: core-ready after 41660 ms
+[04:43:37] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 1241 ms
+[04:43:46] [load-items/INFO]: load items: 51.22s
+[04:43:46] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 19780 ms
+[04:43:48] [world-rest-loader/INFO]: Horizon: resources loaded in 53.8s; 35723 block states, 1658 items, 67 biomes; 2 worker threads
+[04:43:48] [world-rest-loader/INFO]: Horizon: rest-ready after 53796 ms
+[04:43:48] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[04:44:19] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[04:44:21] [Horizon game/INFO]: Horizon: loading the title artwork after 86699 ms
+[04:44:22] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[04:44:52] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[04:44:53] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[04:45:22] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[04:45:24] [Horizon game/INFO]: Horizon: world renderer ready after 149861 ms
+[04:45:25] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)
+[04:45:26] [Horizon game/INFO]: Horizon: waiting for world resources
+[04:45:26] [Horizon game/INFO]: Horizon: world resources joined after 0 ms
+[04:45:26] [Horizon game/INFO]: Horizon: startup handoff 33256 ms (renderer 31717 ms, start_game 712 ms)
+[04:45:26] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[04:45:26] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[04:45:26] [Horizon game/INFO]: Horizon: first frame after 1152 ms
+[04:45:26] [Horizon game/INFO]: Controller connected: GameSir X2 Type-C
+[04:45:26] [Horizon game/INFO]: Horizon: profiling the client to C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsCold.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json
+[04:45:27] [World initialization/INFO]: Horizon: live features ready in 973.659218ms
+[04:45:31] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[04:45:31] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x9b3066a0
+[04:45:31] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio
+[04:45:48] [Services keys/ERROR]: Horizon: Failed to request Minecraft Services public key
+[04:45:49] [Server thread/INFO]: Horizon: profiling the server thread to C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsCold.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json
+[04:45:50] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1921x1079, output 2561x1439, selected scale 75%
+[04:45:54] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[04:45:54] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xfd54d806
+[04:46:19] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[04:46:19] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x814aab3d
+[04:47:38] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[04:47:38] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x42016f1e
+[04:47:57] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[04:47:58] [Horizon game/INFO]: Horizon: Saved C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsCold.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json (the file stays on your computer)

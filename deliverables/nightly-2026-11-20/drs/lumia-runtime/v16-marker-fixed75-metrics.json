@@ -1,0 +1,73 @@
+{
+  "package": "MCHorizonUWP.NightlyNov20.DrsCold.arm_1.0.0.0_arm__4pd4jeb6snrqw",
+  "package_sha256": "cbab2ab762ac59b69c728fc8ec6d44a652cb62adc1f161109dfe3ef7646cf125",
+  "capture": {
+    "sha256": "db9960d64f206d8a0991182887c09bcffa6e26f6127fc8f19cef198968accf13",
+    "gzip_complete": true,
+    "compressed_bytes": 1160051,
+    "decoded_protobuf_bytes": 2034556,
+    "client_stop_present": true
+  },
+  "frame_cadence": {
+    "source": "intervals between game-thread submit spans of successive recorded rendered frames",
+    "thread": "Horizon game",
+    "frames": 570,
+    "duration_s": 29.982522,
+    "average_fps": 19.011075852791834,
+    "median_fps": 18.954112094618267,
+    "p50_ms": 52.75900000000183,
+    "p95_ms": 65.72100000000137,
+    "p99_ms": 75.69900000000052,
+    "median_of_one_second_cpu_medians_ms": 35.617292404174805,
+    "median_of_one_second_gpu_medians_ms": null,
+    "sampled_max_rss_mb": 747.0
+  },
+  "section_memory": {
+    "capture_time_s": 151.366727032,
+    "measurements": {
+      "allocator.commit_mb": 614.5,
+      "allocator.peak_commit_mb": 737.8,
+      "client_columns.biomes_mb": 0.0,
+      "client_columns.blocks_mb": 0.9,
+      "client_columns.column_records_mb": 0.0,
+      "client_columns.columns": 49.0,
+      "client_columns.heightmaps_mb": 0.0,
+      "client_columns.light_arrays": 250.0,
+      "client_columns.light_mb": 0.5,
+      "client_columns.section_records_mb": 0.1,
+      "client_columns.sections": 1176.0,
+      "client_columns.total_mb": 1.5,
+      "client_columns.uniform_block_sections": 730.0,
+      "client_columns.unique_sections": 1176.0,
+      "named_mb": 1.6,
+      "process.allocator_commit_mb": 614.5,
+      "process.allocator_peak_commit_mb": 737.8,
+      "process.resident_mb": 699.6,
+      "render_distance": 2.0,
+      "renderer.cpu.block_entities_mb": 0.0,
+      "renderer.cpu.far_tiles_mb": 0.0,
+      "renderer.cpu.light_sources_mb": 0.0,
+      "renderer.cpu.resident_sections_mb": 0.1,
+      "renderer.section_arenas_mb": 24.0,
+      "renderer.section_vertices_mb": 9.4,
+      "unattributed_mb": 697.9
+    }
+  },
+  "scale_percent": 75,
+  "world_color_px": [
+    1921,
+    1079
+  ],
+  "world_depth_px": [
+    1921,
+    1079
+  ],
+  "output_px": [
+    2561,
+    1439
+  ],
+  "texture_budget_mib": 4,
+  "adaptive": false,
+  "live_probe_requests_screenshot": false,
+  "peak_portal_working_set_bytes": 796774400.0
+}
