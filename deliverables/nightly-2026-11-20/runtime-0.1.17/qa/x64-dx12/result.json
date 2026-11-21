@@ -1,0 +1,46 @@
+﻿{
+    "Name":  "MCHorizonUWP.Nov20.qa.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  11028,
+    "BeginUtc":  "2026-11-21T05:38:36.7207958Z",
+    "Mode":  "World",
+    "Backend":  "Dx12",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  true,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  false,
+    "Renderer":  "[05:38:51] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "FirstFrame":  "[05:38:54] [Horizon game/INFO]: Horizon: first frame after 2329 ms",
+    "StartupObservedMs":  18749,
+    "CaptureMethod":  "game mod screenshot",
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-v17-desktop-qa\\capture-20261121-053836-174-x64-Dx12-World-Enabled-100\\world.png",
+                    "Width":  1800,
+                    "Height":  1350,
+                    "Cyan":  6400,
+                    "Magenta":  6400,
+                    "SceneColors":  2043
+                },
+    "NativeLoad":  "[05:38:38] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[05:38:41] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 142 ms, modules 2043 ms, linking 25 ms, instantiation 1 ms, subscriptions 1 ms, initialization 1 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe"
+                                ],
+    "ResolutionEvidence":  [
+
+                           ],
+    "AudioOutput":  [
+                        "[05:38:52] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)",
+                        "[05:38:59] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio"
+                    ],
+    "AudioNonSilent":  true,
+    "Exit":  "closed"
+}
