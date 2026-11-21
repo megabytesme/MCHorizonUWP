@@ -6,7 +6,6 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.devices.sensors.h>
 #include <windows.graphics.display.h>
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
@@ -16,8 +15,7 @@ using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
 
 namespace {
-using Clock = std::chrono::steady_clock;
-constexpr auto max_sample_age = std::chrono::milliseconds(240);
+constexpr ULONGLONG max_sample_age_ms = 240;
 std::mutex lifecycle;
 std::mutex mutex;
 int display_orientation = 0;
@@ -32,13 +30,13 @@ std::uint32_t generation = 0;
 std::int64_t previous_timestamp = 0;
 float turned_x = 0.0f;
 float turned_y = 0.0f;
-Clock::time_point batch_begin{};
+ULONGLONG batch_begin = 0;
 
 void clear_samples() {
     previous_timestamp = 0;
     turned_x = 0.0f;
     turned_y = 0.0f;
-    batch_begin = {};
+    batch_begin = 0;
 }
 
 bool align(Gyrometer^ device) {
@@ -63,8 +61,8 @@ void reading_changed(std::uint32_t expected_generation, GyrometerReadingChangedE
                 const double x = reading->AngularVelocityX * seconds * radians_per_degree;
                 const double y = reading->AngularVelocityY * seconds * radians_per_degree;
                 if (std::isfinite(x) && std::isfinite(y)) {
-                    const auto now = Clock::now();
-                    if (batch_begin == Clock::time_point{} || now - batch_begin > max_sample_age) {
+                    const auto now = GetTickCount64();
+                    if (batch_begin == 0 || now - batch_begin > max_sample_age_ms) {
                         batch_begin = now;
                         turned_x = 0.0f;
                         turned_y = 0.0f;
@@ -180,8 +178,8 @@ extern "C" int __cdecl horizon_uwp_gyro_take(float* x, float* y, int* rotation) 
     if (x == nullptr || y == nullptr || rotation == nullptr) return 0;
     try {
         std::lock_guard<std::mutex> guard(mutex);
-        if (!running || !aligned || batch_begin == Clock::time_point{}) return 0;
-        if (Clock::now() - batch_begin > max_sample_age) {
+        if (!running || !aligned || batch_begin == 0) return 0;
+        if (GetTickCount64() - batch_begin > max_sample_age_ms) {
             clear_samples();
             return 0;
         }
@@ -190,7 +188,7 @@ extern "C" int __cdecl horizon_uwp_gyro_take(float* x, float* y, int* rotation) 
         // Legacy callers use the low two bits for an extra quarter turn. New
         // callers can reset their filters when the display orientation changes.
         *rotation = aligned_orientation << 2;
-        batch_begin = {};
+        batch_begin = 0;
         turned_x = 0.0f;
         turned_y = 0.0f;
         return 1;
