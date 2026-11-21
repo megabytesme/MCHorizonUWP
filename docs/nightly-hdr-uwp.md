@@ -19,11 +19,22 @@ The view-state bridge uses the WinRT runtime contract for GetAdvancedColorInfo a
 | Official Horizon Nightly | `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` |
 | Pinned wgpu fork | `aa7b65c43ef008d0a92d20fcdf9f10fa0883f157` |
 | HDR wgpu fork branch `codex/hdr-nov20` | `432a009d8d44aa2b5988668bb9620d975a275a00` |
-| Local development identifiers | Patch `0.1.16`, client `0.1.18` |
+| Local development identifiers | Builder `1.0.10`, patch `0.1.16`, client `0.1.18` |
 
-Assemble the pinned November 20 `0.1.15`/`0.1.17` Builder input into a fresh directory following [the November 20 recipe](nightly-runtime-completion-2026-11-21.md). Apply [the HDR engine overlay](../patches/nightly-2026-11-20/hdr-active-view.patch) from the assembled root. Apply [the HDR DX12 overlay](../patches/wgpu-dx11/dx12-uwp-hdr-surface.patch) from the assembled `third_party/wgpu-dx11` root. Both patches support `git apply --check --whitespace=error`. Use the same directory when applying each checked patch.
+Builder 1.0.10 accepts the dedicated HDR recipe for x64, x86, ARM64 and ARM32. Its local client bundle includes all four linked host kits, the pinned wgpu archive and its verified HDR overlay. Builder tests, the WinUI release build and assembly of the local candidate passed. The assembled wgpu tree matches `432a009d8` and the seven HDR engine files match the prior signed x64 build source. [Builder recipe and hashes](../deliverables/hdr/builder/candidate.json) · [Source patch](../patches/nightly-2026-11-20/horizon-uwp-0.1.16.patch) · [Local client bundle](../deliverables/hdr/builder/candidate/uwp-client-0.1.18.zip)
 
-Build the updated host kit with `tools/build_host_artifact_kit.ps1` for each target architecture and stage the matching prebuilt host and import library. The Rust bridge references both new host exports. Reuse verified Wasmtime and Rust standard-library inputs from the pinned build, then run the following from the product worktree on Ben-Desktop with the desktop release lock held.
+Use the exact upstream and wgpu archives, the pinned Wasm inputs and the four-architecture host kit to regenerate the candidate. The resulting development catalog is unsigned. Run from the product worktree on Ben-Desktop. [Pinned input recipe](nightly-runtime-completion-2026-11-21.md)
+
+```powershell
+python ./tools/prepare_candidate.py --revision 3b09323fdbe8f7ae24f760393f86d5f4b2aad042 `
+  --patch-version 0.1.16 --client-version 0.1.18 --builder-version 1.0.10 `
+  --upstream-commit 0a875da91dbb0fdcb7ba8c42c11341aa229af51a `
+  --upstream-repo $HorizonRepo --upstream-archive $HorizonArchive --wgpu-archive $WgpuBaseArchive `
+  --host-artifacts $HostKit --wasmtime-archive $WasmtimeArchive --wasm-standard-library $WasmStdlib `
+  --output $CandidateDirectory
+```
+
+To build the staged game bridge directly, use the matching host kit and verified Rust standard-library sources with the desktop release lock held.
 
 ```powershell
 & ./tools/build_nightly_runtime.ps1 -Source $Assembly -Output $Build `
@@ -42,5 +53,6 @@ Use `tools/package_nightly_runtime.ps1` with the same pin and version IDs, the m
 - [ANGLE](hdr-angle-validation.md) records exact EGL, GL and DXGI measurements on a signed UWP panel probe.
 - [Lumia](hdr-lumia-capabilities.md) records the OS contract, prior physical SDR evidence and the Device Portal retry.
 - [Capability matrix](../deliverables/hdr/capability-matrix.json), [swapchain evidence](../deliverables/hdr/swapchain-probe-results.json) and [color vectors](../deliverables/hdr/color-validation.json) give machine-readable results.
+- [Settings and shader audit reconciliation](hdr-shader-audit-reconciliation.md) records what the captures establish for render scale, shader stages, mods and screenshots.
 
 The official Horizon shader passes were exercised against reference PQ, scRGB, UI composition and screenshot vectors on a software D3D12 driver. Use the signed hardware results for claims about game presentation, and the shader results for numeric color and transfer checks.

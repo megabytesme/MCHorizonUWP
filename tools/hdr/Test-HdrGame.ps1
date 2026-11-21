@@ -11,6 +11,8 @@ param(
     [ValidateSet('Dx12', 'Dx11', 'Gl')][string]$Backend = 'Dx12',
     [ValidateSet(50, 75, 100)][int]$Scale = 100,
     [switch]$AdaptiveResolution,
+    [switch]$SampleMemory,
+    [switch]$ForceDx12Removal,
     [ValidateRange(30, 240)][int]$TargetFps = 60,
     [ValidateSet('None', 'Taa', 'Msaa4x')][string]$AntiAlias = 'None',
     [switch]$ExpectHdr,
@@ -23,6 +25,9 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($DisplayModeTool -and (!$MonitorFriendlyName -or $FallbackDisplay -or !$ExpectHdr)) {
     throw 'The display-mode test requires an HDR game, a named monitor and no monitor move.'
+}
+if ($ForceDx12Removal -and ($Identity -cne 'MCHorizonUWP.HdrDev.DeviceLoss.x64' -or $Backend -ne 'Dx12')) {
+    throw 'Device removal requires the isolated x64 D3D12 recovery package.'
 }
 $package = @(Get-AppxPackage -Name $Identity | Where-Object Name -CEQ $Identity)
 if ($package.Count -ne 1) { throw 'Install the signed HDR development package.' }
@@ -40,6 +45,8 @@ if (!(Test-Path -LiteralPath (Join-Path $FixtureWorld 'level.dat') -PathType Lea
 if (Test-Path -LiteralPath $Output) { throw 'Use a fresh evidence directory.' }
 $destination = [IO.Directory]::CreateDirectory($Output).FullName
 $state = Join-Path $env:LOCALAPPDATA "Packages/$($package.PackageFamilyName)/LocalState"
+$removalRequest = Join-Path $state 'hdr-dx12-recovery.request'
+if ($ForceDx12Removal -and [IO.File]::Exists($removalRequest)) { [IO.File]::Delete($removalRequest) }
 $game = Join-Path $state 'game'
 [void][IO.Directory]::CreateDirectory("$game/saves")
 [void][IO.Directory]::CreateDirectory("$game/telemetry")
@@ -113,6 +120,8 @@ $process = Get-Process -Id $pidGame
 if ($process.Path -ne $exe) { throw 'Activation returned an unrelated executable.' }
 $lifecycle = Join-Path $state 'horizon-uwp-lifecycle.log'
 $log = Join-Path $game 'isolated-test-home/logs/latest.log'
+$hdrChainPattern = 'desc_hr=0x00000000 format=10 alpha=3 .*space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x[0-9A-F]*[13579BDF]\b view_kind=2'
+$sdrChainPattern = 'desc_hr=0x00000000 format=87 alpha=3 .*space=0 set_hr=0x00000000'
 $report = [ordered]@{package=$package.PackageFullName; pid=$pidGame; started=$begin.ToString('o');
     mode=$Hdr; backend=$Backend; scale=$Scale; adaptiveResolution=[bool]$AdaptiveResolution; targetFps=$TargetFps;
     antiAlias=$AntiAlias; shaderPack=$ShaderPack;
@@ -135,15 +144,18 @@ function Wait-For([string]$Description, [int]$Seconds, [scriptblock]$Test) {
     throw "Timed out waiting for $Description."
 }
 function Move-ToDisplay([string]$Name, [int]$Width, [int]$Height) {
-    $screen = [Windows.Forms.Screen]::AllScreens | Where-Object DeviceName -EQ $Name
-    if (!$screen) { throw "Display $Name was not attached." }
     $frame = $gameWindow.FrameHandle()
+    $screen = if ($Name -eq 'Current') { [Windows.Forms.Screen]::FromHandle($frame) }
+        else { [Windows.Forms.Screen]::AllScreens | Where-Object DeviceName -EQ $Name }
+    if (!$screen) { throw "Display $Name was not attached." }
     $area = $screen.WorkingArea
     if (![HorizonHdrTest]::MoveWindow($frame, $area.Left + 80, $area.Top + 80, $Width, $Height, $true)) {
         throw "Could not position the isolated game on $Name."
     }
     Start-Sleep -Milliseconds 800
-    if ([Windows.Forms.Screen]::FromHandle($frame).DeviceName -ne $Name) { throw "The game did not move to $Name." }
+    if ($Name -ne 'Current' -and [Windows.Forms.Screen]::FromHandle($frame).DeviceName -ne $Name) {
+        throw "The game did not move to $Name."
+    }
     return $frame
 }
 function Find-RecentLine([string]$Path, [string]$Pattern, [DateTime]$Since) {
@@ -215,9 +227,9 @@ try {
     }
     $gameWindow = [ScratchKeyboardInput]::new($pidGame)
     $frame = Move-ToDisplay $Display 1200 850
+    $report.actualDisplay = [Windows.Forms.Screen]::FromHandle($frame).DeviceName
     if ($Backend -eq 'Dx12') {
-        $chainPattern = if ($ExpectHdr) { 'format=10 alpha=3 .*space=1 set_hr=0x00000000.*view_kind=2' }
-            else { 'format=87 alpha=3 .*space=0 set_hr=0x00000000' }
+        $chainPattern = if ($ExpectHdr) { $hdrChainPattern } else { $sdrChainPattern }
         $report.checks.swapchain = Wait-For 'requested DXGI configuration' 30 {
             Find-ChainAfter $chainPattern $begin
         }
@@ -233,16 +245,66 @@ try {
             Find-RecentLine $log "shader pack $packName(?: |:)" $begin
         }
     }
-    Start-Sleep -Seconds 5
+    Start-Sleep -Seconds $(if ($AutomaticCapture) { 5 } else { 12 })
     $report.checks.capture = @(Capture-Game 'world' $ExpectHdr)
     $hasHdrPng = @($report.checks.capture | Where-Object original -Like '*-hdr.png').Count -ne 0
     if ($hasHdrPng -ne [bool]$ExpectHdr) { throw 'The screenshot files disagree with the requested presentation mode.' }
+    if ($SampleMemory) {
+        $report.checks.memory = @(foreach ($sample in 1..5) {
+            $process.Refresh()
+            $gpu = @(Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name.StartsWith("pid_$($pidGame)_") })
+            [ordered]@{
+                utc = [DateTime]::UtcNow.ToString('o')
+                processPrivateBytes = $process.PrivateMemorySize64
+                processWorkingSetBytes = $process.WorkingSet64
+                gpuDedicatedBytes = $(if ($gpu.Count) { ($gpu | Measure-Object DedicatedUsage -Sum).Sum })
+                gpuSharedBytes = $(if ($gpu.Count) { ($gpu | Measure-Object SharedUsage -Sum).Sum })
+            }
+            Start-Sleep -Seconds 1
+        })
+    }
+    if ($ForceDx12Removal) {
+        $beforeRemoval = @(Get-Content -LiteralPath $log).Count
+        $requestTime = [DateTime]::UtcNow
+        $requestFile = [IO.File]::Open($removalRequest, [IO.FileMode]::CreateNew)
+        $requestFile.Dispose()
+        $frame = Move-ToDisplay $Display 1120 780
+        $report.checks.removal = Wait-For 'native device removal' 20 {
+            if (Test-Path -LiteralPath $lifecycle) {
+                [string](Get-Content -LiteralPath $lifecycle | Where-Object {
+                    $_ -match '^(\S+).*HDR QA removed reason=0x(?!00000000)[0-9A-F]+' -and
+                        [DateTimeOffset]::Parse($Matches[1]).UtcDateTime -ge $requestTime
+                } | Select-Object -Last 1)
+            }
+        }
+        $report.checks.pressure = @(Get-Content -LiteralPath $lifecycle | Where-Object {
+            $_ -match '^(\S+).*HDR QA pressure' -and
+                [DateTimeOffset]::Parse($Matches[1]).UtcDateTime -ge $requestTime
+        } | ForEach-Object { [string]$_ })
+        $report.checks.recovery = Wait-For 'rebuilt renderer after device removal' 90 {
+            $new = @(Get-Content -LiteralPath $log | Select-Object -Skip $beforeRemoval)
+            $recovered = $new | Where-Object { $_ -match 'graphics device recovered; rebuilding world meshes' } |
+                Select-Object -Last 1
+            if ($recovered -and (!$ExpectHdr -or ($new -match 'HDR output presented its first frame'))) {
+                [string]$recovered
+            }
+        }
+        $removedAt = [DateTimeOffset]::Parse(($report.checks.removal -split '\s+')[0]).UtcDateTime
+        $report.checks.recoveredSwapchain = Wait-For 'successful swapchain after device removal' 25 {
+            Find-ChainAfter $chainPattern $removedAt
+        }
+        if (!$AutomaticCapture) {
+            Start-Sleep -Seconds 8
+            $report.checks.recoveredCapture = @(Capture-Game 'recovered' $ExpectHdr)
+        }
+    }
     if ($FallbackDisplay) {
         $report.fallbackDisplay = $FallbackDisplay
         $transition = [DateTime]::UtcNow
         $frame = Move-ToDisplay $FallbackDisplay 1050 720
         $report.checks.fallback = Wait-For 'SDR swapchain after monitor transition' 35 {
-            Find-ChainAfter 'format=87 alpha=3 .*space=0 set_hr=0x00000000.*view_kind=0' $transition
+            Find-ChainAfter "$sdrChainPattern.*view_kind=0" $transition
         }
         if (!$AutomaticCapture) {
             $report.checks.fallbackCapture = @(Capture-Game 'sdr-transition' $false)
@@ -253,7 +315,7 @@ try {
         $transition = [DateTime]::UtcNow
         $frame = Move-ToDisplay $Display 1200 850
         $report.checks.recoveredHdr = Wait-For 'HDR swapchain after returning to the HDR display' 35 {
-            Find-ChainAfter 'format=10 alpha=3 .*space=1 set_hr=0x00000000.*view_kind=2' $transition
+            Find-ChainAfter $hdrChainPattern $transition
         }
     }
     if ($DisplayModeTool) {
@@ -265,13 +327,13 @@ try {
         & $DisplayModeTool $MonitorFriendlyName off
         if ($LASTEXITCODE) { throw 'Windows rejected the temporary HDR disable.' }
         $report.checks.fallback = Wait-For 'SDR configuration after the Windows HDR mode changed' 35 {
-            Find-ChainAfter 'format=87 alpha=3 .*space=0 set_hr=0x00000000.*view_kind=[01]' $transition
+            Find-ChainAfter "$sdrChainPattern.*view_kind=[01]" $transition
         }
         $transition = [DateTime]::UtcNow
         & $DisplayModeTool $MonitorFriendlyName on
         if ($LASTEXITCODE) { throw 'Windows rejected HDR restoration.' }
         $report.checks.recoveredHdr = Wait-For 'HDR configuration after restoring Windows HDR' 35 {
-            Find-ChainAfter 'format=10 alpha=3 .*space=1 set_hr=0x00000000.*view_kind=2' $transition
+            Find-ChainAfter $hdrChainPattern $transition
         }
     }
     if ($PlmDebugTool) {
@@ -288,7 +350,7 @@ try {
         $resumed = [DateTime]::UtcNow
         $frame = Move-ToDisplay $Display 1120 790
         $report.checks.resumeSwapchain = Wait-For 'HDR configuration after package resume' 30 {
-            Find-ChainAfter 'format=10 alpha=3 .*space=1 set_hr=0x00000000.*view_kind=2' $resumed
+            Find-ChainAfter $hdrChainPattern $resumed
         }
     }
     $report.passed = $true
@@ -296,6 +358,9 @@ try {
     $report.failure = $_.Exception.Message
     throw
 } finally {
+    if ($ForceDx12Removal -and (Test-Path -LiteralPath $removalRequest -PathType Leaf)) {
+        [IO.File]::Delete($removalRequest)
+    }
     if ($plmEnabled) {
         try {
             try {

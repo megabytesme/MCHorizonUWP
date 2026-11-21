@@ -1,0 +1,99 @@
+2026-11-21T13:38:49.336Z tid=37596 OnLaunched
+2026-11-21T13:38:49.372Z tid=37596 Before WinUI
+2026-11-21T13:38:49.373Z tid=37596 Before WinUI metadata provider
+2026-11-21T13:38:49.377Z tid=37596 WinUI metadata provider created
+2026-11-21T13:38:49.378Z tid=37596 WinUI metadata provider initialized
+2026-11-21T13:38:49.405Z tid=37596 WinUI ready
+2026-11-21T13:38:49.408Z tid=37596 Theme ready
+2026-11-21T13:38:49.413Z tid=37596 Window activated
+2026-11-21T13:38:49.414Z tid=37596 ANGLE renderer probe starting
+2026-11-21T13:38:49.415Z tid=37596 ANGLE probe: instance creation starting
+2026-11-21T13:38:49.459Z tid=37596 ANGLE probe: instance created
+2026-11-21T13:38:49.460Z tid=37596 ANGLE probe: surface creation starting
+2026-11-21T13:38:49.461Z tid=37596 ANGLE probe: surface created
+2026-11-21T13:38:49.461Z tid=37596 ANGLE probe: adapter request starting
+2026-11-21T13:38:49.467Z tid=37596 ANGLE probe: adapter returned
+2026-11-21T13:38:49.468Z tid=37596 ANGLE probe: device request starting
+2026-11-21T13:38:49.469Z tid=37596 ANGLE probe: device returned
+2026-11-21T13:38:49.470Z tid=37596 ANGLE probe: surface configuration starting
+2026-11-21T13:38:49.475Z tid=37596 ANGLE probe: surface configured
+2026-11-21T13:38:49.475Z tid=37596 ANGLE probe: frame acquired
+2026-11-21T13:38:49.485Z tid=37596 ANGLE probe: frame presented
+2026-11-21T13:38:49.511Z tid=37596 ANGLE renderer probe succeeded
+2026-11-21T13:38:49.512Z tid=37596 DX12 renderer probe starting
+2026-11-21T13:38:49.512Z tid=37596 DX12 probe: instance creation starting
+2026-11-21T13:38:49.516Z tid=37596 DX12 probe: instance created
+2026-11-21T13:38:49.516Z tid=37596 DX12 probe: surface creation starting
+2026-11-21T13:38:49.517Z tid=37596 DX12 probe: surface created
+2026-11-21T13:38:49.517Z tid=37596 DX12 probe: adapter request starting
+2026-11-21T13:38:49.871Z tid=37596 DX12 probe: adapter returned
+2026-11-21T13:38:49.872Z tid=37596 DX12 probe: device request starting
+2026-11-21T13:38:50.164Z tid=37596 DX12 probe: device returned
+2026-11-21T13:38:50.286Z tid=37596 DX12 probe: surface configuration starting
+2026-11-21T13:38:50.291Z tid=37596 game swap chain attachment requested
+2026-11-21T13:38:50.292Z tid=37596 game swap chain attachment entered the XAML dispatcher
+2026-11-21T13:38:50.292Z tid=37596 game SwapChainPanel SetSwapChain starting
+2026-11-21T13:38:50.293Z tid=37596 game SwapChainPanel SetSwapChain completed
+2026-11-21T13:38:50.294Z tid=37596 DXGI color configure: desc_hr=0x00000000 format=87 alpha=0 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:38:50.301Z tid=37596 DX12 probe: surface configured
+2026-11-21T13:38:50.302Z tid=37596 DX12 probe: frame acquired
+2026-11-21T13:38:50.306Z tid=37596 DX12 probe: frame presented
+2026-11-21T13:38:50.363Z tid=37596 DX12 renderer probe succeeded
+2026-11-21T13:38:50.364Z tid=37596 wgpu D3D11 renderer probe starting
+2026-11-21T13:38:50.364Z tid=37596 wgpu D3D11 probe: instance creation starting
+2026-11-21T13:38:50.365Z tid=37596 wgpu D3D11 probe: instance created
+2026-11-21T13:38:50.365Z tid=37596 wgpu D3D11 probe: surface creation starting
+2026-11-21T13:38:50.366Z tid=37596 wgpu D3D11 probe: surface created
+2026-11-21T13:38:50.366Z tid=37596 wgpu D3D11 probe: adapter request starting
+2026-11-21T13:38:50.541Z tid=37596 wgpu D3D11 probe: adapter returned
+2026-11-21T13:38:50.542Z tid=37596 wgpu D3D11 probe: device request starting
+2026-11-21T13:38:50.547Z tid=37596 wgpu D3D11 probe: device returned
+2026-11-21T13:38:50.558Z tid=37596 wgpu D3D11 probe: surface configuration starting
+2026-11-21T13:38:50.561Z tid=37596 game swap chain attachment requested
+2026-11-21T13:38:50.562Z tid=37596 game swap chain attachment entered the XAML dispatcher
+2026-11-21T13:38:50.563Z tid=37596 game SwapChainPanel SetSwapChain starting
+2026-11-21T13:38:50.564Z tid=37596 game SwapChainPanel SetSwapChain completed
+2026-11-21T13:38:50.565Z tid=37596 wgpu D3D11 probe: surface configured
+2026-11-21T13:38:50.566Z tid=37596 wgpu D3D11 probe: frame acquired
+2026-11-21T13:38:50.570Z tid=37596 wgpu D3D11 probe: frame presented
+2026-11-21T13:38:50.981Z tid=37596 wgpu D3D11 renderer probe succeeded
+2026-11-21T13:38:50.982Z tid=37596 renderer probes D3D11=0 ANGLE=1 DX12=1 WGPU_D3D11=1
+2026-11-21T13:38:50.984Z tid=90408 Worker started
+2026-11-21T13:38:50.985Z tid=90408 initial game-session preparation started
+2026-11-21T13:38:51.485Z tid=37596 startup page accepted choice 1
+2026-11-21T13:38:51.485Z tid=37596 Prompt ready
+2026-11-21T13:38:51.516Z tid=90408 initial game-session preparation returned 1
+2026-11-21T13:38:51.536Z tid=37596 open game view callback entered
+2026-11-21T13:38:51.559Z tid=37596 starting game view with renderer 2
+2026-11-21T13:38:51.573Z tid=37596 game surface shown; waiting for the game renderer
+2026-11-21T13:38:51.574Z tid=117824 game worker entering the Rust bridge
+2026-11-21T13:38:55.551Z tid=62764 game swap chain attachment requested
+2026-11-21T13:38:55.551Z tid=37596 game swap chain attachment entered the XAML dispatcher
+2026-11-21T13:38:55.553Z tid=37596 game SwapChainPanel SetSwapChain starting
+2026-11-21T13:38:55.553Z tid=37596 game SwapChainPanel SetSwapChain completed
+2026-11-21T13:38:55.554Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.688Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1472 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.699Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1472 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.708Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1472 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.727Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.748Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1600 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.774Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.791Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:15.810Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:33.709Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:36.673Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:40.273Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=2048 height=1536 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:39:40.282Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1174 height=772 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:40:01.290Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1174 height=772 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:40:01.316Z tid=62764 HDR QA pressure allocation: hr=0x00000000 bytes=268435456 usage_before=275640320 budget=24684527616
+2026-11-21T13:40:01.333Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1094 height=702 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:40:03.326Z tid=90408 HDR QA pressure held: usage=541650944 budget=24684527616
+2026-11-21T13:40:03.330Z tid=90408 HDR QA removing only the isolated game's D3D12 device
+2026-11-21T13:40:03.336Z tid=90408 HDR QA removed reason=0x887A0005
+2026-11-21T13:40:04.230Z tid=62764 game swap chain attachment requested
+2026-11-21T13:40:04.230Z tid=37596 game swap chain attachment entered the XAML dispatcher
+2026-11-21T13:40:04.232Z tid=37596 game SwapChainPanel SetSwapChain starting
+2026-11-21T13:40:04.233Z tid=37596 game SwapChainPanel SetSwapChain completed
+2026-11-21T13:40:04.234Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1094 height=702 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:40:25.095Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1094 height=702 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000
+2026-11-21T13:40:25.808Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1094 height=702 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000

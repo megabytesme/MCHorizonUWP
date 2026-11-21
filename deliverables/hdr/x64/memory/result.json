@@ -1,0 +1,67 @@
+﻿{
+    "package":  "MCHorizonUWP.HdrDev.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "pid":  7476,
+    "started":  "2026-11-21T13:34:03.5730418Z",
+    "mode":  "Off",
+    "backend":  "Dx12",
+    "scale":  100,
+    "adaptiveResolution":  false,
+    "targetFps":  60,
+    "antiAlias":  "None",
+    "shaderPack":  "",
+    "requestedDisplay":  "Current",
+    "expectedHdr":  false,
+    "captureMethod":  "Wasm screenshot fixture",
+    "wasmFixtureSha256":  "57144EC183896C6B553E1A407FC7D7CE92D308C8043B5396289C40075CD1E456",
+    "checks":  {
+                   "renderer":  "[13:34:25] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+                   "swapchain":  "2026-11-21T13:34:25.091Z tid=60756 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1174 height=772 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000",
+                   "capture":  [
+                                   {
+                                       "original":  "2026-11-21_13.34.55.png",
+                                       "sha256":  "02295B26E75D5D7C9389F11CCE4F8161F61EBB9A33263BA580DEA8E6CD833385",
+                                       "name":  "world-1.png"
+                                   }
+                               ],
+                   "memory":  [
+                                  {
+                                      "utc":  "2026-11-21T13:34:57.1831937Z",
+                                      "processPrivateBytes":  1257402368,
+                                      "processWorkingSetBytes":  999165952,
+                                      "gpuDedicatedBytes":  366690304,
+                                      "gpuSharedBytes":  114991104
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:34:58.2856065Z",
+                                      "processPrivateBytes":  1261543424,
+                                      "processWorkingSetBytes":  1002115072,
+                                      "gpuDedicatedBytes":  366690304,
+                                      "gpuSharedBytes":  114991104
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:34:59.3723579Z",
+                                      "processPrivateBytes":  1263616000,
+                                      "processWorkingSetBytes":  1003560960,
+                                      "gpuDedicatedBytes":  366690304,
+                                      "gpuSharedBytes":  114991104
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:35:00.4309654Z",
+                                      "processPrivateBytes":  1262505984,
+                                      "processWorkingSetBytes":  1002385408,
+                                      "gpuDedicatedBytes":  366690304,
+                                      "gpuSharedBytes":  114991104
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:35:01.5402627Z",
+                                      "processPrivateBytes":  1260941312,
+                                      "processWorkingSetBytes":  1000706048,
+                                      "gpuDedicatedBytes":  366690304,
+                                      "gpuSharedBytes":  115384320
+                                  }
+                              ]
+               },
+    "actualDisplay":  "\\\\.\\DISPLAY1",
+    "passed":  true,
+    "closed":  true
+}

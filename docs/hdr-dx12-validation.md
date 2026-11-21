@@ -38,11 +38,23 @@ The U32J59x was inactive by the time the signed matrix ran. On the remaining PG3
 
 An On run with adaptive resolution enabled and a 240 FPS target presented HDR and saved both PNGs. Windows PLMDebug reported the isolated package suspended. After resuming it, the same process resized the live game panel and successfully reapplied scRGB with the HDR view active. The harness released the debug reference on exit. The test exercised the adaptive rendering path and lifecycle. It did not measure scale convergence or trigger GPU device loss. [Adaptive and lifecycle receipt](../deliverables/hdr/x64/gameplay/adaptive-plm/result.json) · [Windows lifecycle debugging](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/plmdebug)
 
-The current-build screenshot fixture exercised the game's screenshot path under AppContainer. A foreground Windows file picker blocked the direct F2 run.
+The current-build screenshot fixture exercised the game's screenshot path under AppContainer. When the foreground was available, direct F2 on the same signed candidate saved both the RGBA8 SDR PNG and the tagged RGB16 HDR PNG during terrain load. The first game presentation had already configured the live FP16 scRGB chain with an HDR view. The previous captures provide the fully loaded world and HUD evidence. [Direct F2 receipt](../deliverables/hdr/x64/f2/result.json) · [HDR metadata check](../deliverables/hdr/x64/f2/hdr-png.json)
+
+After the F2 run, Windows switched to an active RDP session. The PG32UCDM and U32J59x had no active display paths in that session, and the user kept RDP connected. The physical monitor-move check awaits an active console with both displays.
+
+## Forced D3D12 removal and memory
+
+An independently signed `MCHorizonUWP.HdrDev.DeviceLoss.x64` diagnostic build used the exact Rust bridge from the signed HDR game and a separate host kit. While the world rendered on the RTX 3090 Ti under RDP, the app held a 256 MiB local allocation for two seconds. `QueryVideoMemoryInfo` reported 275,640,320 bytes before allocation and 541,650,944 bytes while held, an increase of about 254 MiB. The diagnostic released the allocation, then removed only the game's D3D12 device. DXGI reported `DXGI_ERROR_DEVICE_REMOVED`. The same process recovered the renderer, began rebuilding the world meshes, configured a fresh opaque BGRA8/sRGB chain and reached its first present call. RDP went inactive during the F2 repeat, before the test could take a fresh post-recovery screenshot. The isolated game was closed. [Signed diagnostic and test receipts](../deliverables/hdr/x64/recovery/index.json)
+
+Five WDDM per-process samples accompanied direct F2 on the physical HDR monitor. A separate run on the same signed game with HDR Off sampled another five times under RDP. Dedicated memory was about 347 MiB in the HDR run and about 350 MiB in the SDR run. The scene, viewport and Windows session differed. A matched HDR/SDR memory comparison and D3D12 device removal in an active HDR view remain pending. [HDR counters](../deliverables/hdr/x64/f2/result.json) · [SDR counters](../deliverables/hdr/x64/memory/result.json)
+
+Build the isolated diagnostic with `tools/hdr/Build-HdrRecoveryCandidate.ps1`, the prior assembled source, the hash-checked signed HDR game bridge and the matching ANGLE DLLs. Follow the development packaging procedure and independently verify the signed package. With the desktop GPU lock held, run `tools/hdr/Test-HdrGame.ps1` against identity `MCHorizonUWP.HdrDev.DeviceLoss.x64` using the isolated world, `-Display Current -Hdr On -SampleMemory -ForceDx12Removal` and the nonautomatic Wasm fixture. Add `-ExpectHdr` when the game is on an active physical HDR display. [Build script](../tools/hdr/Build-HdrRecoveryCandidate.ps1) · [Harness](../tools/hdr/Test-HdrGame.ps1)
 
 ## Surface Pro X
 
 The strict ARM64 release built, signed and installed on the physical Adreno 680 Surface. Its internal panel reported 8-bit SDR only. The native DXGI probe accepted FP16/scRGB and RGB10/PQ formats on the same machine, which confirms that swapchain-format support alone cannot establish HDR output. The signed game's startup configured BGRA8/sRGB with an SDR view. Windows suspended the 31-thread game process in the locked console before a world frame. [Signed ARM64 APPX](../deliverables/hdr/arm64/HorizonUWP-HDR-arm64.appx) · [Surface build, transfer and hardware record](../deliverables/hdr/arm64/README.md) · [Locked activation receipt](../deliverables/hdr/arm64/locked-game-attempt.json)
+
+After the Surface was reported unlocked, the fixture transfer timed out before launch. A separate connection retry to TCP 22 also timed out. Gameplay still requires a reachable, unlocked Surface, and ARM64 HDR requires a connected HDR display.
 
 ## Official Windows comparison
 

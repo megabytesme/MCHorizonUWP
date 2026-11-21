@@ -1,0 +1,44 @@
+{
+  "test_date_utc": "2026-11-21",
+  "hardware": "NVIDIA GeForce RTX 3090 Ti",
+  "driver": "32.0.16.2101",
+  "view": "SDR via active Windows RDP session",
+  "package": {
+    "identity": "MCHorizonUWP.HdrDev.DeviceLoss.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "file": "HorizonUWP-DeviceLoss-x64.appx",
+    "sha256": "9b644485bac4f53322f4b0d3b0770f77242e52c6b49f344b92e08bee4affaacc",
+    "host_sha256": "ac17c2a1b2d0789958a76f19d4f4486bc6f860a526f267f6073d2a8054b86190",
+    "host_source_before_diagnostic": "cee29bb65e6a3acc468e63b951ea20ee681094ac",
+    "bridge_sha256": "d29cd8bde0f7ceeb2720b540d6cea908c81bd19e22c07606f5bdb3e2a4de02e2",
+    "wgpu": "432a009d8d44aa2b5988668bb9620d975a275a00",
+    "signature": "SignTool verify /pa passed",
+    "strict_link": "x64 AppContainer host passed on Ben-Desktop",
+    "scratch": "E:/Temp/mchorizon-hdr-finish/recovery-3"
+  },
+  "pressure_run": {
+    "status": "passed_sdr",
+    "result": "pressure/result.json",
+    "lifecycle": "pressure/lifecycle.log",
+    "game": "pressure/game.log",
+    "pre_removal_png": "pressure/sdr-png.json",
+    "requested_allocation_bytes": 268435456,
+    "allocated_hresult": "0x00000000",
+    "local_usage_before_bytes": 275640320,
+    "local_usage_while_held_bytes": 541650944,
+    "local_usage_delta_bytes": 266010624,
+    "local_budget_bytes": 24684527616,
+    "hold_seconds": 2,
+    "allocation_released_before_removal": true,
+    "native_removed_hresult": "0x887A0005",
+    "presentation_after_removal": "Same process began rebuilding the world meshes, configured BGRA8/sRGB and reached the first present call."
+  },
+  "post_recovery_f2": {
+    "status": "blocked_before_world",
+    "result": "f2-attempt.json",
+    "detail": "The session was disconnected and the game stopped responding before the world started. Closed the isolated game and released the desktop lock."
+  },
+  "limits": [
+    "Device loss in an HDR-active view requires an active physical HDR output.",
+    "The original signed HDR and SDR samples use different viewports and sessions. A matched memory comparison is pending."
+  ]
+}

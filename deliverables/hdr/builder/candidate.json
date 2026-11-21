@@ -2,7 +2,7 @@
   "product_commit": "3b09323fdbe8f7ae24f760393f86d5f4b2aad042",
   "upstream_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
   "wgpu_base_commit": "aa7b65c43ef008d0a92d20fcdf9f10fa0883f157",
-  "wgpu_final_commit": "432a009d8",
+  "wgpu_final_commit": "432a009d8d44aa2b5988668bb9620d975a275a00",
   "wgpu_final_tree": "6c871af7ecf48892e47e09d3babbdf96d4eb6785",
   "wgpu_overlay_sha256": "4c31f9349e28d294fa6d1663a6c4d3cacc134a9a4c8b1e2aea63688230e0c934",
   "recipe": {
@@ -11,6 +11,7 @@
     "builder": "1.0.10"
   },
   "candidate_directory": "E:\\Temp\\mchorizon-hdr-finish\\builder\\candidate",
+  "preserved_candidate_directory": "candidate",
   "assembled_directory": "E:\\Temp\\mchorizon-hdr-finish\\builder\\assembled",
   "candidate_sha256": {
     "catalog.UNSIGNED.json": "5b5e09817a66d8367fb16c0eedf475c7b1a2cd539212fbe0417f562cb4030c5a",

@@ -346,7 +346,10 @@
       "display_setting_restored": true,
       "receipt": "x64/gameplay/mode-transition/result.json",
       "resumed_hdr": "2026-11-21T07:46:24.339Z tid=91296 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1098 height=730 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
-      "resume_receipt": "x64/gameplay/adaptive-plm/result.json"
+      "resume_receipt": "x64/gameplay/adaptive-plm/result.json",
+      "f2_active_hdr": "2026-11-21T13:26:27.024Z tid=61488 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+      "f2_receipt": "x64/f2/result.json",
+      "sdr_device_removal_receipt": "x64/recovery/index.json"
     },
     {
       "architecture": "arm64",

@@ -31,3 +31,9 @@ The source baseline is wgpu `aa7b65c43ef008d0a92d20fcdf9f10fa0883f157` and UWP `
 | `wgpu-hal/src/dx11/hal_device.rs`, `hal_pipeline.rs` | Allocation, view translation and pipeline validation implement a restricted format set. Vertex formats have separate mappings. | Verify texture, RTV and SRV mapping in both directions, blending and the game's actual float world, HUD and final pass. Test invalid format/usage combinations. |
 
 Validation still requires the revised pinned game on a real SwapChainPanel, an active-view HDR reading, a successfully configured and presented HDR surface, a visible in-game world and HUD, and matching SDR transitions. Resize, suspend/resume, display migration and device loss must restore the correct pair. A higher native feature-level result does not certify any subsequent D3D11 tier. The FL9_1 projection and its SDR path remain the compatibility baseline under the existing certification process.
+
+## November 21 native HDR candidate
+
+The isolated `codex/hdr-dx11-native-nov21` candidate at `a52f1988412e20b7ef45f58e9483d6245260baa7` adds the opt-in `wgpu-hal/dx11-native-hdr` feature. The native FL11_0+ API offers opaque FP16 scRGB for UWP XAML and FP16 scRGB or RGB10A2 PQ for desktop HWND. It requires the DXGI PRESENT bit, selects the requested color space on the same chain, and exposes typed readback and format-aware resize. The PQ fixture keeps HDR10 metadata active through its first accepted present. The existing public wgpu projection still offers BGRA8/sRGB.
+
+Desktop and x64 UWP checks, Clippy and seven unit tests passed. Two forced hardware FL9_1 SDR regressions passed on predecessor `b023f9c495e2d986f915a47563b156cd52e56aad`. The native HDR test required an active physical HDR path and stopped before swapchain creation under RDP. The final candidate still needs the physical HWND fixture, signed UWP XAML with world and HUD, resize rollback and the inherited lower-tier suite before promotion.

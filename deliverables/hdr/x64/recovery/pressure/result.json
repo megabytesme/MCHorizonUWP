@@ -1,0 +1,70 @@
+﻿{
+    "package":  "MCHorizonUWP.HdrDev.DeviceLoss.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "pid":  83500,
+    "started":  "2026-11-21T13:38:48.9921491Z",
+    "mode":  "On",
+    "backend":  "Dx12",
+    "scale":  100,
+    "adaptiveResolution":  false,
+    "targetFps":  60,
+    "antiAlias":  "None",
+    "shaderPack":  "",
+    "requestedDisplay":  "Current",
+    "expectedHdr":  false,
+    "captureMethod":  "Wasm screenshot fixture",
+    "wasmFixtureSha256":  "57144EC183896C6B553E1A407FC7D7CE92D308C8043B5396289C40075CD1E456",
+    "checks":  {
+                   "renderer":  "[13:39:36] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+                   "swapchain":  "2026-11-21T13:39:40.282Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1174 height=772 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000",
+                   "capture":  [
+                                   {
+                                       "original":  "2026-11-21_13.39.54.png",
+                                       "sha256":  "6BFC62D7E8C72FDC3C5C370F3E871C910E4CEAC3E38361DD72821B5B9BDA2251",
+                                       "name":  "world-1.png"
+                                   }
+                               ],
+                   "memory":  [
+                                  {
+                                      "utc":  "2026-11-21T13:39:55.8055364Z",
+                                      "processPrivateBytes":  1151823872,
+                                      "processWorkingSetBytes":  980283392,
+                                      "gpuDedicatedBytes":  283734016,
+                                      "gpuSharedBytes":  80285696
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:39:56.9007102Z",
+                                      "processPrivateBytes":  1147965440,
+                                      "processWorkingSetBytes":  976384000,
+                                      "gpuDedicatedBytes":  283734016,
+                                      "gpuSharedBytes":  80285696
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:39:57.9696316Z",
+                                      "processPrivateBytes":  1148862464,
+                                      "processWorkingSetBytes":  977440768,
+                                      "gpuDedicatedBytes":  283734016,
+                                      "gpuSharedBytes":  80285696
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:39:59.0615046Z",
+                                      "processPrivateBytes":  1148391424,
+                                      "processWorkingSetBytes":  976994304,
+                                      "gpuDedicatedBytes":  283734016,
+                                      "gpuSharedBytes":  80285696
+                                  },
+                                  {
+                                      "utc":  "2026-11-21T13:40:00.1517426Z",
+                                      "processPrivateBytes":  1150242816,
+                                      "processWorkingSetBytes":  978296832,
+                                      "gpuDedicatedBytes":  283734016,
+                                      "gpuSharedBytes":  80285696
+                                  }
+                              ],
+                   "removal":  "2026-11-21T13:40:03.336Z tid=90408 HDR QA removed reason=0x887A0005",
+                   "recovery":  "[13:40:25] [Horizon game/INFO]: Horizon: graphics device recovered; rebuilding world meshes",
+                   "recoveredSwapchain":  "2026-11-21T13:40:25.808Z tid=62764 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1094 height=702 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=0.00 min_nits=0.0000"
+               },
+    "actualDisplay":  "\\\\.\\DISPLAY1",
+    "passed":  true,
+    "closed":  true
+}

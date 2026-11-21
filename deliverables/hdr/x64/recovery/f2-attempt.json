@@ -1,0 +1,20 @@
+{
+    "package":  "MCHorizonUWP.HdrDev.DeviceLoss.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "pid":  113688,
+    "started":  "2026-11-21T13:43:26.5279332Z",
+    "mode":  "On",
+    "backend":  "Dx12",
+    "scale":  100,
+    "adaptiveResolution":  false,
+    "targetFps":  60,
+    "antiAlias":  "None",
+    "shaderPack":  "",
+    "requestedDisplay":  "Current",
+    "expectedHdr":  false,
+    "captureMethod":  "F2",
+    "wasmFixtureSha256":  "295326EB0DCA7D0FFD9E7CA45B6A4AA31A7284EA818FAFC50C804225DD89F3BC",
+    "checks":  {
+
+               },
+    "failure":  "Game exited while waiting for hardware renderer and local world."
+}

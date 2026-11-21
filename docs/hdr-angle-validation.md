@@ -55,12 +55,14 @@ can retain its EGL rendering context across the surface format transition. Expli
 BT.2020 requests still returned `EGL_BAD_ATTRIBUTE`. [Configless switch receipt](../deliverables/hdr/angle/x64-fp16-configless-switch.txt)
 
 The isolated candidate fork `codex/hdr-angle-hal-nov21` at
-`3cd220017fad76d11e6939984f42917cee9fa5a7` implements the experiment behind
+`b72e975edff4bafa8d41fc14916d7e475e11c8ad` implements the experiment behind
 `WGPU_UWP_ANGLE_HDR=1`. It requires the explicit ANGLE D3D11 EGL platform, the two EGL
 extensions, a matching non-MSAA FP16 GLES3 window config, successful configless context creation,
 and the existing GL half-float color-target capability. It selects the FP16 EGL config only
 when the application requests `Rgba16Float` with `ExtendedSrgbLinear` and keeps the existing
-EGL config for SDR. An x64 UWP GLES-only `cargo check` passed. The shipped Horizon GL backend
+EGL config for SDR. Failed swaps release the EGL binding. Failed configuration cleans up
+partially allocated resources and leaves the surface available for retry. An x64 UWP GLES-only
+`cargo check` passed. The shipped Horizon GL backend
 continues to select SDR. A signed game integration still needs to drive the active-view HDR
 selection and verify world/HUD composition, in-process fallback, and signed captures on an
 active HDR output. Missing EGL support keeps the default SDR path available.

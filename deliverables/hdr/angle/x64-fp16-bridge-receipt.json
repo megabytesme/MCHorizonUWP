@@ -41,7 +41,7 @@
     "physical_hdr_verified": false
   },
   "prototype_hal": {
-    "commit": "3cd220017fad76d11e6939984f42917cee9fa5a7",
+    "commit": "b72e975edff4bafa8d41fc14916d7e475e11c8ad",
     "opt_in": "WGPU_UWP_ANGLE_HDR=1",
     "cargo_check": "cargo +1.99.1 check --locked --offline -p wgpu-hal --no-default-features --features gles -Z build-std=std,panic_abort --target x86_64-uwp-windows-msvc",
     "cargo_check_passed": true,
