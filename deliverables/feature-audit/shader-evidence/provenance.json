@@ -1,0 +1,78 @@
+﻿{
+    "package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "executable_sha256":  "688380676275422C7ECF95F9522B1D39FCEFF0FD440803641995022F31C0ED89",
+    "release":  {
+                    "schema_version":  1,
+                    "patch_version":  "0.1.15",
+                    "client_version":  "0.1.17",
+                    "upstream_commit":  "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
+                },
+    "utc":  "2026-11-21T07:01:42.7952032Z",
+    "cases":  [
+                  "Dx12:golden",
+                  "Gl:golden",
+                  "Dx11:golden",
+                  "Dx12:hdr",
+                  "Dx12:classic",
+                  "Gl:classic",
+                  "Dx12:off"
+              ],
+    "world":  [
+                  {
+                      "path":  "level.dat",
+                      "sha256":  "E48AB84D3B8242998DDCCE8C9A9B7511CA01AC73E318AF9E2FB47857257B95C2"
+                  },
+                  {
+                      "path":  "level.dat_old",
+                      "sha256":  "240A683C61C57F9FC8CB5493B474E02F56A34E901D6D237179898E54EFE306BA"
+                  },
+                  {
+                      "path":  "data\\minecraft\\game_rules.dat",
+                      "sha256":  "1081E7E241DD49FDCD4A40B0FA2180AE80D29ABD6AADFD201B399EC156249490"
+                  },
+                  {
+                      "path":  "data\\minecraft\\game_rules.dat_old",
+                      "sha256":  "E246682B56DA904E279F8FECBC81A0147D39953A9F276BC54183383817E4815F"
+                  },
+                  {
+                      "path":  "data\\minecraft\\random_sequences.dat",
+                      "sha256":  "8EF42146E4735818A386E95A61693BECF58630F77064B840261F773C570D0409"
+                  },
+                  {
+                      "path":  "data\\minecraft\\weather.dat",
+                      "sha256":  "C164F13A3F35E34232D3E298345BC529EF803712777B1400D3D4FA25D8E6FAA6"
+                  },
+                  {
+                      "path":  "data\\minecraft\\weather.dat_old",
+                      "sha256":  "E72AB5428390C0FD636AAB907BFB97404D6B62B605BEF1A8979CA5C007EFE2E6"
+                  },
+                  {
+                      "path":  "data\\minecraft\\world_clocks.dat",
+                      "sha256":  "EFA3A16469C6E3E2D86FCB753B54A039D159FFDAC0851643E30C779ACF90FCF5"
+                  },
+                  {
+                      "path":  "data\\minecraft\\world_clocks.dat_old",
+                      "sha256":  "EFA3A16469C6E3E2D86FCB753B54A039D159FFDAC0851643E30C779ACF90FCF5"
+                  },
+                  {
+                      "path":  "data\\minecraft\\world_gen_settings.dat",
+                      "sha256":  "662A9AC92225E75947153AC6A2E9B42BEFE1855997B68B2A5EA5F39D11CAF7F7"
+                  },
+                  {
+                      "path":  "dimensions\\minecraft\\overworld\\data\\minecraft\\raids.dat",
+                      "sha256":  "29359527F23CE3D47408E03B3256E59B679538B17DECA07403CC1D74BCC67A41"
+                  },
+                  {
+                      "path":  "dimensions\\minecraft\\overworld\\region\\r.-1.0.mca",
+                      "sha256":  "044FB875CD79F04E469A139BFA72D7F176871AA295E2F431DC6770599FED597F"
+                  },
+                  {
+                      "path":  "dimensions\\minecraft\\overworld\\region\\r.-2.0.mca",
+                      "sha256":  "09790ECDDD4A5E363567A90FD70D6B2AFA99C76F6F79D20796C7D24E06D3D604"
+                  },
+                  {
+                      "path":  "players\\data\\a01e3843-e521-3998-958a-f459800e4d11.dat",
+                      "sha256":  "802AC9A7F57019DC378ED15393D269BB1582A661A3EFB6B0CE82EA5A5AA33B13"
+                  }
+              ]
+}

@@ -1,0 +1,23 @@
+[22:14:06] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[22:14:06] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[22:14:06] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[22:14:09] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 139 ms, modules 2599 ms, linking 28 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms
+[22:14:09] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[22:14:09] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 9 ms
+[22:14:09] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[22:14:09] [unnamed/INFO]: [wgpu_hal::gles::egl] EGL says it can present to the window but not natively
+[22:14:09] [unnamed/INFO]: [wgpu_hal::gles::egl] UWP ANGLE EGL selected window-presentable config: true
+[22:14:09] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:14:09] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)
+[22:14:09] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1800x1350 Bgra8Unorm, Fifo)
+[22:14:09] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[22:14:09] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[22:14:09] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\1a23848d346799f6
+[22:14:09] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[22:14:10] [resource-loader/INFO]: Horizon: UI bundle ready after 1478 ms
+[22:14:11] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[22:14:12] [resource-loader/INFO]: load core tables: 3.19s
+[22:14:13] [World data preload/INFO]: Horizon: worldgen data loaded in 792.6861ms
+[22:14:13] [resource-loader/INFO]: load pack tables: 4.28s
+[22:14:13] [resource-loader/INFO]: Horizon: core-ready after 4338 ms
+[22:14:13] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 68 ms

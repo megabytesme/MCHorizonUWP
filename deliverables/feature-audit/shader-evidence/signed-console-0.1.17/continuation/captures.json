@@ -1,0 +1,443 @@
+[
+  {
+    "case": "Gl:off",
+    "files_sha256": {
+      "harness-error.txt": "d026d4b3a0518b95d2c0e96b9bf8ca24eff0473cd2dc168a0f1f92b2037954f3",
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "ec7ea5970ae6ecce136a16e55d342968e7f58fc9c7f0d2076a542b43213ac6d5",
+      "horizon-graphics.txt": "0a48940882c180941d6f11ee87344e191ea023f8cbf223bee73f2104666e3b73",
+      "game.log": "77bb1e72e953ccc32dae422c75726c9ff4f18748f0f3454c51dfe891d5194aed"
+    },
+    "renderer": null,
+    "ready": false,
+    "exit": "forced isolated candidate shutdown",
+    "runtime_lines": [
+      {
+        "line": 9,
+        "text": "[22:00:48] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 15,
+        "text": "[22:01:02] [Horizon game/INFO]: Horizon renderer: acquiring the first frame"
+      },
+      {
+        "line": 16,
+        "text": "[22:01:02] [Horizon game/INFO]: Horizon renderer: submitting the first frame"
+      },
+      {
+        "line": 17,
+        "text": "[22:01:02] [Horizon game/INFO]: Horizon renderer: presenting the first frame"
+      }
+    ]
+  },
+  {
+    "case": "Gl:sky",
+    "files_sha256": {
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "f71b96f876fff1d1d9525ba0e7d78aa24cda581f7504731996beedd841e65ff5",
+      "horizon-graphics.txt": "b32b8d43c3481cbaddf02e7f2592c5092deaec97c5ca15dd64ae3bfd48a6df8b",
+      "game.log": "363610ed88a99abc8d66fb4bbb9661a8d90cbea0562e3529c5a186124d1ee032",
+      "world.png": "e8ff9f820934576b08ede3a8ba614748d1a1e188e85b86daef7bbb98ebde5660",
+      "horizon-error-20261121-220703-813-81484-0.txt": "e07da6391dd92f9322a6b3145c1dab8f5694f0386f49aa380e89f5502cf98241",
+      "horizon-error-20261121-220703-814-81484-0.txt": "b0913352a9a8455f47330a4cc6be4dbbeb026f433a14a6641df3dc979ed698a0"
+    },
+    "renderer": "[22:06:16] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "ready": true,
+    "exit": "closed",
+    "capture": {
+      "Width": 1800,
+      "Height": 1350,
+      "Cyan": 6400,
+      "Magenta": 6400,
+      "SceneColors": 1995
+    },
+    "runtime_lines": [
+      {
+        "line": 11,
+        "text": "[22:04:48] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 16,
+        "text": "[22:04:57] [Horizon game/INFO]: Horizon renderer: acquiring the first frame"
+      },
+      {
+        "line": 17,
+        "text": "[22:04:57] [Horizon game/INFO]: Horizon renderer: submitting the first frame"
+      },
+      {
+        "line": 18,
+        "text": "[22:04:57] [Horizon game/INFO]: Horizon renderer: presenting the first frame"
+      },
+      {
+        "line": 46,
+        "text": "[22:06:27] [Horizon game/INFO]: Horizon: first frame after 858 ms"
+      },
+      {
+        "line": 48,
+        "text": "[22:06:55] [Horizon game/WARN]: shader pack audit_sky_marker.hshader refused: sky.wgsl: Validation Error"
+      },
+      {
+        "line": 51,
+        "text": "In Device::create_render_pipeline, label = 'Native shader pack sky'"
+      },
+      {
+        "line": 52,
+        "text": "PipelineLayout with 'Native shader pack sky' label is invalid"
+      },
+      {
+        "line": 53,
+        "text": "[22:06:55] [Horizon game/INFO]: [CHAT] Shader pack audit_sky_marker.hshader refused:"
+      },
+      {
+        "line": 57,
+        "text": "In Device::create_render_pipeline, label = 'Native shader pack sky'"
+      },
+      {
+        "line": 58,
+        "text": "PipelineLayout with 'Native shader pack sky' label is invalid"
+      },
+      {
+        "line": 65,
+        "text": "[22:07:05] [Horizon game/INFO]: Saved screenshot to C:\\Users\\ben\\AppData\\Local\\Packages\\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\\LocalState\\game\\screenshots\\2026-11-21_22.07.05.png"
+      },
+      {
+        "line": 66,
+        "text": "[22:07:05] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.07.05.png"
+      }
+    ]
+  },
+  {
+    "case": "Gl:material",
+    "files_sha256": {
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "a8965ddc3cfd2706f46d315d3e9512d3861b20ad0035e9782f5287df95be1744",
+      "horizon-graphics.txt": "4e19d14eac9119e36f8eedf05370df7e397195160abc982712d9a0a6b017fb67",
+      "game.log": "55a4993feef51e0a6f8bf92fc9e408974ab78ef7eeb2d69dc29091b3fbceeee6",
+      "world.png": "98cc6f2fb8388c90528421b4a0bfe1540e484caecc65d5237e6a1047c7925228",
+      "horizon-error-20261121-220743-849-89776-0.txt": "e07da6391dd92f9322a6b3145c1dab8f5694f0386f49aa380e89f5502cf98241",
+      "horizon-error-20261121-220743-850-89776-0.txt": "b0913352a9a8455f47330a4cc6be4dbbeb026f433a14a6641df3dc979ed698a0"
+    },
+    "renderer": "[22:07:23] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "ready": true,
+    "exit": "closed",
+    "capture": {
+      "Width": 1800,
+      "Height": 1350,
+      "Cyan": 6400,
+      "Magenta": 6400,
+      "SceneColors": 1728
+    },
+    "runtime_lines": [
+      {
+        "line": 11,
+        "text": "[22:07:13] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 41,
+        "text": "[22:07:31] [Horizon game/INFO]: Horizon: first frame after 220 ms"
+      },
+      {
+        "line": 43,
+        "text": "[22:07:36] [Horizon game/WARN]: shader pack audit_material_marker.hshader refused: material.wgsl: Validation Error"
+      },
+      {
+        "line": 46,
+        "text": "In Device::create_pipeline_layout, label = 'Native shader pack terrain'"
+      },
+      {
+        "line": 48,
+        "text": "[22:07:36] [Horizon game/INFO]: [CHAT] Shader pack audit_material_marker.hshader refused:"
+      },
+      {
+        "line": 52,
+        "text": "In Device::create_pipeline_layout, label = 'Native shader pack terrain'"
+      },
+      {
+        "line": 60,
+        "text": "[22:07:45] [Horizon game/INFO]: Saved screenshot to C:\\Users\\ben\\AppData\\Local\\Packages\\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\\LocalState\\game\\screenshots\\2026-11-21_22.07.45.png"
+      },
+      {
+        "line": 61,
+        "text": "[22:07:45] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.07.45.png"
+      }
+    ]
+  },
+  {
+    "case": "Gl:postsolo",
+    "files_sha256": {
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "87966233957f88702590b15ecac71616068be13f72c16b0f986cd975e48949e5",
+      "horizon-graphics.txt": "453ba37c24a48b08f710d7698073b7f81f5f8455406bb1ffd47870576ca9644f",
+      "game.log": "830572af02143b3e5bc4570899288d912bc47e08cd5416e6dda870ba6b1dc075",
+      "world.png": "77304ca923f6a1abf9ddf2732e89ea9d9426261f3a7c18583a9b041ecb70a96e",
+      "horizon-error-20261121-220825-594-63284-0.txt": "e07da6391dd92f9322a6b3145c1dab8f5694f0386f49aa380e89f5502cf98241",
+      "horizon-error-20261121-220825-596-63284-0.txt": "b0913352a9a8455f47330a4cc6be4dbbeb026f433a14a6641df3dc979ed698a0"
+    },
+    "renderer": "[22:08:01] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "ready": true,
+    "exit": "closed",
+    "capture": {
+      "Width": 1800,
+      "Height": 1350,
+      "Cyan": 6400,
+      "Magenta": 6400,
+      "SceneColors": 1497
+    },
+    "runtime_lines": [
+      {
+        "line": 11,
+        "text": "[22:07:51] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 41,
+        "text": "[22:08:11] [Horizon game/INFO]: Horizon: first frame after 303 ms"
+      },
+      {
+        "line": 45,
+        "text": "[22:08:15] [Horizon game/WARN]: shader pack audit_post_marker.hshader refused: post.wgsl: Validation Error"
+      },
+      {
+        "line": 50,
+        "text": "[22:08:15] [Horizon game/INFO]: [CHAT] Shader pack audit_post_marker.hshader refused:"
+      },
+      {
+        "line": 62,
+        "text": "[22:08:28] [Horizon game/INFO]: Saved screenshot to C:\\Users\\ben\\AppData\\Local\\Packages\\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\\LocalState\\game\\screenshots\\2026-11-21_22.08.28.png"
+      },
+      {
+        "line": 63,
+        "text": "[22:08:28] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.08.28.png"
+      }
+    ]
+  },
+  {
+    "case": "Gl:multipass",
+    "files_sha256": {
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "140ac66b4911931f7b4824e69269aeadd80be7401c51f51027d61debce92a5af",
+      "horizon-graphics.txt": "90ccdd6f2386834364ab2141c3c9d964efa463367f8677b5c951c9ee26bf2f8b",
+      "game.log": "fdf22cd79db62994c17f489f3c0e1259086342f04e4fe90a2413c8a1ee21b1d7",
+      "world.png": "81be43c7ce373c1eff639d4030d0edad3163d44c892289545046d93067c5e9fd",
+      "horizon-error-20261121-220919-654-26900-0.txt": "e07da6391dd92f9322a6b3145c1dab8f5694f0386f49aa380e89f5502cf98241",
+      "horizon-error-20261121-220919-656-26900-0.txt": "b0913352a9a8455f47330a4cc6be4dbbeb026f433a14a6641df3dc979ed698a0"
+    },
+    "renderer": "[22:08:51] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "ready": true,
+    "exit": "closed",
+    "capture": {
+      "Width": 1800,
+      "Height": 1350,
+      "Cyan": 6400,
+      "Magenta": 6400,
+      "SceneColors": 1516
+    },
+    "runtime_lines": [
+      {
+        "line": 11,
+        "text": "[22:08:38] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 41,
+        "text": "[22:09:03] [Horizon game/INFO]: Horizon: first frame after 275 ms"
+      },
+      {
+        "line": 45,
+        "text": "[22:09:09] [Horizon game/WARN]: shader pack audit_multipass.hshader refused: producer.wgsl: Validation Error"
+      },
+      {
+        "line": 50,
+        "text": "[22:09:09] [Horizon game/INFO]: [CHAT] Shader pack audit_multipass.hshader refused:"
+      },
+      {
+        "line": 62,
+        "text": "[22:09:22] [Horizon game/INFO]: Saved screenshot to C:\\Users\\ben\\AppData\\Local\\Packages\\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\\LocalState\\game\\screenshots\\2026-11-21_22.09.21.png"
+      },
+      {
+        "line": 63,
+        "text": "[22:09:22] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.09.21.png"
+      }
+    ]
+  },
+  {
+    "case": "Gl:classicpost",
+    "files_sha256": {
+      "harness-error.txt": "b59ba034f3863bec19d6045de6381e11d04937459c449b3e37efdc331fdadd9d",
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "6e7414a81fe45ae86fd63f5cdea3a1d8aee5ac5eaa508480003a3558c5ef40ab",
+      "horizon-graphics.txt": "9cb32fec47ab89435ca6d449a374b2f73e597ea4873b7e8cd1b12b2ac94b8495",
+      "game.log": "b661a440303c36a7b19c037ed1a2306d161b82b58bfedd7df82ba5237062188a"
+    },
+    "renderer": "[22:09:39] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "ready": false,
+    "exit": "closed",
+    "runtime_lines": [
+      {
+        "line": 11,
+        "text": "[22:09:28] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 41,
+        "text": "[22:09:43] [Horizon game/INFO]: Horizon: first frame after 1412 ms"
+      },
+      {
+        "line": 43,
+        "text": "[22:10:09] [Horizon game/INFO]: shader pack audit_post_only: mc_Entity for 0 of 35723 block states in 12 ms"
+      },
+      {
+        "line": 44,
+        "text": "[22:10:09] [Horizon game/INFO]: shader pack audit_post_only: folder ``, building its pipelines"
+      },
+      {
+        "line": 45,
+        "text": "[22:10:09] [Shader pack/ERROR]: [wgpu::backend::wgpu_core] Handling wgpu errors as fatal by default"
+      },
+      {
+        "line": 46,
+        "text": "[22:10:09] [Shader pack/ERROR]: Recovered from an error: panicked at C:\\dev\\personal\\MCHorizonUWP-nightly-2026-11-20\\.local\\nov20-runtime-builds\\port\\third_party\\wgpu-dx11\\wgpu\\src\\backend\\wgpu_core.rs:1151:26:"
+      },
+      {
+        "line": 50,
+        "text": "In Device::create_bind_group_layout, label = 'Shader pack hand'"
+      },
+      {
+        "line": 52,
+        "text": "Downlevel flags DownlevelFlags(VERTEX_STORAGE) are required but not supported on the device."
+      }
+    ]
+  },
+  {
+    "case": "Gl:classic",
+    "files_sha256": {
+      "harness-error.txt": "b59ba034f3863bec19d6045de6381e11d04937459c449b3e37efdc331fdadd9d",
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "fa61064bd410edeffe52524715239b7535e652a429eb87d4e347a14d209a19e5",
+      "horizon-graphics.txt": "6ffd848ae6e1a350f5f58475d341d081d30cfbcfaca8a5e7b34ac5586ffab67d",
+      "game.log": "1482e8bd31cf6933aa6c07168d7bb5176e1f9e720bd0464052802b4312acad5d"
+    },
+    "renderer": "[22:11:20] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "ready": false,
+    "exit": "closed",
+    "runtime_lines": [
+      {
+        "line": 9,
+        "text": "[22:10:31] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 41,
+        "text": "[22:11:38] [Horizon game/INFO]: Horizon: first frame after 14294 ms"
+      },
+      {
+        "line": 44,
+        "text": "[22:12:06] [Horizon game/INFO]: shader pack terrain-test: mc_Entity for 308 of 35723 block states in 11 ms"
+      },
+      {
+        "line": 45,
+        "text": "[22:12:06] [Horizon game/INFO]: shader pack terrain-test: folder ``, building its pipelines"
+      },
+      {
+        "line": 46,
+        "text": "[22:12:06] [Shader pack/ERROR]: [wgpu::backend::wgpu_core] Handling wgpu errors as fatal by default"
+      },
+      {
+        "line": 47,
+        "text": "[22:12:06] [Shader pack/ERROR]: Recovered from an error: panicked at C:\\dev\\personal\\MCHorizonUWP-nightly-2026-11-20\\.local\\nov20-runtime-builds\\port\\third_party\\wgpu-dx11\\wgpu\\src\\backend\\wgpu_core.rs:1151:26:"
+      },
+      {
+        "line": 51,
+        "text": "In Device::create_bind_group_layout, label = 'Shader pack entity vertices'"
+      },
+      {
+        "line": 53,
+        "text": "Downlevel flags DownlevelFlags(VERTEX_STORAGE) are required but not supported on the device."
+      }
+    ]
+  },
+  {
+    "case": "Dx12:off",
+    "files_sha256": {
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "ee740f254e97de2c8d4ed2acba0763a20216b7ae03256770e50162fedfef6832",
+      "horizon-graphics.txt": "70c7fd034bf09a11b7b885aa16ed69bdff0d7a5109189698995cf13f9f58bc53",
+      "game.log": "3e65782fc6d6547be2ec559bc910194d4dfd765509e35625db16386d03e3d134",
+      "world.png": "596ea13b764143a54f919c4490a22544461ab48a3fcb0a1118a93e64c938bc83"
+    },
+    "renderer": "[22:12:32] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "ready": true,
+    "exit": "closed",
+    "capture": {
+      "Width": 1800,
+      "Height": 1350,
+      "Cyan": 6400,
+      "Magenta": 6400,
+      "SceneColors": 1929
+    },
+    "runtime_lines": [
+      {
+        "line": 9,
+        "text": "[22:12:24] [Horizon game/INFO]: Horizon renderer: requesting the device (driver 32.0.16.2101) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | TIMESTAMP_QUERY_INSIDE_ENCODERS | TIMESTAMP_QUERY_INSIDE_PASSES | MAPPABLE_PRIMARY_BUFFERS | MULTI_DRAW_INDIRECT_COUNT | VERTEX_WRITABLE_STORAGE | CLEAR_TEXTURE | TEXTURE_ATOMIC | TIMESTAMP_QUERY | INDIRECT_FIRST_INSTANCE | RG11B10UFLOAT_RENDERABLE | FLOAT32_FILTERABLE | FLOAT32_BLENDABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 2147483644 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 14,
+        "text": "COMPUTE_SHADERS | FRAGMENT_WRITABLE_STORAGE | INDIRECT_EXECUTION | BASE_VERTEX | READ_ONLY_DEPTH_STENCIL | NON_POWER_OF_TWO_MIPMAPPED_TEXTURES | CUBE_ARRAY_TEXTURES | COMPARISON_SAMPLERS | INDEPENDENT_BLEND | VERTEX_STORAGE | ANISOTROPIC_FILTERING | FRAGMENT_STORAGE | MULTISAMPLED_SHADING | DEPTH_TEXTURE_AND_BUFFER_COPIES | WEBGPU_TEXTURE_FORMAT_SUPPORT | BUFFER_BINDINGS_NOT_16_BYTE_ALIGNED | UNRESTRICTED_INDEX_BUFFER | FULL_DRAW_INDEX_UINT32 | DEPTH_BIAS_CLAMP | VIEW_FORMATS | UNRESTRICTED_EXTERNAL_TEXTURE_COPIES | SURFACE_VIEW_FORMATS | NONBLOCKING_QUERY_RESOLVE | SHADER_F16_IN_F32 | MSL2_1 | TEXTURE_COMPRESSION | OCCLUSION_QUERY | TWO_SIDED_STENCIL | SEPARATE_ALPHA_BLEND | TEXTURE_2D_ARRAYS | CUBE_TEXTURES | DEPTH_TEXTURE_MULTI_MIP,"
+      },
+      {
+        "line": 140,
+        "text": "[22:12:34] [Horizon game/INFO]: Horizon: first frame after 212 ms"
+      },
+      {
+        "line": 143,
+        "text": "[22:12:40] [Horizon game/INFO]: Saved screenshot to C:\\Users\\ben\\AppData\\Local\\Packages\\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\\LocalState\\game\\screenshots\\2026-11-21_22.12.39.png"
+      },
+      {
+        "line": 144,
+        "text": "[22:12:40] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.12.39.png"
+      }
+    ]
+  },
+  {
+    "case": "Dx12:multipass",
+    "files_sha256": {
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "18e636e61fad10f0200ea7d56e538cd705062c4fe82bad2fb8cb17066ad5c441",
+      "horizon-graphics.txt": "90ccdd6f2386834364ab2141c3c9d964efa463367f8677b5c951c9ee26bf2f8b",
+      "game.log": "a15006719a320a74a6ecf1238ec68762c5d27d096fca55a0349181f7a16c1236",
+      "world.png": "bea91de124611daf3bd854def72d9d4e8efff7eb9920d274b247063ad49eabe6"
+    },
+    "renderer": "[22:12:57] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "ready": true,
+    "exit": "closed",
+    "capture": {
+      "Width": 1800,
+      "Height": 1350,
+      "Cyan": 6400,
+      "Magenta": 6400,
+      "SceneColors": 51
+    },
+    "runtime_lines": [
+      {
+        "line": 9,
+        "text": "[22:12:49] [Horizon game/INFO]: Horizon renderer: requesting the device (driver 32.0.16.2101) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | TIMESTAMP_QUERY_INSIDE_ENCODERS | TIMESTAMP_QUERY_INSIDE_PASSES | MAPPABLE_PRIMARY_BUFFERS | MULTI_DRAW_INDIRECT_COUNT | VERTEX_WRITABLE_STORAGE | CLEAR_TEXTURE | TEXTURE_ATOMIC | TIMESTAMP_QUERY | INDIRECT_FIRST_INSTANCE | RG11B10UFLOAT_RENDERABLE | FLOAT32_FILTERABLE | FLOAT32_BLENDABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 2147483644 bytes, 2048 texture layers)"
+      },
+      {
+        "line": 14,
+        "text": "COMPUTE_SHADERS | FRAGMENT_WRITABLE_STORAGE | INDIRECT_EXECUTION | BASE_VERTEX | READ_ONLY_DEPTH_STENCIL | NON_POWER_OF_TWO_MIPMAPPED_TEXTURES | CUBE_ARRAY_TEXTURES | COMPARISON_SAMPLERS | INDEPENDENT_BLEND | VERTEX_STORAGE | ANISOTROPIC_FILTERING | FRAGMENT_STORAGE | MULTISAMPLED_SHADING | DEPTH_TEXTURE_AND_BUFFER_COPIES | WEBGPU_TEXTURE_FORMAT_SUPPORT | BUFFER_BINDINGS_NOT_16_BYTE_ALIGNED | UNRESTRICTED_INDEX_BUFFER | FULL_DRAW_INDEX_UINT32 | DEPTH_BIAS_CLAMP | VIEW_FORMATS | UNRESTRICTED_EXTERNAL_TEXTURE_COPIES | SURFACE_VIEW_FORMATS | NONBLOCKING_QUERY_RESOLVE | SHADER_F16_IN_F32 | MSL2_1 | TEXTURE_COMPRESSION | OCCLUSION_QUERY | TWO_SIDED_STENCIL | SEPARATE_ALPHA_BLEND | TEXTURE_2D_ARRAYS | CUBE_TEXTURES | DEPTH_TEXTURE_MULTI_MIP,"
+      },
+      {
+        "line": 141,
+        "text": "[22:13:02] [Horizon game/INFO]: Horizon: first frame after 207 ms"
+      },
+      {
+        "line": 143,
+        "text": "[22:13:06] [Horizon game/INFO]: shader pack audit_multipass 0.1.0: producer.wgsl, consumer.wgsl in 76 ms"
+      },
+      {
+        "line": 144,
+        "text": "[22:13:09] [Horizon game/INFO]: Saved screenshot to C:\\Users\\ben\\AppData\\Local\\Packages\\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\\LocalState\\game\\screenshots\\2026-11-21_22.13.09.png"
+      },
+      {
+        "line": 145,
+        "text": "[22:13:09] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.13.09.png"
+      }
+    ]
+  }
+]

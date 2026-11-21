@@ -1,0 +1,8 @@
+schema = 1
+id = "audit_entity"
+name = "audit_entity"
+version = "0.1.0"
+api = "0.2"
+
+[entity]
+file = "marker.wgsl"

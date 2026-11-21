@@ -1,0 +1,21 @@
+[
+  {
+    "case": "Gl:off",
+    "files_sha256": {
+      "harness-error.txt": "4df43af576771b1d878b006b26853613657054ce34715657d845318c548676d6",
+      "metadata.json": "8578f0d5a4e33873b36fedba0d37527c82773e48cad8e724f6d66aca129bc2a7",
+      "result.json": "cd3811830da187e7dd1df833fb447417e7de0b96b0dcc88eab6c69d68917af10",
+      "horizon-graphics.txt": "0a48940882c180941d6f11ee87344e191ea023f8cbf223bee73f2104666e3b73",
+      "game.log": "d04098d065785bfb80d2b2dde5d572b7929acb9e75af879efe8dde617183e635"
+    },
+    "renderer": null,
+    "ready": false,
+    "exit": "forced isolated candidate shutdown",
+    "runtime_lines": [
+      {
+        "line": 11,
+        "text": "[22:14:09] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)"
+      }
+    ]
+  }
+]

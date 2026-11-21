@@ -1,0 +1,9 @@
+schema = 1
+id = "audit_motion"
+name = "audit_motion"
+version = "0.1.0"
+api = "0.2"
+
+[[post]]
+file = "marker.wgsl"
+[motion]

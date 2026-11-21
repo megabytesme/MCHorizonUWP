@@ -1,0 +1,61 @@
+[22:07:09] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[22:07:09] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[22:07:09] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[22:07:13] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 241 ms, modules 3773 ms, linking 33 ms, instantiation 2 ms, subscriptions 0 ms, initialization 0 ms
+[22:07:13] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[22:07:13] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 9 ms
+[22:07:13] [unnamed/INFO]: [wgpu_hal::gles::egl] EGL says it can present to the window but not natively
+[22:07:13] [unnamed/INFO]: [wgpu_hal::gles::egl] UWP ANGLE EGL selected window-presentable config: true
+[22:07:13] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[22:07:13] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:07:13] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)
+[22:07:13] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1800x1350 Bgra8Unorm, Fifo)
+[22:07:13] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[22:07:13] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[22:07:13] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\1a23848d346799f6
+[22:07:13] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[22:07:14] [resource-loader/INFO]: Horizon: UI bundle ready after 1485 ms
+[22:07:16] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[22:07:16] [resource-loader/INFO]: load core tables: 3.36s
+[22:07:17] [World data preload/INFO]: Horizon: worldgen data loaded in 619.1978ms
+[22:07:17] [resource-loader/INFO]: load pack tables: 4.20s
+[22:07:17] [resource-loader/INFO]: Horizon: core-ready after 4235 ms
+[22:07:17] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 56 ms
+[22:07:18] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 1933 ms
+[22:07:18] [load-items/INFO]: load items: 5.44s
+[22:07:19] [world-rest-loader/INFO]: Horizon: resources loaded in 6.4s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[22:07:19] [world-rest-loader/INFO]: Horizon: rest-ready after 6370 ms
+[22:07:21] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[22:07:21] [Horizon game/INFO]: Horizon: loading the title artwork after 8284 ms
+[22:07:21] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:07:22] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[22:07:22] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[22:07:23] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:07:30] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (55 shader modules, layouts and pipelines kept)
+[22:07:31] [Horizon game/INFO]: Horizon: world renderer ready after 18030 ms
+[22:07:31] [Horizon game/WARN]: Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+[22:07:31] [Horizon game/INFO]: Horizon: waiting for world resources
+[22:07:31] [Horizon game/INFO]: Horizon: world resources joined after 0 ms
+[22:07:31] [Horizon game/INFO]: Horizon: startup handoff 8567 ms (renderer 8298 ms, start_game 135 ms)
+[22:07:31] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[22:07:31] [Horizon game/INFO]: Horizon: first frame after 220 ms
+[22:07:31] [World initialization/INFO]: Horizon: live features ready in 101.7697ms
+[22:07:36] [Horizon game/WARN]: shader pack audit_material_marker.hshader refused: material.wgsl: Validation Error
+
+Caused by:
+  In Device::create_pipeline_layout, label = 'Native shader pack terrain'
+    Too many bindings of type SampledTextures in Stage ShaderStages(FRAGMENT), limit is 16, count was 19. Check the limit `max_sampled_textures_per_shader_stage` passed to `Adapter::request_device`
+[22:07:36] [Horizon game/INFO]: [CHAT] Shader pack audit_material_marker.hshader refused:
+[22:07:36] [Horizon game/INFO]: [CHAT] material.wgsl: Validation Error
+
+Caused by:
+  In Device::create_pipeline_layout, label = 'Native shader pack terrain'
+    Too many bindings of type SampledTextures in Stage ShaderStages(FRAGMENT), limit is 16, count was 19. Check the limit `max_sampled_textures_per_shader_stage` passed to `Adapter::request_device`
+[22:07:36] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:07:42] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[22:07:43] [Horizon game/INFO]: Horizon: the renderer was made again for the frame the settings call for in 7308 ms
+[22:07:43] [Post effects/ERROR]: [wgpu::backend::wgpu_core] Handling wgpu errors as fatal by default
+[22:07:43] [Screenshot readback/ERROR]: [wgpu_hal::gles::adapter] Fake map
+[22:07:45] [Screenshot readback/ERROR]: [wgpu_hal::gles::adapter] Fake map
+[22:07:45] [Horizon game/INFO]: Saved screenshot to C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\screenshots\2026-11-21_22.07.45.png
+[22:07:45] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.07.45.png

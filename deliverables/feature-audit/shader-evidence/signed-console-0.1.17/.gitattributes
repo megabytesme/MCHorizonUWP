@@ -1,0 +1,2 @@
+# Keep signed test receipt and capture bytes stable across checkouts.
+* -text

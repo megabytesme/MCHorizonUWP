@@ -1,0 +1,10 @@
+﻿Renderer or world did not reach the requested stage. Evidence: 
+C:\Users\ben\AppData\Local\Temp\horizon-nov20-audit-shader-runtime\capture-20261121-220024-764-x64-Gl-World-Enabled-100
+At C:\Users\ben\AppData\Local\Temp\horizon-nov20-audit-shader-runtime\Test-Nov20Desktop.ps1:398 char:30
++ ... Renderer) { throw "Renderer or world did not reach the requested stag ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Renderer or wor...rld-Enabled-100:String) [], RuntimeException
+    + FullyQualifiedErrorId : Renderer or world did not reach the requested stage. Evidence: C:\Users\ben\AppData\Loca 
+   l\Temp\horizon-nov20-audit-shader-runtime\capture-20261121-220024-764-x64-Gl-World-Enabled-100
+ 
+

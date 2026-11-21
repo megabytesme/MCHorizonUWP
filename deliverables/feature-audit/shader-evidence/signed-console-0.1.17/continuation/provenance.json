@@ -1,0 +1,194 @@
+﻿{
+    "package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "executable_sha256":  "688380676275422C7ECF95F9522B1D39FCEFF0FD440803641995022F31C0ED89",
+    "release":  {
+                    "schema_version":  1,
+                    "patch_version":  "0.1.15",
+                    "client_version":  "0.1.17",
+                    "upstream_commit":  "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
+                },
+    "utc":  "2026-11-21T22:00:23.0900371Z",
+    "cases":  [
+                  "Gl:off",
+                  "Gl:sky",
+                  "Gl:material",
+                  "Gl:postsolo",
+                  "Gl:multipass",
+                  "Gl:classicpost",
+                  "Gl:classic",
+                  "Dx12:off",
+                  "Dx12:multipass"
+              ],
+    "world":  [
+                  {
+                      "path":  "level.dat",
+                      "sha256":  "E48AB84D3B8242998DDCCE8C9A9B7511CA01AC73E318AF9E2FB47857257B95C2"
+                  },
+                  {
+                      "path":  "level.dat_old",
+                      "sha256":  "240A683C61C57F9FC8CB5493B474E02F56A34E901D6D237179898E54EFE306BA"
+                  },
+                  {
+                      "path":  "data\\minecraft\\game_rules.dat",
+                      "sha256":  "1081E7E241DD49FDCD4A40B0FA2180AE80D29ABD6AADFD201B399EC156249490"
+                  },
+                  {
+                      "path":  "data\\minecraft\\game_rules.dat_old",
+                      "sha256":  "E246682B56DA904E279F8FECBC81A0147D39953A9F276BC54183383817E4815F"
+                  },
+                  {
+                      "path":  "data\\minecraft\\random_sequences.dat",
+                      "sha256":  "8EF42146E4735818A386E95A61693BECF58630F77064B840261F773C570D0409"
+                  },
+                  {
+                      "path":  "data\\minecraft\\weather.dat",
+                      "sha256":  "C164F13A3F35E34232D3E298345BC529EF803712777B1400D3D4FA25D8E6FAA6"
+                  },
+                  {
+                      "path":  "data\\minecraft\\weather.dat_old",
+                      "sha256":  "E72AB5428390C0FD636AAB907BFB97404D6B62B605BEF1A8979CA5C007EFE2E6"
+                  },
+                  {
+                      "path":  "data\\minecraft\\world_clocks.dat",
+                      "sha256":  "EFA3A16469C6E3E2D86FCB753B54A039D159FFDAC0851643E30C779ACF90FCF5"
+                  },
+                  {
+                      "path":  "data\\minecraft\\world_clocks.dat_old",
+                      "sha256":  "EFA3A16469C6E3E2D86FCB753B54A039D159FFDAC0851643E30C779ACF90FCF5"
+                  },
+                  {
+                      "path":  "data\\minecraft\\world_gen_settings.dat",
+                      "sha256":  "662A9AC92225E75947153AC6A2E9B42BEFE1855997B68B2A5EA5F39D11CAF7F7"
+                  },
+                  {
+                      "path":  "dimensions\\minecraft\\overworld\\data\\minecraft\\raids.dat",
+                      "sha256":  "29359527F23CE3D47408E03B3256E59B679538B17DECA07403CC1D74BCC67A41"
+                  },
+                  {
+                      "path":  "dimensions\\minecraft\\overworld\\region\\r.-1.0.mca",
+                      "sha256":  "044FB875CD79F04E469A139BFA72D7F176871AA295E2F431DC6770599FED597F"
+                  },
+                  {
+                      "path":  "dimensions\\minecraft\\overworld\\region\\r.-2.0.mca",
+                      "sha256":  "09790ECDDD4A5E363567A90FD70D6B2AFA99C76F6F79D20796C7D24E06D3D604"
+                  },
+                  {
+                      "path":  "players\\data\\a01e3843-e521-3998-958a-f459800e4d11.dat",
+                      "sha256":  "802AC9A7F57019DC378ED15393D269BB1582A661A3EFB6B0CE82EA5A5AA33B13"
+                  }
+              ],
+    "shader_fixtures":  [
+                            {
+                                "path":  "audit_material_marker.hshader",
+                                "sha256":  "268D11B603775EE7866BC877210BEB5D780A7AD28C83A157DF4EDEEF0A0BC38E"
+                            },
+                            {
+                                "path":  "audit_multipass.hshader",
+                                "sha256":  "570C40A1497DEB0A16754B9E58F9459BADDF9B1AA231E4861DD3FA959AD4643A"
+                            },
+                            {
+                                "path":  "audit_post_marker.hshader",
+                                "sha256":  "0B6ECD57F454BA98C033C1BCCDDBB5570B95D39C225946861F4B33A62E5A855F"
+                            },
+                            {
+                                "path":  "audit_sky_marker.hshader",
+                                "sha256":  "0D183116DF0FB8544A2C3651612396A8D247A2250E829D68D7A752522EE85FD0"
+                            },
+                            {
+                                "path":  "golden_hour-2.0.0.hshader",
+                                "sha256":  "0B9900823C979181B86EAF87A7159592F6C57CDCA7987868BD8880D0B3323003"
+                            },
+                            {
+                                "path":  "horizon_hdr-1.0.0.hshader",
+                                "sha256":  "A08DD45DCA04F7AA66519D75A0B7E40C99FDAE09A5FC46551B2DCFECCF8C1560"
+                            },
+                            {
+                                "path":  "audit_invalid\\horizon-shaders.toml",
+                                "sha256":  "7499BA0127CC1A6A6605C43D52BAD358DD7C7C02D3C8F76A4333D4B36CB8DD6A"
+                            },
+                            {
+                                "path":  "audit_invalid\\post.wgsl",
+                                "sha256":  "1E47039C27A7090AC73B80A14F98AC06FFDC71490BB18E6B14ABBDF8DE2F5718"
+                            },
+                            {
+                                "path":  "audit_post_only\\shaders\\composite.fsh",
+                                "sha256":  "9301B6631D381799D3B473BEAB4D8989C9AB13B7D6D71FE6E33F842DB70123FB"
+                            },
+                            {
+                                "path":  "audit_post_only\\shaders\\composite.vsh",
+                                "sha256":  "65534E3B1CD82CAD397E180481E6788916A95639FD1F0C761A81EA458ABB23D1"
+                            },
+                            {
+                                "path":  "post-test\\README.md",
+                                "sha256":  "7BE6898CCB1E748D46450DA9237E63A38587DFB8B3A2D43BCBD4F20A7467C6BA"
+                            },
+                            {
+                                "path":  "post-test\\shaders\\composite.fsh",
+                                "sha256":  "D11613301FE5E8C15E87C759242397E603E6092927BA207F71431039213F35DE"
+                            },
+                            {
+                                "path":  "post-test\\shaders\\composite.vsh",
+                                "sha256":  "5A5655FEBC499589639257B39C2C98E7B8CE36E9FEF5AE49BB6058EB29E12274"
+                            },
+                            {
+                                "path":  "post-test\\shaders\\composite1.fsh",
+                                "sha256":  "22F7441A78FC2ADC6093AE6065E729C9CC5DD15E182BB3D36E99C3C72B7ADAA0"
+                            },
+                            {
+                                "path":  "post-test\\shaders\\composite1.vsh",
+                                "sha256":  "56305D060F403987BD0A45A350028B6D121C4A5E08D07DFDEC19B7AF3492EF21"
+                            },
+                            {
+                                "path":  "post-test\\shaders\\final.fsh",
+                                "sha256":  "E4F49AFCBF79C8BC23E4DFCBDBCCBC87A362F9090FCE0E4B0F076D9361512D94"
+                            },
+                            {
+                                "path":  "post-test\\shaders\\final.vsh",
+                                "sha256":  "5A5655FEBC499589639257B39C2C98E7B8CE36E9FEF5AE49BB6058EB29E12274"
+                            },
+                            {
+                                "path":  "post-test\\shaders\\shaders.properties",
+                                "sha256":  "851AB5ACEBE3C8C9114F0D715FE6266EC2D913665759BBE1A0B1CB3879EC6E32"
+                            },
+                            {
+                                "path":  "terrain-test\\README.md",
+                                "sha256":  "DC1576E73932EF58465274B9F1182311842880E7EA90414B8021975B0F135C9F"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\block.properties",
+                                "sha256":  "A6D1E12BB6AB796BF6EB157B499B0A06EC685858DCF1DF094F5E1A5592B0B0C2"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\composite.fsh",
+                                "sha256":  "A42BE472B80FFBC270EA38CB4E163B5C0D51D65094526A4AA07591FC2C884515"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\composite.vsh",
+                                "sha256":  "9965A8A61B8E59B5724245AD304C6A0FBA7D906F4D4C14EEEE539730C9CB4E70"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\gbuffers_skybasic.fsh",
+                                "sha256":  "595C9AB515B696A6077956DF6797727017023E78F099A6FDAC2E078308298110"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\gbuffers_skybasic.vsh",
+                                "sha256":  "5BACDA22671B1871C4B7118D8EC1FDAA78C88299F297F4C9A81ADD1085266066"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\gbuffers_terrain.fsh",
+                                "sha256":  "65B183E44327F9B7906098F4C45819ED4F633E68E24DB03BBD23AEA90C32E216"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\gbuffers_terrain.vsh",
+                                "sha256":  "720FA3BE7D0F53D9ACAFD24F30225F9D66A0DC86CE987469E7D46EBB042EEEC6"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\gbuffers_textured.fsh",
+                                "sha256":  "1F3786B6CDA61D57E8F64A76954B00EAF5AD1FD32E81E78A78D579B0A771970B"
+                            },
+                            {
+                                "path":  "terrain-test\\shaders\\gbuffers_textured.vsh",
+                                "sha256":  "51C86C2C1FF2169F9AE11A45AB1D4099D5F55C50188F51C423595D1B1CB32AC0"
+                            }
+                        ]
+}

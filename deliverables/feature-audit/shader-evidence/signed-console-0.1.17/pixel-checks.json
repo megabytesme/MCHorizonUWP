@@ -1,0 +1,210 @@
+{
+  "color_space": "Raw SDR game PNG byte RGB",
+  "method": "Sample a central region on an 8-pixel grid. Region fractions are [left, top, right, bottom]. The screenshots come from independent launches of the same staged save. Counts measure marker colors and do not assume pixel-identical camera motion, timing or lighting.",
+  "thresholds": {
+    "changed": "sum of absolute channel differences > 40",
+    "green": "G >= 130, G - R >= 65, G - B >= 35",
+    "magenta": "R >= 125, B >= 60, R - G >= 48, B - G >= 20",
+    "cyan_blue": "R <= 65, G >= 100, B >= 150, B - R >= 110",
+    "red_eligible": "control R >= 55 and control B >= 25",
+    "red_attenuation": "among red-eligible pixels, candidate R <= 60% of control R and absolute B difference <= 20"
+  },
+  "results": [
+    {
+      "case": "Dx12-classicpost",
+      "control": "continuation/Dx12-off/world.png",
+      "control_sha256": "596ea13b764143a54f919c4490a22544461ab48a3fcb0a1118a93e64c938bc83",
+      "candidate": "initial/Dx12-classicpost/world.png",
+      "candidate_sha256": "d952834a765d89fe758d33cc65d2ff9501f79a72a9f844a4aaaad14ff6261425",
+      "counts": {
+        "width": 1800,
+        "height": 1350,
+        "grid_step": 8,
+        "roi_fraction": [
+          0.16,
+          0.08,
+          0.84,
+          0.84
+        ],
+        "samples": 19737,
+        "changed": 19737,
+        "green": 0,
+        "control_green": 17,
+        "magenta": 0,
+        "control_magenta": 0,
+        "cyan_blue": 19509,
+        "control_cyan_blue": 0,
+        "red_attenuation": 4835,
+        "red_eligible": 18402
+      }
+    },
+    {
+      "case": "Dx12-invalid",
+      "control": "continuation/Dx12-off/world.png",
+      "control_sha256": "596ea13b764143a54f919c4490a22544461ab48a3fcb0a1118a93e64c938bc83",
+      "candidate": "initial/Dx12-invalid/world.png",
+      "candidate_sha256": "737835d8e541f27f58213590f5d0448f3a7944a10f9d55aced1c74ecb5262a85",
+      "counts": {
+        "width": 1800,
+        "height": 1350,
+        "grid_step": 8,
+        "roi_fraction": [
+          0.16,
+          0.08,
+          0.84,
+          0.84
+        ],
+        "samples": 19737,
+        "changed": 13665,
+        "green": 0,
+        "control_green": 17,
+        "magenta": 0,
+        "control_magenta": 0,
+        "cyan_blue": 0,
+        "control_cyan_blue": 0,
+        "red_attenuation": 402,
+        "red_eligible": 18402
+      }
+    },
+    {
+      "case": "Dx12-material",
+      "control": "continuation/Dx12-off/world.png",
+      "control_sha256": "596ea13b764143a54f919c4490a22544461ab48a3fcb0a1118a93e64c938bc83",
+      "candidate": "initial/Dx12-material/world.png",
+      "candidate_sha256": "3e26791a1dd8cf17864f1e481cf44d1926814c880b4586d7895499a9e76d939a",
+      "counts": {
+        "width": 1800,
+        "height": 1350,
+        "grid_step": 8,
+        "roi_fraction": [
+          0.16,
+          0.08,
+          0.84,
+          0.84
+        ],
+        "samples": 19737,
+        "changed": 17012,
+        "green": 4,
+        "control_green": 17,
+        "magenta": 7974,
+        "control_magenta": 0,
+        "cyan_blue": 0,
+        "control_cyan_blue": 0,
+        "red_attenuation": 0,
+        "red_eligible": 18402
+      }
+    },
+    {
+      "case": "Dx12-multipass",
+      "control": "continuation/Dx12-off/world.png",
+      "control_sha256": "596ea13b764143a54f919c4490a22544461ab48a3fcb0a1118a93e64c938bc83",
+      "candidate": "continuation/Dx12-multipass/world.png",
+      "candidate_sha256": "bea91de124611daf3bd854def72d9d4e8efff7eb9920d274b247063ad49eabe6",
+      "counts": {
+        "width": 1800,
+        "height": 1350,
+        "grid_step": 8,
+        "roi_fraction": [
+          0.16,
+          0.08,
+          0.84,
+          0.84
+        ],
+        "samples": 19737,
+        "changed": 19515,
+        "green": 0,
+        "control_green": 17,
+        "magenta": 0,
+        "control_magenta": 0,
+        "cyan_blue": 19509,
+        "control_cyan_blue": 0,
+        "red_attenuation": 4081,
+        "red_eligible": 18402
+      }
+    },
+    {
+      "case": "Dx12-postsolo",
+      "control": "continuation/Dx12-off/world.png",
+      "control_sha256": "596ea13b764143a54f919c4490a22544461ab48a3fcb0a1118a93e64c938bc83",
+      "candidate": "initial/Dx12-postsolo/world.png",
+      "candidate_sha256": "f07cc4c70bf37568e04d8751e2990c74c1c1df9ce08fe333095e71a82601a4d5",
+      "counts": {
+        "width": 1800,
+        "height": 1350,
+        "grid_step": 8,
+        "roi_fraction": [
+          0.16,
+          0.08,
+          0.84,
+          0.84
+        ],
+        "samples": 19737,
+        "changed": 19717,
+        "green": 17,
+        "control_green": 17,
+        "magenta": 2,
+        "control_magenta": 0,
+        "cyan_blue": 10945,
+        "control_cyan_blue": 0,
+        "red_attenuation": 9216,
+        "red_eligible": 18402
+      }
+    },
+    {
+      "case": "Dx12-sky",
+      "control": "continuation/Dx12-off/world.png",
+      "control_sha256": "596ea13b764143a54f919c4490a22544461ab48a3fcb0a1118a93e64c938bc83",
+      "candidate": "initial/Dx12-sky/world.png",
+      "candidate_sha256": "bac28058d87175527158c6db427304cd2f27e65106a1332b4e7da629a4d70393",
+      "counts": {
+        "width": 1800,
+        "height": 1350,
+        "grid_step": 8,
+        "roi_fraction": [
+          0.16,
+          0.08,
+          0.84,
+          0.84
+        ],
+        "samples": 19737,
+        "changed": 17473,
+        "green": 8695,
+        "control_green": 17,
+        "magenta": 6,
+        "control_magenta": 0,
+        "cyan_blue": 0,
+        "control_cyan_blue": 0,
+        "red_attenuation": 126,
+        "red_eligible": 18402
+      }
+    },
+    {
+      "case": "Dx11-sky",
+      "control": "initial/Dx11-off/world.png",
+      "control_sha256": "9a266c165c385c07e4bd005184c7b185a6d14a568e696108461209dd70b3a4ac",
+      "candidate": "initial/Dx11-sky/world.png",
+      "candidate_sha256": "fec497ee00b87d3c8c04a5e09f02cae836e865404a63acf59ea3247356e16a20",
+      "counts": {
+        "width": 1800,
+        "height": 1350,
+        "grid_step": 8,
+        "roi_fraction": [
+          0.16,
+          0.08,
+          0.84,
+          0.84
+        ],
+        "samples": 19737,
+        "changed": 9814,
+        "green": 3,
+        "control_green": 1,
+        "magenta": 0,
+        "control_magenta": 0,
+        "cyan_blue": 0,
+        "control_cyan_blue": 0,
+        "red_attenuation": 304,
+        "red_eligible": 18084
+      }
+    }
+  ]
+}

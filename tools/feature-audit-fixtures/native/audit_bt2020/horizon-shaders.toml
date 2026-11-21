@@ -1,0 +1,11 @@
+schema = 1
+id = "audit_bt2020"
+name = "audit_bt2020"
+version = "0.1.0"
+api = "0.2"
+
+[[post]]
+file = "marker.wgsl"
+[frame]
+blend = "linear"
+primaries = "bt2020"

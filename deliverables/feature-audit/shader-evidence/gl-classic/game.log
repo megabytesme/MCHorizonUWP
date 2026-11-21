@@ -1,0 +1,55 @@
+[07:07:35] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[07:07:35] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[07:07:35] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[07:07:39] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 342 ms, modules 3819 ms, linking 39 ms, instantiation 2 ms, subscriptions 0 ms, initialization 0 ms
+[07:07:39] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[07:07:39] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 12 ms
+[07:07:39] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[07:07:39] [unnamed/INFO]: [wgpu_hal::gles::egl] EGL says it can present to the window but not natively
+[07:07:39] [unnamed/INFO]: [wgpu_hal::gles::egl] UWP ANGLE EGL selected window-presentable config: true
+[07:07:39] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[07:07:39] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)
+[07:07:39] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1800x1350 Bgra8Unorm, Fifo)
+[07:07:39] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[07:07:39] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[07:07:39] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\1a23848d346799f6
+[07:07:39] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[07:07:41] [resource-loader/INFO]: Horizon: UI bundle ready after 1660 ms
+[07:07:43] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[07:07:44] [resource-loader/INFO]: load core tables: 4.62s
+[07:07:45] [World data preload/INFO]: Horizon: worldgen data loaded in 1.3043791s
+[07:07:45] [resource-loader/INFO]: load pack tables: 6.27s
+[07:07:45] [resource-loader/INFO]: Horizon: core-ready after 6326 ms
+[07:07:45] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 87 ms
+[07:07:47] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 3250 ms
+[07:07:47] [load-items/INFO]: load items: 7.92s
+[07:07:48] [world-rest-loader/INFO]: Horizon: resources loaded in 9.0s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[07:07:48] [world-rest-loader/INFO]: Horizon: rest-ready after 9029 ms
+[07:07:48] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[07:07:48] [Horizon game/INFO]: Horizon: loading the title artwork after 9464 ms
+[07:07:48] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[07:07:50] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[07:07:50] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[07:07:52] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[07:07:52] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[07:07:53] [Horizon game/INFO]: Horizon: world renderer ready after 13785 ms
+[07:07:53] [Horizon game/WARN]: Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+[07:07:53] [Horizon game/INFO]: Horizon: waiting for world resources
+[07:07:53] [Horizon game/INFO]: Horizon: world resources joined after 0 ms
+[07:07:53] [Horizon game/INFO]: Horizon: startup handoff 3024 ms (renderer 2764 ms, start_game 114 ms)
+[07:07:53] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[07:07:53] [Horizon game/INFO]: Horizon: first frame after 174 ms
+[07:07:53] [World initialization/INFO]: Horizon: live features ready in 110.2339ms
+[07:08:00] [Horizon game/INFO]: shader pack terrain-test: mc_Entity for 308 of 35723 block states in 9 ms
+[07:08:00] [Horizon game/INFO]: shader pack terrain-test: folder ``, building its pipelines
+[07:08:00] [Shader pack/ERROR]: [wgpu::backend::wgpu_core] Handling wgpu errors as fatal by default
+[07:08:00] [Shader pack/ERROR]: Recovered from an error: panicked at C:\dev\personal\MCHorizonUWP-nightly-2026-11-20\.local\nov20-runtime-builds\port\third_party\wgpu-dx11\wgpu\src\backend\wgpu_core.rs:1151:26:
+wgpu error: Validation Error
+
+Caused by:
+  In Device::create_bind_group_layout, label = 'Shader pack entity vertices'
+    Binding 0 entry is invalid
+      Downlevel flags DownlevelFlags(VERTEX_STORAGE) are required but not supported on the device.
+This is not an invalid use of WebGPU: the underlying API or device does not support enough features to be a fully compliant implementation. A subset of the features can still be used. If you are running this program on native and not in a browser and wish to work around this issue, call Adapter::downlevel_properties or Device::downlevel_properties to get a listing of the features the current platform supports.
+
+

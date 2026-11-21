@@ -1,0 +1,25 @@
+{
+  "source_capture": "capture-20261121-053909-739-x64-Gl-World-Enabled-100",
+  "proof": "Historical signed pack-off run at the pinned package. The post-effect worker emitted validation during the same world capture; the game saved a PNG.",
+  "package": "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+  "release": {
+    "schema_version": 1,
+    "patch_version": "0.1.15",
+    "client_version": "0.1.17",
+    "upstream_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
+  },
+  "picked_setting": "pickedShaderPack:",
+  "renderer": "[05:39:23] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+  "utc": "2026-11-21T05:39:10.1520703Z",
+  "world_capture": {
+    "width": 1800,
+    "height": 1350
+  },
+  "raw_error_sha256": "e07da6391dd92f9322a6b3145c1dab8f5694f0386f49aa380e89f5502cf98241",
+  "graphics_config_sha256": "b312a59bc013042eb8b49268ab944bf835989a2ce9f7d12ada3f942e66de671e",
+  "related_game_log": [
+    "[05:39:28] [Post effects/ERROR]: [wgpu::backend::wgpu_core] Handling wgpu errors as fatal by default",
+    "[05:39:28] [Horizon game/INFO]: Saved screenshot to [isolated screenshot path]"
+  ],
+  "diagnostic": "Validation Error\n\nCaused by:\n  In Device::create_render_pipeline, label = 'Post effect pass'\n    In the provided shader, the type given for group 0 binding 1 has a size of 8. As the device does not support `DownlevelFlags::BUFFER_BINDINGS_NOT_16_BYTE_ALIGNED`, the type must have a size that is a multiple of 16 bytes."
+}

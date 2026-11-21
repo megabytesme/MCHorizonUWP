@@ -1,0 +1,20 @@
+﻿{
+    "Name":  "MCHorizonUWP.Nov20.qa.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  75304,
+    "BeginUtc":  "2026-11-21T22:14:04.8541291Z",
+    "Mode":  "World",
+    "Backend":  "Gl",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  false,
+    "ExpectedNativeRejection":  false,
+    "Exit":  "forced isolated candidate shutdown"
+}

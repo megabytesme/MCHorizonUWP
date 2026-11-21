@@ -1,0 +1,59 @@
+{
+  "left_x": 899,
+  "right_x": 900,
+  "first_y": 220,
+  "last_y": 1119,
+  "excluded_y": [
+    650,
+    700
+  ],
+  "sample_rows": 849,
+  "minimum_abs_blue_delta": 20,
+  "maximum_abs_red_green_delta": 3,
+  "results": [
+    {
+      "case": "golden",
+      "image": "deliverables/feature-audit/shader-evidence/dx12-golden/world.png",
+      "sha256": "d9a6d085ba59fbf99fa2e4d78481ac7178402dc19be18db5b65cfe7370b72b8e",
+      "qualified_rows": 0,
+      "mean_absolute_delta_rgb": [
+        3.623,
+        4.807,
+        2.119
+      ]
+    },
+    {
+      "case": "hdr",
+      "image": "deliverables/feature-audit/shader-evidence/dx12-hdr/world.png",
+      "sha256": "af8c342ca3a11494a5c18333693152c1a53c95ad778f3d795c45279ddd490081",
+      "qualified_rows": 0,
+      "mean_absolute_delta_rgb": [
+        4.005,
+        4.423,
+        2.788
+      ]
+    },
+    {
+      "case": "classic",
+      "image": "deliverables/feature-audit/shader-evidence/dx12-classic/world.png",
+      "sha256": "97f74907dcf0abfae3de05cf7daf31ce94cc52f99b4d2943b1ac358506a3c4bc",
+      "qualified_rows": 397,
+      "mean_absolute_delta_rgb": [
+        10.766,
+        9.511,
+        45.951
+      ]
+    },
+    {
+      "case": "prior",
+      "image": "deliverables/nightly-2026-11-20/runtime-0.1.17/qa/x64-dx12/world.png",
+      "sha256": "fd43f28bf2d9f3a4bb3cae553d344c8e5990105daf13723e36199e976bde8fd7",
+      "qualified_rows": 0,
+      "mean_absolute_delta_rgb": [
+        3.575,
+        3.736,
+        3.293
+      ]
+    }
+  ]
+}
