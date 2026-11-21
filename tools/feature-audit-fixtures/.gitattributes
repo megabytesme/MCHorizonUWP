@@ -1,0 +1,5 @@
+# Keep fixture bytes and archive SHA-256 values stable across checkouts.
+*.wgsl text eol=lf
+*.toml text eol=lf
+*.vsh text eol=lf
+*.fsh text eol=lf

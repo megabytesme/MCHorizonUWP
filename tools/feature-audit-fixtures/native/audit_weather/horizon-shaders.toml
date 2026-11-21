@@ -1,0 +1,8 @@
+schema = 1
+id = "audit_weather"
+name = "audit_weather"
+version = "0.1.0"
+api = "0.2"
+
+[weather]
+file = "marker.wgsl"

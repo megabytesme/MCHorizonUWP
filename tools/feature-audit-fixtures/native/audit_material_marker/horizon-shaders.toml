@@ -1,0 +1,8 @@
+schema = 1
+id = "audit_material_marker"
+name = "Audit material marker"
+version = "0.1.0"
+api = "0.2"
+
+[material]
+file = "material.wgsl"

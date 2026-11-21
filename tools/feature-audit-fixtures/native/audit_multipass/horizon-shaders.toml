@@ -1,0 +1,11 @@
+schema = 1
+api = "0.2"
+id = "audit_multipass"
+name = "Audit ordered post markers"
+version = "0.1.0"
+
+[[post]]
+file = "producer.wgsl"
+
+[[post]]
+file = "consumer.wgsl"

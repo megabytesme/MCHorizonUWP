@@ -1,0 +1,125 @@
+{
+  "scope": "Host CPU fixture validation and component binary reruns",
+  "runtime_verified": false,
+  "official_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+  "host": "Ben-Desktop",
+  "sdk_executable_sha256": "76ccca2d97fd11f469080dd42b6141a550293ec50ee018906821a58674847d23",
+  "native": [
+    {
+      "fixture": "audit_sky_marker",
+      "status": "directory and archive accepted",
+      "stages": [
+        "sky"
+      ],
+      "sha256": "0d183116df0fb8544a2c3651612396a8d247a2250e829d68d7a752522ee85fd0"
+    },
+    {
+      "fixture": "audit_material_marker",
+      "status": "directory and archive accepted",
+      "stages": [
+        "material"
+      ],
+      "sha256": "268d11b603775ee7866bc877210beb5d780a7ad28c83a157df4edeef0a0bc38e"
+    },
+    {
+      "fixture": "audit_post_marker",
+      "status": "directory and archive accepted",
+      "stages": [
+        "post"
+      ],
+      "sha256": "0b6ecd57f454ba98c033c1bccddbb5570b95d39c225946861f4b33a62e5a855f"
+    },
+    {
+      "fixture": "audit_multipass",
+      "status": "directory and archive accepted",
+      "stages": [
+        "producer.wgsl",
+        "consumer.wgsl"
+      ],
+      "sha256": "570c40a1497deb0a16754b9e58f9459baddf9b1aa231e4861dd3fa959ad4643a"
+    },
+    {
+      "fixture": "audit_invalid",
+      "status": "expected error",
+      "exit_code_nonzero": true,
+      "diagnostic": "post.wgsl:2:12 no definition in scope for identifier: audit_marker_is_not_declared"
+    },
+    {
+      "fixture": "audit_depth",
+      "status": "directory and archive accepted",
+      "sha256": "0c5456a40fceb70a454329fc1241837ca395cac770f5168ffeaf8aca648c9c89",
+      "stages": [
+        "post"
+      ]
+    },
+    {
+      "fixture": "audit_depth_load",
+      "status": "directory and archive accepted",
+      "sha256": "3212fa8232b4a00acc8567dbbf283ad1d8d821cf23b484bc7e9558e78e47f2ba",
+      "stages": [
+        "post"
+      ]
+    },
+    {
+      "fixture": "audit_entity",
+      "status": "directory and archive accepted",
+      "sha256": "87cb00753f199a47864cb9dc765c75e38586aa22eefab2a6842ba3fe79b848a2",
+      "stages": [
+        "entity"
+      ]
+    },
+    {
+      "fixture": "audit_weather",
+      "status": "directory and archive accepted",
+      "sha256": "51f1cb4d2b2f8580fdd08a45c10599f1f3e0db366a48bfa279020538aef42e1c",
+      "stages": [
+        "weather"
+      ]
+    },
+    {
+      "fixture": "audit_tonemap",
+      "status": "directory and archive accepted",
+      "sha256": "98eaab94185481ffc75c8ca7cc67eb416c2acb1dd3839b7d6e0f4dae46a31d1a",
+      "stages": [
+        "tonemap"
+      ]
+    },
+    {
+      "fixture": "audit_bt2020",
+      "status": "directory and archive accepted",
+      "sha256": "4b42f60c6c5e2c6d0ec99b88e1623a6f26a0efb5691075a0d86023dc553ecc94",
+      "stages": [
+        "post"
+      ]
+    },
+    {
+      "fixture": "audit_motion",
+      "status": "directory and archive accepted",
+      "sha256": "a0d124fa5705c31a7d4187b7116e6ce0a751b7d1fe915ccebaf5d68c39d49cf7",
+      "stages": [
+        "post"
+      ]
+    }
+  ],
+  "classic": {
+    "fixture": "audit_post_only",
+    "command": "verify_classic.exe tools/feature-audit-fixtures/classic/audit_post_only",
+    "exit_code": 0,
+    "observation": "Translated exactly one composite vertex/fragment pair to colortex0"
+  },
+  "component_binaries": [
+    {
+      "name": "horizon_shader_api-e4b509b075c7fa0c.exe",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "horizon_shaders-4be534d3be4657e8.exe",
+      "passed": 258,
+      "failed": 0,
+      "ignored": 3
+    }
+  ]
+}

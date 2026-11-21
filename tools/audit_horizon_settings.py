@@ -12,6 +12,9 @@ from collections import Counter
 from pathlib import Path
 
 import audit_horizon_extras
+from audit_horizon_gap_report import LEDGER, compile_ledger
+from audit_horizon_graphics_followup import apply_graphics
+from audit_horizon_platform_evidence import apply_platform
 import audit_horizon_launcher
 import audit_horizon_render_settings
 import audit_horizon_world
@@ -173,6 +176,8 @@ def inventory(official, port, product=ROOT):
     features, declarations = feature_rows(product)
     merge_coverage(coverage, declarations)
     merge_coverage(coverage, audit_horizon_render_settings.link_renderer(settings, features, product))
+    apply_graphics(settings, features, product, port)
+    apply_platform(settings, features, product, port)
     settings = sorted((finalize(row) for row in settings), key=lambda row: row["id"])
     features = sorted((finalize(row) for row in features), key=lambda row: row["id"])
     duplicates = [identifier for identifier, count in Counter(
@@ -245,7 +250,7 @@ def unsupported_markdown(rows):
     lines = [
         "# Horizon UWP limitations and proof gaps", "",
         "Each row below has a broken, gated, missing, no-op, or demonstrated hardware/OS limitation.",
-        "The JSON inventory gives profile scope, source anchors and individual test methods.", "",
+        "The JSON inventory gives profile scope and source anchors. [Every unverified or defective cell with a bounded next test](verification-gaps.csv).", "",
         "| Owner | ID | Affected profiles | Evidence finding |",
         "| --- | --- | --- | --- |",
     ]
@@ -302,10 +307,14 @@ def generate(official, port, product, language=None):
         "settings": settings,
         "user_visible_feature_groups": features,
     }
+    ledger, counts = compile_ledger(settings, features, product)
+    coverage_data = coverage_report(settings, features, coverage)
+    coverage_data["runtime_verification_gaps"] = counts
     return {
+        LEDGER: ledger,
         "settings-inventory.json": structured(model),
         "settings-matrix.csv": settings_csv(settings + features),
-        "coverage.json": structured(coverage_report(settings, features, coverage)),
+        "coverage.json": structured(coverage_data),
         "unsupported-features.md": unsupported_markdown(settings + features),
     }
 

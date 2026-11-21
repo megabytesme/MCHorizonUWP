@@ -1,0 +1,8 @@
+schema = 1
+api = "0.2"
+id = "audit_invalid"
+name = "Audit invalid post shader"
+version = "0.1.0"
+
+[[post]]
+file = "post.wgsl"

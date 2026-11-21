@@ -143,6 +143,32 @@ class PinnedSourceTests(unittest.TestCase):
         csv_rows = list(csv.DictReader(io.StringIO(first["settings-matrix.csv"])))
         self.assertEqual([row["id"] for row in self.settings + self.features],
                          [row["id"] for row in csv_rows])
+        gap_csv = list(csv.DictReader(io.StringIO(first["verification-gaps.csv"])))
+        got = {(row["matrix"], row["id"], row["profile"], row["status"]) for row in gap_csv}
+        self.assertEqual(len(got), len(gap_csv))
+        expected = {
+            ("feature" if row["scope"] == "feature" else "setting", row["id"], profile, status)
+            for row in self.settings + self.features
+            for profile, status in [
+                ("official/windows", row["official_baseline_status"]),
+                *((profile, cell["status"]) for profile, cell in row["profiles"].items()),
+            ]
+            if status != "V"
+        }
+        with (audit.ROOT / audit.OUTPUT / "renderer-features.csv").open(encoding="utf-8-sig", newline="") as source:
+            for row in csv.DictReader(source):
+                for prefix, field in (("", "status"), ("official/", "official_windows_status")):
+                    if row[field] != "V":
+                        expected.add(("renderer", row["feature_id"], prefix + row["profile_id"], row[field]))
+        with (audit.ROOT / audit.OUTPUT / "shader-pack-tests.csv").open(encoding="utf-8-sig", newline="") as source:
+            for row in csv.DictReader(source):
+                for key, value in row.items():
+                    if key.startswith(("official_windows_", "uwp_")) and value != "V":
+                        profile = "official/" + key if key.startswith("official_windows_") else key
+                        expected.add(("shader", row["test_id"], profile, value))
+        self.assertEqual(expected, got)
+        for row in gap_csv:
+            self.assertTrue(row["classification"] and row["repair_owner"] and row["reproduction"])
         declared = json.loads(first["coverage.json"])
         for path, members in self.coverage.items():
             self.assertEqual(declared["source_files"][path]["count"], len(set(members)))

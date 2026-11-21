@@ -60,6 +60,17 @@ An official Windows cell is independent of its UWP cells. A `V` for one point on
 
 These are feature-level receipts. The individual option rows retain their own statuses. [Runtime follow-up](nightly-runtime-completion-2026-11-21.md) · [Lumia storage, DRS and gyro evidence](nightly-lumia-drs-2026-11-21.md) · [Native installation](native-mods-uwp-2026-11-19.md)
 
+## Unverified and defective behavior
+
+The follow-up ledger gives each unresolved setting, feature, renderer and shader cell its own row with the backend, architecture, D3D11 feature level when applicable, observed blocker, evidence, reproduction and repair owner. Filter `classification` for missing implementation, stub, broken, driver or platform limits, intentional gating, untested behavior, or official upstream limitations. A partial result retains a test for its open portion. The coverage test compares the ledger to every non-verified cell in all four matrices. [Verification ledger](../deliverables/feature-audit/verification-gaps.csv) · [Coverage counts](../deliverables/feature-audit/coverage.json)
+
+| Owner | Pinned operation | Reproduction and completion evidence |
+| --- | --- | --- |
+| HDR | UWP D3D12 Auto has no display-state provider at the product pin. The separate HDR branch has signed x64 scRGB evidence. | Check OS HDR state, selected color space, presenter metadata and distinct HUD levels on the same scene. Repeat Auto toggle, transition and non-HDR fallback on the exact candidate. [Renderer comparison](horizon-uwp-renderer-comparison.md) |
+| D3D11 tier owner and UWP engine | Pinned compatibility dispatch rejects shader packs on negotiated FL11_1 and deliberately forced FL9_1. | Capture the negotiation receipt, select a standalone native marker and a classic composite, and require fallback without a process exit. Test the modern path only on a candidate that exposes it. [Shader comparison](horizon-uwp-shader-compatibility.md) |
+| ANGLE and Horizon shader engine | Signed x64 GLES 3.0 produced native sky layout rejection and classic entity vertex-storage rejection. The separate stock post-effect alignment error also appears with packs off. | Compare pack-off, native sky only, native post only and classic post only on the same signed build. Archive first validation errors and marker pixels, including a baseline that reproduces the independent post-effect condition. [Shader fixtures](../tools/feature-audit-fixtures/README.md) |
+| UWP platform and QA | Narrator backend is a stub and UWP audio routing uses the default endpoint. Earlier signed touch, controller, gyro and reconnect evidence covers specific profiles and package versions. | Record the selected setting and actual speech or audio routing, controller/touch handoff, copied clipboard text, observed focus and lifecycle events, and a non-loopback join against a dedicated test server. [Verification ledger](../deliverables/feature-audit/verification-gaps.csv) |
+
 ## Remaining physical scope
 
 The signed x64 shader run captured the positive D3D12 cases and two scoped ANGLE failures. The ANGLE classic failure interrupted the same-session pack-off capture. The earlier signed pack-off receipt provides a reference comparison. Surface session 1 remained locked at the foreground check. The Lumia Device Portal returned HTTP 503 and timed out on retry. The retained signed receipts therefore cover the prior mobile tests. The next controls are a same-session pack-off replay, isolated sky/material/post stages and separate physical output tests. [Shader runner and receipts](horizon-uwp-shader-compatibility.md) · [Device-specific proof gaps](horizon-uwp-renderer-comparison.md)
@@ -77,4 +88,4 @@ $env:HORIZON_AUDIT_UWP_SOURCE = $UwpPatchedSource
 python -B -m unittest discover -s tools -p test_audit_horizon_settings.py -v
 ```
 
-Omit `--check` to regenerate the four extractor outputs. The tests independently compare source match arms, serializer entries, static controls, bundled manifests and profile evidence requirements. The shader and renderer matrices carry their separate stage and hardware receipts.
+Omit `--check` to regenerate the five extractor outputs. The tests independently compare source match arms, serializer entries, static controls, bundled manifests and profile evidence requirements. The shader and renderer matrices carry their separate stage and hardware receipts.

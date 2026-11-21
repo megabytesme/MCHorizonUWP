@@ -18,11 +18,11 @@
   "setting_profile_status_counts": {
     "?": 9330,
     "B": 1,
-    "C": 4510,
-    "H": 259,
-    "P": 159,
-    "S": 208,
-    "U": 2499,
+    "C": 4548,
+    "H": 263,
+    "P": 138,
+    "S": 201,
+    "U": 2485,
     "V": 5,
     "X": 21
   },
@@ -4578,5 +4578,35 @@
     "runtime-registered-controls": "The finite source inventory covers control types and shipped native packs; installed mods, classic packs and hardware-dependent choices supply additional values at runtime.",
     "settings-metadata": "Unresolved field-level behavior, exact ranges and controls are listed by record ID.",
     "hardware-matrix": "Physical acceptance requires the exact signed version, negotiated device/profile, active route and exercised values."
+  },
+  "runtime_verification_gaps": {
+    "ledger": "verification-gaps.csv",
+    "unverified_or_defective_cells": 21813,
+    "by_matrix": {
+      "feature": 1826,
+      "renderer": 1298,
+      "setting": 18049,
+      "shader": 640
+    },
+    "by_status": {
+      "?": 10223,
+      "B": 13,
+      "C": 7477,
+      "H": 941,
+      "P": 212,
+      "S": 348,
+      "U": 2526,
+      "X": 73
+    },
+    "by_classification": {
+      "broken": 13,
+      "driver, hardware or OS limited": 73,
+      "intentionally capability-gated": 937,
+      "missing implementation": 2518,
+      "not tested": 17700,
+      "not tested in full": 212,
+      "official upstream limitation": 26,
+      "stub": 334
+    }
   }
 }
