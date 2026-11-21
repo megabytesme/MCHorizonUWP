@@ -1134,6 +1134,9 @@ fn start_upstream(
     session: Option<horizon_client::auth::AuthSession>,
 ) -> horizon_client::Result<()> {
     let startup = horizon_client::entry::prepare_uwp(resources, game_dir)?;
+    // The trusted gyro mod uses the app-local game directory for its opt-in trace.
+    // HORIZON_HOME can point to a separate logging directory.
+    unsafe { std::env::set_var("HORIZON_UWP_GYRO_TRACE_ROOT", game_dir) };
     horizon_client::game::set_uwp_session(session);
     horizon_mod_host::start(startup)
 }
