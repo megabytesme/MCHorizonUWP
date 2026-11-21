@@ -1,0 +1,48 @@
+# November 20 Lumia saved-world dynamic resolution
+
+The protected November 18 installation and saves stayed intact. A separate signed ARM32 diagnostic installation copied the 155,534-byte `Nov20Smoke` fixture into its own `LocalState` and started it through Horizon's pinned-world route. The runtime used Horizon `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, wgpu `aa7b65c43ef008d0a92d20fcdf9f10fa0883f157`, and the unmodified client 0.1.14 game bridge. The Lumia exposed a 2561×1439 landscape panel and swapchain on the Adreno 430 with D3D11 feature level 11_1 and Horizon's FL9_1 compatibility shaders. The driver was 11.18.1078.53.
+
+| Attempt | Observed result |
+| --- | --- |
+| Forced hardware FL9_1 at 50% and 16 MiB | The launcher spinner remained visible through the diagnostic deadline. The user reported audio. The launch emitted no game frame callback or new capture. |
+| Hardware compatibility at 50% and 16 MiB, cold | Both swapchains attached and the game's startup frame presented at native dimensions. The world renderer's texture upload failed with `wgpu error: Out of Memory`. |
+| Hardware compatibility at 50% and 4 MiB, warm | The game rendered a live local world with non-silent XAudio2. The FL9_1 world target became 1281×720 after load, with a 2561×1439 output. |
+| Hardware compatibility at 75% and 4 MiB, warm | The process was suspended during title artwork rebuild, briefly resumed, and exited before the first game frame. Its capture remained unchanged. |
+
+The completed 50% run used a two-chunk render distance, 30 FPS target and a 4 MiB texture budget. The lower budget selected 1,301 block sprites at 16 pixels. The renderer created color and depth textures from the same 1281×720 descriptor, then composited the world before drawing the HUD at the swapchain size. The recovered client timeline covered 477 `submit` intervals during settled play over 27.93 seconds. Mean and median frame rates were 17.08 and 20.86 FPS. P50, P95 and P99 were 47.95, 65.42 and 128.03 ms. The median of one-second CPU frame medians was 34.18 ms. GPU timing was unavailable. The sampled Portal working set reached 797,675,520 bytes for the original game PID. The last recovered memory sample measured 24.00 MiB of section arenas and 9.40 MiB of section vertices. These figures cover one preliminary trial.
+
+The raw capture contains 1,735,440 decoded bytes of complete protobuf records and lacks its final gzip trailer. The parser rejects incomplete streams by default and reproduced the recorded cadence CSV byte for byte with explicit recovery enabled. The test produced a 64×64 world icon. The Wasm-triggered full-size screenshot hit the UWP hard-link error. The app log confirms non-silent audio. An underrun counter, reliable thermal data, and input latency were unavailable.
+
+[Fixed 50% world log](../deliverables/nightly-2026-11-20/drs/lumia-runtime/fixed-50-game.log) · [Frame intervals](../deliverables/nightly-2026-11-20/drs/lumia-runtime/fixed-50-cadence.csv) · [Run metrics and original capture hash](../deliverables/nightly-2026-11-20/drs/lumia-runtime/fixed-50-metrics.json) · [Original capture](../deliverables/nightly-2026-11-20/drs/lumia-runtime/fixed-50.hzperf.partial) · [World icon](../deliverables/nightly-2026-11-20/drs/lumia-runtime/fixed-50-world-icon.png)
+
+The cold OOM exposed a missing path in the startup renderer handoff. The handoff destroyed the previous ordinary HUD atlas before building the world atlas. FL9_1 keeps its atlas in separate 2048×2048 RGBA8 tiles. Those live tiles could each hold 16 MiB through the replacement upload. The runtime patch retires them after the existing queue wait. The screenshot patch publishes the completed temporary file on UWP through a same-directory `MoveFileExW` call with replacement disabled. A Win32 smoke test confirmed collision error 183 and preserved the existing file, then published the staged file successfully under an unused name.
+
+[Cold OOM log](../deliverables/nightly-2026-11-20/drs/lumia-runtime/cold-16mib-game.log) · [Interrupted 75% log](../deliverables/nightly-2026-11-20/drs/lumia-runtime/interrupted-75-game.log) · [Screenshot collision smoke](../deliverables/nightly-2026-11-20/drs/lumia-runtime/screenshot-move-contract.json)
+
+## Physical gyro correlation
+
+The separate signed `MCHorizonUWP.NightlyNov20.GyroTrace.arm` package used client 0.1.15, embedded gyro 0.1.1, and the stock Wasm fixture without an automatic quit. It seeded the same saved world with a 4 MiB texture budget and one worker. The package resumed the original game PID 6692 through normal Device Portal activation after its working set had been trimmed during suspension. The game attached a 2561×1439 D3D11 swapchain and dismissed the launcher overlay after the first game frame.
+
+At approximately 03:09 UTC, Ben reported holding the Lumia still, turning and tilting it with no touch or controller input, and seeing the camera follow both yaw and pitch in the visible world. The signed package receipt and timed lifecycle evidence identify the observed session. The native gyro uses the game's camera rotation API. Its requested CSV was absent because this UWP build's mod data-file service returns unsupported. The physical observation provides directional evidence. Numeric sensor-to-camera deltas and menu-state movement suppression remain unmeasured in this session.
+
+[Package and physical observation record](../deliverables/nightly-2026-11-20/drs/lumia-runtime/gyro-physical-provenance.json) · [Gyro session lifecycle](../deliverables/nightly-2026-11-20/drs/lumia-runtime/gyro-lifecycle.log)
+
+## Repeatable physical sweep
+
+Use a separate signed `MCHorizonUWP.NightlyNov20.DrsTrace.arm` diagnostic host version with the same synthetic world and the installed resource framework. Start from a warm run with a two-chunk render distance, the same budget, frame pacing, fixed camera, and a 30 FPS target. The device must stay in the foreground. Treat a suspend, foreground change, or settings mismatch as an interrupted trial. A diagnostic host may request an active display while it is foregrounded. It leaves system timeout settings alone.
+
+Run 100%, 75%, 67% and 50% with adaptive disabled. A 2561×1439 surface should produce approximately 2561×1439, 1921×1079, 1716×964 and 1281×720 world color and depth. Verify the actual size in each run's renderer log. Run adaptive at a configurable 50% floor and 30 FPS after the fixed runs. Allow an unchanged scene to settle and then repeat a consistent camera transition. Read the logged fallback reasons and intervals, count actual changes, and confirm the configured floor. The FL9_1 path should keep GPU time unavailable. High CPU frame time can limit the achievable frame rate even when the world target shrink helps graphics work.
+
+Use at least two warm trials at each scale with the same camera, distances, texture budget, foreground state and power source. Preserve raw full-size HUD screenshots, app and lifecycle logs, graphics values, the frame capture, and sampled working set. Record failures, confirmed audio underruns, and GPU or input timings only when the path measures them. Compare matched settled windows and report missing measurements. For sustained validation, leave the isolated game foregrounded long enough to collect an additional steady window and check for allocation or audio failures.
+
+The Windows PowerShell helper requires the owner's existing pinned Lumia Device Portal setup. It changes graphics settings only for the exact diagnostic app while its process is stopped. It writes evidence under the system temp directory by default. Run it on Ben-Desktop.
+
+```powershell
+powershell.exe -NoProfile -File .\tools\lumia-drs\measure-lumia-case.ps1 -Variant DrsTrace -AppVersion 1.0.1.0 -Scale 75 -TextureBudgetMiB 4 -Label fixed-75
+powershell.exe -NoProfile -File .\tools\lumia-drs\measure-lumia-case.ps1 -Variant DrsTrace -AppVersion 1.0.1.0 -Scale 50 -TextureBudgetMiB 4 -Adaptive -Label adaptive-50-floor
+python .\tools\lumia-drs\summarize_capture.py <capture-path> --output <output-directory>
+```
+
+Use `--allow-incomplete` only for a capture with a missing gzip trailer and intact protobuf records. A trace from a previous launch is saved as `trace.stale` and cannot support the current result. Verify the in-world start time, particularly for early profiler starts that include startup or world loading.
+
+[Device Portal app and performance APIs](https://learn.microsoft.com/en-us/windows/uwp/debug-test-perf/device-portal-api-core) · [Foreground DisplayRequest behavior](https://learn.microsoft.com/en-us/uwp/api/windows.system.display.displayrequest)

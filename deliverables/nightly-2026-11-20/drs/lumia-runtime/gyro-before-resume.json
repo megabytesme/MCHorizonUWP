@@ -1,0 +1,17 @@
+{
+    "utc":  "2026-11-21T03:06:49.2845478Z",
+    "process":  {
+                    "ProcessId":  6692,
+                    "WorkingSetSize":  85295104,
+                    "PrivateWorkingSet":  4096,
+                    "PageFileUsage":  638234624,
+                    "CPUUsage":  0.000000
+                },
+    "power":  {
+                  "AcOnline":  1,
+                  "Charging":  0,
+                  "RemainingCapacity":  12900,
+                  "MaximumCapacity":  12900
+              },
+    "available_mb":  1343.62
+}

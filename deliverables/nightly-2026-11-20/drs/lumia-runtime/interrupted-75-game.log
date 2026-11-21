@@ -1,0 +1,33 @@
+[02:50:19] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[02:50:19] [Horizon game/INFO]: Embedded native mod: horizon_gyro_aim 0.1.0
+[02:50:19] [Horizon game/INFO]: Embedded native mod: uwp_native_hook_probe 0.1.0
+[02:50:19] [Horizon game/INFO]: Embedded native mod: uwp_native_after_probe 0.1.0
+[02:50:19] [Horizon game/WARN]: wasm module cache disabled: folder C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsTrace.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[02:50:57] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 1248 ms, modules 35907 ms, linking 180 ms, instantiation 7 ms, subscriptions 0 ms, initialization 1 ms
+[02:50:57] [Horizon game/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[02:50:57] [Horizon game/INFO]: Horizon renderer: asking DirectX 11 for a graphics device
+[02:50:57] [Horizon game/WARN]: [wgpu_core::instance] DX11 is experimental and exposes a restricted FL9_1 graphics backend with constrained owner-thread HWND and CoreWindow surfaces
+[02:50:57] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[02:50:57] [Horizon game/INFO]: Horizon renderer: requesting the device (driver D3D11 FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53) with features [] and the adapter's limits (buffers up to 4294967291 bytes, storage bindings up to 0 bytes, 6 texture layers)
+[02:50:57] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (2561x1439 Bgra8Unorm, Fifo)
+[02:50:57] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[02:50:57] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[02:50:58] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 124 ms
+[02:50:58] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[02:50:59] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsTrace.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\9609d2132279efd1
+[02:50:59] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[02:51:12] [resource-loader/INFO]: Horizon: UI bundle ready after 15013 ms
+[02:51:19] [load-render/INFO]: Horizon: block sprites: 1301 layers at 16 px (largest 64 px, budget 4 MiB)
+[02:51:22] [resource-loader/INFO]: load core tables: 25.13s
+[02:51:30] [World data preload/INFO]: Horizon: worldgen data loaded in 8.672140677s
+[02:51:31] [resource-loader/INFO]: load pack tables: 34.08s
+[02:51:31] [resource-loader/INFO]: Horizon: core-ready after 34361 ms
+[02:51:32] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 585 ms
+[02:51:40] [load-items/INFO]: load items: 43.56s
+[02:51:42] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 20162 ms
+[02:51:43] [world-rest-loader/INFO]: Horizon: resources loaded in 46.2s; 35723 block states, 1658 items, 67 biomes; 2 worker threads
+[02:51:43] [world-rest-loader/INFO]: Horizon: rest-ready after 46209 ms
+[02:51:43] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[02:52:20] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[02:52:22] [Horizon game/INFO]: Horizon: loading the title artwork after 85146 ms
+[02:52:22] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)

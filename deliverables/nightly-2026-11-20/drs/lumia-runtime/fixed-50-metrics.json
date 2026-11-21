@@ -1,0 +1,45 @@
+{
+  "capture": {
+    "sha256": "e4141122280e8d3d1093f40990785c92835101c2abed660a7371fa88a6c3eba4",
+    "gzip_complete": false,
+    "compressed_bytes": 959134,
+    "decoded_protobuf_bytes": 1735440,
+    "client_stop_present": false
+  },
+  "settled_sample": {
+    "source": "intervals between game-thread submit spans of successive recorded rendered frames",
+    "thread": "Horizon game",
+    "frames": 477,
+    "duration_s": 27.929430999999997,
+    "average_fps": 17.078758246095312,
+    "median_fps": 20.855927254525596,
+    "p50_ms": 47.94800000000032,
+    "p95_ms": 65.41799999999785,
+    "p99_ms": 128.0329999999958,
+    "median_of_one_second_cpu_medians_ms": 34.18268013000488,
+    "median_of_one_second_gpu_medians_ms": null,
+    "sampled_max_rss_mb": 776.0
+  },
+  "renderer": {
+    "world_color": [
+      1281,
+      720
+    ],
+    "world_depth": [
+      1281,
+      720
+    ],
+    "output": [
+      2561,
+      1439
+    ],
+    "texture_budget_mib": 4,
+    "sprite_edge_px": 16,
+    "render_distance_chunks": 2,
+    "target_fps": 30,
+    "render_scale_percent": 50,
+    "section_arena_mib": 24.0,
+    "section_vertices_mib": 9.4
+  },
+  "peak_portal_working_set_bytes": 797675520
+}
