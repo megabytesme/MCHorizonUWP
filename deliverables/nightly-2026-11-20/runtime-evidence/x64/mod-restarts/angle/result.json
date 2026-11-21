@@ -1,0 +1,48 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.HostFix.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.HostFix.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.HostFix.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "Pid":  84800,
+    "BeginUtc":  "2026-11-21T02:55:19.1107283Z",
+    "Mode":  "World",
+    "Backend":  "Gl",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  false,
+    "Renderer":  "[02:55:30] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "FirstFrame":  "[02:55:31] [Horizon game/INFO]: Horizon: first frame after 210 ms",
+    "StartupObservedMs":  13438,
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025518-645-x64-Gl-World-Enabled-100\\world.png",
+                    "Width":  1560,
+                    "Height":  1080,
+                    "Cyan":  4032,
+                    "Magenta":  4032,
+                    "SceneColors":  1367
+                },
+    "NativeLoad":  "[02:55:20] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[02:55:23] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 317 ms, modules 1746 ms, linking 14 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe"
+                                ],
+    "DebugCapture":  {
+                         "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025518-645-x64-Gl-World-Enabled-100\\f3.png",
+                         "Width":  1560,
+                         "Height":  1080,
+                         "Cyan":  4032,
+                         "Magenta":  4032,
+                         "SceneColors":  1282
+                     },
+    "ResolutionEvidence":  [
+
+                           ],
+    "Exit":  "closed"
+}

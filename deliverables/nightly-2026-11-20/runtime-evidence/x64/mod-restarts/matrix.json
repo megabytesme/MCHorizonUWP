@@ -1,0 +1,37 @@
+[
+  {
+    "Case": "both on",
+    "Pass": true,
+    "Report": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025233-109-x64-Dx11-World-Enabled-50\\result.json"
+  },
+  {
+    "Case": "native off",
+    "Pass": true,
+    "Report": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025253-589-x64-Dx11-World-WasmOnly-50\\result.json"
+  },
+  {
+    "Case": "native on and Wasm off",
+    "Pass": true,
+    "Report": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025335-621-x64-Dx11-World-NativeOnly-50\\result.json"
+  },
+  {
+    "Case": "both on again",
+    "Pass": true,
+    "Report": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025414-742-x64-Dx11-World-Enabled-50\\result.json"
+  },
+  {
+    "Case": "both off",
+    "Pass": true,
+    "Report": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025436-153-x64-Dx11-World-Disabled-50\\result.json"
+  },
+  {
+    "Case": "D3D12 regression",
+    "Pass": true,
+    "Report": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025458-910-x64-Dx12-World-Enabled-100\\result.json"
+  },
+  {
+    "Case": "ANGLE regression",
+    "Pass": true,
+    "Report": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025518-645-x64-Gl-World-Enabled-100\\result.json"
+  }
+]

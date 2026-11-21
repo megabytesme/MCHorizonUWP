@@ -1,0 +1,5 @@
+mod.horizon_gyro_aim:false
+mod.uwp_smoke:false
+mod.uwp_wasm_hook_probe:true
+mod.uwp_native_hook_probe:false
+mod.uwp_native_after_probe:false

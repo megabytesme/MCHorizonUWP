@@ -30,6 +30,18 @@ The fix moves background server and world tile status work off XAML's dispatcher
 
 Signed x64 and x86 D3D11 clients each logged in to the exact pinned 26.3 dedicated server, rendered both mod markers, moved and disconnected. Each was then launched in a fresh process and the stock server logged the player's persisted movement position. x64 moved from `(-527.500, 69.000, 64.500)` to `(-527.610, 66.000, 70.527)`. x86 resumed at `(-527.500, 66.000, 70.712)`. The x64 same-host wired-address test reached the connector and timed out. The successful offline allowlisted test used a temporary loopback exemption for each exact isolated family. The listener stopped, both worlds saved and both exemptions were removed. [x64 login and cleanup](../deliverables/nightly-2026-11-20/runtime-evidence/x64/host-fix-multiplayer/) · [x64 reconnect](../deliverables/nightly-2026-11-20/runtime-evidence/x64/host-fix-multiplayer-reconnect/result.json) · [x86 login and cleanup](../deliverables/nightly-2026-11-20/runtime-evidence/x86/host-fix-multiplayer/) · [x86 reconnect](../deliverables/nightly-2026-11-20/runtime-evidence/x86/host-fix-multiplayer-reconnect/result.json)
 
+## Signed mod restart and admission
+
+| x64 D3D11 state across fresh processes | Native marker pixels | Wasm marker pixels |
+| --- | ---: | ---: |
+| Both enabled | 4096 | 4096 |
+| Native disabled | 0 | 4096 |
+| Wasm disabled | 4096 | 0 |
+| Both re-enabled | 4096 | 4096 |
+| Both disabled | 0 | 0 |
+
+Every capture showed actual saved-world play. The installed native and Wasm package files remained present for each test. The logs agreed with the enabled inventory. A separate signed package carrying an altered expected native SHA-256 was refused before its DLL could load. Both active hooks also rendered on signed x64 hardware D3D12 and ANGLE. The signed Surface candidate ran native-only on D3D11 (9,216/0) and Wasm-only on D3D12 (0/6,432) after clean process exits. [Desktop matrix](../deliverables/nightly-2026-11-20/runtime-evidence/x64/mod-restarts/matrix.json) · [Rejected native manifest](../deliverables/nightly-2026-11-20/runtime-evidence/x64/bad-native-checksum/result.json) · [Surface D3D11 control](../deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-native-only/result.json) · [Surface D3D12 control](../deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-wasm-only/result.json)
+
 ## Process lifetime and mod settings
 
 At the pinned upstream revision, the engine seal, point table and platform provider are process globals. The old XAML return-to-home flow cleared a host flag and queued another game within the same process. The second engine startup would try to install its already-installed registration provider. The host now completes view and input cleanup, holds its launch guard, and requests a fresh launcher process on Windows versions that support the restart API. The legacy ARM32 route closes after Quit Game so the next activation starts with a new process. Both retain the ordinary in-game return-to-title behavior until the player quits the game. The modern route falls back to closing if Windows rejects the restart. [WinRT restart API](https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.core.coreapplication.requestrestartasync?view=winrt-19041)

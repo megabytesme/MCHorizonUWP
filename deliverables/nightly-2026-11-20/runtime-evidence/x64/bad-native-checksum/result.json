@@ -1,0 +1,21 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.BadMod.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.BadMod.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.BadMod.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "Pid":  23968,
+    "BeginUtc":  "2026-11-21T02:56:46.2309436Z",
+    "Mode":  "World",
+    "Backend":  "Dx11",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  true,
+    "NativeRejection":  "Horizon UWP encountered an error: C:\\Program Files\\WindowsApps\\MCHorizonUWP.NightlyNov20.BadMod.x64.NativeMods_1.0.0.0_x64__4pd4jeb6snrqw\\horizon_uwp_mod_uwp_native_hook_probe.dll: native library hash mismatch",
+    "Exit":  "closed"
+}

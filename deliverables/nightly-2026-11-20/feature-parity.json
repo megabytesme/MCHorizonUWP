@@ -2545,7 +2545,26 @@
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "docs/nightly-mod-runtime-2026-11-20.md",
         "uwp/wasm-abi-probe/README.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "L",
+          "x64_dx12": "I",
+          "x64_angle": "I",
+          "x86_dx11_fl91": "I",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "On signed x64 D3D11, the test guest's 32 MiB memory ceiling refused growth. Its 100-tick epoch deadline and a separate intentional trap stopped only their own groups. The independent Wasm and native markers continued drawing.",
+        "evidence": [
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/wasm-limits-and-trap/game.log"
+        ]
+      }
     },
     {
       "id": "wasm-limits",
@@ -2574,7 +2593,26 @@
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "docs/nightly-mod-runtime-2026-11-20.md",
         "uwp/code-generation-probe/README.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "L",
+          "x64_dx12": "I",
+          "x64_angle": "I",
+          "x86_dx11_fl91": "I",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "On signed x64 D3D11, the test guest's 32 MiB memory ceiling refused growth. Its 100-tick epoch deadline and a separate intentional trap stopped only their own groups. The independent Wasm and native markers continued drawing.",
+        "evidence": [
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/wasm-limits-and-trap/game.log"
+        ]
+      }
     },
     {
       "id": "wasm-toggle",
@@ -2602,7 +2640,28 @@
         "https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md",
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "docs/nightly-mod-runtime-2026-11-20.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "V",
+          "x64_dx12": "I",
+          "x64_angle": "I",
+          "x86_dx11_fl91": "I",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "L",
+          "arm64_dx12": "L",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "The x64 signed same-package five-state sequence included fresh-process independent native/Wasm toggles. The Surface also drew native only on D3D11 and Wasm only on D3D12 on separate clean process starts.",
+        "evidence": [
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/mod-restarts/matrix.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-native-only/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-wasm-only/result.json"
+        ]
+      }
     },
     {
       "id": "native-source",
@@ -2663,7 +2722,28 @@
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "docs/nightly-mod-runtime-2026-11-20.md",
         "docs/nightly-arm-hud-2026-11-20.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "V",
+          "x64_dx12": "I",
+          "x64_angle": "I",
+          "x86_dx11_fl91": "L",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "L",
+          "arm64_dx12": "L",
+          "arm32_dx11_fl91": "H",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "Signed native optional mods drew on x64, x86 and ARM64. The x64 negative test rejected a signed package with a wrong declared library digest before loading it. ARM32 uses Builder-time native embedding.",
+        "evidence": [
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/mod-restarts/matrix.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/bad-native-checksum/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-native-only/result.json"
+        ]
+      }
     },
     {
       "id": "native-embedded",

@@ -1,0 +1,40 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.arm64",
+    "Family":  "MCHorizonUWP.NightlyNov20.arm64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.arm64_1.0.1.0_arm64__4pd4jeb6snrqw",
+    "Pid":  19628,
+    "BeginUtc":  "\/Date(1795228822614)\/",
+    "Mode":  "World",
+    "Backend":  "Dx12",
+    "Scale":  100,
+    "Hooks":  "WasmOnly",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  true,
+    "Ready":  true,
+    "Renderer":  "[02:41:46] [Horizon game/INFO]: Horizon renderer: Qualcomm(R) Adreno(TM) 680 GPU (backend=Dx12, device_type=IntegratedGpu, vendor=0x4d4f4351, device=0x41333430, driver=\"27.20.2160.0\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\MCHorizonUWP-NightlyNov20-ARM64\\capture-20261121-024021-691-arm64-Dx12-World-WasmOnly-100\\world.png",
+                    "Width":  2074,
+                    "Height":  1614,
+                    "Cyan":  0,
+                    "Magenta":  6432
+                },
+    "CaptureWaitSeconds":  17.7,
+    "DebugCapture":  {
+                         "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\MCHorizonUWP-NightlyNov20-ARM64\\capture-20261121-024021-691-arm64-Dx12-World-WasmOnly-100\\f3.png",
+                         "Width":  2074,
+                         "Height":  1614,
+                         "Cyan":  0,
+                         "Magenta":  6432
+                     },
+    "ResolutionEvidence":  [
+
+                           ],
+    "AudioOutput":  [
+                        "[02:41:48] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)",
+                        "[02:41:55] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio"
+                    ],
+    "AudioNonSilent":  true,
+    "Exit":  "closed"
+}
