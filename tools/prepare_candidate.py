@@ -18,6 +18,7 @@ NIGHTLY_UPSTREAM_ARCHIVE_SHA256 = "1a73fb817549e9b0ec8870b8aec7efd1ea4e274e8be75
 NOV20_UPSTREAM = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
 NOV20_UPSTREAM_ARCHIVE_SHA256 = "abd6a91c41407522f9b0ec43d16555f46cd76832625645658bee57e2ab49da3d"
 NOV20_PATCH = "0.1.13"
+NOV20_INITIAL_RECIPE = ("0.1.14", "1.0.7")
 NOV20_WASM_STANDARD_LIBRARY_SHA256 = "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f"
 NIGHTLY_RECIPES = {
     "0.1.5": ("0.1.6", "1.0.4"),
@@ -28,7 +29,7 @@ NIGHTLY_RECIPES = {
     "0.1.10": ("0.1.11", "1.0.6"),
     "0.1.11": ("0.1.12", "1.0.6"),
     "0.1.12": ("0.1.13", "1.0.6"),
-    NOV20_PATCH: ("0.1.14", "1.0.7"),
+    NOV20_PATCH: ("0.1.15", "1.0.8"),
 }
 WASMTIME_ARCHIVE_SHA256 = "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
 WASM_STANDARD_LIBRARY_SHA256 = "123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b"
@@ -221,12 +222,14 @@ def main():
     elif args.wasmtime_archive is not None or args.wasm_standard_library is not None:
         parser.error("Wasm inputs are only accepted when building a client archive with the Wasm runtime")
     if nightly:
-        if upstream_commit != nightly_source or (client_version, builder_version) != nightly:
+        recipes = (nightly, NOV20_INITIAL_RECIPE) if nov20 else (nightly,)
+        if upstream_commit != nightly_source or (client_version, builder_version) not in recipes:
             raise ValueError(f"Nightly patch {args.patch_version} requires its pinned source, "
                              f"client {default_client} and Builder {default_builder}")
         if not args.patch_only and args.wgpu_archive is None:
             raise ValueError("Preparing a Nightly client requires --wgpu-archive")
     elif (args.wgpu_archive is not None or upstream_commit in (NIGHTLY_UPSTREAM, NOV20_UPSTREAM)
+          or client_version == NOV20_INITIAL_RECIPE[0]
           or any(client_version == client for client, _ in NIGHTLY_RECIPES.values())):
         raise ValueError("The Nightly source, client and wgpu inputs require a Nightly patch")
 

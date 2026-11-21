@@ -6,7 +6,8 @@ public static class NightlyUwp
     public const string November20Commit = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a";
     public const string November20SourceTag = "nightly-source/2026-11-20-0a875da";
     public const string November20Patch = "0.1.13";
-    public const string November20Client = "0.1.14";
+    public const string November20Client = "0.1.15";
+    private const string November20InitialClient = "0.1.14";
     public const string PatchVersion = "0.1.5";
     public const string ClientVersion = "0.1.6";
     public const string CandidatePatchVersion = "0.1.12";
@@ -40,6 +41,8 @@ public static class NightlyUwp
 
     private static bool IsNovember20(string? commit) => string.Equals(commit, November20Commit, StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsNovember20Client(string? client) => client is November20InitialClient or November20Client;
+
     public static bool Matches(string? commit) =>
         IsNovember20(commit) || string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);
 
@@ -48,7 +51,7 @@ public static class NightlyUwp
     internal static bool IsClient(string? version) =>
         version is ClientVersion or EmbeddedClientVersion or CodeRuntimeClientVersion
             or LegacyRendererClientVersion or ArmHudClientVersion or MobileControlsClientVersion
-            or FixedWgpuClientVersion or CandidateClientVersion or November20Client;
+            or FixedWgpuClientVersion or CandidateClientVersion || IsNovember20Client(version);
 
     public static bool SupportsNativeSource(string patch, string client) =>
         (patch, client) is (EmbeddedPatchVersion, EmbeddedClientVersion)
@@ -58,32 +61,33 @@ public static class NightlyUwp
             or (MobileControlsPatchVersion, MobileControlsClientVersion)
             or (FixedWgpuPatchVersion, FixedWgpuClientVersion)
             or (CandidatePatchVersion, CandidateClientVersion)
-            or (November20Patch, November20Client);
+            || (patch == November20Patch && IsNovember20Client(client));
 
     internal static bool UsesPackagedCodeRuntime(string? client, TargetProfile target) =>
         (client is CodeRuntimeClientVersion or LegacyRendererClientVersion or ArmHudClientVersion
-            or MobileControlsClientVersion or FixedWgpuClientVersion or CandidateClientVersion or November20Client)
+            or MobileControlsClientVersion or FixedWgpuClientVersion or CandidateClientVersion
+            || IsNovember20Client(client))
             && target is TargetProfile.DesktopX64 or TargetProfile.DesktopX86 or TargetProfile.SurfaceProX;
 
     internal static bool UsesLegacyArm32Wasm(string? client, TargetProfile target) =>
-        client == November20Client && target == TargetProfile.WindowsMobile;
+        IsNovember20Client(client) && target == TargetProfile.WindowsMobile;
 
     internal static bool UsesWasmRuntime(string? client, TargetProfile target) =>
         UsesPackagedCodeRuntime(client, target) || UsesLegacyArm32Wasm(client, target);
 
     internal static bool UsesFixedWgpu(string? client) =>
-        client is FixedWgpuClientVersion or StreamingAudioClientVersion or November20Client;
+        client is FixedWgpuClientVersion or StreamingAudioClientVersion || IsNovember20Client(client);
 
     internal static bool MatchesRecipe(string commit, string patch, string client) =>
         IsNovember20(commit)
-            ? (patch, client) is (November20Patch, November20Client)
+            ? patch == November20Patch && IsNovember20Client(client)
             : string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase)
                 && ((patch, client) is (PatchVersion, ClientVersion)
-                    || (client != November20Client && SupportsNativeSource(patch, client)));
+                    || (!IsNovember20Client(client) && SupportsNativeSource(patch, client)));
 
     internal static string GameBuildId(string architecture, string patch = PatchVersion, string client = ClientVersion)
     {
-        var commit = client == November20Client ? November20Commit : UpstreamCommit;
+        var commit = IsNovember20Client(client) ? November20Commit : UpstreamCommit;
         return $"mchorizonuwp-{client}-patch-{patch}-{architecture}-{commit}";
     }
 }

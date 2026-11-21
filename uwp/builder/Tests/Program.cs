@@ -2067,6 +2067,11 @@ static async Task TestReleaseSource()
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.CandidatePatchVersion, NightlyUwp.CandidateClientVersion),
             "Nightly recipes reject source and SDK mismatches");
         var november20Arm = new BuildSelection(TargetProfile.WindowsMobile, true);
+        Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, "0.1.14")
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.UpstreamCommit, NightlyUwp.November20Patch, "0.1.14")
+            && NightlyUwp.GameBuildId("arm", NightlyUwp.November20Patch, "0.1.14").EndsWith(NightlyUwp.November20Commit, StringComparison.Ordinal)
+            && november20Arm.FeaturesForClient("0.1.14").Contains("uwp-wasm"),
+            "the initial November 20 client keeps its immutable source, SDK and legacy Wasm profile");
         Require(november20Arm.FeaturesForClient(NightlyUwp.November20Client).Contains("uwp-wasm")
             && !november20Arm.FeaturesForClient(NightlyUwp.November20Client).Contains("uwp-native-mods"),
             "November 20 ARM32 uses the Wasm runtime and build-time native embedding");
