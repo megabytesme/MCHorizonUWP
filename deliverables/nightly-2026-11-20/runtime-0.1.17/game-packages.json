@@ -1,0 +1,141 @@
+{
+  "horizon": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "wgpu": "aa7b65c43ef008d0a92d20fcdf9f10fa0883f157",
+  "patch": "0.1.15",
+  "client": "0.1.17",
+  "builder": "1.0.9",
+  "appx_version": "1.0.2.0",
+  "resource_framework": "Horizon.Asset.26-3.98ccbead789d397639d5badd0bb805",
+  "public_signing_certificate": {
+    "file": "development-publisher.cer",
+    "sha256": "5c7ff2ea1261f6bb0c26930cca60f84224b85748df0bfc91ee2e47817e5509bd"
+  },
+  "architectures": [
+    {
+      "architecture": "arm",
+      "name": "MCHorizonUWP.Nov20.normal.arm",
+      "version": "1.0.2.0",
+      "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "build_id": "mchorizonuwp-0.1.17-patch-0.1.15-arm-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "bridge_sha256": "680cd889475f85b624ed6c90d03b614463ed558c323b8aa7d369a075724a748f",
+      "native_dlls_sha256": null,
+      "packages": [
+        {
+          "name": "HorizonUWP-arm.appx",
+          "role": "game",
+          "bytes": 42713812,
+          "sha256": "54bd37a55b635775b7bf8539394c71909af850751524bbcb08b8bffa43d6ccd1",
+          "relative_path": "game/arm/HorizonUWP-arm.appx"
+        }
+      ]
+    },
+    {
+      "architecture": "x64",
+      "name": "MCHorizonUWP.Nov20.normal.x64",
+      "version": "1.0.2.0",
+      "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "build_id": "mchorizonuwp-0.1.17-patch-0.1.15-x64-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "bridge_sha256": "09c0864904288f981494619803b8930abbd85126bb8b8cee579f78e3d7ac6948",
+      "native_dlls_sha256": {
+        "horizon_uwp_mod_horizon_gyro_aim.dll": "fcd6e588b83479f7a14b408aaab99b8c55a7a70d477d4acb3616823a27e99b38",
+        "horizon_uwp_mod_uwp_native_after_probe.dll": "d78793159fe72d16d651daeff218c72f7243355dec500b5de19d04c97169c99e",
+        "horizon_uwp_mod_uwp_native_hook_probe.dll": "c58bb652f7a525b84f16013265cb0da1418cf135eb2c0a8b66b562ce3015bbf6"
+      },
+      "packages": [
+        {
+          "name": "HorizonUWP-x64.appx",
+          "role": "game",
+          "bytes": 51499810,
+          "sha256": "550d6affedc873c5b12f24ba6d6c9e884d581f41e6f150ee18961a6eda73d3ca",
+          "relative_path": "game/x64/HorizonUWP-x64.appx"
+        },
+        {
+          "name": "main.appxbundle",
+          "role": "main",
+          "bytes": 51501135,
+          "sha256": "1788ec0461b60c249073bdffcbfabfdf7e8db6313c310d015d2077d17fed87d8",
+          "relative_path": "game/x64/main.appxbundle"
+        },
+        {
+          "name": "optional.appxbundle",
+          "role": "native_mods",
+          "bytes": 91593,
+          "sha256": "8b20cb89893dfa9a40ed1ed3e01b802857198a1ee1fbfee1de30bda44bca2e1c",
+          "relative_path": "game/x64/optional.appxbundle"
+        }
+      ]
+    },
+    {
+      "architecture": "x86",
+      "name": "MCHorizonUWP.Nov20.normal.x86",
+      "version": "1.0.2.0",
+      "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "build_id": "mchorizonuwp-0.1.17-patch-0.1.15-x86-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "bridge_sha256": "99c2418d664ed749ac45ccc4731660d0a5b3a52e1074c73a62c0e5e9c2677274",
+      "native_dlls_sha256": {
+        "horizon_uwp_mod_horizon_gyro_aim.dll": "f61ae7c7e6ec7b906dc73484e969bcc52f1af9fd46df488970ee485827948383",
+        "horizon_uwp_mod_uwp_native_after_probe.dll": "4243fc910828951f687f98ef2cca7b3dccd42d1c5c8f0dd491334bcd93e76b98",
+        "horizon_uwp_mod_uwp_native_hook_probe.dll": "3ded8fe49e7de80ee3a38e8cee54f84f1fa02ee83ee0adb33f57b1ed0f691fc3"
+      },
+      "packages": [
+        {
+          "name": "HorizonUWP-x86.appx",
+          "role": "game",
+          "bytes": 48732758,
+          "sha256": "36d514e3f1325804c2ddb7654f0950c4c5508e680406b40eaa6049706b49f95c",
+          "relative_path": "game/x86/HorizonUWP-x86.appx"
+        },
+        {
+          "name": "main.appxbundle",
+          "role": "main",
+          "bytes": 48734268,
+          "sha256": "23e777effbe7a801613594ed3e05932e25b94dbb68e29dd2c4e0cafb50062258",
+          "relative_path": "game/x86/main.appxbundle"
+        },
+        {
+          "name": "optional.appxbundle",
+          "role": "native_mods",
+          "bytes": 88392,
+          "sha256": "50f7bc5e131a7f614c385d54d811ac2d1ea174422463e7827f13ca7b5a68425d",
+          "relative_path": "game/x86/optional.appxbundle"
+        }
+      ]
+    },
+    {
+      "architecture": "arm64",
+      "name": "MCHorizonUWP.Nov20.normal.arm64",
+      "version": "1.0.2.0",
+      "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "build_id": "mchorizonuwp-0.1.17-patch-0.1.15-arm64-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+      "bridge_sha256": "aca886aca6c1c5fec69a902d7d92c6f9ff3f7dfd2a5a6117303696c6cf1f01a1",
+      "native_dlls_sha256": {
+        "horizon_uwp_mod_horizon_gyro_aim.dll": "bf096fcc89fcac9d4d80fce802d91bddd473ba37bc0bf60006b692f384ebcb65",
+        "horizon_uwp_mod_uwp_native_after_probe.dll": "5543ac5eebc9f1ece1fe7f71f6f820aebc73ca593f823b1ab5f637698a3078bc",
+        "horizon_uwp_mod_uwp_native_hook_probe.dll": "c4382e916073a829db9419c690aa651a772d1a74c35120eee011ef110740b4e1"
+      },
+      "packages": [
+        {
+          "name": "HorizonUWP-arm64.appx",
+          "role": "game",
+          "bytes": 45251756,
+          "sha256": "011772d2b66d308318a21eecf3dc16a89318770304f8a3bc7adc787310c97f59",
+          "relative_path": "game/arm64/HorizonUWP-arm64.appx"
+        },
+        {
+          "name": "main.appxbundle",
+          "role": "main",
+          "bytes": 45253461,
+          "sha256": "4505e9646a33eabc06ec9bc97e5f3687ec62cd417477baef4aae5258af78de61",
+          "relative_path": "game/arm64/main.appxbundle"
+        },
+        {
+          "name": "optional.appxbundle",
+          "role": "native_mods",
+          "bytes": 89730,
+          "sha256": "7d1054845d3bb1ee51c6ab6ff0dae2d41f50861b15b91ed8afc6ef6d7fee78d6",
+          "relative_path": "game/arm64/optional.appxbundle"
+        }
+      ]
+    }
+  ]
+}
