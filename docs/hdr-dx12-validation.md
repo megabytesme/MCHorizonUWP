@@ -62,7 +62,7 @@ The package uses its own AppContainer and the existing `Horizon.Asset.26-3.98ccb
   -WasmFixture "$Fixtures/automatic.hmod" -AutomaticCapture -Output $Evidence
 ```
 
-For the physical HDR trial, select the HDR monitor with `-Display`, use `-Hdr On -ExpectHdr` and take the F2 capture with `f2.hmod` and `-AutomaticCapture` omitted. For a monitor move, supply the SDR monitor as `-FallbackDisplay`. Native rejection of HDR configuration, successful SDR recovery and repeated detach retries still need targeted fault injection.
+For the physical HDR trial, select the HDR monitor with `-Display`, use `-Hdr On -ExpectHdr` and take the F2 capture with `f2.hmod` and `-AutomaticCapture` omitted. For a monitor move, supply the SDR monitor as `-FallbackDisplay`. Use the separate instrumented APPX for native fault injection. [Diagnostic procedure](hdr-run-evidence.md)
 
 ### Follow-up on the physical HDR console
 
@@ -71,6 +71,8 @@ The signed PanelRollback package played the isolated world on the PG32UCDM with 
 With both displays active, the signed game window moved from the PG32UCDM to the U32J59x and back. The same process switched from FP16/scRGB to BGRA8/sRGB on the SDR view, saved a fresh SDR-only F2 image, and reapplied FP16/scRGB on the initial monitor.
 
 The separate signed DeviceLoss diagnostic on the established Builder wgpu overlay removed the game's D3D12 device on the physical HDR view. DXGI returned `DXGI_ERROR_DEVICE_REMOVED`. The same process rebuilt world meshes, presented a fresh FP16/scRGB frame and saved a new F2 SDR/HDR pair. An initial run archived a zero-byte SDR file while its writer was still open. The harness now waits for a complete PNG and the matching HDR companion before copying. An independent rerun passed with freshly recorded screenshots and the installed host and bridge matched the signed APPX.
+
+The signed PanelFault diagnostic on the rollback revision exercised native `SetColorSpace1` rejection with `0x80070057`. During a requested HDR switch with SDR already attached, the same process restored BGRA8/sRGB, attached a fresh panel and saved an SDR-only F2 image while the display stayed in HDR mode. During HDR resize, one simulated detach failure was followed by a successful retry, a fresh FP16/scRGB attachment and a new F2 pair. The fresh-chain Check and Set requests stayed unconsumed because startup attached SDR and reused the chain to apply HDR. Those native call sites remain unexercised. [Fault procedure and evidence contract](hdr-run-evidence.md)
 
 On the PanelRollback package, matched Off and On trials used the same test save, display, backend, fixed scale and window size. Five WDDM samples per trial showed 334.3 MiB dedicated GPU usage in SDR and 346.9 MiB in scRGB. The samples describe these two runs. [Verify archived runs](hdr-run-evidence.md)
 

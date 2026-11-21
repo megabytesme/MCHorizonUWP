@@ -20,10 +20,20 @@ param(
     [switch]$AutomaticCapture,
     [string]$ShaderFixture,
     [ValidatePattern('^(horizon:)?[A-Za-z0-9_-]+$')][string]$ShaderPack,
-    [switch]$ExpectClassicPackRefusal
+    [switch]$ExpectClassicPackRefusal,
+    [ValidateSet('Control', 'FreshCheck', 'FreshSet', 'ReusedSetFromSdr', 'ReusedSetDetachHdrRetry')][string]$PanelFaultCase
 )
 
 $ErrorActionPreference = 'Stop'
+if ($PanelFaultCase) {
+    $startHdr = $PanelFaultCase -in @('Control', 'ReusedSetDetachHdrRetry')
+    if ($Identity -cne 'MCHorizonUWP.HdrDev.PanelFault.x64' -or $Backend -ne 'Dx12' -or $Hdr -ne 'On' -or
+        $Display -eq 'Current' -or [bool]$ExpectHdr -ne $startHdr -or !$WasmFixture -or $AutomaticCapture -or
+        $FallbackDisplay -or $DisplayModeTool -or $PlmDebugTool -or $ForceDx12Removal -or $ShaderPack) {
+        throw 'Panel fault cases require the isolated diagnostic identity, D3D12 HDR On, a named display and direct F2. Expect HDR at startup for Control and ReusedSetDetachHdrRetry only.'
+    }
+    . "$PSScriptRoot/PanelFaultEvidence.ps1"
+}
 if ($ExpectClassicPackRefusal -and ($Backend -ne 'Dx11' -or !$ShaderPack -or $ShaderPack.StartsWith('horizon:') -or $AutomaticCapture)) {
     throw 'Classic shader pack refusal requires D3D11, a classic pack ID and direct F2 capture after refusal.'
 }
@@ -49,6 +59,22 @@ if (!(Test-Path -LiteralPath (Join-Path $FixtureWorld 'level.dat') -PathType Lea
 if (Test-Path -LiteralPath $Output) { throw 'Use a fresh evidence directory.' }
 $destination = [IO.Directory]::CreateDirectory($Output).FullName
 $state = Join-Path $env:LOCALAPPDATA "Packages/$($package.PackageFamilyName)/LocalState"
+$panelFaultRequests = @()
+$panelFaultCreated = [Collections.Generic.List[string]]::new()
+if ($PanelFaultCase) {
+    $requestNames = @{
+        Control=@()
+        FreshCheck=@('hdr-panel-fresh-check.request')
+        FreshSet=@('hdr-panel-fresh-set.request')
+        ReusedSetFromSdr=@('hdr-panel-reused-set.request')
+        ReusedSetDetachHdrRetry=@('hdr-panel-detach.request','hdr-panel-reused-set.request')
+    }
+    if (Get-ChildItem -LiteralPath $state -Filter 'hdr-panel-*.request' -File -ErrorAction SilentlyContinue) {
+        throw 'Remove stale panel fault requests from the isolated LocalState before running the trial.'
+    }
+    $panelFaultRequests = @($requestNames[$PanelFaultCase] | ForEach-Object { Join-Path $state $_ })
+}
+$startupFault = $PanelFaultCase -like 'Fresh*' -or $PanelFaultCase -eq 'ReusedSetFromSdr'
 $removalRequest = Join-Path $state 'hdr-dx12-recovery.request'
 if ($ForceDx12Removal -and [IO.File]::Exists($removalRequest)) { [IO.File]::Delete($removalRequest) }
 $game = Join-Path $state 'game'
@@ -118,10 +144,27 @@ $data = [Windows.Management.Core.ApplicationDataManager,Windows.Management.Core,
 $property = [System.Collections.Generic.IDictionary[string,object]].GetProperty('Item')
 $property.SetValue($data.LocalSettings.Values, [uint32]@{Dx11=3; Dx12=2; Gl=1}[$Backend], [object[]]@('game-renderer'))
 
+function Add-PanelFaultRequests {
+    foreach ($request in $panelFaultRequests) {
+        $file = [IO.File]::Open($request, [IO.FileMode]::CreateNew)
+        $panelFaultCreated.Add($request)
+        $file.Dispose()
+    }
+}
+function Remove-PanelFaultRequests {
+    foreach ($request in $panelFaultCreated) { [IO.File]::Delete($request) }
+}
+
 $begin = [DateTime]::UtcNow
-$pidGame = [HorizonHdrTest]::Activate("$($package.PackageFamilyName)!App")
-$process = Get-Process -Id $pidGame
-if ($process.Path -ne $exe) { throw 'Activation returned an unrelated executable.' }
+try {
+    if ($startupFault) { Add-PanelFaultRequests }
+    $pidGame = [HorizonHdrTest]::Activate("$($package.PackageFamilyName)!App")
+    $process = Get-Process -Id $pidGame
+    if ($process.Path -ne $exe) { throw 'Activation returned an unrelated executable.' }
+} catch {
+    Remove-PanelFaultRequests
+    throw
+}
 $lifecycle = Join-Path $state 'horizon-uwp-lifecycle.log'
 $log = Join-Path $game 'isolated-test-home/logs/latest.log'
 $hdrChainPattern = 'desc_hr=0x00000000 format=10 alpha=3 .*space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x[0-9A-F]*[13579BDF]\b view_kind=2'
@@ -136,6 +179,7 @@ $gameWindow = $null
 $restoreDisplayHdr = $false
 $plmEnabled = $false
 $packageSuspended = $false
+if ($PanelFaultCase) { $report.panelFaultCase = $PanelFaultCase }
 
 function Wait-For([string]$Description, [int]$Seconds, [scriptblock]$Test) {
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
@@ -231,9 +275,40 @@ function Invoke-PackageLifecycle([string]$Action) {
     [string]($lines -join [Environment]::NewLine)
 }
 
+function Watch-PanelFault([DateTimeOffset]$RequestedAt, [int]$GameOffset) {
+    $gameLines = @(Get-Content -LiteralPath $log -ErrorAction SilentlyContinue | Select-Object -Skip $GameOffset)
+    $lifecycleLines = @(Get-Content -LiteralPath $lifecycle -ErrorAction SilentlyContinue)
+    $report.checks.panelFault = Get-PanelFaultEvidence $PanelFaultCase $lifecycleLines $gameLines $RequestedAt
+    if ($report.checks.panelFault.complete) { $report.checks.panelFault }
+}
+
+function Confirm-PanelFaultCapture($Capture, [DateTimeOffset]$RequestedAt, [int]$GameOffset, [bool]$HdrRestored) {
+    $sdr = @($Capture | Where-Object original -NotLike '*-hdr.png')
+    $hdr = @($Capture | Where-Object original -Like '*-hdr.png')
+    if ($sdr.Count -ne 1 -or $hdr.Count -ne [int]$HdrRestored) {
+        throw 'The post-fault capture files do not match the restored panel mode.'
+    }
+    $saved = $sdr[0].original
+    if ($HdrRestored) { $saved += " and $($hdr[0].original)" }
+    $pattern = [regex]::Escape($saved)
+    $report.checks.postFaultSaved = [string](Wait-For 'game confirmation of the post-fault capture' 20 {
+        $lines = @(Get-Content -LiteralPath $log -ErrorAction SilentlyContinue)
+        $lines | Select-Object -Skip $GameOffset | Where-Object { $_ -match "\[CHAT\] Saved screenshot as $pattern$" } |
+            Select-Object -First 1
+    })
+    if ([Windows.Forms.Screen]::FromHandle($gameWindow.FrameHandle()).DeviceName -ne $Display) {
+        throw 'The game left the requested HDR display during the fault trial.'
+    }
+    if (!(Watch-PanelFault $RequestedAt $GameOffset)) { throw 'Post-fault panel evidence is incomplete.' }
+}
+
 try {
     $gameWindow = Wait-For 'isolated game window' 45 {
         try { [ScratchKeyboardInput]::new($pidGame) } catch {}
+    }
+    if ($startupFault) {
+        $null = Move-ToDisplay $Display 1200 850
+        $null = Wait-For 'native HDR rejection followed by SDR attachment' 90 { Watch-PanelFault $begin 0 }
     }
     $name = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, 'Not now')
     $report.checks.renderer = Wait-For 'hardware renderer and local world' 360 {
@@ -277,6 +352,25 @@ try {
     $report.checks.capture = @(Capture-Game 'world' $ExpectHdr)
     $hasHdrPng = @($report.checks.capture | Where-Object original -Like '*-hdr.png').Count -ne 0
     if ($hasHdrPng -ne [bool]$ExpectHdr) { throw 'The screenshot files disagree with the requested presentation mode.' }
+    if ($startupFault) {
+        Confirm-PanelFaultCapture $report.checks.capture $begin 0 $false
+    } elseif ($PanelFaultCase -eq 'ReusedSetDetachHdrRetry') {
+        $faultLogOffset = @(Get-Content -LiteralPath $log).Count
+        $faultRequestTime = [DateTimeOffset]::UtcNow
+        Add-PanelFaultRequests
+        $null = Move-ToDisplay $Display 1120 780
+        $null = Wait-For 'native HDR rejection, detach retry and restored panel attachment' 45 {
+            Watch-PanelFault $faultRequestTime $faultLogOffset
+        }
+        $report.checks.postFaultCapture = @(Capture-Game 'post-fault' $true)
+        Confirm-PanelFaultCapture $report.checks.postFaultCapture $faultRequestTime $faultLogOffset $true
+    } elseif ($PanelFaultCase -eq 'Control') {
+        $faultEvents = Get-Content -LiteralPath $lifecycle | Where-Object {
+            $_ -match '^(\S+).* HDR panel fault: consumed request' -and
+                [DateTimeOffset]::Parse($Matches[1]).UtcDateTime -ge $begin
+        }
+        if ($faultEvents) { throw 'The no-fault control consumed a diagnostic request.' }
+    }
     if ($SampleMemory) {
         $report.checks.memory = @(foreach ($sample in 1..5) {
             $process.Refresh()
@@ -386,6 +480,7 @@ try {
     $report.failure = $_.Exception.Message
     throw
 } finally {
+    Remove-PanelFaultRequests
     if ($ForceDx12Removal -and (Test-Path -LiteralPath $removalRequest -PathType Leaf)) {
         [IO.File]::Delete($removalRequest)
     }

@@ -41,6 +41,32 @@ With the HDR monitor active, create one empty request file in this package's `Lo
 | 3 | `hdr-panel-reused-set.request` | Attempt the same operation on an already attached HDR chain. |
 | 4 | `hdr-panel-detach.request` | Simulate one detach error in the reused-chain rollback. Pair this with site 1 or 3. |
 
-Arm a fresh request before launch and choose HDR On. For reused-chain trials start in HDR without a request, then arm the files and resize the same game window. A site 4 request only triggers during resized-chain error cleanup. Remove any unconsumed requests after each trial.
+Run the trials independently under the desktop GPU lock. The game harness arms the requests in the isolated package, removes any unconsumed requests on exit, and captures complete PNGs via F2. Use a fresh output directory for each case and the direct-F2 Wasm fixture.
 
-For each trial, require the consumed-site event plus the actual DXGI rejection or missing PRESENT flag, then a fresh SDR configuration and world screenshot while the same process remains on an HDR-active view. For a set trial the recorder shows `space=-1` and the HRESULT. For a check trial the renderer logs the native error or flags. A fresh rejected chain should never attach. A reused-chain detach failure should log the injected error followed by a successful pending-detach retry before configuration can continue. Keep a no-fault control and preserve the whole session log. A driver that accepts the injected call has not reproduced the intended rejection. This overlay has been staged offline and still needs signed runtime execution.
+```powershell
+$common = @{
+    Identity = 'MCHorizonUWP.HdrDev.PanelFault.x64'; Hdr = 'On'; Backend = 'Dx12'
+    Display = '\\.\DISPLAY2'; FixtureWorld = "$Fixtures/Nov20Smoke"; WasmFixture = "$Fixtures/f2.hmod"
+}
+& ./tools/hdr/Test-HdrGame.ps1 @common -PanelFaultCase Control -ExpectHdr -Output "$Evidence/control"
+& ./tools/hdr/Test-HdrGame.ps1 @common -PanelFaultCase FreshCheck -Output "$Evidence/fresh-check"
+& ./tools/hdr/Test-HdrGame.ps1 @common -PanelFaultCase FreshSet -Output "$Evidence/fresh-set"
+& ./tools/hdr/Test-HdrGame.ps1 @common -PanelFaultCase ReusedSetFromSdr -Output "$Evidence/reused-set-from-sdr"
+& ./tools/hdr/Test-HdrGame.ps1 @common -PanelFaultCase ReusedSetDetachHdrRetry -ExpectHdr -Output "$Evidence/reused-set-hdr-retry"
+```
+
+The fresh requests are armed before launch. For reused-chain coverage the harness starts in HDR, takes an HDR control image, then arms sites 3 and 4 and resizes the same window. A site 4 request triggers during resized-chain error cleanup. The control case checks that no fault request was consumed.
+
+The fault cases require the consumed-site event plus the actual DXGI rejection or missing PRESENT flag, then a successful new chain configuration, XAML attachment and F2 capture from the same process. The renderer must stay on the HDR-active display. For a set trial the recorder shows `space=-1` and the negative HRESULT. For a check trial the renderer logs the native error or flags. A reused-chain detach fault requires the injected error and a successful pending-detach retry.
+
+`ReusedSetFromSdr` arms only site 3 before launch, then checks that the attached chain was configured for SDR before attempting HDR and that SDR was restored. `ReusedSetDetachHdrRetry` requires the native rejection, the injected detach failure and a successful retry, then checks restoration of the already applied HDR mode and a new F2 pair. The SDR recovery cases require an SDR-only capture and fail if the game returns to HDR before capture.
+
+### Signed x64 diagnostic results
+
+The signed PanelFault APPX with SHA-256 `f5efdde398a088630c322e0b3039d0e6f76502744364b6526d105762c9dfbf54` passed SignTool and deployed with matching host and bridge payload hashes. The no-fault control confirmed FP16/scRGB and a fresh F2 pair on the RTX 3090 Ti and PG32UCDM.
+
+FreshCheck and FreshSet left their requests unconsumed. The game configured an SDR panel during startup and reused the existing chain for its first HDR configuration. The fresh native seams remain untested.
+
+`ReusedSetFromSdr` passed in PID 64924. On the HDR-active view, the same renderer configured BGRA8/sRGB before the HDR request. DXGI rejected `SetColorSpace1` with `0x80070057`. The renderer then configured and attached a new BGRA8/sRGB chain and saved a fresh SDR-only F2 capture. The offline verifier confirmed the captured PNG and archive hashes.
+
+`ReusedSetDetachHdrRetry` passed in PID 71108. After native `SetColorSpace1` rejection with `0x80070057`, the injected detach error occurred once and the pending detach retry succeeded. The same renderer configured and attached a new FP16/scRGB chain. The process then saved a fresh SDR/HDR F2 pair, with both PNGs independently validated at 1098 × 720. An earlier trial with the same native fault sequence expected SDR from an already active HDR renderer and timed out. Its raw result records successful HDR reattachment and remains in the evidence archive.
