@@ -194,11 +194,11 @@
           "x86_angle": "X",
           "arm64_dx11_fl91": "V",
           "arm64_dx12": "V",
-          "arm32_dx11_fl91": "I",
+          "arm32_dx11_fl91": "L",
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "Signed AppContainer saved-world entry verified on x64, x86 D3D11 and Surface Pro X D3D11 and hardware D3D12. The Surface used November 20 client 0.1.14. Lumia ARM32 presented a launcher probe; full world screenshots and interactive HUD require separate evidence.",
+        "qualification": "Signed AppContainer saved-world entry verified on x64, x86 D3D11 and Surface Pro X D3D11 and hardware D3D12. The Surface used November 20 client 0.1.14. The signed Lumia diagnostic entered the copied two-chunk world with non-silent XAudio2 and actual 50% world rendering. Full-screen capture failed on the original hard-link path.",
         "evidence": [
           "docs/nightly-cross-architecture-2026-11-20.md",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
@@ -206,7 +206,8 @@
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/angle-world-100/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67-interactive/result.json",
-          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-world-100/result.json"
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-world-100/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm32/fixed-50-first-world/completed-game.log"
         ]
       }
     },
@@ -1177,23 +1178,24 @@
           "x86_angle": "X",
           "arm64_dx11_fl91": "V",
           "arm64_dx12": "I",
-          "arm32_dx11_fl91": "I",
+          "arm32_dx11_fl91": "L",
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "Full-game candidate status. Production color/depth scaler and one-pixel HUD separation passed offscreen on x64 and x86 Win32 at actual FL9_1 and FL11_1 and signed ARM64 AppContainer at actual FL9_1. Signed ARM32 AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1. Lumia gameplay, output-surface scaling, sustained performance, touch and presentation remain unverified.",
+        "qualification": "Full-game candidate status. Production color/depth scaler and one-pixel HUD separation passed offscreen on x64 and x86 Win32 at actual FL9_1 and FL11_1 and signed ARM64 AppContainer at actual FL9_1. Signed ARM32 AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1. Lumia 50-percent gameplay and output scaling were verified with a warm 4 MiB block texture budget. Its matched-scale comparison, full HUD capture and touch test remain open.",
         "component_verification": {
           "x64_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 770 × 510 internal, 1539 × 1020 output, with native and Wasm HUD markers at 50%",
           "x86_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 1154 × 765 internal, 1539 × 1020 output with both HUD markers at 75%",
           "arm64_dx11_fl91": "8/8 signed offscreen checks at actual FL9_1. Two signed game runs at the 67% compatibility projection: 1372 x 1029 world, 2048 x 1536 output, with both HUD markers. Resize and restore updated and recovered both targets.",
-          "arm32_dx11_fl91": "Signed ARMNT AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1"
+          "arm32_dx11_fl91": "Signed ARMNT offscreen 8/8 on physical Adreno 430 FL9_1. The normal hardware projection additionally rendered the copied saved world at 1281 x 720 against 2561 x 1439 output at 50 percent. The 75-percent retry was suspended before world entry."
         },
         "evidence": [
           "docs/nightly-drs-2026-11-20.md",
           "deliverables/nightly-2026-11-20/drs/evidence/offscreen-readbacks.csv",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json",
-          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67-interactive/result.json"
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67-interactive/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm32/fixed-50-first-world/completed-game.log"
         ]
       }
     },
@@ -7554,5 +7556,13 @@
     "patch": "0.1.13",
     "client": "0.1.14",
     "status_scope": "Full-game feature acceptance on the November 20 UWP candidate. Component and stock tests stay scoped in their qualifications."
+  },
+  "runtime_followup": {
+    "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "builder": "1.0.8",
+    "patch": "0.1.14",
+    "client": "0.1.16",
+    "report": "docs/nightly-runtime-completion-2026-11-21.md",
+    "status_scope": "Individual updates specify the tested diagnostic or game package. The final recipe's clean assembly passed."
   }
 }
