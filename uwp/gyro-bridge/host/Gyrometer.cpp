@@ -28,12 +28,14 @@ bool aligned = false;
 int aligned_orientation = 0;
 std::uint32_t generation = 0;
 std::int64_t previous_timestamp = 0;
+ULONGLONG previous_report_ms = 0;
 float turned_x = 0.0f;
 float turned_y = 0.0f;
 ULONGLONG batch_begin = 0;
 
 void clear_samples() {
     previous_timestamp = 0;
+    previous_report_ms = 0;
     turned_x = 0.0f;
     turned_y = 0.0f;
     batch_begin = 0;
@@ -54,25 +56,34 @@ void reading_changed(std::uint32_t expected_generation, GyrometerReadingChangedE
         const auto timestamp = reading->Timestamp.UniversalTime;
         std::lock_guard<std::mutex> guard(mutex);
         if (!running || !aligned || generation != expected_generation) return;
-        if (previous_timestamp != 0 && timestamp > previous_timestamp) {
-            const double seconds = static_cast<double>(timestamp - previous_timestamp) / 10000000.0;
-            if (seconds > 0.0 && seconds <= 0.1) {
-                constexpr double radians_per_degree = 0.017453292519943295;
-                const double x = reading->AngularVelocityX * seconds * radians_per_degree;
-                const double y = reading->AngularVelocityY * seconds * radians_per_degree;
-                if (std::isfinite(x) && std::isfinite(y)) {
-                    const auto now = GetTickCount64();
-                    if (batch_begin == 0 || now - batch_begin > max_sample_age_ms) {
-                        batch_begin = now;
-                        turned_x = 0.0f;
-                        turned_y = 0.0f;
-                    }
-                    turned_x = std::clamp(turned_x + static_cast<float>(x), -6.2831853f, 6.2831853f);
-                    turned_y = std::clamp(turned_y + static_cast<float>(y), -6.2831853f, 6.2831853f);
-                }
-            }
+        if (timestamp <= 0) return;
+        const auto now = GetTickCount64();
+        const auto prev = previous_timestamp;
+        // Drop duplicates and reordering. A quiet period lets the stream recover
+        // if Windows changes the clock used in sensor timestamps.
+        if (prev != 0 && timestamp <= prev && now - previous_report_ms <= max_sample_age_ms) return;
+        constexpr std::int64_t max_report_gap = 1'000'000; // 100 ms in WinRT DateTime ticks.
+        const auto duration = prev == 0 ? 0 : timestamp - prev;
+        if (duration <= 0 || duration > max_report_gap) {
+            clear_samples();
+            previous_timestamp = timestamp;
+            previous_report_ms = now;
+            return;
         }
         previous_timestamp = timestamp;
+        previous_report_ms = now;
+        constexpr double radians_per_degree = 0.017453292519943295;
+        const double seconds = static_cast<double>(duration) / 10000000.0;
+        const double x = reading->AngularVelocityX * seconds * radians_per_degree;
+        const double y = reading->AngularVelocityY * seconds * radians_per_degree;
+        if (!std::isfinite(x) || !std::isfinite(y)) return;
+        if (batch_begin == 0 || now - batch_begin > max_sample_age_ms) {
+            batch_begin = now;
+            turned_x = 0.0f;
+            turned_y = 0.0f;
+        }
+        turned_x = std::clamp(turned_x + static_cast<float>(x), -6.2831853f, 6.2831853f);
+        turned_y = std::clamp(turned_y + static_cast<float>(y), -6.2831853f, 6.2831853f);
     } catch (...) {}
 }
 
@@ -139,16 +150,9 @@ extern "C" void __cdecl horizon_uwp_gyro_set_orientation(int value) {
         std::lock_guard<std::mutex> transition(lifecycle);
         if (value == display_orientation) return;
         display_orientation = value;
-        if (!running) return;
-        {
-            std::lock_guard<std::mutex> guard(mutex);
-            aligned = false;
-        }
-        const bool ready = align(sensor);
-        std::lock_guard<std::mutex> guard(mutex);
-        clear_samples();
-        aligned = ready;
-        aligned_orientation = display_orientation;
+        // Invalidate any queued reports still carrying the old display transform.
+        if (running) stop_sensor();
+        reconcile();
     } catch (...) {}
 }
 
