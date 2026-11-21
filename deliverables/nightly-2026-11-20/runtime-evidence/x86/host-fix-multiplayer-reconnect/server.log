@@ -1,0 +1,34 @@
+Horizon Nightly 2026-11-20 · 0a875da
+wasm module cache disabled: folder C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-desktop-runtime-validation\multiplayer-x86-20261121-024959125\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+load core tables: 0.78s
+load pack tables: 1.38s
+load items: 1.96s
+Horizon: resources loaded in 2.4s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[02:50:02] [Server thread/INFO]: Starting minecraft server version 26.3
+[02:50:02] [Server thread/INFO]: Loading properties
+[02:50:02] [Server thread/INFO]: Default game type: CREATIVE
+[02:50:02] [Server thread/INFO]: Generating keypair
+[02:50:02] [Server thread/INFO]: Starting Minecraft server on 127.0.0.1:64484
+[02:50:02] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!
+[02:50:02] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.
+[02:50:02] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.
+[02:50:02] [Server thread/WARN]: To change this, set "online-mode" to "true" in the server.properties file.
+[02:50:02] [Server thread/INFO]: Preparing level "Nov20Smoke"
+Horizon: worldgen data loaded in 195.2027ms
+Horizon: live features ready in 233.7558ms
+[02:50:04] [Server thread/INFO]: Chat filter on: 45 words (server.toml [chat_filter]; enabled = false turns it off)
+[02:50:04] [Server thread/INFO]: Done (4.658s)! For help, type "help"
+[02:50:04] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Nov20Smoke]'/minecraft:overworld
+[02:50:04] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Nov20Smoke]'/minecraft:the_nether
+[02:50:04] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Nov20Smoke]'/minecraft:the_end
+[02:50:04] [Server thread/INFO]: System chat: Game rule advance_time is now set to false
+[02:50:04] [Server thread/INFO]: System chat: Game rule advance_weather is now set to false
+[02:50:04] [Server thread/INFO]: System chat: Set minecraft:overworld to time marker minecraft:noon
+[02:50:04] [Server thread/INFO]: System chat: Set the weather to clear
+[02:50:23] [Server thread/INFO]: Player35793[/127.0.0.1:64506] logged in with entity id 1 at (-527.5, 69.0, 64.5)
+[02:50:23] [Server thread/INFO]: System chat: Player35793 joined the game
+[02:50:29] [Server thread/INFO]: Player35793 lost connection: Disconnected
+[02:50:29] [Server thread/INFO]: System chat: Player35793 left the game
+[02:50:45] [Server thread/INFO]: Player35793[/127.0.0.1:63721] logged in with entity id 143 at (-527.5, 66.0, 70.71202867807035)
+[02:50:45] [Server thread/INFO]: System chat: Player35793 joined the game

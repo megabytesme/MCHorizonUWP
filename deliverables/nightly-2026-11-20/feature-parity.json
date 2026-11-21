@@ -463,10 +463,10 @@
       ],
       "candidate_statuses": {
         "status_by_profile": {
-          "x64_dx11_fl91": "I",
+          "x64_dx11_fl91": "L",
           "x64_dx12": "I",
           "x64_angle": "I",
-          "x86_dx11_fl91": "I",
+          "x86_dx11_fl91": "L",
           "x86_dx12": "I",
           "x86_angle": "X",
           "arm64_dx11_fl91": "I",
@@ -475,11 +475,15 @@
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "The November 20 signed x64 D3D12 and x86 D3D11 localhost runs timed out in graphics startup. x64 D3D11 reached the server connector over the private wired route; no login or connection error appeared in the observation window. Prior Nightly multiplayer entries describe the November 18 baseline.",
+        "qualification": "Both signed November 20 D3D11 host-fix clients joined the exact stock 26.3 dedicated server, moved in the world, disconnected and rejoined in a fresh process with position preserved. These tests used a temporary exact-package loopback exemption. The x64 same-host wired-address attempt got as far as a TCP connection timeout. Separate-LAN-host and online sign-in routes remain open.",
         "evidence": [
           "docs/nightly-cross-architecture-2026-11-20.md",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-multiplayer-lan/game.log",
-          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-multiplayer-lan/server.log"
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-multiplayer-lan/server.log",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/host-fix-multiplayer/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/host-fix-multiplayer-reconnect/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/host-fix-multiplayer/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/host-fix-multiplayer-reconnect/result.json"
         ]
       }
     },
@@ -1230,18 +1234,20 @@
           "x86_dx12": "I",
           "x86_angle": "X",
           "arm64_dx11_fl91": "I",
-          "arm64_dx12": "I",
+          "arm64_dx12": "L",
           "arm32_dx11_fl91": "I",
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
         "qualification": "FL9_1 uses labeled frame pressure when GPU timestamps are unavailable, with bounded scale floor, warm-up, settled samples and confirmation of a scale trial. Ten controller tests and a sizing test passed. No sustained adaptive workload test on a physical game candidate is recorded here.",
         "component_verification": {
-          "rules": "Warm-up, measured-pressure hysteresis, hold for CPU-bound work, confirmed and rejected reductions, stall and interrupted-window handling"
+          "rules": "Warm-up, measured-pressure hysteresis, hold for CPU-bound work, confirmed and rejected reductions, stall and interrupted-window handling",
+          "arm64_dx12_initial": "On client 0.1.14 the three hardware Adreno 680 F3 captures stayed at 100 percent, reporting 619135574736896 ms across three GPU passes. This is an invalid measurement."
         },
         "evidence": [
           "docs/nightly-drs-2026-11-20.md",
-          "deliverables/nightly-2026-11-20/drs/evidence/controller-tests.log"
+          "deliverables/nightly-2026-11-20/drs/evidence/controller-tests.log",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-adaptive-timestamp-control/adaptive-f3-scale.png"
         ]
       }
     },

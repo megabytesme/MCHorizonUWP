@@ -1,0 +1,12 @@
+id = "uwp_wasm_limits_probe"
+name = "UWP Wasm Resource Limits Probe"
+version = "0.1.0"
+description = "Checks denied guest memory growth and the engine's epoch deadline."
+api = "0.2"
+side = "client"
+capabilities = ["registries"]
+wasm_memory_mib = 32
+
+[wasm]
+sha512 = "0713c8a2e11448ca799c5e387eb15b0ecac75ad63de73d45773deff8fec86bbee85f084a76ffbbc6c2e8f69e2e99848f9d3e207fa9b6a0354249a7f34ed2ef0d"
+toolchain = "1.99.1 58cf8f9c35b355199727627d07ae34a4e2846d67"

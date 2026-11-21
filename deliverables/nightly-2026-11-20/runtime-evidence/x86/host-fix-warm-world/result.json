@@ -1,0 +1,57 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.HostFix.x86",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.HostFix.x86_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.HostFix.x86_1.0.0.0_x86__4pd4jeb6snrqw",
+    "Pid":  70676,
+    "BeginUtc":  "2026-11-21T02:49:06.0127605Z",
+    "Mode":  "World",
+    "Backend":  "Dx11",
+    "Scale":  75,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  true,
+    "Gyro":  false,
+    "Ready":  true,
+    "Renderer":  "[02:49:19] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+    "FirstFrame":  "[02:49:22] [Horizon game/INFO]: Horizon: first frame after 612 ms",
+    "StartupObservedMs":  17260,
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-024905-587-x86-Dx11-World-Enabled-75\\world.png",
+                    "Width":  1560,
+                    "Height":  1080,
+                    "Cyan":  4096,
+                    "Magenta":  4096,
+                    "SceneColors":  1886
+                },
+    "DebugCapture":  {
+                         "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-024905-587-x86-Dx11-World-Enabled-75\\f3.png",
+                         "Width":  1560,
+                         "Height":  1080,
+                         "Cyan":  4096,
+                         "Magenta":  4096,
+                         "SceneColors":  1798
+                     },
+    "ResolutionEvidence":  [
+                               "[02:49:22] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%",
+                               "[02:49:24] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1154x765, output 1539x1020, selected scale 75%"
+                           ],
+    "RenderArea":  {
+                       "World":  [
+                                     1154,
+                                     765
+                                 ],
+                       "Output":  [
+                                      1539,
+                                      1020
+                                  ]
+                   },
+    "AudioOutput":  [
+                        "[02:49:21] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)",
+                        "[02:49:27] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio"
+                    ],
+    "AudioNonSilent":  true,
+    "Exit":  "closed"
+}

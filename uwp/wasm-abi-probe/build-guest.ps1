@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$HorizonSource,
     [string]$CargoHorizonMod,
-    [ValidateSet('Hook', 'Trap')][string]$Fixture = 'Hook',
+    [ValidateSet('Hook', 'Trap', 'Limits')][string]$Fixture = 'Hook',
     [switch]$PrepareOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -22,8 +22,13 @@ if (!$PrepareOnly) {
 $local = Join-Path $source '.local'
 $null = New-Item -Path $local -ItemType Directory -Force
 $work = Join-Path $local ('uwp-wasm-abi-probe-' + [Guid]::NewGuid().ToString('N'))
-$fixtureDirectory = if ($Fixture -eq 'Trap') { 'guest-trap' } else { 'guest' }
-$fixtureId = if ($Fixture -eq 'Trap') { 'uwp_wasm_trap_probe' } else { 'uwp_wasm_hook_probe' }
+$fixtures = @{
+    Hook = @{ Directory = 'guest'; Id = 'uwp_wasm_hook_probe' }
+    Trap = @{ Directory = 'guest-trap'; Id = 'uwp_wasm_trap_probe' }
+    Limits = @{ Directory = 'guest-limits'; Id = 'uwp_wasm_limits_probe' }
+}
+$fixtureDirectory = $fixtures[$Fixture].Directory
+$fixtureId = $fixtures[$Fixture].Id
 $fixtureSource = Join-Path $PSScriptRoot $fixtureDirectory
 Copy-Item -LiteralPath $fixtureSource -Destination $work -Recurse
 if ($PrepareOnly) {

@@ -1,0 +1,92 @@
+Building against the game checkout \\?\C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da
+   Compiling compiler_builtins v0.1.160 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins)
+   Compiling core v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\core)
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling libc v0.2.189
+   Compiling cfg-if v1.0.5
+   Compiling object v0.39.1
+   Compiling std v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\std)
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling syn v3.0.10
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.7
+   Compiling serde_derive v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling typenum v1.20.1
+   Compiling serde v1.0.229
+   Compiling zerocopy v0.8.63
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.19
+   Compiling syn v2.0.119
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling ppv-lite86 v0.2.21
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling rand_chacha v0.3.1
+   Compiling cpufeatures v0.2.17
+   Compiling winnow v1.0.5
+   Compiling siphasher v1.0.4
+   Compiling phf_shared v0.11.3
+   Compiling toml_parser v1.1.5+spec-1.1.0
+   Compiling rand v0.8.8
+   Compiling sha2 v0.10.9
+   Compiling toml_datetime v1.1.3+spec-1.1.0
+   Compiling serde_spanned v1.1.3
+   Compiling anyhow v1.0.104
+   Compiling foldhash v0.2.0
+   Compiling toml_writer v1.2.0+spec-1.1.0
+   Compiling toml v1.2.1+spec-1.1.0
+   Compiling hashbrown v0.17.1
+   Compiling phf_generator v0.11.3
+   Compiling horizon-mod-surface v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-surface)
+   Compiling rustc-std-workspace-core v1.99.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\rustc-std-workspace-core)
+   Compiling alloc v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\alloc)
+   Compiling unwind v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\unwind)
+   Compiling cfg-if v1.0.4
+   Compiling adler2 v2.0.1
+   Compiling dlmalloc v0.2.14
+   Compiling rustc-demangle v0.1.28
+   Compiling panic_abort v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\panic_abort)
+   Compiling rustc-literal-escaper v0.0.8
+   Compiling bitflags v2.13.2
+   Compiling equivalent v1.0.3
+   Compiling rustc-std-workspace-alloc v1.99.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\rustc-std-workspace-alloc)
+   Compiling gimli v0.34.0
+   Compiling miniz_oxide v0.9.1
+   Compiling std_detect v0.1.5 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\std_detect)
+   Compiling panic_unwind v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\panic_unwind)
+   Compiling prettyplease v0.2.37
+   Compiling semver v1.0.28
+   Compiling wasmparser v0.261.0
+   Compiling addr2line v0.27.1
+   Compiling indexmap v2.14.2
+   Compiling horizon-mod-source v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-source)
+   Compiling phf_codegen v0.11.3
+   Compiling horizon-mod-point-shape v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-point-shape)
+   Compiling log v0.4.35
+   Compiling id-arena v2.3.0
+   Compiling unicode_names2_generator v2.0.0
+   Compiling proc_macro v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\proc_macro)
+   Compiling wit-parser v0.261.0
+   Compiling horizon-game-discovery v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-game-discovery)
+   Compiling heck v0.5.0
+   Compiling horizon-mod-api-gen v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-api-gen)
+   Compiling unicode_names2 v2.0.0
+   Compiling libm v0.2.16
+   Compiling phf v0.11.3
+   Compiling bytemuck_derive v1.12.1
+   Compiling horizon-core v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-core)
+   Compiling bytemuck v1.25.2
+   Compiling glam v0.30.10
+   Compiling horizon-mod-vocab v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-vocab)
+   Compiling horizon-mod-api v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-api)
+   Compiling horizon-mod-runtime v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-runtime)
+   Compiling horizon-mod-api-macros v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\crates\horizon-mod-api-macros)
+   Compiling mod-uwp-wasm-limits-probe v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\.local\guest-limits\target\horizon-mod\group\uwp_wasm_limits_probe)
+    Finished `horizon-wasm` profile [optimized] target(s) in 9m 44s
+Built .\target/horizon-mod\uwp_wasm_limits_probe.hmod

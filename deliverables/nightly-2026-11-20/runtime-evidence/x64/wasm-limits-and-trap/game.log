@@ -1,0 +1,60 @@
+[02:51:17] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[02:51:17] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[02:51:17] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.HostFix.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[02:51:23] [Horizon game/INFO]: Horizon: wasm mods loaded (3): packages 429 ms, modules 5599 ms, linking 53 ms, instantiation 3 ms, subscriptions 0 ms, initialization 0 ms
+[02:51:23] [Horizon game/INFO]: Horizon renderer: asking DirectX 11 for a graphics device
+[02:51:23] [Horizon game/WARN]: [wgpu_core::instance] DX11 is experimental and exposes a restricted FL9_1 graphics backend with constrained owner-thread HWND and CoreWindow surfaces
+[02:51:24] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 12 ms
+[02:51:24] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[02:51:24] [Horizon game/INFO]: Horizon renderer: requesting the device (driver D3D11 FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101) with features [] and the adapter's limits (buffers up to 4294967291 bytes, storage bindings up to 0 bytes, 6 texture layers)
+[02:51:24] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1539x1020 Bgra8Unorm, Fifo)
+[02:51:24] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[02:51:24] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[02:51:31] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[02:51:31] [Horizon game/INFO]: Horizon renderer: acquiring the first frame
+[02:51:31] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%
+[02:51:31] [Horizon game/INFO]: Horizon renderer: submitting the first frame
+[02:51:31] [Horizon game/INFO]: Horizon renderer: presenting the first frame
+[02:51:31] [Horizon game/INFO]: Horizon: loading screen shown after 7616 ms
+[02:51:47] [resource-loader/INFO]: Horizon: copied 23219 prepared files (248353373 bytes) for mod staging in 23145 ms
+[02:51:47] [resource-loader/INFO]: Horizon: content from 6 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.HostFix.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\18aee237a3a79fb5
+[02:51:47] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[02:51:47] [resource-loader/INFO]: Horizon: UI bundle ready after 24091 ms
+[02:51:47] [Horizon game/INFO]: Horizon: loading the title artwork after 24092 ms
+[02:51:47] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[02:51:48] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[02:51:48] [resource-loader/INFO]: load core tables: 25.12s
+[02:51:49] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[02:51:49] [World data preload/INFO]: Horizon: worldgen data loaded in 436.4998ms
+[02:51:49] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%
+[02:51:49] [resource-loader/INFO]: load pack tables: 25.65s
+[02:51:49] [resource-loader/INFO]: Horizon: core-ready after 25672 ms
+[02:51:49] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 47 ms
+[02:51:49] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[02:51:50] [load-items/INFO]: load items: 26.43s
+[02:51:50] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 1359 ms
+[02:51:50] [world-rest-loader/INFO]: Horizon: resources loaded in 26.7s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[02:51:50] [world-rest-loader/INFO]: Horizon: rest-ready after 26661 ms
+[02:51:51] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[02:51:51] [Horizon game/INFO]: Horizon: world renderer ready after 27509 ms
+[02:51:51] [Horizon game/WARN]: Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+[02:51:51] [Horizon game/INFO]: Horizon: waiting for world resources
+[02:51:51] [Horizon game/INFO]: Horizon: world resources joined after 0 ms
+[02:51:51] [Horizon game/INFO]: Horizon: startup handoff 1916 ms (renderer 1672 ms, start_game 163 ms)
+[02:51:51] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[02:51:51] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%
+[02:51:51] [World initialization/INFO]: Horizon: live features ready in 92.7614ms
+[02:51:51] [Horizon game/INFO]: Horizon: first frame after 390 ms
+[02:51:53] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[02:51:53] [Horizon game/WARN]: wasm group uwp_wasm_limits_probe: memory.grow to 129 MiB refused at the group's limit of 32 MiB
+[02:51:53] [Horizon game/ERROR]: wasm mod libuwp_wasm_trap_probe.so stopped its group: Hook, depth 1, active epoch budget 100: wasm trap: wasm `unreachable` instruction executed: error while executing at wasm backtrace:
+    0: 0x157d09 - <unknown>!<wasm function 1618>
+    1: 0x7a2658 - <unknown>!<wasm function 10727>
+    2: 0x75e10c - <unknown>!<wasm function 10726>
+    3: 0x9b9824 - <unknown>!<wasm function 12626>: wasm trap: wasm `unreachable` instruction executed
+[02:51:54] [Horizon game/ERROR]: wasm mod libuwp_wasm_limits_probe.so stopped its group: Hook, depth 1, active epoch budget 100: epoch deadline: the call ran past its budget of 100 ticks (about 100 ms): error while executing at wasm backtrace:
+    0: 0x157d3f - <unknown>!<wasm function 1618>
+    1: 0x7a2766 - <unknown>!<wasm function 10727>
+    2: 0x75e21a - <unknown>!<wasm function 10726>
+    3: 0x9b9932 - <unknown>!<wasm function 12626>: wasm trap: interrupt
+[02:51:54] [Horizon game/INFO]: Horizon renderer: FL9_1 world 770x510, output 1539x1020, selected scale 50%

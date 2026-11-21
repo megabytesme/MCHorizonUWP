@@ -1,0 +1,60 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.HostFix.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.HostFix.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.HostFix.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "Pid":  56652,
+    "BeginUtc":  "2026-11-21T02:46:11.9031872Z",
+    "Mode":  "Multiplayer",
+    "Backend":  "Dx11",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Connection",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "Renderer":  "[02:46:28] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+    "FirstFrame":  "[02:46:31] [Horizon game/INFO]: Horizon: first frame after 523 ms",
+    "StartupObservedMs":  20179,
+    "ServerLogin":  "[02:46:31] [Server thread/INFO]: Player19150[/127.0.0.1:63130] logged in with entity id 1 at (-527.5, 69.0, 64.5)",
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-024611-414-x64-Dx11-Multiplayer-Enabled-100\\multiplayer.png",
+                    "Width":  1560,
+                    "Height":  1080,
+                    "Cyan":  4096,
+                    "Magenta":  4096,
+                    "SceneColors":  1700
+                },
+    "DebugCapture":  {
+                         "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-024611-414-x64-Dx11-Multiplayer-Enabled-100\\f3.png",
+                         "Width":  1560,
+                         "Height":  1080,
+                         "Cyan":  4096,
+                         "Magenta":  4096,
+                         "SceneColors":  1624
+                     },
+    "MovementCapture":  {
+                            "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-024611-414-x64-Dx11-Multiplayer-Enabled-100\\f3-after-w.png",
+                            "Width":  1560,
+                            "Height":  1080,
+                            "Cyan":  4096,
+                            "Magenta":  4096,
+                            "SceneColors":  1542
+                        },
+    "ResolutionEvidence":  [
+                               "[02:46:31] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%"
+                           ],
+    "RenderArea":  {
+                       "World":  [
+                                     1539,
+                                     1020
+                                 ],
+                       "Output":  [
+                                      1539,
+                                      1020
+                                  ]
+                   },
+    "Exit":  "closed"
+}

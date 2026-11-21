@@ -1,0 +1,65 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.HostFix.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.HostFix.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.HostFix.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+    "Pid":  86332,
+    "BeginUtc":  "2026-11-21T02:51:16.0431306Z",
+    "Mode":  "World",
+    "Backend":  "Dx11",
+    "Scale":  50,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "Renderer":  "[02:51:49] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+    "FirstFrame":  "[02:51:51] [Horizon game/INFO]: Horizon: first frame after 390 ms",
+    "StartupObservedMs":  35973,
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025115-616-x64-Dx11-World-Enabled-50\\world.png",
+                    "Width":  1560,
+                    "Height":  1080,
+                    "Cyan":  4096,
+                    "Magenta":  4096,
+                    "SceneColors":  2008
+                },
+    "NativeLoad":  "[02:51:17] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[02:51:23] [Horizon game/INFO]: Horizon: wasm mods loaded (3): packages 429 ms, modules 5599 ms, linking 53 ms, instantiation 3 ms, subscriptions 0 ms, initialization 0 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe",
+                                    "uwp_wasm_limits_probe",
+                                    "uwp_wasm_trap_probe"
+                                ],
+    "WasmTrap":  "[02:51:53] [Horizon game/ERROR]: wasm mod libuwp_wasm_trap_probe.so stopped its group: Hook, depth 1, active epoch budget 100: wasm trap: wasm `unreachable` instruction executed: error while executing at wasm backtrace:",
+    "WasmMemoryRefusal":  "[02:51:53] [Horizon game/WARN]: wasm group uwp_wasm_limits_probe: memory.grow to 129 MiB refused at the group\u0027s limit of 32 MiB",
+    "WasmEpochInterruption":  "[02:51:54] [Horizon game/ERROR]: wasm mod libuwp_wasm_limits_probe.so stopped its group: Hook, depth 1, active epoch budget 100: epoch deadline: the call ran past its budget of 100 ticks (about 100 ms): error while executing at wasm backtrace:",
+    "DebugCapture":  {
+                         "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-desktop-runtime-validation\\capture-20261121-025115-616-x64-Dx11-World-Enabled-50\\f3.png",
+                         "Width":  1560,
+                         "Height":  1080,
+                         "Cyan":  4096,
+                         "Magenta":  4096,
+                         "SceneColors":  1894
+                     },
+    "ResolutionEvidence":  [
+                               "[02:51:31] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%",
+                               "[02:51:49] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%",
+                               "[02:51:51] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%",
+                               "[02:51:54] [Horizon game/INFO]: Horizon renderer: FL9_1 world 770x510, output 1539x1020, selected scale 50%"
+                           ],
+    "RenderArea":  {
+                       "World":  [
+                                     770,
+                                     510
+                                 ],
+                       "Output":  [
+                                      1539,
+                                      1020
+                                  ]
+                   },
+    "Exit":  "closed"
+}
