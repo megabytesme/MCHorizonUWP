@@ -1,0 +1,21 @@
+{
+  "package_identity": "MCHorizonUWP.NightlyNov20.DrsCold.arm",
+  "package_version": "1.0.0.0",
+  "package_sha256": "CBAB2AB762AC59B69C728FC8EC6D44A652CB62ADC1F161109DFE3EF7646CF125",
+  "bridge_sha256": "317B529EFA7545E7C1264048865F13C31E39FBFB8A403A1AE44357944681851E",
+  "first_game_frame_utc": "2026-11-21T04:24:18.831Z",
+  "selected_world_scale": 50,
+  "world_px": [
+    1281,
+    720
+  ],
+  "output_px": [
+    2561,
+    1439
+  ],
+  "texture_budget_mib": 4,
+  "non_silent_audio": true,
+  "device_loss": "Out of memory during the screenshot readback following portrait-to-landscape rotation",
+  "raw_trace_sha256": "c9fac9c47eb62229a7356751a35f619fe8bd98da58490ba3c38129f056ee49e0",
+  "qualified_steady_matched_benchmark": false
+}
