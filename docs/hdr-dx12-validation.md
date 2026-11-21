@@ -68,6 +68,8 @@ For the physical HDR trial, select the HDR monitor with `-Display`, use `-Hdr On
 
 The signed PanelRollback package played the isolated world on the PG32UCDM with D3D12 scRGB, D3D12 SDR, D3D11 FL9_1 compatibility SDR, and ANGLE SDR. The same D3D12 process switched to BGRA8/sRGB after Windows HDR was disabled, returned to FP16/scRGB after HDR was restored, and configured scRGB again after Windows PLM suspend and resume. The harness verified the original Windows HDR mode was restored.
 
+With both displays active, the signed game window moved from the PG32UCDM to the U32J59x and back. The same process switched from FP16/scRGB to BGRA8/sRGB on the SDR view, saved a fresh SDR-only F2 image, and reapplied FP16/scRGB on the initial monitor.
+
 The separate signed DeviceLoss diagnostic on the established Builder wgpu overlay removed the game's D3D12 device on the physical HDR view. DXGI returned `DXGI_ERROR_DEVICE_REMOVED`. The same process rebuilt world meshes, presented a fresh FP16/scRGB frame and saved a new F2 SDR/HDR pair. An initial run archived a zero-byte SDR file while its writer was still open. The harness now waits for a complete PNG and the matching HDR companion before copying. An independent rerun passed with freshly recorded screenshots and the installed host and bridge matched the signed APPX.
 
 On the PanelRollback package, matched Off and On trials used the same test save, display, backend, fixed scale and window size. Five WDDM samples per trial showed 334.3 MiB dedicated GPU usage in SDR and 346.9 MiB in scRGB. The samples describe these two runs. [Verify archived runs](hdr-run-evidence.md)

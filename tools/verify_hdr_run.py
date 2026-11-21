@@ -144,6 +144,17 @@ def verify_run(appx, receipt, directory, case, expected_hdr, display):
                     "Recovery capture reuses the initial capture")
         else:
             result["pending"].append("Fresh world screenshot after device recovery")
+    if case == "monitor-transfer":
+        require(expected_hdr and run.get("fallbackDisplay") and run["fallbackDisplay"] != result["display"],
+                "Missing distinct SDR destination monitor")
+        fallback = chain("fallback", False, checks, lifecycle, initial, sdr_view=True)
+        restored = chain("recoveredHdr", True, checks, lifecycle, fallback)
+        require(initial < fallback < restored, "Monitor transfer timestamps are out of order")
+        result["fallback_display"] = run["fallbackDisplay"]
+        result["fallback_capture"] = captures(directory, checks["fallbackCapture"], False, game)
+        require(result["fallback_capture"]["sdr"]["original"] != result["initial_capture"]["sdr"]["original"],
+                "SDR monitor capture reuses the initial capture")
+        result["lifecycle_chains"] = {key: checks[key] for key in ("fallback", "recoveredHdr")}
     if case == "display-lifecycle":
         require(expected_hdr and run.get("modeTransitionMonitor") and run.get("displayHdrRestored") is True,
                 "Missing Windows HDR toggle or restoration receipt")
@@ -166,7 +177,8 @@ def main():
     parser.add_argument("appx", type=Path)
     parser.add_argument("receipt", type=Path, help="Rollback package.json or diagnostic recovery index.json")
     parser.add_argument("run", type=Path, help="Test-HdrGame.ps1 output directory")
-    parser.add_argument("--case", choices=("smoke", "device-recovery", "display-lifecycle"), default="smoke")
+    parser.add_argument("--case", choices=("smoke", "device-recovery", "display-lifecycle", "monitor-transfer"),
+                        default="smoke")
     parser.add_argument("--expect", choices=("sdr", "hdr"), required=True)
     parser.add_argument("--display", help="Require the recorded Windows display name")
     args = parser.parse_args()

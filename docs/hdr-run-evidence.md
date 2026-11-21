@@ -6,6 +6,7 @@ Run `tools/verify_hdr_run.py` with Python 3.11 or later after `Test-HdrGame.ps1`
 python ./tools/verify_hdr_run.py $Appx $PackageReceipt $Run --expect hdr --display '\\.\DISPLAY2'
 python ./tools/verify_hdr_run.py $DiagnosticAppx $RecoveryIndex $RecoveryRun --expect sdr --case device-recovery
 python ./tools/verify_hdr_run.py $Appx $PackageReceipt $LifecycleRun --expect hdr --case display-lifecycle
+python ./tools/verify_hdr_run.py $Appx $PackageReceipt $MonitorRun --expect hdr --case monitor-transfer
 ```
 
 The verifier checks SHA-256 for the APPX, packaged host and game bridge, matches the run's package full name to the APPX manifest, and cross-checks the recorded D3D12 renderer and DXGI configuration against the archived logs. It checks the capture hashes and PNG structure, including BT.2020/PQ metadata and matching SDR and HDR companion filenames. `--display` compares the Windows display name from the run, which can be mapped to a physical monitor using the native display probe.
@@ -15,6 +16,8 @@ Run SignTool separately for signature verification. Archive the package install 
 `--case device-recovery` additionally checks native `DXGI_ERROR_DEVICE_REMOVED`, renderer recovery, subsequent panel configuration and the first present call. It requires a separate screenshot recorded by the game after recovery. Use the diagnostic APPX with direct F2 to collect that screenshot. The prior RDP pressure run has native removal and rebuilt-renderer evidence and returns `incomplete` because it has only a pre-removal image.
 
 `--case display-lifecycle` checks the chronological HDR → SDR → HDR panel configurations, the PLMDebug suspended status for the matching package, the later HDR panel configuration after resume, and restoration of the Windows HDR setting. The archived harness captures an initial HDR pair. This case verifies later panel configurations from the logs, without claiming fresh gameplay captures for those states.
+
+`--case monitor-transfer` checks that the harness moved the game window to a distinct SDR monitor and back. It requires the new SDR panel configuration and a fresh F2 SDR image between the initial and restored scRGB configurations.
 
 Exit code `0` reports verified evidence for the requested case, `1` reports inconsistent or unreadable evidence, and `2` reports an incomplete run. Device removal and HDR configure rejection are separate cases. Native HDR rejection and repeated detach retry still require an instrumented candidate with explicit fault and rollback events.
 
