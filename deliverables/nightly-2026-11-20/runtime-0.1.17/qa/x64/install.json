@@ -1,0 +1,11 @@
+{
+  "family": "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+  "package": "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+  "architecture": "x64",
+  "main_sha256": "73AC711654E316E065EB5CA5458CAEAE764699C31EEFA1F0DB8E73A88F5D76FE",
+  "optional_sha256": "3863DA770CCBA74C66CCC1EE440F64D310FB9A19198E2FA34F47D9D603B24149",
+  "sdk_patch": "0.1.15",
+  "client": "0.1.17",
+  "source": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "saved_server_fixture_sha256": "C5FC33D5F7027B556B8BA84D41D1FA774F8BA6881DB0D6B0A68A71EF8C58AB22"
+}

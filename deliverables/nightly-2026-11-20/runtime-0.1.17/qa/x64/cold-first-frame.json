@@ -1,0 +1,23 @@
+﻿{
+    "Name":  "MCHorizonUWP.Nov20.qa.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  20560,
+    "BeginUtc":  "2026-11-21T04:56:24.4169643Z",
+    "Mode":  "World",
+    "Backend":  "Dx11",
+    "Scale":  50,
+    "Hooks":  "Enabled",
+    "Trial":  "Cold",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  true,
+    "Gyro":  false,
+    "Ready":  false,
+    "ExpectedNativeRejection":  false,
+    "Renderer":  "[04:59:17] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+    "FirstFrame":  "[04:59:22] [Horizon game/INFO]: Horizon: first frame after 1472 ms",
+    "StartupObservedMs":  178384,
+    "Exit":  "closed"
+}
