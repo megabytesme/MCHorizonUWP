@@ -1,0 +1,146 @@
+[21:45:36] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[21:45:36] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[21:45:36] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[21:45:46] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 485 ms, modules 9253 ms, linking 52 ms, instantiation 3 ms, subscriptions 0 ms, initialization 0 ms
+[21:45:46] [Horizon game/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[21:45:46] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[21:45:46] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver="32.0.16.2101", driver_info="", feature_level=native, hardware=true, software=false)
+[21:45:46] [Horizon game/INFO]: Horizon renderer: requesting the device (driver 32.0.16.2101) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | TIMESTAMP_QUERY_INSIDE_ENCODERS | TIMESTAMP_QUERY_INSIDE_PASSES | MAPPABLE_PRIMARY_BUFFERS | MULTI_DRAW_INDIRECT_COUNT | VERTEX_WRITABLE_STORAGE | CLEAR_TEXTURE | TEXTURE_ATOMIC | TIMESTAMP_QUERY | INDIRECT_FIRST_INSTANCE | RG11B10UFLOAT_RENDERABLE | FLOAT32_FILTERABLE | FLOAT32_BLENDABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 2147483644 bytes, 2048 texture layers)
+[21:45:46] [Horizon game/WARN]: [wgpu_core::instance] Missing downlevel flags: DownlevelFlags(0x0)
+The underlying API or device in use does not support enough features to be a fully compliant implementation of WebGPU. A subset of the features can still be used. If you are running this program on native and not in a browser and wish to limit the features you use to the supported subset, call Adapter::downlevel_properties or Device::downlevel_properties to get a listing of the features the current platform supports.
+[21:45:46] [Horizon game/WARN]: [wgpu_core::instance] DownlevelCapabilities {
+    flags: DownlevelFlags(
+        COMPUTE_SHADERS | FRAGMENT_WRITABLE_STORAGE | INDIRECT_EXECUTION | BASE_VERTEX | READ_ONLY_DEPTH_STENCIL | NON_POWER_OF_TWO_MIPMAPPED_TEXTURES | CUBE_ARRAY_TEXTURES | COMPARISON_SAMPLERS | INDEPENDENT_BLEND | VERTEX_STORAGE | ANISOTROPIC_FILTERING | FRAGMENT_STORAGE | MULTISAMPLED_SHADING | DEPTH_TEXTURE_AND_BUFFER_COPIES | WEBGPU_TEXTURE_FORMAT_SUPPORT | BUFFER_BINDINGS_NOT_16_BYTE_ALIGNED | UNRESTRICTED_INDEX_BUFFER | FULL_DRAW_INDEX_UINT32 | DEPTH_BIAS_CLAMP | VIEW_FORMATS | UNRESTRICTED_EXTERNAL_TEXTURE_COPIES | SURFACE_VIEW_FORMATS | NONBLOCKING_QUERY_RESOLVE | SHADER_F16_IN_F32 | MSL2_1 | TEXTURE_COMPRESSION | OCCLUSION_QUERY | TWO_SIDED_STENCIL | SEPARATE_ALPHA_BLEND | TEXTURE_2D_ARRAYS | CUBE_TEXTURES | DEPTH_TEXTURE_MULTI_MIP,
+    ),
+    limits: DownlevelLimits {
+        empty_binding_visibility: true,
+        texture_1d: true,
+        texture_3d: true,
+        texture_3d_usage_mask: 65599,
+        texture_3d_format_mask: 4294967295,
+        texture_3d_mipmaps: true,
+        texture_3d_non_suffix_mip_views: true,
+        multisampled_texture_usage_mask: 65599,
+        texture_to_buffer_copy_format_mask: 4294967295,
+        max_texture_to_buffer_copy_layers: 4294967295,
+        texture_3d_texture_copies: true,
+        npot_texture_3d: true,
+        max_texture_cube_dimension: 4294967295,
+        texture_cube_format_mask: 4294967295,
+        npot_cube_textures: true,
+        sampled_depth_textures: true,
+        comparison_sampler_function_mask: 255,
+        comparison_sampler_independent_filters: true,
+        sampler_lod_clamp: true,
+        max_comparison_sampler_anisotropy: 16,
+        border_addressing_requires_comparison_sampler: false,
+        sampled_sint_textures: true,
+        sampled_uint_textures: true,
+        multisampled_texture_bindings: true,
+        alpha_to_coverage: true,
+        shader_loops: true,
+        shader_dynamic_loops: true,
+        vertex_index_input: true,
+        vertex_base_vertex_input: true,
+        vertex_base_instance_input: true,
+        vertex_point_size_output: true,
+        vertex_index_input_requires_hidden_slot: false,
+        vertex_index_topology_mask: 31,
+        instance_index_input: true,
+        vertex_uniform_array_indexing: false,
+        fragment_uniform_array_indexing: false,
+        vertex_index_local_array_indexing: false,
+        vertex_index_vector_indexing: false,
+        max_sampled_textures_per_vertex_stage: 16,
+        max_sampled_texture_sampler_pairs_per_shader_stage: 4294967295,
+        max_vertex_shader_uniform_vectors: 4294967295,
+        max_fragment_shader_uniform_vectors: 4294967295,
+        unrestricted_npot_texture_sampling: true,
+        max_texture_repeat_per_primitive: 4294967295,
+        max_sampler_anisotropy: 16,
+        src_alpha_saturated_blend: true,
+        viewport_rectangles_outside_target: true,
+        depth_bias_with_fragment_depth: true,
+        fragment_depth_without_color_target_0: true,
+        fragment_sample_mask_output: true,
+        fragment_sample_mask_input: true,
+        fragment_point_coord_input: true,
+        fragment_non_perspective_interpolation: true,
+        fragment_front_facing: true,
+        fragment_position: true,
+        texture_query: true,
+        texture_dimensions_2d_float_fragment: false,
+        texture_dimensions_3d_float_fragment: false,
+        texture_dimensions_cube_float_fragment: false,
+        texture_num_levels_2d_float_fragment: false,
+        texture_num_levels_3d_float_fragment: false,
+        texture_num_levels_cube_float_fragment: false,
+        texture_sample_base_clamp_to_edge: true,
+        texture_sample_base_clamp_to_edge_2d_float_fragment: false,
+        texture_sample_level: true,
+        texture_sample_level_zero_2d_float_fragment: false,
+        texture_sample_level_integer_2d_float_fragment: false,
+        texture_sample_grad_2d_float_single_mip_fragment: false,
+        texture_gather: true,
+        texture_gather_2d_float_fragment: false,
+        texture_load: true,
+        texture_load_2d_float_fragment: false,
+        texture_load_3d_float_fragment: false,
+        runtime_integer_shader_operations: true,
+        frexp_fraction_only_fragment: false,
+        matrix_inverse: false,
+        matrix_inverse_2x2: false,
+        matrix_inverse_3x3: false,
+        matrix_inverse_4x4_vertex: false,
+        matrix_outer_product: false,
+        matrix_aggregate_stores: true,
+        max_texture_sample_bias: 4294967295,
+        texture_sample_bias_dynamic: true,
+        fragment_texture_sample_bias_literal_select: false,
+        texture_sample_bias_offset: true,
+        texture_sample_compare_offset: true,
+        fragment_texture_sample_bias_offset_2d_single_mip: false,
+        fragment_texture_sample_compare_offset_2d_single_mip: false,
+        texture_sample_bias_requires_compatible_sampler: false,
+        fragment_derivatives: true,
+        vertex_format_mask: 26938034880511,
+    },
+    shader_model: Sm5,
+}
+[21:45:46] [Horizon game/WARN]: [wgpu_core::instance] Feature MAPPABLE_PRIMARY_BUFFERS enabled on a discrete gpu. This is a massive performance footgun and likely not what you wanted
+[21:45:46] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 28 ms
+[21:45:46] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[21:45:46] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1800x1350 Bgra8Unorm, Mailbox)
+[21:45:46] [Horizon game/INFO]: Horizon renderer: HDR output HDR10 (PQ)
+[21:45:46] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[21:45:47] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\1a23848d346799f6
+[21:45:47] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[21:45:48] [resource-loader/INFO]: Horizon: UI bundle ready after 2796 ms
+[21:45:51] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[21:45:52] [resource-loader/INFO]: load core tables: 6.85s
+[21:45:54] [World data preload/INFO]: Horizon: worldgen data loaded in 1.6337895s
+[21:45:55] [resource-loader/INFO]: load pack tables: 9.41s
+[21:45:55] [resource-loader/INFO]: Horizon: core-ready after 9485 ms
+[21:45:55] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 192 ms
+[21:45:56] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw on, occlusion culling on, GPU culling unavailable, GPU timer on)
+[21:45:56] [Horizon game/INFO]: Horizon: loading the title artwork after 10163 ms
+[21:45:56] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver="32.0.16.2101", driver_info="", feature_level=native, hardware=true, software=false)
+[21:45:56] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (76 shader modules, layouts and pipelines kept)
+[21:45:57] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver="32.0.16.2101", driver_info="", feature_level=native, hardware=true, software=false)
+[21:46:04] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (80 shader modules, layouts and pipelines kept)
+[21:46:05] [Horizon game/INFO]: Horizon: world renderer ready after 18916 ms
+[21:46:05] [Horizon game/WARN]: Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+[21:46:05] [Horizon game/INFO]: Horizon: waiting for world resources
+[21:46:26] [load-items/INFO]: load items: 40.33s
+[21:46:36] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 43262 ms
+[21:46:37] [world-rest-loader/INFO]: Horizon: resources loaded in 51.8s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[21:46:37] [world-rest-loader/INFO]: Horizon: rest-ready after 51779 ms
+[21:46:37] [Horizon game/INFO]: Horizon: world resources joined after 32511 ms
+[21:46:38] [Horizon game/INFO]: Horizon: startup handoff 41240 ms (renderer 8262 ms, start_game 32723 ms)
+[21:46:38] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[21:46:38] [Horizon game/INFO]: Horizon: first frame after 32916 ms
+[21:46:38] [World initialization/INFO]: Horizon: live features ready in 197.0009ms
+[21:46:49] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[21:47:17] [Horizon game/INFO]: shader pack audit_sky_marker 0.1.0: sky.wgsl in 275 ms
+[21:47:21] [Horizon game/INFO]: Saved screenshot to C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\screenshots\2026-11-21_21.47.21.png
+[21:47:21] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_21.47.21.png

@@ -1,0 +1,8 @@
+﻿The native/Wasm markers did not reach the expected state in the rendered view.
+At C:\Users\ben\AppData\Local\Temp\horizon-nov20-audit-shader-runtime\Test-Nov20Desktop.ps1:450 char:25
++ ... kerMatches){throw 'The native/Wasm markers did not reach the expected ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (The native/Wasm... rendered view.:String) [], RuntimeException
+    + FullyQualifiedErrorId : The native/Wasm markers did not reach the expected state in the rendered view.
+ 
+

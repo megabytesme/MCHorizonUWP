@@ -1,0 +1,18 @@
+[22:00:35] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[22:00:35] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[22:00:35] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[22:00:48] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 1686 ms, modules 9307 ms, linking 909 ms, instantiation 4 ms, subscriptions 25 ms, initialization 1 ms
+[22:00:48] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[22:00:48] [unnamed/INFO]: [wgpu_hal::gles::egl] EGL says it can present to the window but not natively
+[22:00:48] [unnamed/INFO]: [wgpu_hal::gles::egl] UWP ANGLE EGL selected window-presentable config: true
+[22:00:48] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:00:48] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)
+[22:00:48] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1800x1350 Bgra8Unorm, Fifo)
+[22:00:48] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[22:00:48] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[22:00:48] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 21 ms
+[22:01:01] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[22:01:02] [Horizon game/INFO]: Horizon renderer: acquiring the first frame
+[22:01:02] [Horizon game/INFO]: Horizon renderer: submitting the first frame
+[22:01:02] [Horizon game/INFO]: Horizon renderer: presenting the first frame
+[22:01:02] [Horizon game/INFO]: Horizon: loading screen shown after 14730 ms

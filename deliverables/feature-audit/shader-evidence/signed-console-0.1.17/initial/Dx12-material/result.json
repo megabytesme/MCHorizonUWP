@@ -1,0 +1,41 @@
+﻿{
+    "Name":  "MCHorizonUWP.Nov20.qa.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  42128,
+    "BeginUtc":  "2026-11-21T21:47:27.2487424Z",
+    "Mode":  "World",
+    "Backend":  "Dx12",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  false,
+    "Renderer":  "[21:47:50] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "FirstFrame":  "[21:47:55] [Horizon game/INFO]: Horizon: first frame after 373 ms",
+    "StartupObservedMs":  29034,
+    "CaptureMethod":  "game mod screenshot",
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\horizon-nov20-audit-shader-runtime\\capture-20261121-214726-945-x64-Dx12-World-Enabled-100\\world.png",
+                    "Width":  1800,
+                    "Height":  1350,
+                    "Cyan":  6400,
+                    "Magenta":  6400,
+                    "SceneColors":  708
+                },
+    "NativeLoad":  "[21:47:32] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[21:47:39] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 377 ms, modules 6544 ms, linking 57 ms, instantiation 4 ms, subscriptions 0 ms, initialization 0 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe"
+                                ],
+    "ResolutionEvidence":  [
+
+                           ],
+    "Exit":  "closed"
+}

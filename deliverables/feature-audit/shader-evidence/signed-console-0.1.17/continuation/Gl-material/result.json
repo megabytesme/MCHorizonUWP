@@ -1,0 +1,44 @@
+﻿{
+    "Name":  "MCHorizonUWP.Nov20.qa.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  121916,
+    "BeginUtc":  "2026-11-21T22:07:07.3201016Z",
+    "Mode":  "World",
+    "Backend":  "Gl",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  false,
+    "Renderer":  "[22:07:23] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver=\"\", driver_info=\"OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)\", feature_level=native, hardware=true, software=false)",
+    "FirstFrame":  "[22:07:31] [Horizon game/INFO]: Horizon: first frame after 220 ms",
+    "StartupObservedMs":  24531,
+    "CaptureMethod":  "game mod screenshot",
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\horizon-nov20-audit-shader-runtime\\capture-20261121-220707-198-x64-Gl-World-Enabled-100\\world.png",
+                    "Width":  1800,
+                    "Height":  1350,
+                    "Cyan":  6400,
+                    "Magenta":  6400,
+                    "SceneColors":  1728,
+                    "SceneSamples":  5220,
+                    "SceneCyan":  0,
+                    "SceneOrange":  0
+                },
+    "NativeLoad":  "[22:07:09] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[22:07:13] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 241 ms, modules 3773 ms, linking 33 ms, instantiation 2 ms, subscriptions 0 ms, initialization 0 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe"
+                                ],
+    "ResolutionEvidence":  [
+
+                           ],
+    "Exit":  "closed"
+}

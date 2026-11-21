@@ -1,0 +1,44 @@
+﻿{
+    "Name":  "MCHorizonUWP.Nov20.qa.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  85816,
+    "BeginUtc":  "2026-11-21T22:12:41.8217016Z",
+    "Mode":  "World",
+    "Backend":  "Dx12",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "Trial":  "Warm",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  false,
+    "Renderer":  "[22:12:57] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "FirstFrame":  "[22:13:02] [Horizon game/INFO]: Horizon: first frame after 207 ms",
+    "StartupObservedMs":  21244,
+    "CaptureMethod":  "game mod screenshot",
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\horizon-nov20-audit-shader-runtime\\capture-20261121-221241-721-x64-Dx12-World-Enabled-100\\world.png",
+                    "Width":  1800,
+                    "Height":  1350,
+                    "Cyan":  6400,
+                    "Magenta":  6400,
+                    "SceneColors":  51,
+                    "SceneSamples":  5220,
+                    "SceneCyan":  5217,
+                    "SceneOrange":  3
+                },
+    "NativeLoad":  "[22:12:43] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[22:12:49] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 183 ms, modules 5358 ms, linking 31 ms, instantiation 2 ms, subscriptions 0 ms, initialization 0 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe"
+                                ],
+    "ResolutionEvidence":  [
+
+                           ],
+    "Exit":  "closed"
+}

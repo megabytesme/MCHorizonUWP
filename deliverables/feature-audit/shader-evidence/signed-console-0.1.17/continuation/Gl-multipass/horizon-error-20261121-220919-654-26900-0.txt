@@ -1,0 +1,7 @@
+panicked at C:\dev\personal\MCHorizonUWP-nightly-2026-11-20\.local\nov20-runtime-builds\port\third_party\wgpu-dx11\wgpu\src\backend\wgpu_core.rs:1417:26:
+wgpu error: Validation Error
+
+Caused by:
+  In Device::create_render_pipeline, label = 'Post effect pass'
+    In the provided shader, the type given for group 0 binding 1 has a size of 8. As the device does not support `DownlevelFlags::BUFFER_BINDINGS_NOT_16_BYTE_ALIGNED`, the type must have a size that is a multiple of 16 bytes.
+

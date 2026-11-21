@@ -1,0 +1,1 @@
+Horizon encountered an unexpected error at C:\dev\personal\MCHorizonUWP-nightly-2026-11-20\.local\nov20-runtime-builds\port\third_party\wgpu-dx11\wgpu\src\backend\wgpu_core.rs:1417 and must close. A diagnostic was saved in app storage.

@@ -1,0 +1,63 @@
+[22:07:48] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[22:07:48] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[22:07:48] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[22:07:51] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 159 ms, modules 2522 ms, linking 22 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms
+[22:07:51] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[22:07:51] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 8 ms
+[22:07:51] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[22:07:51] [unnamed/INFO]: [wgpu_hal::gles::egl] EGL says it can present to the window but not natively
+[22:07:51] [unnamed/INFO]: [wgpu_hal::gles::egl] UWP ANGLE EGL selected window-presentable config: true
+[22:07:51] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:07:51] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)
+[22:07:51] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1800x1350 Bgra8Unorm, Fifo)
+[22:07:51] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[22:07:51] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[22:07:51] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\1a23848d346799f6
+[22:07:51] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[22:07:52] [resource-loader/INFO]: Horizon: UI bundle ready after 1345 ms
+[22:07:54] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[22:07:54] [resource-loader/INFO]: load core tables: 3.03s
+[22:07:55] [World data preload/INFO]: Horizon: worldgen data loaded in 601.912ms
+[22:07:55] [resource-loader/INFO]: load pack tables: 3.75s
+[22:07:55] [resource-loader/INFO]: Horizon: core-ready after 3783 ms
+[22:07:55] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 54 ms
+[22:07:56] [load-items/INFO]: load items: 4.96s
+[22:07:56] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 2003 ms
+[22:07:56] [world-rest-loader/INFO]: Horizon: resources loaded in 5.2s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[22:07:56] [world-rest-loader/INFO]: Horizon: rest-ready after 5243 ms
+[22:07:59] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[22:07:59] [Horizon game/INFO]: Horizon: loading the title artwork after 8096 ms
+[22:07:59] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:07:59] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[22:08:01] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[22:08:01] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:08:09] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (55 shader modules, layouts and pipelines kept)
+[22:08:10] [Horizon game/INFO]: Horizon: world renderer ready after 19020 ms
+[22:08:10] [Horizon game/WARN]: Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+[22:08:10] [Horizon game/INFO]: Horizon: waiting for world resources
+[22:08:10] [Horizon game/INFO]: Horizon: world resources joined after 0 ms
+[22:08:10] [Horizon game/INFO]: Horizon: startup handoff 9483 ms (renderer 9186 ms, start_game 157 ms)
+[22:08:10] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[22:08:11] [Horizon game/INFO]: Horizon: first frame after 303 ms
+[22:08:11] [World initialization/INFO]: Horizon: live features ready in 155.924ms
+[22:08:15] [Horizon game/ERROR]: [wgpu::backend::wgpu_core] Shader translation error for stage ShaderStages(FRAGMENT): WGSL `textureLoad` from depth textures is not supported in GLSL
+[22:08:15] [Horizon game/ERROR]: [wgpu::backend::wgpu_core] Please report it to https://github.com/gfx-rs/wgpu
+[22:08:15] [Horizon game/WARN]: shader pack audit_post_marker.hshader refused: post.wgsl: Validation Error
+
+Caused by:
+  In Device::create_render_pipeline, label = 'post.wgsl'
+    Internal error in ShaderStages(FRAGMENT) shader: WGSL `textureLoad` from depth textures is not supported in GLSL
+[22:08:15] [Horizon game/INFO]: [CHAT] Shader pack audit_post_marker.hshader refused:
+[22:08:15] [Horizon game/INFO]: [CHAT] post.wgsl: Validation Error
+
+Caused by:
+  In Device::create_render_pipeline, label = 'post.wgsl'
+    Internal error in ShaderStages(FRAGMENT) shader: WGSL `textureLoad` from depth textures is not supported in GLSL
+[22:08:15] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[22:08:23] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[22:08:24] [Horizon game/INFO]: Horizon: the renderer was made again for the frame the settings call for in 9389 ms
+[22:08:25] [Post effects/ERROR]: [wgpu::backend::wgpu_core] Handling wgpu errors as fatal by default
+[22:08:25] [Screenshot readback/ERROR]: [wgpu_hal::gles::adapter] Fake map
+[22:08:28] [Screenshot readback/ERROR]: [wgpu_hal::gles::adapter] Fake map
+[22:08:28] [Horizon game/INFO]: Saved screenshot to C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw\LocalState\game\screenshots\2026-11-21_22.08.28.png
+[22:08:28] [Horizon game/INFO]: [CHAT] Saved screenshot as 2026-11-21_22.08.28.png
