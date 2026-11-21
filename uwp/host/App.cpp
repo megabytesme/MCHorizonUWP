@@ -1013,6 +1013,7 @@ static void run_game_in_primary_view() {
         if (page_result < 0)
             throw Platform::Exception::CreateException(page_result);
         page_hidden = true;
+        horizon_uwp_trace_shell_event("game surface shown; waiting for the game renderer");
 
         if (renderer == 0) {
 #ifdef HORIZON_UWP_NATIVE_D3D11
@@ -1047,6 +1048,7 @@ static void run_game_in_primary_view() {
         Windows::System::Threading::ThreadPool::RunAsync(
             ref new Windows::System::Threading::WorkItemHandler([resources, game, renderer](Windows::Foundation::IAsyncAction^) {
                 try {
+                    horizon_uwp_trace_shell_event("game worker entering the Rust bridge");
                     const int32_t result = horizon_uwp_run_prepared(
                         reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                         reinterpret_cast<const uint16_t*>(game->Data()), game->Length(), renderer);

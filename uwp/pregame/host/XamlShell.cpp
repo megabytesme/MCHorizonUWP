@@ -902,7 +902,11 @@ void request_server_status(const std::wstring& address) {
             server_details[address] = result;
             const auto view = server_views.find(address);
             if (view != server_views.end()) apply_server_details(view->second, result);
-            update_server_secondary_tile(*exists, result);
+            // Start-screen activation can block in a shell broker call. Keep
+            // optional tile notifications off the dispatcher that presents the game.
+            ThreadPool::RunAsync(ref new WorkItemHandler([server = *exists, result](IAsyncAction^) {
+                update_server_secondary_tile(server, result);
+            }));
             if (live_tile_options & 4) update_live_tile();
         })); } catch (...) {}
     }));
@@ -1098,16 +1102,17 @@ void update_live_tile() {
     const auto statuses = server_details;
     const auto local = ApplicationData::Current->LocalFolder->Path;
     ThreadPool::RunAsync(ref new WorkItemHandler([local](IAsyncAction^) { update_pinned_world_tiles(local); }));
-    if (options == 0) {
-        try {
-            auto updater = TileUpdateManager::CreateTileUpdaterForApplication();
-            updater->EnableNotificationQueue(false);
-            updater->Clear();
-        } catch (...) {}
-        return;
-    }
     ThreadPool::RunAsync(ref new WorkItemHandler([options, kind, has_skin, account_name, servers, statuses, local, generation](IAsyncAction^) {
         try {
+            if (options == 0) {
+                if (tile_generation.load() == generation) {
+                    auto updater = TileUpdateManager::CreateTileUpdaterForApplication();
+                    if (tile_generation.load() != generation) return;
+                    updater->EnableNotificationQueue(false);
+                    updater->Clear();
+                }
+                return;
+            }
             std::vector<std::wstring> updates;
             const bool include_worlds = (options & 1) != 0;
             const bool include_account = (options & 2) != 0;
@@ -1172,9 +1177,18 @@ void update_server_secondary_tile(const SavedServer& server, const ServerDetails
     } catch (Platform::Exception^) {}
 }
 
-bool secondary_tile_exists(const std::wstring& kind, const std::wstring& target) {
-    try { return SecondaryTile::Exists(ref new Platform::String(secondary_tile_id(kind, target).c_str())); }
-    catch (Platform::Exception^) { return false; }
+void refresh_secondary_tile_pin(AppBarButton^ button, const std::wstring& kind, const std::wstring& target) {
+    button->Label = L"Pin to Start";
+    const auto id = secondary_tile_id(kind, target);
+    const Platform::WeakReference weak(button);
+    create_task([id]() {
+        return SecondaryTile::Exists(ref new Platform::String(id.c_str()));
+    }).then([weak](task<bool> result) {
+        try {
+            auto current = weak.Resolve<AppBarButton>();
+            if (current && result.get()) current->Label = L"Unpin";
+        } catch (...) {}
+    }, task_continuation_context::use_current());
 }
 
 void toggle_secondary_tile(const std::wstring& kind, const std::wstring& target, const std::wstring& title) {
@@ -2352,7 +2366,8 @@ void refresh_save_list(StackPanel^ output) {
                         quick_play_world = name; quick_connect_address.clear(); quick_benchmark = false; choose(1, generation);
                     });
                     commands->PrimaryCommands->Append(play);
-                    auto pin = ref new AppBarButton(); pin->Label = secondary_tile_exists(L"world", name) ? L"Unpin" : L"Pin to Start";
+                    auto pin = ref new AppBarButton();
+                    refresh_secondary_tile_pin(pin, L"world", name);
                     pin->Icon = ref new SymbolIcon(Symbol::Pin);
                     pin->Click += ref new RoutedEventHandler([name](Platform::Object^, RoutedEventArgs^) { toggle_secondary_tile(L"world", name, name); });
                     commands->PrimaryCommands->Append(pin);
@@ -2944,7 +2959,7 @@ void refresh() {
                 });
             server_commands->PrimaryCommands->Append(remove);
             auto pin = ref new AppBarButton();
-            pin->Label = secondary_tile_exists(L"server", address) ? L"Unpin" : L"Pin to Start";
+            refresh_secondary_tile_pin(pin, L"server", address);
             pin->Icon = ref new SymbolIcon(Symbol::Pin);
             const auto server_name = server.name;
             pin->Click += ref new RoutedEventHandler([address, server_name](Platform::Object^, RoutedEventArgs^) {
@@ -3797,6 +3812,7 @@ struct AttachGameSwapchainContext {
 };
 
 static void __cdecl attach_game_swapchain_on_ui(void* raw_context) {
+    horizon_uwp_trace_shell_event("game swap chain attachment entered the XAML dispatcher");
     auto context = static_cast<AttachGameSwapchainContext*>(raw_context);
     if (!dispatcher || !dispatcher->HasThreadAccess) {
         context->result = RPC_E_WRONG_THREAD;
@@ -3819,7 +3835,10 @@ static void __cdecl attach_game_swapchain_on_ui(void* raw_context) {
     if (SUCCEEDED(description_result))
         horizon_uwp_trace_game_swapchain(description.Width, description.Height);
 #endif
+    horizon_uwp_trace_shell_event("game SwapChainPanel SetSwapChain starting");
     context->result = panel->SetSwapChain(reinterpret_cast<IDXGISwapChain*>(context->swap_chain));
+    horizon_uwp_trace_shell_event(SUCCEEDED(context->result)
+        ? "game SwapChainPanel SetSwapChain completed" : "game SwapChainPanel SetSwapChain failed");
 }
 
 struct DetachGameSwapchainContext {
@@ -3844,7 +3863,9 @@ extern "C" int32_t __cdecl horizon_uwp_detach_game_swapchain() {
 extern "C" int32_t __cdecl horizon_uwp_attach_game_swapchain(void* swap_chain) {
     if (!swap_chain) return E_POINTER;
     AttachGameSwapchainContext context{ swap_chain, E_FAIL };
+    horizon_uwp_trace_shell_event("game swap chain attachment requested");
     const int32_t dispatch = horizon_uwp_dispatch_ui_sync(attach_game_swapchain_on_ui, &context);
+    if (FAILED(dispatch)) horizon_uwp_trace_shell_event("game swap chain attachment dispatch failed");
     return FAILED(dispatch) ? dispatch : context.result;
 }
 
