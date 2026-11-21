@@ -1,0 +1,13 @@
+{
+  "package": "MCHorizonUWP.NightlyNov20.DrsTrace.arm_1.0.2.0_arm__4pd4jeb6snrqw",
+  "appx_sha256": "2DE0A3FAAAC1D6FB76D045619FEDED14E238EFDBA7FCCA1083B8734A63D6D6CD",
+  "bridge_sha256": "680cd889475f85b624ed6c90d03b614463ed558c323b8aa7d369a075724a748f",
+  "requested_by": "Wasm gameplay test hook",
+  "storage_path": "LocalState/game/screenshots/2026-11-21_05.00.50.png",
+  "screenshot_sha256": "804F0C16FC5282F87C810746EB784BBC01D2B8C3F646133BC69CC0E15BA3F057",
+  "device_creation_utc": "2026-11-21T05:00:55.2025120Z",
+  "width": 2561,
+  "height": 1439,
+  "visible": "Saved world, touch HUD, native green marker, Wasm magenta marker",
+  "manifest_pictures_library_capability": false
+}

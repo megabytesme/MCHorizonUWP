@@ -1708,7 +1708,7 @@
       "id": "screenshots",
       "category": "Graphics",
       "official_behavior": "F2, screenshot quality, world icon capture and new mod screenshot request",
-      "uwp_behavior_and_root_cause": "UWP tests used offscreen and Device Portal system screenshots. A signed Lumia client reached the mod screenshot request and reported access denied. A signed storage probe narrowed the problem to resolving opened file and folder handles, then verified a direct same-folder move using the validated paths.",
+      "uwp_behavior_and_root_cause": "Client 0.1.16 reported access denied for the mod screenshot. A signed Lumia storage probe isolated the denied handle-to-path lookups. Client 0.1.17 used the validated same-folder paths directly and wrote a complete 2561 x 1439 screenshot for the same Wasm request inside a real saved world. Direct F2 runtime verification remains open.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -1734,7 +1734,8 @@
         "docs/nightly-arm-hud-2026-11-20.md",
         "docs/nightly-mobile-2026-11-20.md",
         "deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-fixed-75-screenshot-error.png",
-        "deliverables/nightly-2026-11-20/drs/lumia-runtime/screenshot-storage-probe-lumia.txt"
+        "deliverables/nightly-2026-11-20/drs/lumia-runtime/screenshot-storage-probe-lumia.txt",
+        "deliverables/nightly-2026-11-20/drs/lumia-runtime/v17-modded-game-screenshot.json"
       ]
     },
     {
