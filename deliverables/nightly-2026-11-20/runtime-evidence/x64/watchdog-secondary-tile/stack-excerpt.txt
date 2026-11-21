@@ -1,0 +1,19 @@
+Ben-Desktop, 2026-11-21 02:26 UTC
+Signed baseline MCHorizonUWP.NightlyNov20.x64 1.0.2.0.
+Observed while graphics startup was stalled, before the 30-second watchdog.
+The XAML owner was identified with its thread ID from the shell lifecycle log.
+The game host lacks private symbol names in this capture. The executable caller
+of GetActivationFactoryByPCWSTR, at host RVA 0x632be, references the string
+Windows.UI.StartScreen.SecondaryTile at RVA 0xc8670.
+
+XAML owner and activation broker
+000000bf`4e3fef50 00007ff8`1b064414 combase!CoCreateInstanceFromApp+0x3d8
+000000bf`4e3feff0 00007ff8`1b0639a8 combase!RoGetActivationFactory+0xac4
+000000bf`4e3ff680 00007ff6`707032c3 vccorlib140_app!GetActivationFactoryByPCWSTR+0x80
+000000bf`4e3fef50 00007ff8`1b064414 combase!CoCreateInstanceFromApp+0x3d8
+000000bf`5667ee40 00007ff8`1b064414 combase!CoCreateInstanceFromApp+0x3d8
+000000bf`56e7e6a0 00007ff8`1b064414 combase!CoCreateInstanceFromApp+0x3d8
+
+Game worker and waiting swapchain dispatch
+000000bf`595a4ff0 00007ff6`7074a501 HorizonUWP!horizon_uwp_dispatch_ui_sync+0x12c
+000000bf`595a5060 00007ffe`70bf5c64 HorizonUWP!horizon_uwp_attach_game_swapchain+0x31
