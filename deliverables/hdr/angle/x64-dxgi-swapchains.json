@@ -1,0 +1,74 @@
+{
+  "provider": "Microsoft-Windows-DXGI",
+  "provider_guid": "ca11c036-0102-4a2d-a6ad-f03cfed5d3c9",
+  "keyword_mask": "0x3",
+  "level": 5,
+  "pid": 95432,
+  "host": "Ben-Desktop",
+  "os": "Windows 11 Pro 10.0.26300",
+  "gpu": "NVIDIA GeForce RTX 3090 Ti",
+  "driver": "32.0.16.2101",
+  "package": "MCHorizonUWP.Hdr.AngleProbe_1.0.0.0_x64__4pd4jeb6snrqw",
+  "appx_sha256": "5684b4138914b9544e0869bc55f0dcf8311dc1a23660e4cdad64665e30ed94fe",
+  "signature": "signtool verify /pa passed",
+  "swapchain_event_id": 10,
+  "swapchains": [
+    {
+      "egl_attempt": "rgba8-default",
+      "utc": "2026-11-21T07:00:36.4855796Z",
+      "format_id": 87,
+      "format": "DXGI_FORMAT_B8G8R8A8_UNORM",
+      "width": 320,
+      "height": 240,
+      "buffer_count": 2,
+      "swap_effect_id": 3,
+      "redirected": true,
+      "scanout_eligible": false
+    },
+    {
+      "egl_attempt": "rgba8-srgb",
+      "utc": "2026-11-21T07:00:36.5003165Z",
+      "format_id": 87,
+      "format": "DXGI_FORMAT_B8G8R8A8_UNORM",
+      "width": 320,
+      "height": 240,
+      "buffer_count": 2,
+      "swap_effect_id": 3,
+      "redirected": true,
+      "scanout_eligible": false
+    },
+    {
+      "egl_attempt": "rgb10-default",
+      "utc": "2026-11-21T07:00:36.5123954Z",
+      "format_id": 24,
+      "format": "DXGI_FORMAT_R10G10B10A2_UNORM",
+      "width": 320,
+      "height": 240,
+      "buffer_count": 2,
+      "swap_effect_id": 3,
+      "redirected": true,
+      "scanout_eligible": false
+    },
+    {
+      "egl_attempt": "fp16-default",
+      "utc": "2026-11-21T07:00:36.5210453Z",
+      "format_id": 10,
+      "format": "DXGI_FORMAT_R16G16B16A16_FLOAT",
+      "width": 320,
+      "height": 240,
+      "buffer_count": 2,
+      "swap_effect_id": 3,
+      "redirected": true,
+      "scanout_eligible": false
+    }
+  ],
+  "present_end_event_id": 43,
+  "present_hresult": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "set_color_space_task": 25,
+  "set_color_space_events": 0
+}
