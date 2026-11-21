@@ -24,6 +24,8 @@ Use an isolated package profile, open a test world and jot down the starting F3 
 
 ### Recording a short motion trace
 
+On UWP, build version 0.1.2 against the game bridge with gyro trace root support. The bridge supplies the app-local game directory to the trusted native mod. The writer replaces only its own `motion.csv` and leaves the code-mod file service unchanged.
+
 Enable **Capture gyro diagnostics** in the mod's settings on the copied test profile. The mod records up to 360 recent observations at five per second and updates `horizon-mod-data/horizon_gyro_aim/motion.csv` inside the game directory about once a second. The rows show focus and screen state, WinRT display orientation flags, the received integrated radians, the requested degree deltas, and the player's yaw and pitch before and after the standard rotation setter. A `NaN` sensor field denotes an observation without a consumed batch. The frame interval is the time between consumed batches on the game thread. It is separate from the sensor's per-report integration time.
 
 Hold the display nearly upright. Pause briefly before each left/right turn and up/down tilt, then repeat in the flipped landscape orientation. Compare the CSV with the visible world or F3 recording. Check touch and controller movement separately before moving the phone during the same session. Leave diagnostics enabled when switching gyro aiming off for the control, then disable diagnostics while still in the world to save the final rows. Turn diagnostics off for DRS benchmarks.

@@ -1,6 +1,8 @@
+#[cfg(not(target_vendor = "uwp"))]
+use mod_api::ConfigPath;
 use mod_api::{
-    self, ClientHost, ClientStoppingEvent, ConfigPath, EntityRef, GuiRenderPostEvent, Hooks,
-    Registrar, RegistrationContext, RenderFramePreEvent, SettingSpec,
+    self, ClientHost, ClientStoppingEvent, EntityRef, GuiRenderPostEvent, Hooks, Registrar,
+    RegistrationContext, RenderFramePreEvent, SettingSpec,
 };
 use std::collections::VecDeque;
 use std::fmt::Write;
@@ -29,6 +31,8 @@ struct MotionTrace {
     next_row_ms: u128,
     next_save_ms: u128,
     rows: VecDeque<String>,
+    #[cfg(target_vendor = "uwp")]
+    reported_write_failure: bool,
 }
 
 impl MotionTrace {
@@ -38,6 +42,8 @@ impl MotionTrace {
             next_row_ms: 0,
             next_save_ms: 0,
             rows: VecDeque::new(),
+            #[cfg(target_vendor = "uwp")]
+            reported_write_failure: false,
         }
     }
 
@@ -78,14 +84,24 @@ impl MotionTrace {
         }
     }
 
-    fn save(&self, host: &dyn ClientHost) {
+    fn save(&mut self, _host: &dyn ClientHost) {
         let mut csv = String::from("elapsed_ms,enabled,playing,focused,screen_open,sensor_active,orientation_flags,frame_interval_ms,sensor_x_rad,sensor_y_rad,requested_yaw_deg,requested_pitch_deg,before_yaw_deg,before_pitch_deg,accepted,after_yaw_deg,after_pitch_deg
 ");
         for row in &self.rows {
             let _ = writeln!(csv, "{row}");
         }
+        #[cfg(target_vendor = "uwp")]
+        match trace_file::write(csv.as_bytes()) {
+            Ok(()) => self.reported_write_failure = false,
+            Err(error) if !self.reported_write_failure => {
+                self.reported_write_failure = true;
+                eprintln!("Gyro diagnostics could not write motion.csv: {error}");
+            }
+            Err(_) => {}
+        }
+        #[cfg(not(target_vendor = "uwp"))]
         if let Ok(path) = ConfigPath::new("motion.csv") {
-            let _ = host.data_files().write(&path, csv.as_bytes());
+            let _ = _host.data_files().write(&path, csv.as_bytes());
         }
     }
 }
@@ -362,7 +378,7 @@ impl Hooks for GyroAim {
                     .trace
                     .get_or_insert_with(|| MotionTrace::new(now))
                     .record(now, host, player, active, frame);
-            } else if let Some(trace) = state.trace.take() {
+            } else if let Some(mut trace) = state.trace.take() {
                 trace.save(host);
             }
         }
@@ -408,6 +424,68 @@ impl Hooks for GyroAim {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .stop();
+    }
+}
+
+#[cfg(target_vendor = "uwp")]
+mod trace_file {
+    //! The trusted UWP gyro mod owns just this opt-in diagnostics file.
+
+    use std::fs::{self, OpenOptions};
+    use std::io::{self, Write};
+    use std::os::windows::fs::MetadataExt;
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    static NEXT_TEMP: AtomicU32 = AtomicU32::new(0);
+
+    pub(super) fn write(csv: &[u8]) -> io::Result<()> {
+        let root = std::env::var_os("HORIZON_UWP_GYRO_TRACE_ROOT")
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute())
+            .ok_or_else(|| io::Error::other("the app-local gyro trace root is unavailable"))?;
+        write_in_game(&root, csv)
+    }
+
+    fn write_in_game(root: &Path, csv: &[u8]) -> io::Result<()> {
+        ordinary_directory(root)?;
+        let mut directory = root.to_path_buf();
+        for component in ["horizon-mod-data", super::ID] {
+            directory.push(component);
+            match fs::create_dir(&directory) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+                Err(error) => return Err(error),
+            }
+            ordinary_directory(&directory)?;
+        }
+
+        let path = directory.join("motion.csv");
+        let sequence = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
+        let temporary = directory.join(format!(".motion-{}-{sequence}.tmp", std::process::id()));
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        let written = file.write_all(csv);
+        drop(file);
+        let result = written.and_then(|()| fs::rename(&temporary, &path));
+        if result.is_err() {
+            let _ = fs::remove_file(temporary);
+        }
+        result
+    }
+
+    fn ordinary_directory(path: &Path) -> io::Result<()> {
+        let metadata = fs::symlink_metadata(path)?;
+        if metadata.is_dir() && metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::other(
+                "the gyro trace directory is not an ordinary directory",
+            ))
+        }
     }
 }
 
