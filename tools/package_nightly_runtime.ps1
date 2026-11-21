@@ -91,11 +91,17 @@ if ($AngleBin) {
     $options.RequireAngle = $true
 }
 & "$source/uwp/host/package.ps1" @options
-if ($LegacyArm32Wasm) {
+if ($LegacyArm32Wasm -or $NormalProfile) {
     $path = Join-Path $output 'package/AppxManifest.xml'
     $manifest = [xml](Get-Content -LiteralPath $path -Raw)
-    foreach ($family in $manifest.Package.Dependencies.TargetDeviceFamily) {
-        $family.MinVersion = '10.0.15063.0'
+    if ($LegacyArm32Wasm) {
+        foreach ($family in $manifest.Package.Dependencies.TargetDeviceFamily) {
+            $family.MinVersion = '10.0.15063.0'
+        }
+    }
+    if ($NormalProfile) {
+        $manifest.Package.Properties.DisplayName = 'Horizon UWP Nightly'
+        $manifest.Package.Applications.Application.VisualElements.SetAttribute('DisplayName', 'Horizon UWP Nightly')
     }
     $manifest.Save($path)
 }
