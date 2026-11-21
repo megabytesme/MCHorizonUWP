@@ -1183,12 +1183,12 @@
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "Full-game candidate status. Production color/depth scaler and one-pixel HUD separation passed offscreen on x64 and x86 Win32 at actual FL9_1 and FL11_1 and signed ARM64 AppContainer at actual FL9_1. Signed ARM32 AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1. Lumia 50-percent gameplay and output scaling were verified with a warm 4 MiB block texture budget. Its matched-scale comparison, full HUD capture and touch test remain open.",
+        "qualification": "Full-game candidate status. The color/depth scaler and one-pixel HUD separation passed offscreen on x64 and x86 Win32 at actual FL9_1 and FL11_1 and signed ARM64 AppContainer at actual FL9_1. Signed ARM32 offscreen, 8/8 on the Lumia Adreno 430. Actual Lumia gameplay at 50, 67 and 75 percent kept native-size output. The fixed 50 and 67 percent matched profile produced complete traces. The 75 percent HUD is visible in a physical capture. A dedicated touch coordinate test remains open.",
         "component_verification": {
           "x64_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 770 × 510 internal, 1539 × 1020 output, with native and Wasm HUD markers at 50%",
           "x86_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 1154 × 765 internal, 1539 × 1020 output with both HUD markers at 75%",
           "arm64_dx11_fl91": "8/8 signed offscreen checks at actual FL9_1. Two signed game runs at the 67% compatibility projection: 1372 x 1029 world, 2048 x 1536 output, with both HUD markers. Resize and restore updated and recovered both targets.",
-          "arm32_dx11_fl91": "Signed ARMNT offscreen 8/8 on physical Adreno 430 FL9_1. The normal hardware projection additionally rendered the copied saved world at 1281 x 720 against 2561 x 1439 output at 50 percent. The 75-percent retry was suspended before world entry."
+          "arm32_dx11_fl91": "Signed ARMNT offscreen 8/8 on physical Adreno 430 FL9_1. In signed game client 0.1.16, normal hardware projection rendered the saved world at 1281 x 720 (50%), 1716 x 964 (67%) and 1921 x 1079 (75%) against 2561 x 1439 output."
         },
         "evidence": [
           "docs/nightly-drs-2026-11-20.md",
@@ -1196,7 +1196,10 @@
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67-interactive/result.json",
-          "deliverables/nightly-2026-11-20/runtime-evidence/arm32/fixed-50-first-world/completed-game.log"
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm32/fixed-50-first-world/completed-game.log",
+          "deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-marker-fixed50-metrics.json",
+          "deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-marker-fixed67-metrics.json",
+          "deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-fixed75-metrics.json"
         ]
       }
     },
