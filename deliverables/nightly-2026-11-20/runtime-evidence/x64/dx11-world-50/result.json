@@ -1,0 +1,66 @@
+{
+  "Name": "MCHorizonUWP.NightlyNov20.x64",
+  "MainOnlyControl": false,
+  "Family": "MCHorizonUWP.NightlyNov20.x64_4pd4jeb6snrqw",
+  "Package": "MCHorizonUWP.NightlyNov20.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+  "Pid": 89324,
+  "BeginUtc": "/Date(1795223841258)/",
+  "Mode": "World",
+  "Backend": "Dx11",
+  "Scale": 50,
+  "Hooks": "Enabled",
+  "StrictFl91": false,
+  "Content": true,
+  "AudioTest": true,
+  "Gyro": true,
+  "Ready": true,
+  "Renderer": "[01:18:14] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+  "Capture": {
+    "Path": "world.png",
+    "Width": 1560,
+    "Height": 1080,
+    "Cyan": 4096,
+    "Magenta": 4096
+  },
+  "DebugCapture": {
+    "Path": "f3.png",
+    "Width": 1560,
+    "Height": 1080,
+    "Cyan": 4096,
+    "Magenta": 4096
+  },
+  "ContentEvidence": [
+    {
+      "Generation": "f989f5f4b62ed966",
+      "Table": "entity-types.json",
+      "Hash": "5A068D74273407CBAFEB0275BEEC45F41AB3471E1AADCD515CEE965EDA989DB9"
+    },
+    {
+      "Generation": "f989f5f4b62ed966",
+      "Table": "command-registries.json",
+      "Hash": "7840123783FF16CD3E9160C19CD44B409C2EA036D752C58A57346DFD85834EF6"
+    }
+  ],
+  "ResolutionEvidence": [
+    "[01:17:39] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+    "[01:18:16] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+    "[01:18:17] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%",
+    "[01:18:26] [Horizon game/INFO]: Horizon renderer: FL9_1 world 770x510, output 1539x1020, selected scale 50%"
+  ],
+  "RenderArea": {
+    "World": [
+      770,
+      510
+    ],
+    "Output": [
+      1539,
+      1020
+    ]
+  },
+  "AudioOutput": [
+    "[01:18:16] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)",
+    "[01:18:21] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio"
+  ],
+  "AudioNonSilent": true,
+  "Exit": "closed"
+}

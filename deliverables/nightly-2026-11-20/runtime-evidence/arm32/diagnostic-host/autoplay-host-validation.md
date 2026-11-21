@@ -1,0 +1,7 @@
+# Isolated Lumia automatic saved-world smoke host
+
+The C++/CX host starts the ordinary pregame flow, which selects `Nov20Smoke` through the existing pinned-world launch path. The test host checks its package identity, copies missing fixture files into its own `LocalState\game` and saves a zero optional telemetry mask. The packaged fixture selects 50% fixed render scale, a 16 MiB texture budget, disabled adaptive resolution and a 30 FPS target. The original ARM32 bridge DLL is byte-identical in the staged package. Audio, performance tracing and strict hardware FL9_1 selection are enabled by the existing marker flags.
+
+Build the test host from a temporary archive of HorizonUWP commit `816ace2b0` with `test-host-automation.patch` applied. Run `tools/build_host_artifact_kit.ps1 -Architecture arm -SourceRoot <temp-source> -OutputDirectory <new-output>`. The strict link passed and the executable PE is ARMNT AppContainer. Its SHA-256 is `6C4A2C004695FDD75501F52AFA706E8F208C4C0F2E4DC69B4FF19AED9BAE06A2`. The game bridge SHA-256 is `DE3D8A8A04EEF16B07B9545A7E4E5BC7BA4038AA4AE6CD5F894F4F2F7D36F574`.
+
+Use the staged candidate manifest identity `MCHorizonUWP.NightlyNov20.DrsSmoke.arm`, EXE and WinMD, plus the 22-file `lumia-world-seed\` payload. The existing framework dependencies stay in the test manifest. Evidence contains the strict host build log, import list and fixture hashes. The complete app gameplay proof depends on a later package install and run.

@@ -1,0 +1,81 @@
+--- a/uwp/pregame/host/XamlShell.cpp
++++ b/uwp/pregame/host/XamlShell.cpp
+@@ -1997,6 +1997,66 @@
+     dialog->Content = text(message, 15);
+     dialog->PrimaryButtonText = L"Close";
+     dialog->ShowAsync();
++}
++
++bool seed_isolated_lumia_world() {
++    auto package = Windows::ApplicationModel::Package::Current;
++    if (package->Id->Name != L"MCHorizonUWP.NightlyNov20.DrsSmoke.arm") {
++        throw ref new Platform::FailureException(L"Wrong package identity for the isolated Lumia world seed.");
++    }
++
++    const std::wstring input = std::wstring(package->InstalledLocation->Path->Data()) + L"\\lumia-world-seed\\";
++    const std::wstring game = std::wstring(ApplicationData::Current->LocalFolder->Path->Data()) + L"\\game";
++    auto ensure_directory = [](const std::wstring& path) {
++        if (!CreateDirectoryW(path.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS)
++            throw ref new Platform::FailureException(L"Could not create an isolated Lumia game subfolder.");
++    };
++    ensure_directory(game);
++    const wchar_t* files[] = {
++        LR"(audio-test.enabled)",
++        LR"(horizon-graphics.txt)",
++        LR"(horizon-mods.txt)",
++        LR"(horizon-mods\uwp_wasm_hook_probe.hmod)",
++        LR"(options.txt)",
++        LR"(performance-trace.enabled)",
++        LR"(saves\Nov20Smoke\data\minecraft\game_rules.dat)",
++        LR"(saves\Nov20Smoke\data\minecraft\game_rules.dat_old)",
++        LR"(saves\Nov20Smoke\data\minecraft\random_sequences.dat)",
++        LR"(saves\Nov20Smoke\data\minecraft\weather.dat)",
++        LR"(saves\Nov20Smoke\data\minecraft\weather.dat_old)",
++        LR"(saves\Nov20Smoke\data\minecraft\world_clocks.dat)",
++        LR"(saves\Nov20Smoke\data\minecraft\world_clocks.dat_old)",
++        LR"(saves\Nov20Smoke\data\minecraft\world_gen_settings.dat)",
++        LR"(saves\Nov20Smoke\dimensions\minecraft\overworld\data\minecraft\raids.dat)",
++        LR"(saves\Nov20Smoke\dimensions\minecraft\overworld\region\r.-1.0.mca)",
++        LR"(saves\Nov20Smoke\dimensions\minecraft\overworld\region\r.-2.0.mca)",
++        LR"(saves\Nov20Smoke\level.dat)",
++        LR"(saves\Nov20Smoke\level.dat_old)",
++        LR"(saves\Nov20Smoke\players\data\a01e3843-e521-3998-958a-f459800e4d11.dat)",
++        LR"(saves\Nov20Smoke\session.lock)",
++        LR"(strict-dx11-bench.enabled)",
++    };
++    COPYFILE2_EXTENDED_PARAMETERS copy{};
++    copy.dwSize = sizeof(copy);
++    copy.dwCopyFlags = COPY_FILE_FAIL_IF_EXISTS;
++    for (const auto* file : files) {
++        const std::wstring relative(file);
++        std::wstring target = game;
++        size_t start = 0;
++        for (auto slash = relative.find(L'\\'); slash != std::wstring::npos; slash = relative.find(L'\\', start)) {
++            target.append(L"\\").append(relative, start, slash - start);
++            ensure_directory(target);
++            start = slash + 1;
++        }
++        target.append(L"\\").append(relative, start, std::wstring::npos);
++        const HRESULT hr = CopyFile2((input + relative).c_str(), target.c_str(), &copy);
++        if (FAILED(hr) && hr != HRESULT_FROM_WIN32(ERROR_FILE_EXISTS) && hr != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
++            throw ref new Platform::FailureException(L"Could not copy the isolated Lumia world fixture.");
++    }
++    if (horizon_uwp_telemetry_save(reinterpret_cast<const uint16_t*>(game.data()), game.size(), 0) != 0)
++        throw ref new Platform::FailureException(L"Could not record zero telemetry for the isolated Lumia test.");
++    horizon_uwp_trace_shell_event("isolated Lumia world fixture seeded and optional telemetry disabled");
++    return true;
+ }
+ 
+ void try_pending_tile_launch(unsigned generation) {
+@@ -3080,6 +3140,11 @@
+         ui_settings = ref new UISettings();
+         accessibility = ref new AccessibilitySettings();
+         auto values = ApplicationData::Current->LocalSettings->Values;
++        if (seed_isolated_lumia_world()) {
++            pending_tile_launch = L"world:Nov20Smoke";
++            values->Insert(L"update-check-enabled", PropertyValue::CreateBoolean(false));
++            values->Insert(L"game-renderer", PropertyValue::CreateUInt32(3));
++        }
+         if (values->HasKey(L"update-check-enabled")) {
+             try { update_checks_enabled.store(safe_cast<IPropertyValue^>(values->Lookup(L"update-check-enabled"))->GetBoolean(), std::memory_order_release); }
+             catch (Platform::Exception^) { update_checks_enabled.store(true, std::memory_order_release); }

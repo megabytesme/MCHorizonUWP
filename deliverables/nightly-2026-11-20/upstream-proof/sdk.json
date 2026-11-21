@@ -1,0 +1,229 @@
+{
+  "schema": 1,
+  "build": {
+    "commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "game": "26.3",
+    "date": "2026-11-20"
+  },
+  "package_format": 6,
+  "toolchain": {
+    "rust": "1.99.1"
+  },
+  "content_api": "0.2",
+  "surface": {
+    "hash": "e05637790d2a91aaa8075e748e2ca872",
+    "previous": "5ef7734fdd854add5efd6817178be3c988d8d050",
+    "source": "additive",
+    "changes": [
+      "handle:LevelRef::structures_at",
+      "handle:MobTickCost::new",
+      "handle:PacketCount::new",
+      "handle:PlayerRef::refresh",
+      "handle:PlayerRef::set_profile_property",
+      "handle:PlayerRef::set_statistics",
+      "handle:PlayerRef::statistics",
+      "handle:PlayerRef::take_packet_counts",
+      "handle:StructureAt::new",
+      "method:prelude::ClientViewClientHost::native_corner_shown",
+      "method:prelude::ConfigClientHost::official_extra_settings",
+      "method:prelude::ConfigServerHost::count_packets",
+      "method:prelude::ConfigServerHost::mob_cost_sampling",
+      "method:prelude::ConfigServerHost::take_mob_costs",
+      "method:prelude::PlayersServerHost::profile_by_name",
+      "method:prelude::PlayersServerHost::profile_by_uuid",
+      "method:prelude::ScreensClientHost::request_client_quit",
+      "method:prelude::ScreensClientHost::request_screenshot",
+      "type:MobTickCost",
+      "type:PacketCount",
+      "type:ScreenshotError",
+      "type:StructureAt"
+    ]
+  },
+  "mixins": {
+    "rev": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
+    "patch": "52eaeef7cac10d894066635dc46b12f76d877416317f06eaf385f176de5e1c35"
+  },
+  "assets": {
+    "api-aarch64-apple-darwin.tar.xz": {
+      "sha256": "7faeac644896f845c60dc5bc6696f52252b5813ffae78ca043b365de7a5d12b1",
+      "size": 29737276,
+      "kind": "api",
+      "codec": "xz",
+      "target": "aarch64-apple-darwin",
+      "side": "client"
+    },
+    "api-source.tar.xz": {
+      "sha256": "5d57c0b41f0e7edc487b4e07785bfaee1bbfe792c554446e2658deb46205b82d",
+      "size": 1540256,
+      "kind": "api-source",
+      "codec": "xz"
+    },
+    "api-x86_64-pc-windows-gnu.tar.xz": {
+      "sha256": "c591d3b224f1abfd18cfcdb06bb90ddf7f1c772d3ef65a1def944a8433ea4dc9",
+      "size": 30826872,
+      "kind": "api",
+      "codec": "xz",
+      "target": "x86_64-pc-windows-gnu",
+      "side": "client"
+    },
+    "api-x86_64-unknown-linux-gnu-server.tar.xz": {
+      "sha256": "1e2c1c1efdb87752594d14c250cdfa4d0bf63614dd418b9f0f5633761eaa5567",
+      "size": 29996516,
+      "kind": "api",
+      "codec": "xz",
+      "target": "x86_64-unknown-linux-gnu",
+      "side": "server"
+    },
+    "api-x86_64-unknown-linux-gnu.tar.xz": {
+      "sha256": "1e2c1c1efdb87752594d14c250cdfa4d0bf63614dd418b9f0f5633761eaa5567",
+      "size": 29996516,
+      "kind": "api",
+      "codec": "xz",
+      "target": "x86_64-unknown-linux-gnu",
+      "side": "client"
+    },
+    "build-data.tar.xz": {
+      "sha256": "09177b80bf6f20c9acc33b4e8c4e85da25adc0b12a8618bf5ed131dde7fb9e7c",
+      "size": 2451508,
+      "kind": "build-data",
+      "codec": "xz"
+    },
+    "engine-aarch64-apple-darwin.tar.xz": {
+      "sha256": "be759b17deb0d39dc93b1b43c05c6b3a84a9ec432e505f1c6624b2be58392cfd",
+      "size": 156202192,
+      "kind": "engine",
+      "codec": "xz",
+      "target": "aarch64-apple-darwin",
+      "side": "client"
+    },
+    "engine-x86_64-pc-windows-gnu.tar.xz": {
+      "sha256": "b89be5fcd17dbe710b6b47ebdb67e9aad9d43247c650e222ab8517e82864fd95",
+      "size": 188990016,
+      "kind": "engine",
+      "codec": "xz",
+      "target": "x86_64-pc-windows-gnu",
+      "side": "client"
+    },
+    "engine-x86_64-unknown-linux-gnu-server.tar.xz": {
+      "sha256": "8a600f4229eca04e229711868f7d2d7c65851e8168d4f797ad59c920c34d123f",
+      "size": 170646288,
+      "kind": "engine",
+      "codec": "xz",
+      "target": "x86_64-unknown-linux-gnu",
+      "side": "server"
+    },
+    "engine-x86_64-unknown-linux-gnu.tar.xz": {
+      "sha256": "f080ade7a5a573af0a944ecf7883951a14ff8b9753de3f31cff1c83aa66f3eb7",
+      "size": 174319792,
+      "kind": "engine",
+      "codec": "xz",
+      "target": "x86_64-unknown-linux-gnu",
+      "side": "client"
+    },
+    "runtime-aarch64-apple-darwin.tar.xz": {
+      "sha256": "5d7cead5ed41b67ce22375d7b5265b9381ea513641fc90d3ece5265f2a6eb638",
+      "size": 61690828,
+      "kind": "runtime",
+      "codec": "xz",
+      "target": "aarch64-apple-darwin",
+      "side": "client"
+    },
+    "runtime-x86_64-pc-windows-gnu.tar.xz": {
+      "sha256": "68def4a5434d06d2b16950c25872722164737120005e5c9c701e9146a5e34710",
+      "size": 69512620,
+      "kind": "runtime",
+      "codec": "xz",
+      "target": "x86_64-pc-windows-gnu",
+      "side": "client"
+    },
+    "runtime-x86_64-unknown-linux-gnu-server.tar.xz": {
+      "sha256": "83893343f94e950d8d1f2798310d7533e74ddd2cd9fa23facb6f41f65d5571cc",
+      "size": 70477628,
+      "kind": "runtime",
+      "codec": "xz",
+      "target": "x86_64-unknown-linux-gnu",
+      "side": "server"
+    },
+    "runtime-x86_64-unknown-linux-gnu.tar.xz": {
+      "sha256": "e835303d298db31b7275d87932f3673232bf8a89892d2ecb5e84f1a8c0a9e482",
+      "size": 71011360,
+      "kind": "runtime",
+      "codec": "xz",
+      "target": "x86_64-unknown-linux-gnu",
+      "side": "client"
+    },
+    "surface.json": {
+      "sha256": "09767c0d4be1b004b229ccec70f5d052b555e0a1c67a0cec9bfdaf960fe8d3e9",
+      "size": 6807688,
+      "kind": "surface",
+      "codec": "none"
+    }
+  },
+  "inputs": {
+    "routes": {
+      "api": {
+        "sdk": [
+          "runtime",
+          "api"
+        ]
+      },
+      "engine": {
+        "sdk": [
+          "runtime",
+          "api",
+          "engine"
+        ]
+      },
+      "package": {
+        "program": [
+          "horizon-ctl",
+          "horizon-prepare",
+          "horizon-server",
+          "horizon-wasm-std.wasm"
+        ],
+        "checkout": [
+          "exporters/manifest.json"
+        ]
+      },
+      "package-server": {
+        "program": [
+          "horizon-prepare",
+          "horizon-server",
+          "horizon-wasm-std.wasm"
+        ],
+        "checkout": [
+          "exporters/manifest.json"
+        ]
+      }
+    },
+    "how": {
+      "api": "the SDK release of the game's exact commit",
+      "engine": "the SDK release of the game's exact commit",
+      "exporters/manifest.json": "horizon-prepare compile-exporters --root CHECKOUT, then copy its server, client and manifest.json into CHECKOUT/exporters/",
+      "horizon-ctl": "cargo build PROFILE -p horizon-client-lib --bin horizon-ctl",
+      "horizon-prepare": "cargo build PROFILE -p horizon-prepare",
+      "horizon-server": "cargo build PROFILE -p horizon-server",
+      "horizon-wasm-std.wasm": "cargo run --locked -p cargo-horizon-mod -- wasm-std PROGRAM_FOLDER/horizon-wasm-std.wasm",
+      "runtime": "the SDK release of the game's exact commit"
+    },
+    "members": {
+      "api": [
+        "native_mod_entry.rs.template",
+        "points.json",
+        "internals.json",
+        "loops.json",
+        "deps/@rmeta:mod_api",
+        "deps/@rmeta:mod_points"
+      ],
+      "runtime": [
+        "horizon-prebuilt.json",
+        "bin/@program:horizon-client",
+        "deps/@dylib:horizon_mod_host",
+        "deps/@dylib:horizon_mod_wasm",
+        "deps/@dylib:mod_api",
+        "deps/@dylib:mod_vocab",
+        "deps/@dylib:mod_points"
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "patch_version": "0.1.13",
+  "client_version": "0.1.14",
+  "builder_version": "1.0.7",
+  "packages": [
+    {
+      "file": "game/lumia-arm/HorizonUWP-arm.appx",
+      "size": 42680985,
+      "sha256": "62d206b68b38a18925ec3c4b841c1c1e6695210406ca60b1b25a16b3bb8d9f56",
+      "role": "game",
+      "arch": "arm"
+    },
+    {
+      "file": "game/x64-1.0.2.0/main.appxbundle",
+      "size": 51487626,
+      "sha256": "e5ba683580a22d7e5e80c42ba93caf638ee9802a8ac26803b857201b1f380dd3",
+      "role": "main",
+      "arch": "x64"
+    },
+    {
+      "file": "game/x64-1.0.2.0/optional.appxbundle",
+      "size": 53446,
+      "sha256": "736bb24da02cdcd05bad0440dcd11c140219f8ce776dd780cf597473ec7ca38c",
+      "role": "native_mods",
+      "arch": "x64"
+    },
+    {
+      "file": "game/x86/related/main.appxbundle",
+      "size": 48715606,
+      "sha256": "a742e3bb1b272b3aadc79b341fc11fb9c37d4bfabb97e9b6b73bfff4fd680227",
+      "role": "main",
+      "arch": "x86"
+    },
+    {
+      "file": "game/x86/related/optional.appxbundle",
+      "size": 50877,
+      "sha256": "f839a043cd93876d38b76752a8f7968bed320fe844215a7d27e30fcd007a55ea",
+      "role": "native_mods",
+      "arch": "x86"
+    },
+    {
+      "file": "game/arm64/related/main.appxbundle",
+      "size": 45248255,
+      "sha256": "5565c5d0528d2472f6ac40b3c686166129b46e83d099b35c48e415a069e9a689",
+      "role": "main",
+      "arch": "arm64"
+    },
+    {
+      "file": "game/arm64/related/optional.appxbundle",
+      "size": 53873,
+      "sha256": "bddfa8b2e4aae3988bc7d70f6775477824dd69b8156d732bc42e523ad52ee605",
+      "role": "native_mods",
+      "arch": "arm64"
+    },
+    {
+      "file": "game/lumia-drs-smoke/HorizonUWP-Arm32-DRS-World-Smoke.signed.appx",
+      "size": 45613886,
+      "sha256": "ba7cf6a25f4126dad2e01d24c2229485721ba5a69912390f6a5d59522614db5e",
+      "role": "world_smoke",
+      "arch": "arm"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "Name": "MCHorizonUWP.NightlyNov20.x86",
+  "MainOnlyControl": false,
+  "Family": "MCHorizonUWP.NightlyNov20.x86_4pd4jeb6snrqw",
+  "Package": "MCHorizonUWP.NightlyNov20.x86_1.0.1.0_x86__4pd4jeb6snrqw",
+  "Pid": 42476,
+  "BeginUtc": "/Date(1795224329448)/",
+  "Mode": "World",
+  "Backend": "Dx11",
+  "Scale": 75,
+  "Hooks": "Enabled",
+  "StrictFl91": false,
+  "Content": false,
+  "AudioTest": true,
+  "Gyro": false,
+  "Ready": true,
+  "Renderer": "[01:26:27] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+  "Capture": {
+    "Path": "world.png",
+    "Width": 1560,
+    "Height": 1080,
+    "Cyan": 4096,
+    "Magenta": 4096
+  },
+  "DebugCapture": {
+    "Path": "f3.png",
+    "Width": 1560,
+    "Height": 1080,
+    "Cyan": 4096,
+    "Magenta": 4096
+  },
+  "ResolutionEvidence": [
+    "[01:25:46] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+    "[01:26:27] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+    "[01:26:30] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+    "[01:26:31] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%",
+    "[01:26:33] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1154x765, output 1539x1020, selected scale 75%"
+  ],
+  "RenderArea": {
+    "World": [
+      1154,
+      765
+    ],
+    "Output": [
+      1539,
+      1020
+    ]
+  },
+  "AudioOutput": [
+    "[01:26:29] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)",
+    "[01:26:35] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio"
+  ],
+  "AudioNonSilent": true,
+  "Exit": "closed"
+}

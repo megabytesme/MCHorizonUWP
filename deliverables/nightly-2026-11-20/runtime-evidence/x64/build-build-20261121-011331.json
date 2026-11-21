@@ -1,0 +1,41 @@
+{
+  "source": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\port",
+  "target": "x86_64-uwp-windows-msvc",
+  "build_id": "mchorizonuwp-0.1.14-patch-0.1.13-x64-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "cargo_arguments": [
+    "+1.99.1-x86_64-pc-windows-msvc",
+    "--config",
+    ".cargo/wasmtime-uwp.toml",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "uwp/game-bridge/Cargo.toml",
+    "-Z",
+    "build-std=std,panic_abort",
+    "--target",
+    "x86_64-uwp-windows-msvc",
+    "--release",
+    "--target-dir",
+    "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\target-x64",
+    "-p",
+    "horizon-uwp-native-horizon-gyro-aim",
+    "-p",
+    "horizon-uwp-native-uwp-native-after-probe",
+    "-p",
+    "horizon-uwp-native-uwp-native-hook-probe",
+    "-p",
+    "horizon-uwp-game-bridge",
+    "--features",
+    "horizon-uwp-game-bridge/uwp-dx11-renderer,horizon-uwp-game-bridge/uwp-dx12-renderer,horizon-uwp-game-bridge/native-touch-mod,horizon-uwp-game-bridge/native-device-vibration-mod,horizon-uwp-game-bridge/uwp-audio,horizon-uwp-game-bridge/uwp-https,horizon-uwp-game-bridge/uwp-controller,horizon-uwp-game-bridge/xaml-shell,horizon-uwp-game-bridge/uwp-wasm,horizon-uwp-game-bridge/uwp-native-mods"
+  ],
+  "cargo_log": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\build-x64\\cargo-build-20261121-011331.log",
+  "bridge_archive": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\target-x64\\x86_64-uwp-windows-msvc\\release\\horizon_uwp_game_bridge.lib",
+  "bridge_sha256": "f0c5b3d6d697de0e4f1ad7d8df6ccf1c3a0081bde06cce3f07efca83bb96e0ab",
+  "native_dlls_sha256": {
+    "horizon_uwp_mod_horizon_gyro_aim.dll": "f457b6b1c107de44fc5c4a5275fdc715988f14efba63d275d65d87386f54885a",
+    "horizon_uwp_mod_uwp_native_after_probe.dll": "f7019ff4749b707d3e1170775e99c933930796e085b391879a0184306eef5b7e",
+    "horizon_uwp_mod_uwp_native_hook_probe.dll": "e50d7c00c6ee88160d7b1b108eb7794d294d12fb197c3444cf22d98361c7216d"
+  },
+  "result": "passed"
+}

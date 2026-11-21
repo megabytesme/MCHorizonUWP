@@ -62,7 +62,7 @@
     "wgpu": "aa7b65c43ef008d0a92d20fcdf9f10fa0883f157",
     "device_runtime_evidence": "Previous signed builds, with package versions listed in the referenced evidence"
   },
-  "target_runtime_verification": "The runtime matrix records the verified November 18 port baseline. November 20 source evidence establishes inventory and code paths. Verify the migrated signed packages independently before transferring runtime statuses.",
+  "target_runtime_verification": "The baseline status cells describe the November 18 signed port. Candidate statuses and the cross-architecture report record direct November 20 measurements separately.",
   "status_legend": {
     "V": "Fully supported and verified",
     "L": "Supported with limitations",
@@ -1119,10 +1119,10 @@
       ],
       "candidate_statuses": {
         "status_by_profile": {
-          "x64_dx11_fl91": "I",
+          "x64_dx11_fl91": "V",
           "x64_dx12": "I",
           "x64_angle": "I",
-          "x86_dx11_fl91": "I",
+          "x86_dx11_fl91": "V",
           "x86_dx12": "I",
           "x86_angle": "X",
           "arm64_dx11_fl91": "I",
@@ -1133,14 +1133,16 @@
         },
         "qualification": "Full-game candidate status. Production color/depth scaler and one-pixel HUD separation passed offscreen on x64 and x86 Win32 at actual FL9_1 and FL11_1 and signed ARM64 AppContainer at actual FL9_1. Signed ARM32 AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1. Lumia gameplay, output-surface scaling, sustained performance, touch and presentation remain unverified.",
         "component_verification": {
-          "x64_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1",
-          "x86_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1",
+          "x64_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 770 × 510 internal, 1539 × 1020 output, with native and Wasm HUD markers at 50%",
+          "x86_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 1154 × 765 internal, 1539 × 1020 output with both HUD markers at 75%",
           "arm64_dx11_fl91": "Signed ARM64 AppContainer offscreen, 8/8 on Surface Pro X physical FL9_1",
           "arm32_dx11_fl91": "Signed ARMNT AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1"
         },
         "evidence": [
           "docs/nightly-drs-2026-11-20.md",
-          "deliverables/nightly-2026-11-20/drs/evidence/offscreen-readbacks.csv"
+          "deliverables/nightly-2026-11-20/drs/evidence/offscreen-readbacks.csv",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json"
         ]
       }
     },
@@ -2228,12 +2230,13 @@
         "qualification": "Standalone standard native client mod, default off. Uses existing typed render_frame_pre and local rotation methods plus the narrow Gyrometer provider. ARM32 delivery uses Builder native embedding. ARM64, x64 and x86 use signed related-set DLLs or embedding. Physical sensor availability alone does not verify movement, orientation sign, controls, focus or enable/disable behavior in an isolated world.",
         "component_verification": {
           "arm64": "Surface Pro X WinRT GetDefault found a gyrometer (2 ms minimum report interval), orientation sensor and accelerometer",
-          "desktop": "Ben-Desktop WinRT GetDefault returned no gyrometer",
+          "desktop": "Ben-Desktop WinRT GetDefault returned no gyrometer; the installed signed game displayed the unavailable-sensor status in a saved world",
           "arm32": "Signed ARM32 AppContainer found Gyrometer.GetDefault (4 ms minimum) and received event and polled samples. In-world aim proof pending"
         },
         "evidence": [
           "uwp/mods/horizon-gyro-aim/README.md",
-          "docs/nightly-integration-2026-11-20.md"
+          "docs/nightly-integration-2026-11-20.md",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/f3.png"
         ]
       }
     },

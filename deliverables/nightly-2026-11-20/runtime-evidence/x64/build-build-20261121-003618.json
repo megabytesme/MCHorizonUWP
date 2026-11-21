@@ -1,0 +1,41 @@
+{
+  "source": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\port",
+  "target": "x86_64-uwp-windows-msvc",
+  "build_id": "mchorizonuwp-0.1.14-patch-0.1.13-x64-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "cargo_arguments": [
+    "+1.99.1-x86_64-pc-windows-msvc",
+    "--config",
+    ".cargo/wasmtime-uwp.toml",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "uwp/game-bridge/Cargo.toml",
+    "-Z",
+    "build-std=std,panic_abort",
+    "--target",
+    "x86_64-uwp-windows-msvc",
+    "--release",
+    "--target-dir",
+    "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\target-x64",
+    "-p",
+    "horizon-uwp-native-horizon-gyro-aim",
+    "-p",
+    "horizon-uwp-native-uwp-native-after-probe",
+    "-p",
+    "horizon-uwp-native-uwp-native-hook-probe",
+    "-p",
+    "horizon-uwp-game-bridge",
+    "--features",
+    "horizon-uwp-game-bridge/uwp-dx11-renderer,horizon-uwp-game-bridge/uwp-dx12-renderer,horizon-uwp-game-bridge/native-touch-mod,horizon-uwp-game-bridge/native-device-vibration-mod,horizon-uwp-game-bridge/uwp-audio,horizon-uwp-game-bridge/uwp-https,horizon-uwp-game-bridge/uwp-controller,horizon-uwp-game-bridge/xaml-shell,horizon-uwp-game-bridge/uwp-wasm,horizon-uwp-game-bridge/uwp-native-mods"
+  ],
+  "cargo_log": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\build-x64\\cargo-build-20261121-003618.log",
+  "bridge_archive": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-integration\\target-x64\\x86_64-uwp-windows-msvc\\release\\horizon_uwp_game_bridge.lib",
+  "bridge_sha256": "1545ef332bd58868b1f6a739bb5e2592af8bfadd337c52551ca135a7ed02a452",
+  "native_dlls_sha256": {
+    "horizon_uwp_mod_horizon_gyro_aim.dll": "06fc049c88e0ca90e74816aa8239bb0ee1b5b06532b76c311b5da81ff124dfa7",
+    "horizon_uwp_mod_uwp_native_after_probe.dll": "92c477df854f35be933b67566a2a5f518921c0cfe2cb79004531d59f8b404036",
+    "horizon_uwp_mod_uwp_native_hook_probe.dll": "eb95f0ad5cdf95d5d058cc1e79a070676f2619ef9a5ca60ea3d9153d55fe9681"
+  },
+  "result": "passed"
+}

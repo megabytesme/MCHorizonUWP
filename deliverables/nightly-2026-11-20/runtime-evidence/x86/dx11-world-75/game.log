@@ -1,0 +1,53 @@
+[01:25:33] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[01:25:33] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[01:25:33] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.x86_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[01:25:37] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 275 ms, modules 2521 ms, linking 29 ms, instantiation 2 ms, subscriptions 1 ms, initialization 1 ms
+[01:25:37] [Horizon game/INFO]: Horizon renderer: asking DirectX 11 for a graphics device
+[01:25:37] [Horizon game/WARN]: [wgpu_core::instance] DX11 is experimental and exposes a restricted FL9_1 graphics backend with constrained owner-thread HWND and CoreWindow surfaces
+[01:25:37] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 14 ms
+[01:25:37] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[01:25:37] [Horizon game/INFO]: Horizon renderer: requesting the device (driver D3D11 FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101) with features [] and the adapter's limits (buffers up to 4294967291 bytes, storage bindings up to 0 bytes, 6 texture layers)
+[01:25:37] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1800x1350 Bgra8Unorm, Fifo)
+[01:25:37] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[01:25:37] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[01:25:46] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[01:25:46] [Horizon game/INFO]: Horizon renderer: acquiring the first frame
+[01:25:46] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%
+[01:25:46] [Horizon game/INFO]: Horizon renderer: submitting the first frame
+[01:25:46] [Horizon game/INFO]: Horizon renderer: presenting the first frame
+[01:25:46] [Horizon game/INFO]: Horizon: loading screen shown after 10095 ms
+[01:26:24] [resource-loader/INFO]: Horizon: copied 23219 prepared files (248353373 bytes) for mod staging in 47117 ms
+[01:26:24] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.x86_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\416c7f29cdd1cf4c
+[01:26:24] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[01:26:25] [resource-loader/INFO]: Horizon: UI bundle ready after 48287 ms
+[01:26:25] [Horizon game/INFO]: Horizon: loading the title artwork after 48290 ms
+[01:26:25] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[01:26:26] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[01:26:26] [resource-loader/INFO]: load core tables: 49.54s
+[01:26:26] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[01:26:26] [resource-loader/INFO]: load pack tables: 50.09s
+[01:26:27] [resource-loader/INFO]: Horizon: core-ready after 50128 ms
+[01:26:27] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%
+[01:26:27] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 73 ms
+[01:26:27] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[01:26:27] [load-items/INFO]: load items: 51.07s
+[01:26:28] [World data preload/INFO]: Horizon: worldgen data loaded in 1.9931243s
+[01:26:28] [world-rest-loader/INFO]: Horizon: resources loaded in 51.9s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[01:26:28] [world-rest-loader/INFO]: Horizon: rest-ready after 51853 ms
+[01:26:28] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 2449 ms
+[01:26:29] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[01:26:29] [Horizon game/INFO]: Horizon: world renderer ready after 52770 ms
+[01:26:29] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)
+[01:26:29] [Horizon game/INFO]: Horizon: waiting for world resources
+[01:26:29] [Horizon game/INFO]: Horizon: world resources joined after 0 ms
+[01:26:29] [Horizon game/INFO]: Horizon: startup handoff 2673 ms (renderer 2325 ms, start_game 195 ms)
+[01:26:30] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[01:26:30] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%
+[01:26:30] [World initialization/INFO]: Horizon: live features ready in 88.8225ms
+[01:26:30] [Horizon game/INFO]: Horizon: first frame after 459 ms
+[01:26:31] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1539x1020, output 1539x1020, selected scale 100%
+[01:26:31] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[01:26:33] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1154x765, output 1539x1020, selected scale 75%
+[01:26:35] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[01:26:35] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x44444ca4
+[01:26:35] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio

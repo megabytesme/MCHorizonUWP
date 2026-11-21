@@ -1,0 +1,34 @@
+{
+  "Name": "MCHorizonUWP.NightlyNov20.x64",
+  "MainOnlyControl": false,
+  "Family": "MCHorizonUWP.NightlyNov20.x64_4pd4jeb6snrqw",
+  "Package": "MCHorizonUWP.NightlyNov20.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+  "Pid": 61684,
+  "BeginUtc": "/Date(1795224258524)/",
+  "Mode": "World",
+  "Backend": "Dx12",
+  "Scale": 100,
+  "Hooks": "Enabled",
+  "StrictFl91": false,
+  "Content": false,
+  "AudioTest": false,
+  "Gyro": false,
+  "Ready": true,
+  "Renderer": "[01:24:31] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+  "Capture": {
+    "Path": "world.png",
+    "Width": 1560,
+    "Height": 1080,
+    "Cyan": 4096,
+    "Magenta": 4096
+  },
+  "DebugCapture": {
+    "Path": "f3.png",
+    "Width": 1560,
+    "Height": 1080,
+    "Cyan": 4096,
+    "Magenta": 4096
+  },
+  "ResolutionEvidence": [],
+  "Exit": "closed"
+}
