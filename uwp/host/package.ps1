@@ -17,7 +17,8 @@ param(
     [string]$ReleaseNotes,
     [string]$ReleaseMetadataPath,
     [string]$EmbeddedNativeMods,
-    [string]$WasmStandardLibrary
+    [string]$WasmStandardLibrary,
+    [switch]$LegacyArm32Wasm
 )
 $ErrorActionPreference = 'Stop'
 if (-not $WinUIFramework) { $WinUIFramework = if ($Architecture -eq 'arm') { '2.7' } else { '2.8' } }
@@ -114,6 +115,7 @@ if ($ReleaseNotes) {
 }
 $releaseMetadataStage = Join-Path $stage 'HorizonRelease.json'
 if (Test-Path -LiteralPath $releaseMetadataStage) { Remove-Item -LiteralPath $releaseMetadataStage -Force }
+$release = $null
 if ($ReleaseMetadataPath) {
     $metadata = Get-Item -LiteralPath $ReleaseMetadataPath -ErrorAction Stop
     if ($metadata.PSIsContainer -or $metadata.Length -gt 4096) { throw 'Release metadata must be a JSON file no larger than 4 KiB.' }
@@ -171,9 +173,14 @@ if ($AngleBin) {
 $wasmStage = Join-Path $stage 'horizon-wasm-std.wasm'
 if (Test-Path -LiteralPath $wasmStage) { throw 'Wasm standard library staging already exists; use a fresh OutputDirectory.' }
 if ($WasmStandardLibrary) {
-    $wasmStdHash = '123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b'
+    $upstream = if ($release) { $release.upstream_commit } else { '0b14f8acfd97fa2c750e42795249dcc981178ca4' }
+    $wasmStdHash = switch ($upstream) {
+        '0b14f8acfd97fa2c750e42795249dcc981178ca4' { '123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b' }
+        '0a875da91dbb0fdcb7ba8c42c11341aa229af51a' { 'c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f' }
+        default { throw 'This Horizon build has no pinned shared Wasm standard library.' }
+    }
     if ((Get-FileHash -LiteralPath $WasmStandardLibrary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $wasmStdHash) {
-        throw 'Use the shared Wasm standard library built for Horizon Nightly 2026-11-18.'
+        throw 'The shared Wasm standard library does not match the Horizon source revision.'
     }
     Copy-Item -LiteralPath $WasmStandardLibrary -Destination $wasmStage
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'uwp/code-generation-probe/wasmtime/LICENSE.wasmtime') -Destination (Join-Path $licenseStage 'Wasmtime.txt')
@@ -202,8 +209,12 @@ if ($PackageVersion) {
     $manifestXml.Package.Identity.Version = $PackageVersion
     $manifest = $manifestXml.OuterXml
 }
-if ($WasmStandardLibrary) {
-    # The current guest host-stack check imports GetCurrentThreadStackLimits from Windows 10 1709.
+if ($LegacyArm32Wasm -and ($Architecture -ne 'arm' -or -not $WasmStandardLibrary -or
+        $release.upstream_commit -ne '0a875da91dbb0fdcb7ba8c42c11341aa229af51a')) {
+    throw 'The legacy ARM32 interpreter package requires the matching November 20 ARM32 bridge and Wasm standard library.'
+}
+if ($WasmStandardLibrary -and -not $LegacyArm32Wasm) {
+    # The modern guest host-stack check imports GetCurrentThreadStackLimits from Windows 10 1709.
     $manifestXml = [xml]$manifest
     foreach ($family in $manifestXml.Package.Dependencies.TargetDeviceFamily) {
         if ([version]$family.MinVersion -lt [version]'10.0.16299.0') { $family.MinVersion = '10.0.16299.0' }

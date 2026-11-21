@@ -429,6 +429,8 @@ public static class LocalBuildRunner
         {
             packageArguments.Add("-WasmStandardLibrary");
             packageArguments.Add(Path.Combine(snapshot, NightlyUwp.WasmStandardLibrary));
+            if (NightlyUwp.UsesLegacyArm32Wasm(release?.Client.Version, selection.Target))
+                packageArguments.Add("-LegacyArm32Wasm");
         }
         packageArguments.AddRange(LocalRecipe.ResourceArguments(selection, packageResources, framework?.Name));
         if (angleBin is not null) { packageArguments.Add("-AngleBin"); packageArguments.Add(angleBin); packageArguments.Add("-RequireAngle"); }
