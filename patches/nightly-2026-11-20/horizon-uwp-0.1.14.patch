@@ -11800,6 +11800,104 @@ index 02039a44eaa..c28080622fb 100644
          return false;
      }
      [format, wgpu::TextureFormat::Depth32Float, SURFACE_FORMAT]
+diff --git a/crates/horizon-client-render/src/gfx/pack_timing.rs b/crates/horizon-client-render/src/gfx/pack_timing.rs
+index 0fd70514212..77d8bfe7c0d 100644
+--- a/crates/horizon-client-render/src/gfx/pack_timing.rs
++++ b/crates/horizon-client-render/src/gfx/pack_timing.rs
+@@ -13,6 +13,8 @@ use std::sync::{
+ };
+ use std::time::{Duration, Instant};
+ 
++use super::timing::timestamp_duration_ms;
++
+ /// Timestamp pairs per frame at most: a pass, a part or an encoder span takes one.
+ const CAPACITY: u32 = 128;
+ const TIMESTAMP_BYTES: u64 = CAPACITY as u64 * 16;
+@@ -573,6 +575,9 @@ impl PassTiming {
+             return;
+         }
+         let layout: Vec<_> = self.entries.iter().map(|e| (e.stamp, e.parent)).collect();
++        let Some(total_ms) = frame_span(&stamps, &layout, self.period_ns) else {
++            return;
++        };
+         let times = entry_times(&stamps, &layout, self.period_ns);
+         let mut passes: Vec<(String, f32)> = Vec::new();
+         let mut parts: Vec<(String, Vec<(String, f32)>)> = Vec::new();
+@@ -624,7 +629,7 @@ impl PassTiming {
+             }
+             self.frames.push_back(TimedFrame {
+                 at,
+-                total_ms: frame_span(&stamps, &layout, self.period_ns),
++                total_ms: Some(total_ms),
+                 passes,
+                 parts,
+             });
+@@ -1236,21 +1241,27 @@ fn entry_times(
+     times
+ }
+ 
+-/// A frame's ms from its first stamp to its last, over the pairs that are whole.
++/// Validates a timestamp batch before any of its passes are published. Zeroed pairs are
++/// unwritten. The other pairs must share a plausible frame span even when passes overlap.
+ fn frame_span(
+     stamps: &[u64],
+     entries: &[(Option<u32>, Option<usize>)],
+     period_ns: f32,
+ ) -> Option<f32> {
+-    let (first, last) = entries
+-        .iter()
+-        .filter_map(|e| {
+-            let at = 2 * e.0? as usize;
+-            let p = stamps.get(at..at + 2)?;
+-            (p[0] != 0 && p[1] >= p[0]).then_some((p[0], p[1]))
+-        })
+-        .fold((u64::MAX, 0), |(f, l), (b, e)| (f.min(b), l.max(e)));
+-    (last >= first).then(|| (last - first) as f32 * period_ns / 1e6)
++    let mut first = u64::MAX;
++    let mut last = 0;
++    for stamp in entries.iter().filter_map(|&(stamp, _)| stamp) {
++        let at = 2 * stamp as usize;
++        let pair = stamps.get(at..at + 2)?;
++        let (begin, end) = (pair[0], pair[1]);
++        if begin == 0 && end == 0 {
++            continue;
++        }
++        timestamp_duration_ms(begin, end, period_ns)?;
++        first = first.min(begin);
++        last = last.max(end);
++    }
++    timestamp_duration_ms(first, last, period_ns).filter(|&ms| ms > 0.0)
+ }
+ 
+ #[cfg(test)]
+@@ -1356,6 +1367,27 @@ mod tests {
+         assert_eq!(frame_span(&stamps, &[(None, None)], 1.0), None);
+     }
+ 
++    #[test]
++    fn a_corrupt_pair_invalidates_the_batch() {
++        let entries = [(Some(0), None), (Some(1), None)];
++        for pair in [[11, u64::MAX - 1], [11, 10], [0, 11], [11, 0]] {
++            assert_eq!(frame_span(&[1, 10, pair[0], pair[1]], &entries, 16.7), None);
++        }
++        assert_eq!(frame_span(&[1, 10, 11], &entries, 16.7), None);
++        assert_eq!(frame_span(&[1, 10, 0, 0], &entries, 1e6), Some(9.0));
++    }
++
++    #[test]
++    fn disjoint_clock_values_and_empty_frames_are_untimed() {
++        let entries = [(Some(0), None), (Some(1), None)];
++        assert_eq!(
++            frame_span(&[1, 10, u64::MAX - 99, u64::MAX - 1], &entries, 16.7),
++            None
++        );
++        assert_eq!(frame_span(&[1, 1, 1, 1], &entries, 16.7), None);
++        assert_eq!(frame_span(&[0, 0, 0, 0], &entries, 16.7), None);
++    }
++
+     fn support(unit: Option<FragmentUnit>) -> DetailSupport {
+         DetailSupport {
+             parts: PartsMode::InsidePasses,
 diff --git a/crates/horizon-client-render/src/gfx/panorama.rs b/crates/horizon-client-render/src/gfx/panorama.rs
 index feef779e58e..d71d7a7750b 100644
 --- a/crates/horizon-client-render/src/gfx/panorama.rs
@@ -11988,6 +12086,45 @@ index 00000000000..e44833aaf0e
 +    let color = textureSample(panorama, panorama_sampler, in.direction);
 +    return vec4(color.rgb, 1.0);
 +}
+diff --git a/crates/horizon-client-render/src/gfx/screenshot.rs b/crates/horizon-client-render/src/gfx/screenshot.rs
+index cb05bc55fd5..f63d00d4b9f 100644
+--- a/crates/horizon-client-render/src/gfx/screenshot.rs
++++ b/crates/horizon-client-render/src/gfx/screenshot.rs
+@@ -201,8 +201,8 @@ fn write_png(image: &mod_api::ScreenshotImage, path: &Path) -> Result<()> {
+ }
+ 
+ /// Write a file through `write` into a new temporary file beside `path`, then publish
+-/// it as `path` only if no file has that name. A hard link never replaces its target,
+-/// unlike a rename on Windows, so the publish is atomic and an existing file is kept.
++/// it as `path` only if no file has that name. A hard link, or a no-replace move on
++/// UWP, atomically publishes the completed screenshot and preserves existing files.
+ /// The temporary file is removed in every case: nothing partial is left behind.
+ fn publish_new(path: &Path, write: impl FnOnce(&Path) -> Result<()>) -> Result<()> {
+     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+@@ -219,7 +219,11 @@ fn publish_new(path: &Path, write: impl FnOnce(&Path) -> Result<()>) -> Result<(
+             Err(e) => return Err(e.into()),
+         }
+     };
+-    let published = write(&temp).and_then(|()| match std::fs::hard_link(&temp, path) {
++    #[cfg(target_vendor = "uwp")]
++    let publish = horizon_threads::move_file_no_replace;
++    #[cfg(not(target_vendor = "uwp"))]
++    let publish = |from: &Path, to: &Path| std::fs::hard_link(from, to);
++    let published = write(&temp).and_then(|()| match publish(&temp, path) {
+         Ok(()) => Ok(()),
+         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+             log::warn!(
+@@ -230,7 +234,9 @@ fn publish_new(path: &Path, write: impl FnOnce(&Path) -> Result<()>) -> Result<(
+         }
+         Err(e) => Err(e.into()),
+     });
+-    if let Err(e) = std::fs::remove_file(&temp) {
++    if let Err(e) = std::fs::remove_file(&temp)
++        && e.kind() != std::io::ErrorKind::NotFound
++    {
+         log::warn!(
+             "Horizon renderer: couldn't remove the temporary screenshot {}: {e}",
+             temp.display()
 diff --git a/crates/horizon-client-render/src/gfx/stars.rs b/crates/horizon-client-render/src/gfx/stars.rs
 index bd1f95d152c..c245dcbe7c6 100644
 --- a/crates/horizon-client-render/src/gfx/stars.rs
@@ -12248,6 +12385,67 @@ index 95b9ac17ab6..4371c2b671f 100644
                  depth_write_enabled: Some(true),
                  depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                  stencil: Default::default(),
+diff --git a/crates/horizon-client-render/src/gfx/timing.rs b/crates/horizon-client-render/src/gfx/timing.rs
+index d90cd826b8a..527cb339b98 100644
+--- a/crates/horizon-client-render/src/gfx/timing.rs
++++ b/crates/horizon-client-render/src/gfx/timing.rs
+@@ -33,6 +33,20 @@ const MAPPED: u8 = 4;
+ /// Readback failed; stop timing rather than reuse an invalid buffer.
+ const FAILED: u8 = 5;
+ 
++/// A broad bound for one frame, including stalls. Larger deltas signal unusable query data.
++const MAX_FRAME_GPU_MS: f64 = 60_000.0;
++
++/// Converts one timestamp pair, including equal stamps. Callers reject an
++/// empty whole frame separately because a real pass can finish in a single tick.
++pub(super) fn timestamp_duration_ms(begin: u64, end: u64, period_ns: f32) -> Option<f32> {
++    if begin == 0 || end == u64::MAX || !period_ns.is_finite() || period_ns <= 0.0 {
++        return None;
++    }
++    let ticks = end.checked_sub(begin)?;
++    let ms = ticks as f64 * f64::from(period_ns) / 1e6;
++    (ms <= MAX_FRAME_GPU_MS).then_some(ms as f32)
++}
++
+ struct Slot {
+     buffer: wgpu::Buffer,
+     state: Arc<AtomicU8>,
+@@ -260,9 +274,10 @@ impl GpuTimer {
+                 };
+                 // Read unaligned: the mapping isn't guaranteed to be 8-byte aligned.
+                 let stamps: [u64; 2] = bytemuck::pod_read_unaligned(&data[..16]);
+-                // A start marker that ran late (rare on Metal) leaves the frame untimed.
+-                if let Some(ticks) = stamps[1].checked_sub(stamps[0]) {
+-                    out.push((ticks as f64 * f64::from(self.period_ns) / 1e6) as f32);
++                if let Some(ms) = timestamp_duration_ms(stamps[0], stamps[1], self.period_ns)
++                    .filter(|&ms| ms > 0.0)
++                {
++                    out.push(ms);
+                 }
+             }
+             slot.buffer.unmap();
+@@ -308,6 +323,21 @@ pub(super) fn end_pipeline(
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn timestamp_pairs_reject_invalid_readback() {
++        assert_eq!(timestamp_duration_ms(1_000, 3_000, 1_000.0), Some(2.0));
++        assert_eq!(timestamp_duration_ms(1_000, 1_000, 1_000.0), Some(0.0));
++        assert_eq!(timestamp_duration_ms(0, 0, 16.7), None);
++        assert_eq!(timestamp_duration_ms(0, 10, 16.7), None);
++        assert_eq!(timestamp_duration_ms(10, 1, 16.7), None);
++        assert_eq!(timestamp_duration_ms(10, u64::MAX, 16.7), None);
++        assert_eq!(timestamp_duration_ms(10, u64::MAX - 1, 16.7), None);
++        assert_eq!(timestamp_duration_ms(10, 20, f32::NAN), None);
++        assert_eq!(timestamp_duration_ms(10, 20, f32::INFINITY), None);
++        assert_eq!(timestamp_duration_ms(10, 20, 0.0), None);
++        assert_eq!(timestamp_duration_ms(10, 20, -1.0), None);
++    }
++
+     fn mapped_timer() -> Option<(wgpu::Device, wgpu::Queue, GpuTimer)> {
+         let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+         // WGL can hang while creating a test instance on Windows (#5238).
 diff --git a/crates/horizon-client-render/src/gfx/upload.rs b/crates/horizon-client-render/src/gfx/upload.rs
 index 721d158f49b..4f26d417944 100644
 --- a/crates/horizon-client-render/src/gfx/upload.rs
@@ -23030,7 +23228,7 @@ index 3464b177bfd..a7261dd0baf 100644
 +    }
  }
 diff --git a/crates/horizon-threads/Cargo.toml b/crates/horizon-threads/Cargo.toml
-index 6d86d1f23e7..3a8221f7d78 100644
+index 6d86d1f23e7..c519e6b2ffe 100644
 --- a/crates/horizon-threads/Cargo.toml
 +++ b/crates/horizon-threads/Cargo.toml
 @@ -8,6 +8,8 @@ description = "Scheduling hints for the game's threads and its allocator, and th
@@ -23047,7 +23245,7 @@ index 6d86d1f23e7..3a8221f7d78 100644
  
  [target.'cfg(windows)'.dependencies]
 -windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Console", "Win32_System_IO", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
-+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Console", "Win32_System_IO", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_WindowsAndMessaging"] }
++windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_WindowsAndMessaging"] }
 +
 +[target.'cfg(all(windows, not(target_vendor = "uwp")))'.dependencies]
 +windows-sys = { version = "0.61", features = ["Win32_UI_Shell"] }
@@ -23201,7 +23399,7 @@ index b3a4222b3a4..6b35e8d9f27 100644
                  return base;
              }
 diff --git a/crates/horizon-threads/src/lib.rs b/crates/horizon-threads/src/lib.rs
-index edd411a09cc..10b0b617228 100644
+index edd411a09cc..1dade38ae2b 100644
 --- a/crates/horizon-threads/src/lib.rs
 +++ b/crates/horizon-threads/src/lib.rs
 @@ -9,6 +9,7 @@ pub mod allocator_stats;
@@ -23331,7 +23529,7 @@ index edd411a09cc..10b0b617228 100644
  pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Result<()> {
      // What `mklink /J` does, without its ~100 ms `cmd` process per directory: an empty
      // directory given a mount point reparse point (REPARSE_DATA_BUFFER) naming the target.
-@@ -818,6 +854,15 @@ pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Resu
+@@ -818,6 +854,38 @@ pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Resu
      set
  }
  
@@ -23344,10 +23542,33 @@ index edd411a09cc..10b0b617228 100644
 +    ))
 +}
 +
++/// Publish a staged file beside its destination, leaving an existing destination untouched.
++#[cfg(all(windows, target_vendor = "uwp"))]
++pub fn move_file_no_replace(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
++    use std::{fs, io, os::windows::ffi::OsStrExt, path::Path};
++    use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
++
++    let name = to.file_name().ok_or(io::ErrorKind::InvalidInput)?;
++    let parent = to
++        .parent()
++        .filter(|p| !p.as_os_str().is_empty())
++        .unwrap_or(Path::new("."));
++    let from = fs::canonicalize(from)?;
++    let to = fs::canonicalize(parent)?.join(name);
++    let from: Vec<_> = from.as_os_str().encode_wide().chain(Some(0)).collect();
++    let to: Vec<_> = to.as_os_str().encode_wide().chain(Some(0)).collect();
++    // SAFETY: both paths are live, nul-terminated buffers. Zero flags prevent replacement
++    // and prevent a fallback to a copy across volumes.
++    if unsafe { MoveFileExW(from.as_ptr(), to.as_ptr(), 0) } == 0 {
++        return Err(io::Error::last_os_error());
++    }
++    Ok(())
++}
++
  /// Keep this process's standard handles out of the processes it starts. Windows hands a child
  /// every inheritable handle of its parent, not only the three standard handles it is given
  /// (CreateProcessW with bInheritHandles, as `std::process::Command` starts it). horizon-ctl's own
-@@ -826,7 +871,7 @@ pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Resu
+@@ -826,7 +894,7 @@ pub fn junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Resu
  /// the caller, waiting for the end of horizon-ctl's output, would wait until the game quits. A
  /// child given `Stdio::inherit()` still gets them: `Command` duplicates the handles it passes.
  /// Unix needs none of this: a child's 0-2 are replaced and the rest are close-on-exec.
@@ -23356,7 +23577,7 @@ index edd411a09cc..10b0b617228 100644
  pub fn keep_stdio_from_children() {
      use windows_sys::Win32::Foundation::{
          HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE, SetHandleInformation,
-@@ -1066,6 +1111,7 @@ mod tests {
+@@ -1066,6 +1134,7 @@ mod tests {
      /// The allocator's options are the process's, and libtest runs tests in
      /// parallel: this must stay the only test here that configures it, or the
      /// default read first sees another test's setting.
@@ -23364,7 +23585,7 @@ index edd411a09cc..10b0b617228 100644
      #[test]
      fn configuring_the_allocator_purges_at_once() {
          // SAFETY: reads and sets one integer option.
-@@ -1091,7 +1137,7 @@ mod tests {
+@@ -1091,7 +1160,7 @@ mod tests {
      }
  }
  
