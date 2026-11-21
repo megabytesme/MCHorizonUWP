@@ -21,6 +21,8 @@ The cold OOM exposed a missing path in the startup renderer handoff. The handoff
 
 The first signed patch 0.1.14/client 0.1.16 diagnostic still failed on a cold 16 MiB run. It reached a different D3D11 failure at `Device::create_texture`, with the crash report identifying out of memory. The user captured the displayed error and the paired Device Portal retrieved that exact photo. This trial yielded no frame-time result. [Device Portal screenshot](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-cold-16mib-screen.png) · [Crash record](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-cold-16mib-wgpu-error.txt)
 
+The signed 4 MiB trial with a 50% adaptive floor and a 30 FPS target reached the world and dismissed the launcher spinner at 03:25:24 UTC. Ben moved around during this trial. At 03:28:03 UTC, the phone capture showed terrain, a readable F3 overlay, the hotbar and both mod markers. Ben also reported an access-denied chat message from an in-game screenshot request. The message had cleared by the time of the phone capture. [Phone screenshot retrieved through Device Portal](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-adaptive-world-screen.png)
+
 ## Physical gyro correlation
 
 The separate signed `MCHorizonUWP.NightlyNov20.GyroTrace.arm` package used client 0.1.15, embedded gyro 0.1.1, and the stock Wasm fixture without an automatic quit. It seeded the same saved world with a 4 MiB texture budget and one worker. The package resumed the original game PID 6692 through normal Device Portal activation after its working set had been trimmed during suspension. The game attached a 2561×1439 D3D11 swapchain and dismissed the launcher overlay after the first game frame.

@@ -56,11 +56,11 @@ The UWP screenshot publisher moves an already encoded temporary file into the de
 
 GPU timing now rejects zero-duration whole frames, reversed or invalid timestamp pairs and impossible spans. The UWP renderer uses measured frame pressure after three consecutive rejected whole-frame readbacks, returns to GPU timing after three valid readbacks, and resets the old measurement window on source change. Missing query results and per-pass-only faults do not change DRS timing source. The 20 isolated timing and controller tests passed. The Adreno 680 needs a follow-up run of the corrected binaries. [Timing tests](../deliverables/nightly-2026-11-20/runtime-0.1.16/source-checks/timestamp-fallback-tests.log)
 
-The local development export used product commit `726ef25154dd9ef2998ea725f02dea83157ef9d8` and the immutable Horizon ZIP with SHA-256 `abd6a91c41407522f9b0ec43d16555f46cd76832625645658bee57e2ab49da3d`. The patched source assembled in a new directory. All four unsigned catalog compatibility rows accepted patch 0.1.14, client 0.1.16 and Builder 1.0.8. The clean source resolved Cargo metadata with the locked offline inputs. The signed public catalog stays separate. [Builder files and hashes](../deliverables/nightly-2026-11-20/runtime-0.1.16/builder-candidate/) · [Immutable tool inputs](../deliverables/nightly-2026-11-20/runtime-0.1.16/source-checks/immutable-inputs.sha256)
+The local development export includes gyro 0.1.2 from product commit `f591ce94045171d79f96bd1cdef9ac946758439b`. It uses the immutable Horizon ZIP with SHA-256 `abd6a91c41407522f9b0ec43d16555f46cd76832625645658bee57e2ab49da3d`. The patched source assembled in a new directory. All four unsigned catalog compatibility rows accepted patch 0.1.14, client 0.1.16 and Builder 1.0.8. The clean source resolved Cargo metadata with the locked offline inputs. [Builder files and hashes](../deliverables/nightly-2026-11-20/runtime-0.1.16/builder-candidate-verified/) · [Immutable tool inputs](../deliverables/nightly-2026-11-20/runtime-0.1.16/source-checks/immutable-inputs.sha256)
 
 ```powershell
 & ./tools/build_host_artifact_kit.ps1 -OutputDirectory $HostKit
-python tools/prepare_candidate.py --revision 726ef25154dd9ef2998ea725f02dea83157ef9d8 `
+python tools/prepare_candidate.py --revision f591ce94045171d79f96bd1cdef9ac946758439b `
   --patch-version 0.1.14 --client-version 0.1.16 --builder-version 1.0.8 `
   --upstream-repo $HorizonGit --upstream-archive $HorizonZip --wgpu-archive $WgpuZip `
   --host-artifacts $HostKit --wasmtime-archive $WasmtimeCrate --wasm-standard-library $WasmStandardLibrary `
