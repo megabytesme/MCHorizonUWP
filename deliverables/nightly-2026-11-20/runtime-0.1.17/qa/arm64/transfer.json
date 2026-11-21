@@ -1,0 +1,13 @@
+{
+  "identity": "MCHorizonUWP.Nov20.qa.arm64",
+  "version": "1.0.2.0",
+  "main_sha256": "FDA9CF8E8D671944727E7BFF21371AB5ED1E480DDDFE0FC4B0BCB1743D0E05AB",
+  "optional_sha256": "E21A5D40EDBDE4F87F2025E01233D8123FFDF9469B2C9F22593DF9CB17D7BAB3",
+  "harness_sha256": "2CAED0F81C8563B770C1BB09FD5F1A18006FC9F87C9EB1628497523822D33ECC",
+  "main_source": "C:\\dev\\personal\\MCHorizonUWP-nightly-2026-11-20\\.local\\nov20-runtime-builds\\final-0.1.17\\related-arm64-qa\\main.appxbundle",
+  "optional_source": "C:\\dev\\personal\\MCHorizonUWP-nightly-2026-11-20\\.local\\nov20-runtime-builds\\final-0.1.17\\related-arm64-qa\\optional.appxbundle",
+  "main_destination": "C:/Users/ben/AppData/Local/Temp/MCHorizonUWP-NightlyNov20-v17-ARM64/main.appxbundle",
+  "optional_destination": "C:/Users/ben/AppData/Local/Temp/MCHorizonUWP-NightlyNov20-v17-ARM64/optional.appxbundle",
+  "main_bytes": 45253708,
+  "optional_bytes": 89724
+}
