@@ -50,7 +50,19 @@ Five WDDM per-process samples accompanied direct F2 on the physical HDR monitor.
 
 Build the isolated diagnostic with `tools/hdr/Build-HdrRecoveryCandidate.ps1`, the prior assembled source, the hash-checked signed HDR game bridge and the matching ANGLE DLLs. Follow the development packaging procedure and independently verify the signed package. With the desktop GPU lock held, run `tools/hdr/Test-HdrGame.ps1` against identity `MCHorizonUWP.HdrDev.DeviceLoss.x64` using the isolated world, `-Display Current -Hdr On -SampleMemory -ForceDx12Removal` and the nonautomatic Wasm fixture. Add `-ExpectHdr` when the game is on an active physical HDR display. [Build script](../tools/hdr/Build-HdrRecoveryCandidate.ps1) · [Harness](../tools/hdr/Test-HdrGame.ps1)
 
-The separate `codex/hdr-dx12-panel-rollback-nov21` candidate at `4ca69dcdedd39e0bd5193fbcdf033e8bdce4b06d` validates fresh DXGI chains before attaching them to XAML. If reconfiguring an attached chain fails, it detaches the chain and allows a failed detach to be retried. x64 UWP DX12 HAL Cargo check and Clippy passed. Signed linking and runtime fault injection remain pending on that branch. The Builder and signed evidence above use wgpu `432a009d8d44aa2b5988668bb9620d975a275a00`.
+## Signed x64 panel rollback candidate
+
+The separate `codex/hdr-dx12-panel-rollback-nov21` candidate at `4ca69dcdedd39e0bd5193fbcdf033e8bdce4b06d` validates fresh DXGI chains before attaching them to XAML. If reconfiguring an attached chain fails, it detaches the chain and allows a failed detach to be retried. The locked x64 UWP release and strict AppContainer link passed on Ben-Desktop. The isolated package `MCHorizonUWP.HdrDev.PanelRollback.x64` version `1.0.0.0` passed SignTool verification and its packaged bridge, host, Wasm library and ANGLE DLLs match the receipts. Builder keeps `432a009d8d44aa2b5988668bb9620d975a275a00`. [Signed APPX](../deliverables/hdr/x64/rollback/HorizonUWP-HDR-PanelRollback-x64.appx) · [Package and source receipts](../deliverables/hdr/x64/rollback/package.json) · [Test fixtures](../deliverables/hdr/x64/rollback/qa-fixtures.zip)
+
+The package uses its own AppContainer and the existing `Horizon.Asset.26-3.98ccbead789d397639d5badd0bb805` framework. With the desktop GPU lock held on the local console, issue `Add-AppxPackage -Path $Appx` in Windows PowerShell 5.1 and expand `qa-fixtures.zip` into a fresh directory. Run the following from the product worktree with that directory assigned to `$Fixtures` and a fresh evidence path assigned to `$Evidence`.
+
+```powershell
+& ./tools/hdr/Test-HdrGame.ps1 -Identity MCHorizonUWP.HdrDev.PanelRollback.x64 `
+  -Display Current -Hdr Off -FixtureWorld "$Fixtures/Nov20Smoke" `
+  -WasmFixture "$Fixtures/automatic.hmod" -AutomaticCapture -Output $Evidence
+```
+
+For the physical HDR trial, select the HDR monitor with `-Display`, use `-Hdr On -ExpectHdr` and take the F2 capture with `f2.hmod` and `-AutomaticCapture` omitted. For a monitor move, supply the SDR monitor as `-FallbackDisplay`. Native rejection of HDR configuration, successful SDR recovery and repeated detach retries still need targeted fault injection.
 
 ## Surface Pro X
 

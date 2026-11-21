@@ -1,0 +1,28 @@
+{
+  "utc": "2026-11-21T22:11:31.0339227Z",
+  "host": "BEN-DESKTOP",
+  "identity": "MCHorizonUWP.HdrDev.PanelRollback.x64",
+  "version": "1.0.0.0",
+  "architecture": "x64",
+  "package": "HorizonUWP-HDR-PanelRollback-x64.appx",
+  "package_sha256": "2e2ccb994cd1229850d6cd1a08a7df5055280d6c903ff2db65b7791c211d1152",
+  "package_bytes": 51416717,
+  "resource_framework": "Horizon.Asset.26-3.98ccbead789d397639d5badd0bb805",
+  "wgpu_branch": "codex/hdr-dx12-panel-rollback-nov21",
+  "wgpu_commit": "4ca69dcdedd39e0bd5193fbcdf033e8bdce4b06d",
+  "wgpu_tree": "2706817fda088ffe77d9b16254e6f039c00c8f82",
+  "proven_builder_wgpu": "432a009d8d44aa2b5988668bb9620d975a275a00",
+  "sources": "source-verification.json",
+  "strict_build": "build-receipt.json",
+  "bridge_sha256": "571914303cd106f167e40b2e1bb465a7161eb930dbff0f430228cb19559d8869",
+  "host_sha256": "936369d1676fb1fab76b9a52c900c712164d50e930807e8b6216eb58b5883746",
+  "wasm_std_sha256": "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f",
+  "signature": "SignTool verify /pa passed",
+  "fixtures": "qa-fixtures.zip",
+  "fixtures_sha256": "0c5720447d743740a50f4f6181007b80c00b20529662803f9e4f72f98d0e5e99",
+  "pending_runtime_validation": [
+    "Native HDR configure rejection",
+    "Panel detach retry",
+    "Repeated SDR restoration"
+  ]
+}

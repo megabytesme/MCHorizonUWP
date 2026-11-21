@@ -1,0 +1,6 @@
+File: deliverables/hdr/x64/rollback/HorizonUWP-HDR-PanelRollback-x64.appx
+Index  Algorithm  Timestamp
+========================================
+0      sha256     None
+
+Successfully verified: deliverables/hdr/x64/rollback/HorizonUWP-HDR-PanelRollback-x64.appx

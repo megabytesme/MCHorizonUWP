@@ -25,8 +25,9 @@
       "panel_rollback_candidate": {
         "branch": "codex/hdr-dx12-panel-rollback-nov21",
         "commit": "4ca69dcdedd39e0bd5193fbcdf033e8bdce4b06d",
-        "verified": "x64 UWP DX12 HAL Cargo check and Clippy",
-        "remaining": "Signed link and physical configuration-failure injection"
+        "verified": "x64 UWP DX12 HAL Cargo check and Clippy, locked release, strict AppContainer link, signed APPX and packaged payload verification",
+        "package": "x64/rollback/package.json",
+        "remaining": "Physical gameplay and native configuration-failure injection on the signed candidate"
       },
       "evidence": [
         "swapchain-probe-results.json",

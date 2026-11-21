@@ -1,0 +1,19 @@
+{
+  "wgpu_revision": "4ca69dcdedd39e0bd5193fbcdf033e8bdce4b06d",
+  "wgpu_tree": "2706817fda088ffe77d9b16254e6f039c00c8f82",
+  "verified_git_files": 2561,
+  "changed_files": {
+    "wgpu-hal/src/dx12/instance.rs": {
+      "git_blob": "dc3e773d425962346f6e0c8cb6d809e30c46aecd",
+      "sha256": "672c905b1e2de635fdbc2fb236d6a7c282677acd94c11f296c02e62101ae2b6e"
+    },
+    "wgpu-hal/src/dx12/mod.rs": {
+      "git_blob": "be63af203619ec3c02978c26ba46d88a1ee68f81",
+      "sha256": "60fb37e54d6fbf04152decee7aa2018497d55bd69f288c39baab4fcb2f69bffa"
+    }
+  },
+  "lock_sha256": "b05286c184fd8b99376b67a9b7841c4f963fd863361e5191e1d42da170f07946",
+  "wasmtime_archive_sha256": "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e",
+  "wasm_std_sha256": "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f",
+  "host_exe_sha256": "936369d1676fb1fab76b9a52c900c712164d50e930807e8b6216eb58b5883746"
+}
