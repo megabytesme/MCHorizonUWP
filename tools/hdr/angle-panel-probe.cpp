@@ -9,6 +9,8 @@
 #include <GLES3/gl3.h>
 
 using namespace Windows::Foundation;
+using Windows::Foundation::Metadata::ApiInformation;
+using namespace Windows::Graphics::Display;
 using namespace Windows::Foundation::Collections;
 using namespace Windows::Storage;
 using namespace Windows::UI::Xaml;
@@ -71,10 +73,29 @@ public:
         attempt("rgba8-display-p3", sdr, window, EGL_GL_COLORSPACE_DISPLAY_P3_EXT, false);
         attempt("rgb10-default", rgb10, window, EGL_NONE, false);
         attempt("rgb10-pq", rgb10, window, EGL_GL_COLORSPACE_BT2020_PQ_EXT, false);
-        attempt("fp16-default", fp16, window, EGL_NONE, false);
+        attempt("fp16-default", fp16, window, EGL_NONE, false, EGL_NO_CONTEXT, true);
         attempt("fp16-scrgb-linear", fp16, window, EGL_GL_COLORSPACE_SCRGB_LINEAR_EXT, false);
         attempt("fp16-bt2020-linear", fp16, window, EGL_GL_COLORSPACE_BT2020_LINEAR_EXT, false);
-        std::fprintf(report_, "egl_terminate=%u\n", terminate_(display_));
+        // A configless context is required for changing window formats without losing game resources.
+        const EGLint context_attrs[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
+        const auto shared_context = create_context_(display_, nullptr, EGL_NO_CONTEXT, context_attrs);
+        if (shared_context == EGL_NO_CONTEXT) {
+            std::fprintf(report_, "no_config_context=failed error=0x%x\n", get_error_());
+        } else {
+            std::fprintf(report_, "no_config_context=success\n");
+            attempt("shared-context-rgba8-before", sdr, window, EGL_NONE, false, shared_context);
+            attempt("shared-context-fp16", fp16, window, EGL_NONE, false, shared_context, true);
+            attempt("shared-context-rgba8-after", sdr, window, EGL_NONE, false, shared_context);
+            destroy_context_(display_, shared_context);
+        }
+        // Retain the final, presented swapchain briefly for external window capture.
+        attempt("fp16-capture", fp16, window, EGL_NONE, false, EGL_NO_CONTEXT, true, true);
+    }
+
+    void finish() {
+        if (held_context_ != EGL_NO_CONTEXT) destroy_context_(display_, held_context_);
+        if (held_surface_ != EGL_NO_SURFACE) destroy_surface_(display_, held_surface_);
+        if (display_ != EGL_NO_DISPLAY) terminate_(display_);
     }
 
 private:
@@ -89,12 +110,11 @@ private:
     }
 
     bool load_gl() {
-        gl_string_ = reinterpret_cast<PFNGLGETSTRINGPROC>(GetProcAddress(gles_, "glGetString"));
-        gl_integer_ = reinterpret_cast<PFNGLGETINTEGERVPROC>(GetProcAddress(gles_, "glGetIntegerv"));
-        gl_get_attachment_ = reinterpret_cast<PFNGLGETFRAMEBUFFERATTACHMENTPARAMETERIVPROC>(
-            GetProcAddress(gles_, "glGetFramebufferAttachmentParameteriv"));
-        gl_get_error_ = reinterpret_cast<PFNGLGETERRORPROC>(GetProcAddress(gles_, "glGetError"));
-        return gl_string_ && gl_integer_ && gl_get_attachment_ && gl_get_error_;
+        #define GL_FUNCTION(type, name, function) \
+            gl_##name##_ = reinterpret_cast<type>(GetProcAddress(gles_, #function)); if (!gl_##name##_) return false;
+        #include "angle-panel-probe-gl.inc"
+        #undef GL_FUNCTION
+        return true;
     }
 
     EGLint config_attribute(EGLConfig config, EGLint attribute) const {
@@ -119,7 +139,8 @@ private:
         return nullptr;
     }
 
-    void attempt(const char* label, EGLConfig config, EGLNativeWindowType window, EGLint colorspace, bool log_gl) {
+    void attempt(const char* label, EGLConfig config, EGLNativeWindowType window, EGLint colorspace, bool log_gl,
+        EGLContext shared_context = EGL_NO_CONTEXT, bool probe_blit = false, bool hold = false) {
         std::fprintf(report_, "\n[%s]\n", label);
         if (!config) {
             std::fprintf(report_, "config=unavailable\n");
@@ -136,7 +157,8 @@ private:
             return;
         }
         const EGLint context_attrs[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
-        const auto context = create_context_(display_, config, EGL_NO_CONTEXT, context_attrs);
+        const auto context = shared_context != EGL_NO_CONTEXT ? shared_context :
+            create_context_(display_, config, EGL_NO_CONTEXT, context_attrs);
         if (context == EGL_NO_CONTEXT) {
             std::fprintf(report_, "context=failed error=0x%x\n", get_error_());
         } else if (!make_current_(display_, surface, surface, context)) {
@@ -149,6 +171,7 @@ private:
                 std::fprintf(report_, "egl_surface_colorspace=unavailable error=0x%x\n", get_error_());
             }
             report_framebuffer(log_gl);
+            if (probe_blit) probe_fp16_blit();
             if (swap_buffers_(display_, surface)) {
                 std::fprintf(report_, "swap_buffers=success\n");
             } else {
@@ -156,8 +179,56 @@ private:
             }
             make_current_(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         }
-        if (context != EGL_NO_CONTEXT) destroy_context_(display_, context);
-        destroy_surface_(display_, surface);
+        if (hold) {
+            held_context_ = context;
+            held_surface_ = surface;
+        } else {
+            if (context != EGL_NO_CONTEXT && shared_context == EGL_NO_CONTEXT) destroy_context_(display_, context);
+            destroy_surface_(display_, surface);
+        }
+    }
+
+    bool read_fp16(const char* label, GLint x, GLint y, const GLfloat (&expected)[4]) const {
+        GLfloat rgba[4] = {};
+        gl_read_pixels_(x, y, 1, 1, GL_RGBA, GL_FLOAT, rgba);
+        const GLenum error = gl_get_error_();
+        const bool pass = error == GL_NO_ERROR && rgba[0] == expected[0] && rgba[1] == expected[1] &&
+            rgba[2] == expected[2] && rgba[3] == expected[3];
+        std::fprintf(report_, "%s=%.6f/%.6f/%.6f/%.6f error=0x%x match=%s\n",
+            label, rgba[0], rgba[1], rgba[2], rgba[3], error, pass ? "true" : "false");
+        return pass;
+    }
+
+    void probe_fp16_blit() const {
+        // Match the GLES HAL presentation path: RGBA16F renderbuffer -> default framebuffer.
+        // All values are exactly representable in binary16. Alpha stays opaque for composition.
+        const GLfloat expected[4] = { -0.125f, 0.5f, 4.0f, 1.0f };
+        GLuint framebuffer = 0;
+        GLuint renderbuffer = 0;
+        gl_gen_framebuffers_(1, &framebuffer);
+        gl_gen_renderbuffers_(1, &renderbuffer);
+        gl_bind_framebuffer_(GL_FRAMEBUFFER, framebuffer);
+        gl_bind_renderbuffer_(GL_RENDERBUFFER, renderbuffer);
+        gl_renderbuffer_storage_(GL_RENDERBUFFER, GL_RGBA16F, 320, 240);
+        gl_framebuffer_renderbuffer_(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffer);
+        const GLenum status = gl_check_framebuffer_(GL_FRAMEBUFFER);
+        const GLenum setup_error = gl_get_error_();
+        std::fprintf(report_, "fp16_source_status=0x%x error=0x%x\n", status, setup_error);
+        if (status == GL_FRAMEBUFFER_COMPLETE && setup_error == GL_NO_ERROR) {
+            gl_clear_buffer_(GL_COLOR, 0, expected);
+            const bool source_pass = read_fp16("fp16_source_pixel", 160, 120, expected);
+            gl_bind_framebuffer_(GL_DRAW_FRAMEBUFFER, 0);
+            gl_blit_framebuffer_(0, 240, 320, 0, 0, 0, 320, 240, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            const GLenum blit_error = gl_get_error_();
+            gl_bind_framebuffer_(GL_READ_FRAMEBUFFER, 0);
+            const bool window_pass = read_fp16("fp16_window_pixel", 160, 120, expected);
+            std::fprintf(report_, "fp16_blit_error=0x%x fp16_blit_pass=%s\n",
+                blit_error, source_pass && window_pass && blit_error == GL_NO_ERROR ? "true" : "false");
+        }
+        gl_bind_framebuffer_(GL_FRAMEBUFFER, 0);
+        gl_bind_renderbuffer_(GL_RENDERBUFFER, 0);
+        gl_delete_renderbuffers_(1, &renderbuffer);
+        gl_delete_framebuffers_(1, &framebuffer);
     }
 
     void report_framebuffer(bool log_gl) const {
@@ -183,17 +254,20 @@ private:
     HMODULE egl_ = nullptr;
     HMODULE gles_ = nullptr;
     EGLDisplay display_ = EGL_NO_DISPLAY;
+    EGLContext held_context_ = EGL_NO_CONTEXT;
+    EGLSurface held_surface_ = EGL_NO_SURFACE;
     #define EGL_FUNCTION(type, name, function) type name##_ = nullptr;
     #include "angle-panel-probe-egl.inc"
     #undef EGL_FUNCTION
-    PFNGLGETSTRINGPROC gl_string_ = nullptr;
-    PFNGLGETINTEGERVPROC gl_integer_ = nullptr;
-    PFNGLGETFRAMEBUFFERATTACHMENTPARAMETERIVPROC gl_get_attachment_ = nullptr;
-    PFNGLGETERRORPROC gl_get_error_ = nullptr;
+    #define GL_FUNCTION(type, name, function) type gl_##name##_ = nullptr;
+    #include "angle-panel-probe-gl.inc"
+    #undef GL_FUNCTION
 };
 
 ref class App sealed : Application {
     bool ran_ = false;
+    DispatcherTimer^ capture_timer_ = nullptr;
+    EglProbe* probe_ = nullptr;
 
 protected:
     void OnLaunched(Windows::ApplicationModel::Activation::LaunchActivatedEventArgs^) override {
@@ -212,10 +286,30 @@ private:
         FILE* report = nullptr;
         if (_wfopen_s(&report, path.c_str(), L"wb") == 0) {
             std::fprintf(report, "ANGLE XAML SwapChainPanel probe\n");
-            EglProbe probe(report);
-            probe.run(safe_cast<SwapChainPanel^>(sender));
+            if (ApiInformation::IsMethodPresent(L"Windows.Graphics.Display.DisplayInformation", L"GetAdvancedColorInfo")) {
+                const auto color = DisplayInformation::GetForCurrentView()->GetAdvancedColorInfo();
+                std::fprintf(report, "advanced_color_kind=%d sdr_white_nits=%f peak_nits=%f\n",
+                    static_cast<int>(color->CurrentAdvancedColorKind), color->SdrWhiteLevelInNits, color->MaxLuminanceInNits);
+            }
+            probe_ = new EglProbe(report);
+            probe_->run(safe_cast<SwapChainPanel^>(sender));
             std::fprintf(report, "probe_complete=true\n");
             std::fclose(report);
+        }
+        capture_timer_ = ref new DispatcherTimer();
+        TimeSpan interval;
+        interval.Duration = 12LL * 10000000;
+        capture_timer_->Interval = interval;
+        capture_timer_->Tick += ref new EventHandler<Platform::Object^>(this, &App::on_capture_done);
+        capture_timer_->Start();
+    }
+
+    void on_capture_done(Platform::Object^, Platform::Object^) {
+        capture_timer_->Stop();
+        if (probe_) {
+            probe_->finish();
+            delete probe_;
+            probe_ = nullptr;
         }
         Application::Current->Exit();
     }

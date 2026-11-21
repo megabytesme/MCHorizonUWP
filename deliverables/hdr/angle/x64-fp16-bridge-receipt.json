@@ -1,0 +1,50 @@
+{
+  "host": "BEN-DESKTOP",
+  "arch": "x64",
+  "source_base": "cee29bb65",
+  "angle_revision": "d9fc4a372074b1079c193c422fc4a180e79b6636",
+  "angle_runtime_digest_file": "x64-runtime.sha256",
+  "toolchain": "MSVC 14.44.35207 / Windows SDK 10.0.26100.0",
+  "switch_package": {
+    "name": "MCHorizonUWP.Hdr.AngleFp16SwitchProbe",
+    "sha256": "a6114fbf2f7a0f4a572641f61bb863d7548583fc6425a5a0120e23b3b5a89ffb",
+    "signature_verified": true,
+    "log": "x64-fp16-configless-switch.txt",
+    "source_rgba": [
+      -0.125,
+      0.5,
+      4.0,
+      1.0
+    ],
+    "window_rgba": [
+      -0.125,
+      0.5,
+      4.0,
+      1.0
+    ],
+    "same_context_switch": [
+      "rgba8",
+      "fp16",
+      "rgba8"
+    ],
+    "all_three_presents_passed": true
+  },
+  "capture_package": {
+    "name": "MCHorizonUWP.Hdr.AngleFp16CaptureProbe",
+    "sha256": "3ce0604f690028db342720d0eaf137ef737f60d7cf04217a51a063e157787aba",
+    "signature_verified": true,
+    "log": "x64-fp16-capture-panel.txt",
+    "active_advanced_color_kind": 0,
+    "active_sdr_white_nits": 80,
+    "wgc_first_diagnostic": "x64-fp16-wgc-first-diagnostic.txt",
+    "wgc_result": "initial frame pool rejected 0x80070057",
+    "physical_hdr_verified": false
+  },
+  "prototype_hal": {
+    "commit": "3cd220017fad76d11e6939984f42917cee9fa5a7",
+    "opt_in": "WGPU_UWP_ANGLE_HDR=1",
+    "cargo_check": "cargo +1.99.1 check --locked --offline -p wgpu-hal --no-default-features --features gles -Z build-std=std,panic_abort --target x86_64-uwp-windows-msvc",
+    "cargo_check_passed": true,
+    "integrated_game_tested": false
+  }
+}

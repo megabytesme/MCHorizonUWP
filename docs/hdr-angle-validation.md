@@ -37,3 +37,44 @@ Build the separate probe with `tools/hdr/build-angle-panel-probe.ps1`. Give it t
 For native evidence, capture the `Microsoft-Windows-DXGI` ETW provider with an elevated local `logman` session, keyword mask `0x3` and level `5`. Filter to the activation PID. Read the `Format`, size, backbuffer count and swap effect from event `10`, and the `Result` of `Present` from event `43`. Task `25` is `SetColorSpace1` on the recorded desktop build. [Probe build script](../tools/hdr/build-angle-panel-probe.ps1) · [Probe source](../tools/hdr/angle-panel-probe.cpp)
 
 Windows 10 Mobile uses the older WinRT window path and its ARM32 ANGLE build disables the newer ANGLE compositor-native-window option. The desktop high-precision results do not establish support on that device. [ARM build recipe](../uwp/angle-arm32/README.md) · [Lumia evidence](hdr-lumia-capabilities.md)
+
+## November 21 FP16 bridge candidate
+
+A new signed x64 probe used the same three ANGLE runtime DLL hashes. It drew the exactly representable
+linear values `(-0.125, 0.5, 4.0, 1.0)` into an RGBA16F renderbuffer and used the Y-flipped
+`GL_NEAREST` blit used by the GLES HAL. `GL_RGBA/GL_FLOAT` readback returned the four exact channels
+from both the offscreen renderbuffer and the default FP16 window framebuffer. Both GL readbacks,
+the blit, and `eglSwapBuffers` succeeded. This proves the GLES copy preserves negative gamut
+components and values above reference white up through the EGL window framebuffer. The result
+does not measure the Windows compositor or monitor output.
+
+The same package also used `EGL_KHR_no_config_context` to create one GLES context, bind an 8-bit
+window, destroy it, bind a default FP16 window, verify the exact values again, then destroy the
+FP16 window and restore the 8-bit window. Every swap succeeded. This establishes that the product
+can retain its EGL rendering context across the surface format transition. Explicit scRGB and
+BT.2020 requests still returned `EGL_BAD_ATTRIBUTE`. [Configless switch receipt](../deliverables/hdr/angle/x64-fp16-configless-switch.txt)
+
+The isolated candidate fork `codex/hdr-angle-hal-nov21` at
+`3cd220017fad76d11e6939984f42917cee9fa5a7` implements the experiment behind
+`WGPU_UWP_ANGLE_HDR=1`. It requires the explicit ANGLE D3D11 EGL platform, the two EGL
+extensions, a matching non-MSAA FP16 GLES3 window config, successful configless context creation,
+and the existing GL half-float color-target capability. It selects the FP16 EGL config only
+when the application requests `Rgba16Float` with `ExtendedSrgbLinear` and keeps the existing
+EGL config for SDR. An x64 UWP GLES-only `cargo check` passed. The shipped Horizon GL backend
+continues to select SDR. A signed game integration still needs to drive the active-view HDR
+selection and verify world/HUD composition, in-process fallback, and signed captures on an
+active HDR output. Missing EGL support keeps the default SDR path available.
+
+A second signed AppX extended the hold time of the final FP16 surface for Windows Graphics
+Capture, with per-view Windows Advanced Color telemetry. The RDP view reported SDR, with 80 nits
+reference white. The first scoped WGC diagnostic found the CoreWindow during startup, then
+rejected the capture frame pool with `E_INVALIDARG`. The helper now waits for the desktop frame
+and checks the capture dimensions before creating a FP16 pool. WGC and monitor proof require
+a usable target window and an active HDR view. [Panel receipt](../deliverables/hdr/angle/x64-fp16-capture-panel.txt) · [WGC diagnostic](../deliverables/hdr/angle/x64-fp16-wgc-first-diagnostic.txt)
+
+Build the new package with the command above and pass `-PackageName MCHorizonUWP.Hdr.AngleFp16CaptureProbe`
+to retain the original probe installation. Build `tools/hdr/angle-window-capture.cpp` with MSVC
+x64, C++20, the Windows SDK `cppwinrt` include path, and `d3d11.lib windowsapp.lib ole32.lib user32.lib`.
+After checking that an HDR output is active, run the helper with the new package's application user
+model ID. It launches the probe, targets only its window, and checks the captured FP16 samples for
+the expected pattern. The probe logs its active view and exits after twelve seconds.

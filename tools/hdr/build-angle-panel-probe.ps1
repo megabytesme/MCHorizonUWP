@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][string]$RuntimeDirectory,
     [Parameter(Mandatory)][string]$OutputDirectory,
     [Parameter(Mandatory)][string]$Publisher,
+    [ValidatePattern('^[A-Za-z0-9.-]{3,50}$')][string]$PackageName = 'MCHorizonUWP.Hdr.AngleProbe',
     [string]$VisualCpp = 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207',
     [string]$WindowsKits = 'C:\Program Files (x86)\Windows Kits\10',
     [string]$SdkVersion = '10.0.26100.0'
@@ -54,7 +55,7 @@ try {
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap">
-  <Identity Name="MCHorizonUWP.Hdr.AngleProbe" Publisher="$publisherXml" Version="1.0.0.0" ProcessorArchitecture="x64"/>
+  <Identity Name="$PackageName" Publisher="$publisherXml" Version="1.0.0.0" ProcessorArchitecture="x64"/>
   <Properties><DisplayName>Horizon ANGLE panel probe</DisplayName><PublisherDisplayName>Horizon test build</PublisherDisplayName><Logo>Assets\StoreLogo.png</Logo></Properties>
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.16299.0" MaxVersionTested="$SdkVersion"/>
