@@ -14,6 +14,8 @@ RUNTIME = "docs/nightly-runtime-completion-2026-11-21.md"
 LUMIA = "docs/nightly-lumia-drs-2026-11-21.md"
 DRS = "docs/nightly-drs-2026-11-20.md"
 SHADER = "deliverables/feature-audit/shader-evidence/"
+OFFICIAL_HDR = "deliverables/feature-audit/official-windows-hdr-receipt.json"
+OFFICIAL_HDR_AUTO = "Stock x64 Windows DX12 on RTX 3090 Ti presented HDR10 PQ in Auto with system HDR active on PG32UCDM."
 
 PROFILES = {
     "x64-d3d12": "Ben-Desktop RTX 3090 Ti, signed 0.1.17 D3D12",
@@ -198,6 +200,9 @@ def graphics_evidence(row, uwp):
                    test_method="Record OS HDR state, accepted format/color space, measured nits and visual change under Auto and manual On.",
                    owner="HDR")
         if key == "hdr":
+            row["official_baseline_status"] = "P"
+            row["official_windows_evidence"] = [OFFICIAL_HDR]
+            row["official_windows_behavior"] = OFFICIAL_HDR_AUTO
             row["mode_findings"] = {"Off": "SDR path available", "Auto": "WinRT D3D12 display-state query has no data",
                                     "On": "D3D12 format advertised; measured output unverified"}
         row["sources"].extend(refs)

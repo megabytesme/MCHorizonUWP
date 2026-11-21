@@ -49,6 +49,39 @@ SETTING_ROUTES = {
 }
 ENV_READ = re.compile(r'\b(?:std::)?env::(?:var|var_os)\(\s*"([A-Z][A-Z0-9_]+)"\s*\)')
 
+ENVIRONMENT = {
+    "HORIZON_DEVICE_OPEN_TIMEOUT": ("Changes the deadline for instance, adapter and device selection.", "positive whole seconds", "30 seconds"),
+    "HORIZON_FLAT_DRAWS": ("Forces the flat terrain draw layout or disables it where the path permits.", "0 disables / 1 requests; requires route capability", "backend policy"),
+    "HORIZON_FRAMEGEN_DEBUG": ("Displays generated-frame or motion diagnostics rather than ordinary interpolation output.", "generated / motion", "unset"),
+    "HORIZON_GPU_CULL": ("Changes GPU occlusion policy separately from the counted-draw UI option.", "0 disables / all includes nearby sections", "adapter policy"),
+    "HORIZON_GRAPHICS_API": ("Overrides the saved desktop graphics API for this launch.", "auto / vulkan / dx12 / opengl", "saved API selection"),
+    "HORIZON_HDR_DEBUG": ("Tints expanded HDR pixels magenta and greys the remainder.", "1 enables", "off"),
+    "HORIZON_HDR_DISPLAY": ("Feeds a synthetic HDR state to the offscreen display probe.", "path to a file containing on or off", "no display report"),
+    "HORIZON_HDR_OUTPUT": ("Restricts the advertised HDR output to one encoding. Offscreen uses the named encoding.", "pq / scrgb", "onscreen auto; offscreen no HDR offer"),
+    "HORIZON_MEASURE_SECTION_MARKS": ("Opt-in test for scene-section marker measurements.", "1 runs the measurement", "off"),
+    "HORIZON_MESH_SHADER": ("Requests experimental terrain mesh shading on capable hardware.", "1 requests", "regular path"),
+    "HORIZON_NO_ENTITY_SKIN": ("Disables the GPU entity skinning path.", "any present value", "device policy"),
+    "HORIZON_PACKED_QUADS": ("Controls packed quad processing where the renderer supports it.", "0 disables", "enabled where supported"),
+    "HORIZON_RAY_TRACING": ("Overrides the native pack's ray query scene policy.", "1 forces on; another value forces off", "pack policy"),
+    "HORIZON_RENDER_CAPTURE": ("Requests renderer capture-copy support.", "presence enables the request", "unset"),
+    "HORIZON_RESOURCES": ("Selects prepared resource data for the cited shader/line tests.", "prepared resource directory", "test fallback path"),
+    "HORIZON_RT_CHUNKS": ("Overrides the terrain reach of the ray query scene.", "integer chunk reach", "8 chunks"),
+    "HORIZON_SHADER_PACK_DUMP": ("Requests readback of a named classic pack texture.", "pack texture name", "off"),
+    "HORIZON_SHADER_PACK_SKIP": ("Skips listed stages in a classic shader pack.", "comma-separated program names", "empty"),
+    "HORIZON_SHADER_PACK_WITHOUT": ("Masks named shader-pack capabilities to exercise fallbacks.", "comma-separated capability names", "empty"),
+    "HORIZON_SPRITE_SPLIT": ("Requests smaller sprite texture arrays to compare texture splitting.", "1 through SPRITE_SPLIT", "automatic"),
+    "HORIZON_SUBMIT_THREAD": ("Switches the optional render submission worker.", "0 disables / 1 enables", "disabled on Windows"),
+    "HORIZON_TERRAIN_LOOKS": ("Requests the terrain looks shader path on a compatible adapter.", "1 requests", "off"),
+    "HORIZON_VISBUFFER": ("Requests a visibility buffer when storage binding limits allow.", "1 requests", "off"),
+    "WGPU_ALLOW_UNDERLYING_NONCOMPLIANT_ADAPTER": ("Controls whether wgpu exposes underlying noncompliant adapters. The cited source uses it in a test guard.", "wgpu backend setting", "unset"),
+    "WGPU_BACKEND": ("Supplies explicit wgpu backend selection and affects the client's adapter search.", "backend names accepted by the pinned wgpu instance", "application backend policy"),
+    "WGPU_DX12_COMPILER": ("Signals an explicit wgpu DX12 compiler choice and bypasses the default choice logic.", "compiler name from the pinned DX12 option", "automatic"),
+    "WGPU_VALIDATION_INDIRECT_CALL": ("Changes wgpu indirect-call checking. The cited source uses it in a test guard.", "wgpu backend setting", "unset"),
+}
+TEST_ENVIRONMENT = {
+    "HORIZON_MEASURE_SECTION_MARKS", "HORIZON_RESOURCES",
+    "WGPU_ALLOW_UNDERLYING_NONCOMPLIANT_ADAPTER", "WGPU_VALIDATION_INDIRECT_CALL",
+}
 
 def inventory(official, uwp):
     files = [RENDER / "graphics.rs", RENDER / "gfx.rs"]
@@ -75,15 +108,16 @@ def inventory(official, uwp):
             coverage.setdefault(f"official:{path.as_posix()}", []).append(key)
     rows = []
     for key, refs in sorted(index.items()):
-        description, values = {
-            "HORIZON_GRAPHICS_API": ("Override saved desktop graphics API at launch.", "auto / vulkan / dx12 / opengl"),
-            "HORIZON_RAY_TRACING": ("Override pack-controlled ray-query scene policy.", "1 forces on; another value forces off; absent defers to the pack"),
-            "HORIZON_MESH_SHADER": ("Requests experimental terrain mesh shading on suitable devices.", "1 enables; absent uses regular path"),
-        }.get(key, ("Optional renderer override read at runtime; see cited engine branch.", None))
-        row = setting_row("renderer.env", key, "process environment", "unset", values, refs,
+        description, values, initial = ENVIRONMENT.get(
+            key, ("Optional override observed in the cited source.", None, "unset"),
+        )
+        runner_only = key in TEST_ENVIRONMENT
+        storage = "test environment" if runner_only else "process environment"
+        row = setting_row("renderer.env", key, storage, initial, values, refs,
                           description, persisted="Launch environment only.")
-        row.update(scope="developer", uwp_ui="No normal packaged UI for the environment override.",
-                   uwp_runtime_action="Shared renderer environment branch where present; exact AppContainer invocation needs proof.")
+        row.update(scope="developer", uwp_ui="This environment input has no normal packaged UI.",
+                   uwp_runtime_action=("Diagnostic harness input in the cited source." if runner_only else
+                                       "Environment-sensitive source branch. Verify the exact AppContainer route."))
         if key == "HORIZON_GRAPHICS_API":
             row["uwp_runtime_action"] = "UWP backend is selected by the host; the desktop override is not a normal launch route."
         rows.append(row)

@@ -86,6 +86,11 @@ def annotated_settings(official, uwp):
         effect, _ = declaration(source, field)
         control = EXTRA_UI.get(key, key[0].upper() + key[1:])
         label = EXTRA_LABELS.get(key) or english.get(captions.get(control))
+        label = {
+            "emoteKey": "key.emote",
+            "musicOff": "Track title from the current music list",
+            "threeDSkinLayers": english["horizon.options.three_d_skin_layers"],
+        }.get(key, label)
         desc = english.get(descriptions.get(control))
         page = EXTRA_PAGES.get(key, "Horizon Extras" if label else None)
         sources = [anchor("official", config, source, pos)]
@@ -186,7 +191,7 @@ def pvp_settings(official, uwp):
             values = "top-left / top-right / bottom-left / bottom-right"
         elif parser := re.search(r"(Colour|Shape|ViewTime|ViewWeather)::parse", arm):
             body, _ = section(source, f"impl {parser[1]} {{", "\n}")
-            names = re.findall(r'Self::\w+ => "([^"]+)"', body)
+            names = re.findall(rf'{parser[1]}::\w+ => "([^"]+)"', section(body, "pub fn name(", "\n    }")[0])
             values = " / ".join((["off"] if "=> None" in arm else []) + names)
         if key in PVP_OPTIONS:
             fallback, values = PVP_OPTIONS[key]
@@ -196,6 +201,7 @@ def pvp_settings(official, uwp):
             page = "Controls / Key Binds"
         if key == "hudPlace":
             page = "PvP & HUD / HUD editor"
+            effect = "Moves and scales each enabled HUD widget while preserving its content."
         row = setting_row("extras.pvp", key, "horizon-extras.txt", initial, values, sources,
                           effect, label, page)
         row["uwp_runtime_action"] = "Shared PvP route; observe effect in the signed game."

@@ -1,0 +1,141 @@
+{
+  "evidence": "Official Windows x64 release, live world with first-person hand, crosshair and hotbar",
+  "observation": "Engine-reported HDR10 output and first presented frame; Win32 monitor identity checked before and after capture. PNG light values are reconstructed from encoded pixels.",
+  "utc": "2026-11-21T07:23:12.5363235Z",
+  "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "release_asset": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538551",
+  "release_zip_sha256": "5514bc94f1d2c9b370f4444726236ad9e303d2d34e1323593393e7ebe07abac3",
+  "client_sha256": "2b685d64b5c253eef2a03f7cc5ec7c141984fc543d18cd009079444ab3ef2e21",
+  "host": "BEN-DESKTOP",
+  "windows_build": "26300.9818",
+  "monitor": {
+    "win32_device": "\\\\.\\DISPLAY2",
+    "model": "PG32UCDM",
+    "system_hdr_active": true,
+    "signal": "PQ / BT.2020",
+    "desktop_probe": "../swapchain-probe-results.json"
+  },
+  "renderer": {
+    "arena_bytes": 31457280,
+    "backend": "Dx12",
+    "culled_sections": [
+      [
+        32,
+        35
+      ],
+      0.39382967352867126
+    ],
+    "device_type": "discrete",
+    "drawn_sections": 61,
+    "driver": "32.0.16.2101",
+    "dynamic_resolution": false,
+    "gpu": "NVIDIA GeForce RTX 3090 Ti",
+    "gpu_allocated_bytes": 298647552,
+    "gpu_culling": false,
+    "gpu_culling_auto": "watching",
+    "gpu_culling_mode": "off",
+    "gpu_culling_offer": "Dx12",
+    "gpu_fading": null,
+    "gpu_frame": false,
+    "gpu_occluding": false,
+    "gpu_reserved_bytes": 364904448,
+    "msaa_requested": false,
+    "msaa_samples": 1,
+    "packed_layout": [
+      true,
+      true
+    ],
+    "present_mode": "Fifo",
+    "resident_sections": 601,
+    "resolution_scale": 100,
+    "section_draw_calls": 3,
+    "section_draws": 133,
+    "section_vertex_bytes": 10529856,
+    "size": [
+      1800,
+      1275
+    ],
+    "stats_lag": 0,
+    "uploaded_bytes": 13405632,
+    "vendor": "nvidia",
+    "vertex_bytes_split": [
+      10529856,
+      0
+    ]
+  },
+  "display": {
+    "height": 2160,
+    "refresh_hz": 60,
+    "scale": 1.5,
+    "width": 3240
+  },
+  "scene": {
+    "fixture_sha256": "e48ab84d3b8242998ddcce8c9a9b7511ca01ac73e318af9e2fb47857257b95c2",
+    "fixture": "Nov20Smoke",
+    "in_world": true,
+    "server_loaded": true,
+    "frames": 323,
+    "screen": "playing",
+    "chunks": 117,
+    "dimension": "minecraft:overworld",
+    "day_time": 6000,
+    "yaw": 0.0,
+    "pitch": 0.0
+  },
+  "request": {
+    "hdr": "auto",
+    "look": "horizon",
+    "paper_white_nits": 160,
+    "peak_nits": 450,
+    "ui_nits": 120,
+    "black_nits": 0,
+    "resolution_scale_percent": 100,
+    "msaa": false,
+    "taa": false
+  },
+  "log_evidence": [
+    "[07:22:13] [Render thread/INFO]: Horizon renderer: HDR output HDR10 (PQ)",
+    "[07:22:28] [Render thread/INFO]: Horizon renderer: HDR on: HDR10 (PQ) (Rgb10a2Unorm), 160/450 nits",
+    "[07:23:06] [Render thread/INFO]: Horizon renderer: HDR on: HDR10 (PQ) (Rgb10a2Unorm), 160/450 nits",
+    "[07:23:06] [Render thread/INFO]: Horizon renderer: HDR output presented its first frame"
+  ],
+  "sdr_png": {
+    "file": "world.png",
+    "sha256": "80feb73d44cb9d2aa92c9c6b577da5883a5d6fd3dc3faa3073c2df1f4674333d",
+    "kind": "sdr",
+    "size": [
+      1800,
+      1275
+    ],
+    "bits_per_channel": 8,
+    "png_color_type": 6
+  },
+  "hdr_png": {
+    "file": "world-hdr.png",
+    "sha256": "7fb93438368e1a9b726a7672f16b7ca589254d1b550c5279fc8e444f7c0441b2",
+    "kind": "hdr",
+    "size": [
+      1800,
+      1275
+    ],
+    "bits_per_channel": 16,
+    "png_color_type": 2,
+    "cICP": [
+      9,
+      16,
+      0,
+      1
+    ],
+    "max_cll_nits": 369.8744,
+    "max_fall_nits": 58.7159,
+    "icc_sha256": "8114d1a9e2f58514a86d350b198158bd9d87db4dcc033366c76ee16028dacce2",
+    "mastering_display": null,
+    "decoded_light": {
+      "max_rgb_nits": 369.8743543572082,
+      "average_max_rgb_nits": 58.71591516084788,
+      "paper_white_nits": 160.0,
+      "pixels_above_paper_white": 187,
+      "total_pixels": 2295000
+    }
+  }
+}

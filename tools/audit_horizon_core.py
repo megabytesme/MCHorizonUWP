@@ -117,10 +117,6 @@ def default_fields(source, start, end):
     }
 
 
-def title(identifier):
-    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", identifier).capitalize()
-
-
 def locations(source, kind):
     body, offset = section(source, "pub fn rows()", "fn ")
     pattern = rf"Page::(\w+)\s*,|[veh]\(\s*(?:crate::extras::)?{kind}::(\w+)\s*,"

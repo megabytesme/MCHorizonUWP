@@ -4,7 +4,7 @@ The comparison uses official Horizon Windows `0a875da91dbb0fdcb7ba8c42c11341aa22
 
 ## Inventory and how to read it
 
-The extract records 1,062 settings and actions, 108 feature groups and 16 UWP profiles. Coverage indexes 174 file entries across official source, patched source and product evidence. The renderer matrix compares 42 behaviors, and the shader matrix records 46 cases.
+The extract records 1,062 settings and actions, 108 feature groups and 16 UWP profiles. Coverage indexes 175 file entries across official source, patched source and product evidence. The renderer matrix compares 42 behaviors, and the shader matrix records 46 cases.
 
 | Artifact | Contents |
 | --- | --- |
@@ -41,7 +41,7 @@ An official Windows cell is independent of its UWP cells. A `V` for one point on
 | FXAA, TAA, TAA upscaling and sharpness | The D3D11 compatibility setter applies scale and bypasses the modern post parameters. The modern source path has format, history and pack constraints. | Run edge/motion A/B with selected AA and controlled scene targets. [Renderer matrix](../deliverables/feature-audit/renderer-features.csv) |
 | 4× MSAA | The installed renderer rejects the route on D3D11 and GLES. DX12 checks its terrain format and resolve capabilities. | Capture actual four-sample allocation and resolve on the eligible DX12 route. [Renderer matrix](../deliverables/feature-audit/renderer-features.csv) |
 | FSR 3.1 frame generation | The compatibility renderer forces it off. ANGLE lacks the surface copy destination required to present an interpolated frame. DX12 retains the compute/interpolation path and its frame gates. | On DX12 measure generated-frame cadence and visual output with compatible HUD, then repeat interacting settings and resize. [Renderer matrix](../deliverables/feature-audit/renderer-features.csv) |
-| HDR Auto | DX12 exposes PQ/scRGB capability in the pinned surface API. UWP's SwapChainPanel initializes without the display-state provider that Auto consumes. D3D11 and GLES have independent frame/surface restrictions. | Record OS HDR state, effective game request and selected DXGI format and color space. [Renderer comparison](horizon-uwp-renderer-comparison.md) |
+| HDR Auto | Stock Windows DX12 presented HDR10 PQ in Auto with system HDR active. UWP DX12 exposes PQ/scRGB capability, and its SwapChainPanel initializes without the display-state provider that Auto consumes. D3D11 and GLES have independent frame/surface restrictions. | Record OS HDR state, effective game request and selected DXGI format and color space. [Official Auto receipt](../deliverables/feature-audit/official-windows-hdr-receipt.json) · [Renderer comparison](horizon-uwp-renderer-comparison.md) |
 | HDR On, calibration and look | Manual On needs physical confirmation on the actual UWP compositor path. Black Level, Paper White, Peak Brightness, UI Brightness, Color Boost and Look are separately listed. Pack-controlled lighting, the HUD layer and the compositor can disable individual controls. | Verify actual nits and black, white and peak test patterns, transitions and fallback. [Renderer comparison](horizon-uwp-renderer-comparison.md) |
 | GPU draw/culling features | Counted indirect terrain, translucent batching, occlusion, mesh shaders and ray queries have separate predicates. The flat-page DX12 GPU-culling path has a base-vertex limitation. | Acquire engine dispatch and visible output evidence for each admitted path. [Renderer matrix](../deliverables/feature-audit/renderer-features.csv) |
 | Native and classic shader packs | Shared pack settings declare picker and storage. D3D11 compatible frame execution disables both pack paths. Signed x64 DX12 captured two native packs and the classic depth composite in SDR. Signed x64 ANGLE rejected Golden Hour's sky layout and failed classic entity vertex-storage validation. Individual stages, options and cross-feature interactions still need physical tests. | [Stage and fixture results](horizon-uwp-shader-compatibility.md) |
@@ -53,7 +53,7 @@ An official Windows cell is independent of its UWP cells. A `V` for one point on
 | Saved world and restart | Signed desktop builds entered a saved world. The dedicated x64 restart receipt captured save and quit, a new launcher process, the same world and both GUI markers. | Creation modes and world rules, damaged file handling, suspend/resume, and broader device/architecture restart loops. |
 | Multiplayer and auth | Signed x64/x86 D3D11 joined a pinned offline dedicated server, moved and later rejoined at the stored location. One x64 test matched client/server content registries. | Account refresh and online-mode multiplayer, LAN discovery, Realms and ordinary remote-host networking. The bridge omits the Play with Friends optional tunnel. |
 | Native, Wasm and content mods | Signed x64 independent toggles and re-enable each affected their own GUI marker. Modern UWP uses signed related sets for native mods. Lumia embeds trusted source at build time. The Wasm fixture used Pulley on AppContainer. | Full API and mod combinations, install/update and damaged package handling require separate evidence. |
-| Audio and language | Signed XAudio2 produced audible/non-silent saved-world output on recorded routes. UWP uses default output; the desktop CPAL endpoint selector is unavailable in the packaged path. | Exercise source/category volume, music scheduling, positional mix, language, subtitles and device switching in individual trials. |
+| Audio and language | Signed XAudio2 produced audible/non-silent saved-world output on recorded routes. UWP uses default output. The packaged path omits desktop CPAL endpoint selection. | Exercise source/category volume, music scheduling, positional mix, language, subtitles and device switching in individual trials. |
 | Accessibility and input | Shared accessibility settings persist. The UWP speech backend is inactive. Signed desktop and Surface played with keyboard movement, and Lumia physical motion controlled both yaw and pitch in a documented session. | Narration, assistive navigation, IME and clipboard, touch/controller coexistence, rumble and both gyro orientations. |
 | Capture and storage | Signed 0.1.17 produced game-generated PNGs. The Lumia mod-triggered screenshot succeeded at 2561×1439 after an error-5 path fix. | Verify actual F2 and quality settings, collision behavior on target devices and ownership of exposed platform folders. |
 | Window mode and lifecycle | UWP's Winit fullscreen setter and exclusive-mode enumeration do not implement the desktop mode controls. XAML manages the hosted presentation independently. | Device-specific shell fullscreen, application suspension and restoration, and input focus under resize and monitor change. |
@@ -66,12 +66,12 @@ The signed x64 shader run captured the positive D3D12 cases and two scoped ANGLE
 
 ## Reproduce the extract
 
-Use Python 3.11 or later. Check out the official SHA in a clean directory. Apply the exact product patch to a separate detached checkout at that SHA. Run these commands in the audit worktree with the two source paths supplied.
+Use Python 3.11 or later. Check out the official SHA in a clean directory. Apply the exact product patch to a separate detached checkout at that SHA. Run these commands in the audit worktree with both source paths supplied. Set `$MinecraftEnUs` to `assets/minecraft/lang/en_us.json` from the prepared 26.3 resources. The checked inventory records the language file SHA-256 and retains each resolved translation key.
 
 ```powershell
 git -C $UwpPatchedSource apply --check "$PWD/patches/nightly-2026-11-20/horizon-uwp-0.1.15.patch"
 git -C $UwpPatchedSource apply "$PWD/patches/nightly-2026-11-20/horizon-uwp-0.1.15.patch"
-python -B tools/audit_horizon_settings.py --official $HorizonOfficial --uwp-source $UwpPatchedSource --check
+python -B tools/audit_horizon_settings.py --official $HorizonOfficial --uwp-source $UwpPatchedSource --minecraft-language $MinecraftEnUs --check
 $env:HORIZON_AUDIT_OFFICIAL = $HorizonOfficial
 $env:HORIZON_AUDIT_UWP_SOURCE = $UwpPatchedSource
 python -B -m unittest discover -s tools -p test_audit_horizon_settings.py -v

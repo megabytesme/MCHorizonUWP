@@ -11,17 +11,26 @@ from audit_horizon_evidence import DX11, apply_cells
 
 SHADER_LABELS = {
     "Pack": "Pack filename or manifest display name",
-    "Folder": "Open Pack Folder",
+    "Folder": "pack.openFolder",
     "Option": "Selected pack's option label",
     "Link": "Selected pack's page label",
     "Profile": "Profile",
-    "Reset": "Reset Options",
+    "Reset": "Reset all options",
     "ShadowCache": "Shadow Cache",
 }
+SHADER_VALUES = {
+    "Pack": "Discovered pack or Off",
+    "Folder": "Action opens shaderpacks/",
+    "Option": "Data-defined enum, toggle or slider from the selected pack",
+    "Link": "Action opens a data-defined pack settings page",
+    "Profile": "Profiles declared by the selected classic pack",
+    "Reset": "Action restores the pack's defaults",
+    "ShadowCache": "true / false",
+}
 HDR_STEPS = {
-    "Black": ("Black Level", "hdrBlackLevel"),
-    "Peak": ("Peak Brightness", "hdrPeak"),
-    "PaperWhite": ("Paper White", "hdrPaperWhite"),
+    "Black": ("Black Level", "hdrBlackLevel", "0–1 nits in 0.01 steps", "Sets the dim logo on a black field."),
+    "Peak": ("Peak Brightness", "hdrPeak", "200–2000 by 50, then 2000–10,000 by 500 nits", "Sets the logo in the clipped bright patch."),
+    "PaperWhite": ("Paper White", "hdrPaperWhite", "10–480 nits in 10-nit steps", "Changes the white card for visual matching."),
 }
 
 
@@ -40,18 +49,20 @@ def dynamic_controls(official, port):
             name = found["name"]
             declaration = (found["doc"] or "").replace("    ///", "").replace("\n", " ").strip()
             label = labels[name]
-            writes = None
+            writes, values = None, SHADER_VALUES.get(name) if relative == shader_ui else None
             if isinstance(label, tuple):
-                label, writes = label
+                label, writes, values, declaration = label
             refs = [anchor("official", relative, source, offset + found.start())]
             if found.group() in patched:
                 refs.append(anchor("uwp", relative, patched, patched.index(found.group())))
-            row = setting_row(namespace, name, None, None, None, refs, declaration or None,
+            row = setting_row(namespace, name, None, None, values, refs, declaration or None,
                               label, page, "No separate key." if writes is None else f"On Save writes {writes}.")
             row["scope"] = "action"
             if writes:
                 row["aliases"] = [writes]
+                row["uwp_runtime_action"] = "The shared calibration screen writes the selected HDR parameter on Save."
             if relative == shader_ui:
+                row["uwp_runtime_action"] = "Shared shader pack picker and settings dispatch."
                 apply_cells(row, DX11, "H", "The compatibility route can display shared pack UI; it cannot execute pack stages.")
             rows.append(row)
             covered.append(name)

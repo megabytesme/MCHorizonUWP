@@ -29,6 +29,30 @@ class AuditSchemaTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "V requires evidence"):
             audit.finalize(input_row)
 
+    def test_language_resources_resolve_only_exact_keys(self):
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as directory:
+            language = Path(directory) / "en_us.json"
+            language.write_text('{"options.fov":"FOV"}', encoding="utf-8")
+            settings = [{"official_ui_label": "options.fov"}, {"official_ui_label": "Missing"}]
+            digest, coverage = audit.translate_minecraft_labels(settings, language)
+        self.assertEqual(len(digest), 64)
+        self.assertEqual(settings[0], {"official_ui_label": "FOV", "official_ui_translation_key": "options.fov"})
+        self.assertEqual(settings[1]["official_ui_label"], "Missing")
+        self.assertEqual(next(iter(coverage.values())), ["options.fov"])
+
+    def test_official_hdr_receipt_is_the_pinned_windows_run(self):
+        from audit_horizon_evidence import OFFICIAL_HDR, PIN
+
+        receipt = json.loads((audit.ROOT / OFFICIAL_HDR).read_text(encoding="utf-8"))
+        self.assertEqual(receipt["source_commit"], PIN)
+        self.assertEqual(receipt["request"]["hdr"], "auto")
+        self.assertTrue(receipt["monitor"]["system_hdr_active"])
+        self.assertEqual(receipt["renderer"]["backend"], "Dx12")
+        self.assertTrue(any("HDR output presented its first frame" in line
+                            for line in receipt["log_evidence"]))
+
     def test_duplicate_profile_is_rejected(self):
         input_row = {"id": "fixture", "sources": [], "profiles": {"invented": "C"}}
         with self.assertRaisesRegex(ValueError, "unknown profiles"):

@@ -428,6 +428,56 @@ def parsed_ui_effects(root):
     return {by_control[m[1]]: m[2] for m in re.finditer(pattern, graphic) if m[1] in by_control}
 
 
+def add_option_runtime_evidence(official, uwp, record):
+    key = record["key"]
+    runtime = OPTIONS_RUNTIME.get(key)
+    if runtime:
+        path, pattern, effect = runtime
+        record["expected_visible_effect"] = effect
+        record["official_windows_behavior"] = effect
+        record["sources"].append(ref("official", path, source(official, path), pattern))
+        port_source = source(uwp, path)
+        if re.search(pattern, port_source, re.M):
+            record["sources"].append(ref("uwp", path, port_source, pattern))
+            record["uwp_runtime_action"] = "Source consumer present. " + effect
+    elif key in OPTIONS_WITHOUT_CONSUMER:
+        effect = OPTIONS_WITHOUT_CONSUMER[key]
+        record["expected_visible_effect"] = effect
+        record["official_windows_behavior"] = effect
+        record["uwp_runtime_action"] = "No consuming path identified beyond configuration persistence."
+        record["recommendation"] = "Confirm whether this compatibility key should still be retained."
+    elif key in OPTIONS_UNAVAILABLE_EFFECTS:
+        record["expected_visible_effect"] = OPTIONS_UNAVAILABLE_EFFECTS[key]
+
+    if key == "allowCursorChanges":
+        window = "third_party/winit/src/platform_impl/uwp/window.rs"
+        record["sources"].append(ref("uwp", window, source(uwp, window), r"fn set_cursor\("))
+        record["uwp_runtime_action"] = "The game forwards the chosen icon to UWP Winit, whose set_cursor implementation does nothing."
+        record["root_cause"] = "The AppContainer Winit cursor icon hook is a stub."
+        record["uwp_uniform_status"] = "S"
+        record["recommendation"] = "Wire the native cursor icon hook and test text and link hovers."
+    if key == "onlyShowSecureChat":
+        path = GAME + "network/remote/mod.rs"
+        secure_source = r'let content = if self\.settings\.file\.bool\("onlyShowSecureChat"'
+        for side, root in (("official", official), ("uwp", uwp)):
+            record["sources"].append(ref(side, path, source(root, path), secure_source))
+        official_profile(record, "P", "The UI row is disabled. The remote chat listener still reads the saved value, drops NotSecure messages and selects the signed body.")
+        record["uwp_uniform_status"] = "P"
+        record["uwp_runtime_action"] = "The UI row is disabled. The patched remote chat listener retains both configuration reads."
+        record["root_cause"] = "The UI availability check disables the row despite the presence of its consumer."
+        record["enabling_conditions"] = ["Remote player chat", "Value set in options.txt"]
+        record["recommendation"] = "Verify authenticated chat and evaluate enabling the UI control."
+        record["test_method"] = "Join a compatible authenticated server using two isolated profiles with distinct values. Compare signed, altered and insecure chat delivery."
+    if key == "preferredGraphicsBackend":
+        record["uwp_runtime_action"] = "Reads the legacy Auto/OpenGL/Vulkan values. The UWP host and launch configuration select the actual AppContainer renderer."
+    if key in {"chatDelay", "chatVisibility"}:
+        record["enabling_conditions"].append("Incoming chat")
+    if key == "rotateWithMinecart":
+        record["enabling_conditions"].append("Minecart improvements enabled")
+    if key == "highContrast":
+        record["enabling_conditions"].append("Built-in high-contrast pack available")
+
+
 def option_rows(official, uwp, coverage):
     ods, uds = options_defs(official), options_defs(uwp)
     by_key, pages, captions, unavailable = controls(official)
@@ -561,6 +611,7 @@ def option_rows(official, uwp, coverage):
             if key == "fullscreenResolution":
                 record["enabling_conditions"] = ["An enumerated video mode and exclusive fullscreen"]
                 record["uwp_ui"] = "Source control present; no video modes are available for selection"
+        add_option_runtime_evidence(official, uwp, record)
         if key == "maxAnisotropyBit":
             record["enabling_conditions"] = ["Anisotropic texture filtering"]
         if "Video" in display_pages:
@@ -707,13 +758,30 @@ def controller_rows(official, uwp, coverage):
             for side, root in (("official", official), ("uwp", uwp)):
                 refs.append(ref(side, CONTROLLER_UI, source(root, CONTROLLER_UI), r"let binds: Vec<Setting>"))
         elif key.startswith("radial_"):
-            page = ["Controller > Bindings > Radial Menu"]
-            why = f"Customize the radial menu page's {key.rsplit('_', 1)[1]}."
+            field = key.rsplit("_", 1)[1]
+            if field in {"label", "slots"}:
+                page = ["Controller > Bindings > Radial Menu"]
+                label = "horizon.radial.rename" if field == "label" else "horizon.radial.slot.{slot}"
+                editor = RENDER + "radial_editor.rs"
+                label_ref = r'horizon\.radial\.rename"' if field == "label" else r'horizon\.radial\.slot\.\{slot\}'
+                for side, root in (("official", official), ("uwp", uwp)):
+                    refs.append(ref(side, editor, source(root, editor), label_ref))
+            why = {
+                "kind": "Selects the page's generator kind when loading saved settings.",
+                "name": "Stores the translation key of a built-in page name.",
+                "preset": "Loads the stored built-in radial page preset.",
+                "label": "Renames the radial menu page.",
+                "slots": "Assigns the action or item shown at each of the eight radial directions.",
+            }[field]
         if key in port_defs:
             refs.append("uwp:" + port_defs[key][2])
         record = row(key, "horizon-controller.txt", values, default, refs,
                      localization(official, label), page, scope="setting" if page else "config")
         record["official_ui_label_key"] = label
+        if key == "radial_{page}_slots":
+            record["official_ui_label"] = ", ".join(
+                localization(official, f"horizon.radial.slot.{index}") for index in range(8)
+            )
         record["expected_visible_effect"] = why
         record["enabling_conditions"] = ["Controller support and a connected controller"] if page else []
         if key in port_defs:
@@ -967,3 +1035,139 @@ def debug_rows(official, uwp, coverage):
             coverage[side + ":" + DEBUG_ENTRIES].append(key)
         rows.append(item)
     return rows
+
+OPTIONS_RUNTIME = {
+    "allowCursorChanges": (GAME + "interface/pointer_capture.rs", r"if self\.settings\.allow_cursor_changes",
+                           "Allow hover and editing controls to change the native pointer icon when keyboard focus is not driving the UI."),
+    "allowServerListing": (SETTINGS, r'allows_listing: self\.file\.bool\("allowServerListing"',
+                           "Send the player's listing preference in Client Information. Server handling determines whether a server list shows the player."),
+    "autoJump": ("crates/horizon-client/src/game.rs", r"player\.auto_jump_enabled = self\.settings\.auto_jump",
+                 "Allow the movement simulation to jump over eligible obstacles while moving forward."),
+    "autoSuggestions": (GAME + "interface/chat.rs", r"screen\.auto_suggestions = self\.settings\.auto_suggestions",
+                        "Automatically open command suggestions as the player types."),
+    "backgroundForChatOnly": (GAME + "interface/chat.rs", r'self\.settings\.file\.bool\("backgroundForChatOnly"',
+                              "Confine the configured text backdrop to chat messages instead of applying it to the chat input and other applicable text."),
+    "bobView": (GAME + "interface/fov.rs", r"bob_matrix\(&state, tilt, self\.settings\.view_bobbing",
+                "Enable camera bobbing from player movement."),
+    "chatColors": (SETTINGS, r"colors: self\.chat_colors,",
+                   "Choose whether chat messages display their text colors."),
+    "chatDelay": (GAME + "network/remote/chat_queue.rs", r"self\.settings\.chat_delay \* 1000",
+                  "Space out received chat messages by the configured interval in seconds."),
+    "chatHeightFocused": (SETTINGS, r"height_focused: f64::from\(self\.chat_height_focused",
+                          "Change the number of chat lines that fit when chat is open."),
+    "chatHeightUnfocused": (SETTINGS, r"height_unfocused: f64::from\(self\.chat_height_unfocused",
+                            "Change the number of lines that fit in the default gameplay chat overlay."),
+    "chatLineSpacing": (SETTINGS, r"line_spacing: f64::from\(self\.chat_line_spacing",
+                        "Adjust vertical spacing between lines in the chat overlay."),
+    "chatLinks": (GAME + "interface/chat.rs", r"if !self\.settings\.chat_links",
+                  "Enable URL activation from a chat message."),
+    "chatLinksPrompt": (GAME + "interface/chat.rs", r"if self\.settings\.chat_links_prompt",
+                        "Show a confirmation before opening a permitted chat URL."),
+    "chatOpacity": (SETTINGS, r"opacity: f64::from\(self\.chat_opacity",
+                    "Change foreground opacity for messages in the chat overlay."),
+    "chatScale": (SETTINGS, r"scale: f64::from\(self\.chat_scale",
+                  "Scale chat text and its layout."),
+    "chatVisibility": (GAME + "interface/chat.rs", r"ChatVisibility::from_option\(self\.settings\.chat_visibility",
+                       "Select full chat, commands only, or hidden chat. The value also shapes local chat permissions."),
+    "chatWidth": (SETTINGS, r"width: f64::from\(self\.chat_width",
+                  "Change chat overlay width and where its messages wrap."),
+    "damageTiltStrength": (GAME + "interface/fov.rs", r'self\.settings\.file\.double\("damageTiltStrength"',
+                           "Scale the camera's tilt when the player takes damage."),
+    "darkMojangStudiosBackground": (GAME + "interface/startup_menu.rs", r'self\.settings\.file\.bool\("darkMojangStudiosBackground"',
+                                   "Use the alternate dark background on the startup or reload logo screen."),
+    "darknessEffectScale": (GAME + "blocks/sculk.rs", r'self\.settings\.file\.double\("darknessEffectScale"',
+                            "Scale the visual pulsing from the Darkness effect."),
+    "debugGuiScale": (DEBUG_UI,
+                      r'fn debug_gui_scale_label',
+                      "Set the debug overlay scale independently. The Unchanged choice shares the normal GUI scale."),
+    "discrete_mouse_scroll": ("crates/horizon-client/src/game.rs", r"let discrete = self\.settings\.discrete_scroll",
+                              "Treat wheel motion as discrete steps instead of using the fractional movement of the wheel."),
+    "glintSpeed": (GAME + "interface/item_draw.rs", r'speed: self\.settings\.file\.double\("glintSpeed"',
+                   "Change the animation speed of the enchantment glint."),
+    "glintStrength": (GAME + "interface/item_draw.rs", r'alpha: self\.settings\.file\.double\("glintStrength"',
+                      "Change the opacity of the enchantment glint."),
+    "hideLightningFlashes": (GAME + "world/end.rs", r'!self\.settings\.file\.bool\("hideLightningFlashes"',
+                             "Suppress the lightning-related flash rendered by the world."),
+    "hideServerAddress": (GAME + "interface/startup_menu.rs", r'self\.settings\.file\.bool\("hideServerAddress"',
+                          "Hide server addresses from the multiplayer list presentation."),
+    "hideSplashTexts": (GAME + "interface/startup_menu.rs", r'self\.settings\.file\.bool\("hideSplashTexts"',
+                        "Hide the rotating splash text on the title screen."),
+    "highContrast": (OPTIONS_UI, r'let on = s\.resource_packs\.iter\(\)\.any\(\|id\| id == "high_contrast"',
+                     "Toggle the built-in high-contrast resource pack for menus and other GUI elements."),
+    "highContrastBlockOutline": ("crates/horizon-client/src/game.rs", r'outline_high_contrast: self\.settings\.file\.bool\("highContrastBlockOutline"',
+                                 "Draw the focused block outline with the high-contrast outline style."),
+    "invertXMouse": (INPUT + "mouse.rs", r"if look\.invert_x \{ -xo \}",
+                     "Reverse the horizontal mouse-look axis."),
+    "invertYMouse": (INPUT + "mouse.rs", r"if look\.invert_y \{ -yo \}",
+                     "Reverse the vertical mouse-look axis."),
+    "joinedFirstServer": (GAME + "interface/tutorial.rs", r'if !self\.settings\.file\.bool\("joinedFirstServer"',
+                          "Show the Social Interactions hint once on a server or after publishing a world to LAN."),
+    "lastServer": (GAME + "interface/startup_menu.rs", r'title\.last_server = settings\.file\.string\("lastServer"',
+                   "Prepopulate the Direct Connection address field with the saved address."),
+    "mainHand": (GAME + "interface/frame_geometry.rs", r"let left = self\.settings\.main_hand_left",
+                 "Choose left or right for the primary hand and its first-person held item."),
+    "mouseSensitivity": (GAME + "interface/pointer_capture.rs", r"sensitivity: (?:f64::from\(self\.settings\.sensitivity|self\.settings\.sensitivity)",
+                         "Scale how far the view turns per unit of mouse motion."),
+    "mouseWheelSensitivity": ("crates/horizon-client/src/game.rs", r"self\.settings\.mouse_wheel_sensitivity",
+                              "Scale wheel motion before dispatching scroll and hotbar actions."),
+    "notificationDisplayTime": ("crates/horizon-client/src/game.rs", r"title\.update_toast\(self\.settings\.notification_display_time",
+                                "Scale the time that toasts and other duration-managed notifications stay visible."),
+    "onboardAccessibility": (GAME + "interface/startup_menu.rs", r'if settings\.file\.bool\("onboardAccessibility"',
+                             "Open accessibility onboarding at startup until the flow records completion."),
+    "onlyShowSecureChat": (GAME + "network/remote/mod.rs", r'if matches!\(trust, ChatTrust::NotSecure\) && self\.settings\.file\.bool\("onlyShowSecureChat"',
+                           "Drop remote player chat classified as insecure and use the original signed body in place of unsigned decoration."),
+    "operatorItemsTab": (GAME + "interface/creative_screen.rs", r"self\.can_use_game_master_blocks\(\) && self\.settings\.operator_items_tab",
+                         "Show the operator items tab in Creative when the local player has the required game-master permission."),
+    "panoramaScrollSpeed": (GAME + "runtime/loading_screen.rs", r'self\.settings\.file\.double\("panoramaScrollSpeed"',
+                            "Scale the rotation speed of the title-screen panorama."),
+    "preferredGraphicsBackend": (SETTINGS, r'api: match f\.name\("preferredGraphicsBackend"',
+                                 "Load a legacy graphics API preference as Auto, OpenGL, or Vulkan. A separately saved Horizon Graphics API can take precedence."),
+    "quitShortcuts": (GAME + "interface/startup_menu.rs", r"if !self\.settings\.quit_shortcuts",
+                      "Allow Alt+F4 to close the Windows client via the platform close request when enabled."),
+    "reducedDebugInfo": (GAME + "interface/debug_keys.rs", r"self\.settings\.reduced_debug_info",
+                         "Restrict debug overlay data and debug actions that require full debug information."),
+    "rotateWithMinecart": (GAME + "network/remote_vehicles.rs", r'self\.minecart_improvements\(\) && self\.settings\.file\.bool\("rotateWithMinecart"',
+                           "Turn the player's view with the ridden minecart when minecart improvements are enabled."),
+    "saveChatDrafts": (GAME + "interface/chat.rs", r'should_discard_draft\(reason, self\.settings\.file\.bool\("saveChatDrafts"',
+                       "Retain the unsent chat input when the relevant close reason permits keeping a draft."),
+    "screenEffectScale": (GAME + "interface/fov.rs", r'fn screen_effect_scale',
+                          "Scale screen distortion, including the nausea field-of-view warp."),
+    "skipMultiplayerWarning": ("crates/horizon-client/src/title.rs", r"self\.set_mode\(if self\.skip_multiplayer_warning",
+                               "Skip the multiplayer warning when opening the multiplayer screen."),
+    "sprintWindow": (GAME + "network/remote/mod.rs", r"let sprint_window = self\.settings\.sprint_window",
+                     "Set the tick window for the forward double-tap sprint gesture."),
+    "startedCleanly": (GAME + "runtime/loading_screen.rs", r"pub\(super\) fn unclean_start_recovery",
+                       "Guide next-launch recovery. A saved false clears the fullscreen request and its stored resolution."),
+    "textBackgroundOpacity": (SETTINGS, r"background_opacity: f64::from\(self\.text_background_opacity",
+                              "Scale opacity of the background behind chat and other text using the shared text-background setting."),
+    "toggleAttack": (GAME + "interface/play_input.rs", r"self\.settings\.toggle_attack,",
+                     "Latch the attack action between presses instead of requiring it to be held."),
+    "toggleCrouch": (GAME + "interface/play_input.rs", r"self\.settings\.toggle_crouch,",
+                     "Latch crouching between presses instead of requiring the key to be held."),
+    "toggleSprint": (GAME + "interface/play_input.rs", r"self\.settings\.toggle_sprint,",
+                     "Latch the sprint input between presses instead of requiring it to be held."),
+    "toggleUse": (GAME + "interface/play_input.rs", r"self\.settings\.toggle_use,",
+                  "Latch the use action between presses instead of requiring it to be held."),
+    "tutorialStep": (GAME + "interface/tutorial.rs", r'Step::from_option\(self\.settings\.file\.int\("tutorialStep"',
+                     "Resume the saved tutorial checkpoint and determine which tutorial hint can appear next."),
+    "version": (RENDER + "options_fixes.rs", r"pub fn update\(raw: &mut Raw, version: i32",
+                "Select the options-file migration steps. There is no standalone user-visible control."),
+}
+
+OPTIONS_WITHOUT_CONSUMER = {
+    "glDebugVerbosity": "The pinned options file retains this OpenGL debug setting. A logging change could not be traced beyond storage.",
+    "macFullscreenMenuVisibility": "The pinned file retains this macOS fullscreen preference. There is no Windows control or effect traced.",
+    "overrideHeight": "The pinned file retains this window-height setting. The traced window-sizing path uses launch dimensions.",
+    "overrideWidth": "The pinned file retains this window-width setting. The traced window-sizing path uses launch dimensions.",
+    "syncChunkWrites": "The pinned file retains this client key. No client-side chunk write-policy change was traced for it.",
+    "telemetryOptInExtra": "The pinned file retains this consent key. It was not traced to Horizon's telemetry consent or event policy.",
+    "useNativeTransport": "The pinned file retains this transport preference. No network transport selection was traced for it.",
+}
+
+OPTIONS_UNAVAILABLE_EFFECTS = {
+    "ctrlClickEmulatesRightClick": "Offer a Control-click right-click emulation switch on macOS. The Windows controls list excludes it.",
+    "hideMatchedNames": "The intended control would hide chat matching blocked player names. The pinned control is disabled.",
+    "inGameNotification": "The intended control would toggle in-game friend notifications. The pinned control is disabled.",
+    "realmsNotifications": "The intended control would toggle Realms notifications. The pinned control is disabled.",
+    "sharePresence": "The intended control would select whether to share friend presence. The pinned control is disabled.",
+}

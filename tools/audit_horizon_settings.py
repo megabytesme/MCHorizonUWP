@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import hashlib
 import io
 import json
 import re
@@ -17,7 +18,8 @@ import audit_horizon_world
 import audit_horizon_vanilla
 from audit_horizon_core import graphics, setting_row
 from audit_horizon_evidence import (
-    ACTIVE, DX11, FEATURE_OVERRIDES, OWNERS, PIN, PRODUCT, PROFILES, SHADER, STATUS, WGPU,
+    ACTIVE, DX11, FEATURE_OVERRIDES, OFFICIAL_HDR, OFFICIAL_HDR_AUTO,
+    OWNERS, PIN, PRODUCT, PROFILES, SHADER, STATUS, WGPU,
     apply_cells, audit_setting, cell,
 )
 from audit_horizon_surfaces import bundled_pack_settings, dynamic_controls, parse_preset_tables, registered_settings
@@ -100,6 +102,10 @@ def feature_rows(product):
             row["historical"] = False
             if status in {"U", "S"}:
                 row["root_cause"] = condition
+        if identifier in {"hdr", "renderer-dx12"}:
+            row["official_baseline_status"] = "P"
+            row["official_windows_evidence"] = [OFFICIAL_HDR]
+            row["official_windows_behavior"] = OFFICIAL_HDR_AUTO
         if identifier in {"shader-pack-native", "shader-pack-classic"}:
             classic = identifier.endswith("classic")
             apply_cells(row, DX11, "H", "The current compatibility renderer bypasses shader-pack execution.")
@@ -187,8 +193,8 @@ def csv_value(value):
 
 
 def settings_csv(rows):
-    fields = ("id", "key", "scope", "aliases", "official_ui_label", "official_ui_page", "storage",
-              "values", "default", "official_baseline_status", "official_windows_behavior",
+    fields = ("id", "key", "scope", "aliases", "official_ui_label", "official_ui_translation_key", "official_ui_page", "storage",
+              "values", "default", "official_baseline_status", "official_windows_behavior", "official_windows_evidence",
               "expected_visible_effect", "uwp_ui", "uwp_persistence", "uwp_runtime_action",
               "enabling_conditions", "sources", "test_method", "evidence", "root_cause",
               "recommendation", "owner")
@@ -261,12 +267,30 @@ def unsupported_markdown(rows):
     return "\n".join(lines) + "\n"
 
 
-def generate(official, port, product):
+def translate_minecraft_labels(settings, language):
+    if language is None:
+        return None, {}
+    data = language.read_bytes()
+    labels = json.loads(data)
+    prefix = "prepared:assets/minecraft/lang/en_us.json"
+    used = set()
+    for row in settings:
+        key = row["official_ui_label"]
+        if isinstance(key, str) and key in labels:
+            row["official_ui_translation_key"] = key
+            row["official_ui_label"] = labels[key]
+            used.add(key)
+    return hashlib.sha256(data).hexdigest(), {prefix: sorted(used)}
+
+def generate(official, port, product, language=None):
     settings, features, coverage = inventory(official, port, product)
+    label_digest, label_coverage = translate_minecraft_labels(settings, language)
+    merge_coverage(coverage, label_coverage)
     model = {
         "schema_version": 1,
         "provenance": {"official": PIN, "uwp_product": PRODUCT, "wgpu": WGPU,
-                       "uwp_patch": PATCH, "client": "0.1.17", "builder": "1.0.9"},
+                       "uwp_patch": PATCH, "client": "0.1.17", "builder": "1.0.9",
+                       "prepared_minecraft_en_us_sha256": label_digest},
         "statuses": STATUS,
         "profiles": PROFILES,
         "source_paths": {
@@ -290,6 +314,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--official", type=Path, required=True)
     parser.add_argument("--uwp-source", type=Path, required=True)
+    parser.add_argument("--minecraft-language", type=Path,
+                        help="Pinned prepared Minecraft assets/minecraft/lang/en_us.json")
     parser.add_argument("--output", type=Path, default=ROOT / OUTPUT)
     parser.add_argument("--check", action="store_true", help="Compare outputs without writing")
     options = parser.parse_args()
@@ -301,7 +327,7 @@ def main():
         git(options.uwp_source, "apply", "--reverse", "--check", str(ROOT / PATCH))
     except subprocess.CalledProcessError as error:
         parser.error("UWP source must have the 0.1.15 product patch applied. " + error.stderr.strip())
-    products = generate(options.official, options.uwp_source, ROOT)
+    products = generate(options.official, options.uwp_source, ROOT, options.minecraft_language)
     if options.check:
         differences = [name for name, content in products.items()
                        if not (options.output / name).is_file()
