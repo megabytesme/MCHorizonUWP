@@ -1,0 +1,6 @@
+{
+    "ReadAtUtc":  "2026-11-21T00:33:26.6314253+00:00",
+    "Endpoint":  "/api/os/devicefamily",
+    "Reachable":  false,
+    "Error":  "The operation has timed out"
+}

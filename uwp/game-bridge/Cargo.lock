@@ -1453,7 +1453,6 @@ dependencies = [
  "horizon-game-discovery",
  "horizon-gameplay",
  "horizon-guest-stack",
- "horizon-hdr",
  "horizon-hooks",
  "horizon-items",
  "horizon-java-properties",
@@ -1486,7 +1485,6 @@ dependencies = [
  "horizon-uwp-touch-controls",
  "horizon-world",
  "log",
- "miniz_oxide 0.8.9",
  "naga",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
@@ -1499,7 +1497,6 @@ dependencies = [
  "sha1",
  "sha2",
  "toml",
- "unicode-bidi",
  "ureq",
  "wgpu",
  "winit",
@@ -1521,7 +1518,12 @@ dependencies = [
 name = "horizon-client-gameplay"
 version = "0.1.0"
 dependencies = [
+ "glam",
  "horizon-client-lib",
+ "horizon-core",
+ "horizon-world",
+ "log",
+ "serde_json",
 ]
 
 [[package]]
@@ -1531,6 +1533,7 @@ dependencies = [
  "arboard",
  "horizon-client-core",
  "horizon-engine-slots",
+ "horizon-hooks",
  "horizon-mod-api-macros",
  "log",
  "png",
@@ -1722,7 +1725,21 @@ dependencies = [
 name = "horizon-gameplay"
 version = "0.1.0"
 dependencies = [
+ "horizon-assets",
+ "horizon-client-core",
  "horizon-client-lib",
+ "horizon-command",
+ "horizon-core",
+ "horizon-engine-slots",
+ "horizon-items",
+ "horizon-mod-package",
+ "horizon-mod-runtime",
+ "horizon-mod-vocab",
+ "horizon-protocol",
+ "horizon-threads",
+ "horizon-world",
+ "log",
+ "serde_json",
 ]
 
 [[package]]
@@ -2090,6 +2107,8 @@ dependencies = [
  "horizon-mod-runtime",
  "horizon-uwp-network",
  "horizon-world",
+ "idna",
+ "idna_adapter",
  "ipconfig",
  "log",
  "serde_json",
@@ -2250,6 +2269,7 @@ dependencies = [
  "horizon-assets",
  "horizon-core",
  "horizon-threads",
+ "indexmap",
  "libm",
  "log",
  "lz4_flex",

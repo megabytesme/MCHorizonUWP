@@ -7,6 +7,7 @@ param(
     [string]$Version = '1.0.1.0',
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')][string]$PatchVersion = '0.1.7',
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')][string]$ClientVersion = '0.1.8',
+    [ValidatePattern('^[0-9a-f]{40}$')][string]$UpstreamCommit = '0b14f8acfd97fa2c750e42795249dcc981178ca4',
     [Parameter(Mandatory)][string]$ResourceFramework,
     [string]$WasmStandardLibrary,
     [string]$EmbeddedNativeMods,
@@ -65,7 +66,7 @@ $release = [ordered]@{
     schema_version = 1
     patch_version = $PatchVersion
     client_version = $ClientVersion
-    upstream_commit = '0b14f8acfd97fa2c750e42795249dcc981178ca4'
+    upstream_commit = $UpstreamCommit
 }
 $metadata = Join-Path $output 'HorizonRelease.json'
 $release | ConvertTo-Json | Set-Content -LiteralPath $metadata -Encoding utf8

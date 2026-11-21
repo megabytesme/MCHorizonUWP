@@ -81,7 +81,8 @@ $machines = @{ x86 = 0x14c; x64 = 0x8664; arm64 = 0xaa64 }
 $architecture = $record.architecture
 $buildPattern = '^mchorizonuwp-[0-9]+\.[0-9]+\.[0-9]+-patch-[0-9]+\.[0-9]+\.[0-9]+-' +
     $architecture + '-0b14f8acfd97fa2c750e42795249dcc981178ca4$'
-if ($architecture -notin $machines.Keys -or $record.game_build_id -cnotmatch $buildPattern -or
+$november20 = "mchorizonuwp-0.1.14-patch-0.1.13-$architecture-0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
+if ($architecture -notin $machines.Keys -or ($record.game_build_id -cnotmatch $buildPattern -and $record.game_build_id -cne $november20) -or
     $record.rust_toolchain -cne '1.99.1' -or -not $record.mods.Count) {
     throw 'Expected a staged x64, x86 or ARM64 trusted native modpack build.'
 }

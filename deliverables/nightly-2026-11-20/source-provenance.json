@@ -1,0 +1,96 @@
+{
+  "release": "https://github.com/horizon-rust/horizon/releases/tag/nightly",
+  "name": "Nightly 2026-11-20 · 0a875da",
+  "published_at": "2026-11-20T11:18:27Z",
+  "upstream_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "upstream_tag": "nightly-source/2026-11-20-0a875da",
+  "git_tree": "84463ab1b850d9ac382fb0b94d247f0c06d690fc",
+  "verified_release_signatures": [
+    "nightly",
+    "nightly-2026-11-20-0a875da"
+  ],
+  "verified_git_blob_count": 11596,
+  "older_source": "0b14f8acfd97fa2c750e42795249dcc981178ca4",
+  "upstream_git_commit_count": 331,
+  "upstream_paths_no_renames": 1327,
+  "wgpu_commit": "aa7b65c43ef008d0a92d20fcdf9f10fa0883f157",
+  "wgpu_zip_sha256": "8de8795116083533812728a855144a5f5e229d0562ef07990393bc5124c48c2e",
+  "wasmtime": {
+    "version": "50.0.2",
+    "archive_sha256": "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
+  },
+  "release_assets": [
+    {
+      "name": "horizon-linux-musl-x86_64.tar.gz",
+      "size": 76706377,
+      "sha256": "01c1a09240661e8f2c059c13e2cfe9802ddace275225328d8a7b499e6fba526a",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538549"
+    },
+    {
+      "name": "horizon-linux-x86_64.tar.gz",
+      "size": 75560233,
+      "sha256": "b52c3f7f3e1cdd42ade6904a38cfa8c9fa07075ac8a0b35ed661b4c0a55f3b9a",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538546"
+    },
+    {
+      "name": "horizon-macos-arm64.zip",
+      "size": 64483592,
+      "sha256": "cfff6630ba9b09f95e93945a766bd6628b2c5a445f18acb2df39c1c4e30dc722",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538564"
+    },
+    {
+      "name": "horizon-server-linux-x86_64.tar.gz",
+      "size": 74104988,
+      "sha256": "4a32924266a97030f1a6614dfcb74bf0c8c1fd0d92e6582e89b1704518c7485d",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538717"
+    },
+    {
+      "name": "horizon-source.tar.gz",
+      "size": 59856486,
+      "sha256": "921fc63efde1d8c226ba6c0457677b41effd7be367ba93116ccb424a9790eb75",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538722"
+    },
+    {
+      "name": "horizon-windows-arm64.zip",
+      "size": 62902205,
+      "sha256": "8630fb1029c5789ca3c448eef8ccf7d1beca2e2c906de74c6b35a43cbef90902",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538552"
+    },
+    {
+      "name": "horizon-windows-x64.zip",
+      "size": 77548753,
+      "sha256": "5514bc94f1d2c9b370f4444726236ad9e303d2d34e1323593393e7ebe07abac3",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538551"
+    },
+    {
+      "name": "sdk.json",
+      "size": 7327,
+      "sha256": "a0ec3d4b8651b3e9a322e8ec35a5917bc8f290ac904ade5bcd5bd5b5aacdae84",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538528"
+    },
+    {
+      "name": "SHA256SUMS",
+      "size": 729,
+      "sha256": "9fce36453b4b17bc8de58f3dc0d59b00649c0d66505d5c10d92999983489423d",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538527"
+    },
+    {
+      "name": "SHA256SUMS.sig",
+      "size": 89,
+      "sha256": "361f08b74ae1d6ac2e191c0e45d9b4051deef42d1a476e494029847eedadde43",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538529"
+    },
+    {
+      "name": "SHA256SUMS.v2.sig",
+      "size": 89,
+      "sha256": "a2f20407b85dfc6fc3c6c76104ea4ff840f6be9702752e01b926273dd6ed4dd7",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538530"
+    },
+    {
+      "name": "smoke-test.json",
+      "size": 184,
+      "sha256": "faea63f17baa436ec4878ecb9fe48003c4da1099d586120905fd9f2706e89e82",
+      "asset_api": "https://api.github.com/repos/horizon-rust/horizon/releases/assets/771538531"
+    }
+  ]
+}

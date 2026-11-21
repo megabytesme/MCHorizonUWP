@@ -1,0 +1,470 @@
+
+Dump of file stage\WgpuWorldScaleProbe.exe
+
+PE signature found
+
+File Type: EXECUTABLE IMAGE
+
+FILE HEADER VALUES
+            AA64 machine (ARM64)
+               6 number of sections
+        E3DE8F83 time date stamp
+               0 file pointer to symbol table
+               0 number of symbols
+              F0 size of optional header
+              22 characteristics
+                   Executable
+                   Application can handle large (>2GB) addresses
+
+OPTIONAL HEADER VALUES
+             20B magic # (PE32+)
+           14.00 linker version
+          385E00 size of code
+           F6600 size of initialized data
+               0 size of uninitialized data
+          36A220 entry point (000000014036A220)
+            1000 base of code
+       140000000 image base (0000000140000000 to 0000000140480FFF)
+            1000 section alignment
+             200 file alignment
+            6.00 operating system version
+            0.00 image version
+            6.00 subsystem version
+               0 Win32 version
+          481000 size of image
+             400 size of headers
+               0 checksum
+               2 subsystem (Windows GUI)
+            9160 DLL characteristics
+                   High Entropy Virtual Addresses
+                   Dynamic base
+                   NX compatible
+                   App Container
+                   Terminal Server Aware
+          100000 size of stack reserve
+            1000 size of stack commit
+          100000 size of heap reserve
+            1000 size of heap commit
+               0 loader flags
+              10 number of directories
+               0 [       0] RVA [size] of Export Directory
+          4565E0 [     190] RVA [size] of Import Directory
+               0 [       0] RVA [size] of Resource Directory
+          46B000 [    C398] RVA [size] of Exception Directory
+               0 [       0] RVA [size] of Certificates Directory
+          479000 [    74E8] RVA [size] of Base Relocation Directory
+          45651C [      1C] RVA [size] of Debug Directory
+               0 [       0] RVA [size] of Architecture Directory
+               0 [       0] RVA [size] of Global Pointer Directory
+          4544F8 [      28] RVA [size] of Thread Storage Directory
+          454330 [     140] RVA [size] of Load Configuration Directory
+               0 [       0] RVA [size] of Bound Import Directory
+          456D50 [     5E0] RVA [size] of Import Address Table Directory
+               0 [       0] RVA [size] of Delay Import Directory
+               0 [       0] RVA [size] of COM Descriptor Directory
+               0 [       0] RVA [size] of Reserved Directory
+
+
+SECTION HEADER #1
+   .text name
+  385D78 virtual size
+    1000 virtual address (0000000140001000 to 0000000140386D77)
+  385E00 size of raw data
+     400 file pointer to raw data (00000400 to 003861FF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+60000020 flags
+         Code
+         Execute Read
+
+SECTION HEADER #2
+  .rdata name
+   E0C38 virtual size
+  387000 virtual address (0000000140387000 to 0000000140467C37)
+   E0E00 size of raw data
+  386200 file pointer to raw data (00386200 to 00466FFF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+40000040 flags
+         Initialized Data
+         Read Only
+
+  Debug Directories
+
+        Time Type        Size      RVA  Pointer
+    -------- ------- -------- -------- --------
+    E3DE8F83 repro          0 00000000        0
+
+  Section contains the following imports:
+
+    kernel32.dll
+             140456D50 Import Address Table
+             140456770 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           0 AcquireSRWLockExclusive
+                           0 AddVectoredExceptionHandler
+                           0 CloseHandle
+                           0 CreateEventA
+                           0 CreateFile2
+                           0 CreateWaitableTimerExW
+                           0 DecodePointer
+                           0 FlsAlloc
+                           0 FlsFree
+                           0 FlsSetValue
+                           0 FlushFileBuffers
+                           0 FormatMessageW
+                           0 FreeLibrary
+                           0 GetCurrentProcessId
+                           0 GetCurrentThreadId
+                           0 GetLastError
+                           0 GetModuleFileNameW
+                           0 GetProcAddress
+                           0 GetProcessHeap
+                           0 GetSystemTimeAsFileTime
+                           0 GetTickCount64
+                           0 HeapAlloc
+                           0 HeapFree
+                           0 HeapReAlloc
+                           0 InitOnceExecuteOnce
+                           0 InitializeSListHead
+                           0 IsProcessorFeaturePresent
+                           0 IsThreadAFiber
+                           0 LoadLibraryExA
+                           0 LoadLibraryExW
+                           0 LoadPackagedLibrary
+                           0 QueryPerformanceCounter
+                           0 QueryPerformanceFrequency
+                           0 ReleaseSRWLockExclusive
+                           0 RemoveVectoredExceptionHandler
+                           0 SetThreadErrorMode
+                           0 SetWaitableTimer
+                           0 Sleep
+                           0 SwitchToThread
+                           0 WaitForSingleObject
+                           0 WaitForSingleObjectEx
+                           0 WriteFile
+
+    vccorlib140_app.DLL
+             140456EA8 Import Address Table
+             1404568C8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           D ??0Delegate@Platform@@QE$AAA@XZ
+                           F ??0DisconnectedException@Platform@@QE$AAA@XZ
+                          21 ??0Object@Platform@@QE$AAA@XZ
+                          52 ?AlignedFree@Heap@Details@Platform@@SAXPEAX@Z
+                          54 ?Allocate@Heap@Details@Platform@@SAPEAX_K0@Z
+                          56 ?AllocateException@Heap@Details@Platform@@SAPEAX_K0@Z
+                          7D ?Free@Heap@Details@Platform@@SAXPEAX@Z
+                          80 ?GetActivationFactoryByPCWSTR@@YAJPEAXAEAVGuid@Platform@@PEAPEAX@Z
+                          81 ?GetCmdArguments@Details@Platform@@YAPEAPEA_WPEAH@Z
+                          99 ?GetIBoxArrayVtable@Details@Platform@@YAPEAXPEAX@Z
+                          9B ?GetIidsFn@@YAJHPEAKPEBU__s_GUID@@PEAPEAVGuid@Platform@@@Z
+                          AF ?InitializeData@Details@Platform@@YAJH@Z
+                          B8 ?ReleaseTarget@ControlBlock@Details@Platform@@AEAAXXZ
+                          D4 ?UninitializeData@Details@Platform@@YAXH@Z
+                          DD ?__abi_WinRTraiseAccessDeniedException@@YAXXZ
+                          DE ?__abi_WinRTraiseCOMException@@YAXJ@Z
+                          DF ?__abi_WinRTraiseChangedStateException@@YAXXZ
+                          E0 ?__abi_WinRTraiseClassNotRegisteredException@@YAXXZ
+                          E1 ?__abi_WinRTraiseDisconnectedException@@YAXXZ
+                          E2 ?__abi_WinRTraiseFailureException@@YAXXZ
+                          E3 ?__abi_WinRTraiseInvalidArgumentException@@YAXXZ
+                          E4 ?__abi_WinRTraiseInvalidCastException@@YAXXZ
+                          E5 ?__abi_WinRTraiseNotImplementedException@@YAXXZ
+                          E6 ?__abi_WinRTraiseNullReferenceException@@YAXXZ
+                          E7 ?__abi_WinRTraiseObjectDisposedException@@YAXXZ
+                          E8 ?__abi_WinRTraiseOperationCanceledException@@YAXXZ
+                          E9 ?__abi_WinRTraiseOutOfBoundsException@@YAXXZ
+                          EA ?__abi_WinRTraiseOutOfMemoryException@@YAXXZ
+                          EB ?__abi_WinRTraiseWrongThreadException@@YAXXZ
+                          EF ?__abi_translateCurrentException@@YAJ_N@Z
+
+    MSVCP140_APP.dll
+             140456FA0 Import Address Table
+             1404569C0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                         28E ?_Xlength_error@std@@YAXPEBD@Z
+
+    api-ms-win-core-winrt-error-l1-1-0.dll
+             140456FB0 Import Address Table
+             1404569D0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           4 RoFailFastWithErrorContext
+                          12 SetRestrictedErrorInfo
+
+    api-ms-win-core-winrt-error-l1-1-1.dll
+             140456FC8 Import Address Table
+             1404569E8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           D RoReportUnhandledError
+
+    api-ms-win-core-winrt-string-l1-1-0.dll
+             140456FD8 Import Address Table
+             1404569F8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           A WindowsCreateString
+                           C WindowsDeleteString
+                           E WindowsDuplicateString
+                          10 WindowsGetStringRawBuffer
+
+    combase.dll
+             140457000 Import Address Table
+             140456A20 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           0 CoCreateFreeThreadedMarshaler
+                           0 CoTaskMemAlloc
+                           0 CoTaskMemFree
+                           0 RoGetAgileReference
+
+    api-ms-win-core-synch-l1-2-0.dll
+             140457028 Import Address Table
+             140456A48 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           0 WaitOnAddress
+                           0 WakeByAddressAll
+                           0 WakeByAddressSingle
+
+    bcryptprimitives.dll
+             140457048 Import Address Table
+             140456A68 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           0 ProcessPrng
+
+    api-ms-win-core-winrt-l1-1-0.dll
+             140457058 Import Address Table
+             140456A78 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           3 RoInitialize
+
+    oleaut32.dll
+             140457068 Import Address Table
+             140456A88 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           0 GetErrorInfo
+                           0 SetErrorInfo
+                           0 SysFreeString
+                           0 SysStringLen
+
+    d3d11.dll
+             140457090 Import Address Table
+             140456AB0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           0 D3D11CreateDevice
+
+    VCRUNTIME140_APP.dll
+             1404570A0 Import Address Table
+             140456AC0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           1 _CxxThrowException
+                           8 __C_specific_handler
+                           E __CxxFrameHandler3
+                          20 __std_exception_copy
+                          21 __std_exception_destroy
+                          22 __std_terminate
+                          3A memcmp
+                          3B memcpy
+                          3C memmove
+                          3D memset
+
+    api-ms-win-crt-runtime-l1-1-0.dll
+             1404570F8 Import Address Table
+             140456B18 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                          15 _c_exit
+                          16 _cexit
+                          18 _configure_narrow_argv
+                          1E _crt_atexit
+                          23 _exit
+                          2B _get_narrow_winmain_command_line
+                          33 _initialize_narrow_environment
+                          34 _initialize_onexit_table
+                          36 _initterm
+                          37 _initterm_e
+                          3C _register_onexit_function
+                          3D _register_thread_local_exe_atexit_callback
+                          40 _seh_filter_exe
+                          42 _set_app_type
+                          54 abort
+                          55 exit
+
+    api-ms-win-crt-stdio-l1-1-0.dll
+             140457180 Import Address Table
+             140456BA0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           1 __p__commode
+                          54 _set_fmode
+
+    api-ms-win-crt-math-l1-1-0.dll
+             140457198 Import Address Table
+             140456BB8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           9 __setusermatherr
+                          44 acos
+                          45 acosf
+                          46 acosh
+                          47 acoshf
+                          49 asin
+                          4A asinf
+                          4B asinh
+                          4C asinhf
+                          4E atan
+                          4F atan2
+                          50 atan2f
+                          51 atanf
+                          8A cos
+                          8B cosf
+                          8C cosh
+                          8D coshf
+                          AC exp
+                          AD exp2
+                          AE exp2f
+                          B0 expf
+                          C4 fmod
+                          C5 fmodf
+                          D5 log
+                          D8 log1p
+                          D9 log1pf
+                          DB log2
+                          DC log2f
+                          E1 logf
+                          F9 pow
+                          FA powf
+                         10D sin
+                         10E sinf
+                         10F sinh
+                         110 sinhf
+                         113 tan
+                         114 tanf
+                         115 tanh
+                         116 tanhf
+
+    api-ms-win-crt-heap-l1-1-0.dll
+             1404572D8 Import Address Table
+             140456CF8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           8 _callnewh
+                          16 _set_new_mode
+                          18 free
+                          19 malloc
+
+    api-ms-win-crt-locale-l1-1-0.dll
+             140457300 Import Address Table
+             140456D20 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                           8 _configthreadlocale
+
+    api-ms-win-crt-string-l1-1-0.dll
+             140457310 Import Address Table
+             140456D30 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                          8B strlen
+                          9E wcscmp
+                          A3 wcslen
+
+SECTION HEADER #3
+   .data name
+    2120 virtual size
+  468000 virtual address (0000000140468000 to 000000014046A11F)
+    1C00 size of raw data
+  467000 file pointer to raw data (00467000 to 00468BFF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+C0000040 flags
+         Initialized Data
+         Read Write
+
+SECTION HEADER #4
+  .pdata name
+    C398 virtual size
+  46B000 virtual address (000000014046B000 to 0000000140477397)
+    C400 size of raw data
+  468C00 file pointer to raw data (00468C00 to 00474FFF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+40000040 flags
+         Initialized Data
+         Read Only
+
+SECTION HEADER #5
+    .tls name
+      C1 virtual size
+  478000 virtual address (0000000140478000 to 00000001404780C0)
+     200 size of raw data
+  475000 file pointer to raw data (00475000 to 004751FF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+C0000040 flags
+         Initialized Data
+         Read Write
+
+SECTION HEADER #6
+  .reloc name
+    74E8 virtual size
+  479000 virtual address (0000000140479000 to 00000001404804E7)
+    7600 size of raw data
+  475200 file pointer to raw data (00475200 to 0047C7FF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+42000040 flags
+         Initialized Data
+         Discardable
+         Read Only
+
+  Summary
+
+        3000 .data
+        D000 .pdata
+       E1000 .rdata
+        8000 .reloc
+      386000 .text
+        1000 .tls

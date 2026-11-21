@@ -24,8 +24,8 @@ $null = New-Item -Path $local -ItemType Directory -Force
 $work = Join-Path $local ('uwp-wasm-abi-probe-' + [Guid]::NewGuid().ToString('N'))
 $fixtureDirectory = if ($Fixture -eq 'Trap') { 'guest-trap' } else { 'guest' }
 $fixtureId = if ($Fixture -eq 'Trap') { 'uwp_wasm_trap_probe' } else { 'uwp_wasm_hook_probe' }
-$fixture = Join-Path $PSScriptRoot $fixtureDirectory
-Copy-Item -LiteralPath $fixture -Destination $work -Recurse
+$fixtureSource = Join-Path $PSScriptRoot $fixtureDirectory
+Copy-Item -LiteralPath $fixtureSource -Destination $work -Recurse
 if ($PrepareOnly) {
     Get-Item -LiteralPath $work
     return

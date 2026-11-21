@@ -1,0 +1,22 @@
+cargo +1.99.1 check --offline --locked -Z build-std=std,panic_abort --target thumbv7a-uwp-windows-msvc
+    Checking bytemuck v1.25.2
+    Checking serde v1.0.229
+   Compiling horizon-mod-vocab v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-mod-vocab)
+   Compiling horizon-mod-api v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-mod-api)
+    Checking horizon-core v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-core)
+    Checking horizon-mod-runtime v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-mod-runtime)
+    Checking mod-horizon-gyro-aim v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-gyro-api-20261121)
+    Finished `dev` profile [unoptimized] target(s) in 2m 34s
+cargo +1.99.1 check --offline --locked -Z build-std=std,panic_abort --target aarch64-uwp-windows-msvc
+    Checking bytemuck v1.25.2
+    Checking serde v1.0.229
+   Compiling horizon-mod-vocab v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-mod-vocab)
+   Compiling horizon-mod-api v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-mod-api)
+    Checking horizon-core v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-core)
+    Checking horizon-mod-runtime v0.1.0 (C:\Users\ben\AppData\Local\Temp\ml-0a875da\source\horizon-0a875da\crates\horizon-mod-runtime)
+    Checking mod-horizon-gyro-aim v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-gyro-api-20261121)
+    Finished `dev` profile [unoptimized] target(s) in 3m 43s
+cargo +1.99.1 check --offline --locked -Z build-std=std,panic_abort --target i686-uwp-windows-msvc
+    Finished `dev` profile [unoptimized] target(s) in 8.21s
+cargo +1.99.1 check --offline --locked -Z build-std=std,panic_abort --target x86_64-uwp-windows-msvc
+    Finished `dev` profile [unoptimized] target(s) in 2.07s

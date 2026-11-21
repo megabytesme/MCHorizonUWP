@@ -3,6 +3,10 @@ namespace Horizon.Builder.Core;
 public static class NightlyUwp
 {
     public const string UpstreamCommit = "0b14f8acfd97fa2c750e42795249dcc981178ca4";
+    public const string November20Commit = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a";
+    public const string November20SourceTag = "nightly-source/2026-11-20-0a875da";
+    public const string November20Patch = "0.1.13";
+    public const string November20Client = "0.1.14";
     public const string PatchVersion = "0.1.5";
     public const string ClientVersion = "0.1.6";
     public const string CandidatePatchVersion = "0.1.12";
@@ -34,12 +38,17 @@ public static class NightlyUwp
     // Local git archive of aa7b65c43ef008d0a92d20fcdf9f10fa0883f157, including the upload-shadow commit.
     internal const string FixedWgpuArchiveHash = "8de8795116083533812728a855144a5f5e229d0562ef07990393bc5124c48c2e";
 
-    public static bool Matches(string? commit) => string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);
+    private static bool IsNovember20(string? commit) => string.Equals(commit, November20Commit, StringComparison.OrdinalIgnoreCase);
+
+    public static bool Matches(string? commit) =>
+        IsNovember20(commit) || string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);
+
+    internal static string Date(string commit) => IsNovember20(commit) ? "2026-11-20" : "2026-11-18";
 
     internal static bool IsClient(string? version) =>
         version is ClientVersion or EmbeddedClientVersion or CodeRuntimeClientVersion
             or LegacyRendererClientVersion or ArmHudClientVersion or MobileControlsClientVersion
-            or FixedWgpuClientVersion or CandidateClientVersion;
+            or FixedWgpuClientVersion or CandidateClientVersion or November20Client;
 
     public static bool SupportsNativeSource(string patch, string client) =>
         (patch, client) is (EmbeddedPatchVersion, EmbeddedClientVersion)
@@ -48,18 +57,33 @@ public static class NightlyUwp
             or (ArmHudPatchVersion, ArmHudClientVersion)
             or (MobileControlsPatchVersion, MobileControlsClientVersion)
             or (FixedWgpuPatchVersion, FixedWgpuClientVersion)
-            or (CandidatePatchVersion, CandidateClientVersion);
+            or (CandidatePatchVersion, CandidateClientVersion)
+            or (November20Patch, November20Client);
 
     internal static bool UsesPackagedCodeRuntime(string? client, TargetProfile target) =>
         (client is CodeRuntimeClientVersion or LegacyRendererClientVersion or ArmHudClientVersion
-            or MobileControlsClientVersion or FixedWgpuClientVersion or CandidateClientVersion)
+            or MobileControlsClientVersion or FixedWgpuClientVersion or CandidateClientVersion or November20Client)
             && target is TargetProfile.DesktopX64 or TargetProfile.DesktopX86 or TargetProfile.SurfaceProX;
 
-    internal static bool UsesFixedWgpu(string? client) => client is FixedWgpuClientVersion or StreamingAudioClientVersion;
+    internal static bool UsesLegacyArm32Wasm(string? client, TargetProfile target) =>
+        client == November20Client && target == TargetProfile.WindowsMobile;
 
-    internal static bool MatchesRecipe(string patch, string client) =>
-        (patch, client) is (PatchVersion, ClientVersion) || SupportsNativeSource(patch, client);
+    internal static bool UsesWasmRuntime(string? client, TargetProfile target) =>
+        UsesPackagedCodeRuntime(client, target) || UsesLegacyArm32Wasm(client, target);
 
-    internal static string GameBuildId(string architecture, string patch = PatchVersion, string client = ClientVersion) =>
-        $"mchorizonuwp-{client}-patch-{patch}-{architecture}-{UpstreamCommit}";
+    internal static bool UsesFixedWgpu(string? client) =>
+        client is FixedWgpuClientVersion or StreamingAudioClientVersion or November20Client;
+
+    internal static bool MatchesRecipe(string commit, string patch, string client) =>
+        IsNovember20(commit)
+            ? (patch, client) is (November20Patch, November20Client)
+            : string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase)
+                && ((patch, client) is (PatchVersion, ClientVersion)
+                    || (client != November20Client && SupportsNativeSource(patch, client)));
+
+    internal static string GameBuildId(string architecture, string patch = PatchVersion, string client = ClientVersion)
+    {
+        var commit = client == November20Client ? November20Commit : UpstreamCommit;
+        return $"mchorizonuwp-{client}-patch-{patch}-{architecture}-{commit}";
+    }
 }

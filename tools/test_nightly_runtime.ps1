@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][version]$Version,
     [Parameter(Mandatory)][string]$EvidenceDirectory,
     [string]$WasmFixture,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$WasmFixtureSha256 = 'dfa34da1970cea7df2b7e9031fd17c56f9f47d591912f542a08275d82c5d1194',
     [switch]$Native,
     [switch]$DependentNative,
     [ValidateSet('enabled','disabled','re-enabled')][string[]]$States = @('enabled', 'disabled', 're-enabled'),
@@ -39,8 +40,8 @@ $baseConfig = @(if (Test-Path -LiteralPath $settings) {
 })
 if ($WasmFixture) {
     $digest = (Get-FileHash -LiteralPath $WasmFixture -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($digest -ne 'dfa34da1970cea7df2b7e9031fd17c56f9f47d591912f542a08275d82c5d1194') {
-        throw 'Use the original Nightly Wasm hook fixture.'
+    if ($digest -ne $WasmFixtureSha256) {
+        throw 'The Nightly Wasm hook fixture does not match its expected SHA-256.'
     }
     $mods = Join-Path $game 'horizon-mods'
     $null = New-Item -ItemType Directory -Force -Path $mods

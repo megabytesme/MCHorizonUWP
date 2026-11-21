@@ -5,6 +5,7 @@ param(
     [ValidateSet('x64', 'x86', 'arm64', 'arm')][string]$Architecture = 'x64',
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')][string]$PatchVersion = '0.1.7',
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')][string]$ClientVersion = '0.1.8',
+    [ValidatePattern('^[0-9a-f]{40}$')][string]$UpstreamCommit = '0b14f8acfd97fa2c750e42795249dcc981178ca4',
     [string[]]$AdditionalFeatures = @(),
     [ValidateRange(1, 256)][int]$Jobs = [Environment]::ProcessorCount,
     [string]$PreparedRustSource,
@@ -16,7 +17,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$commit = '0b14f8acfd97fa2c750e42795249dcc981178ca4'
 $source = (Resolve-Path -LiteralPath $Source).Path
 $output = [IO.Path]::GetFullPath($Output)
 $targetDirectory = [IO.Path]::GetFullPath($TargetDirectory)
@@ -29,7 +29,7 @@ $targets = @{
 }
 $target = $targets[$Architecture]
 $targetKey = $target.Replace('-', '_')
-$buildId = "mchorizonuwp-$ClientVersion-patch-$PatchVersion-$Architecture-$commit"
+$buildId = "mchorizonuwp-$ClientVersion-patch-$PatchVersion-$Architecture-$UpstreamCommit"
 $toolchain = '1.99.1-x86_64-pc-windows-msvc'
 $programX86 = [Environment]::GetFolderPath('ProgramFilesX86')
 $vcRoot = Join-Path $programX86 'Microsoft Visual Studio/2022/BuildTools/VC'
@@ -159,9 +159,15 @@ $env:CARGO_BUILD_JOBS = [string]$Jobs
 $env:RUSTC_BOOTSTRAP = '1'
 $env:__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS = 'nightly'
 $env:__CARGO_TESTS_ONLY_SRC_ROOT = Join-Path $rustSource 'library'
-$env:HORIZON_VERSION = 'nightly-2026-11-18-0b14f8a'
-$env:HORIZON_NIGHTLY = '2026-11-18 0b14f8a'
-$env:HORIZON_UPSTREAM_COMMIT = $commit
+$date = switch ($UpstreamCommit) {
+    '0b14f8acfd97fa2c750e42795249dcc981178ca4' { '2026-11-18' }
+    '0a875da91dbb0fdcb7ba8c42c11341aa229af51a' { '2026-11-20' }
+    default { throw 'Choose an upstream commit pinned by this development script.' }
+}
+$shortCommit = $UpstreamCommit.Substring(0, 7)
+$env:HORIZON_VERSION = "nightly-$date-$shortCommit"
+$env:HORIZON_NIGHTLY = "$date $shortCommit"
+$env:HORIZON_UPSTREAM_COMMIT = $UpstreamCommit
 $env:HORIZON_UWP_PORT_REF = "client-v$ClientVersion"
 $env:HORIZON_GAME_BUILD_ID = $buildId
 $env:HORIZON_UWP_XAML_SHELL = '1'

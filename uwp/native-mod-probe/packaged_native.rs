@@ -30,7 +30,6 @@ use abi::Allocator;
 
 const GAME_BUILD_ID: &str = env!("HORIZON_GAME_BUILD_ID");
 const RUSTC_VERSION: &str = env!("HORIZON_RUSTC_VERSION");
-const HORIZON: &str = "0b14f8acfd97fa2c750e42795249dcc981178ca4";
 const MIXINS: &str = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0";
 const RECORD: &str = "native-mods.json";
 const HEAD: u32 = 0x10;
@@ -189,7 +188,7 @@ fn check_manifest(package: &AdjacentManifest) -> Result<(), String> {
     let n = m.native.as_ref().ok_or("missing native declaration")?;
     if m.api != "0.2"
         || n.game != "26.3"
-        || n.horizon != HORIZON
+        || GAME_BUILD_ID.rsplit_once('-').is_none_or(|(_, upstream)| n.horizon != upstream)
         || n.mixins != MIXINS
         || !matches!(m.side, Side::Client | Side::Both)
         || m.version.split_whitespace().count() != 1

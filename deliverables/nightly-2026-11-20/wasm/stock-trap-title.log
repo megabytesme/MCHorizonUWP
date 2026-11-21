@@ -1,0 +1,26 @@
+Horizon Nightly 2026-11-20 · 0a875da
+wasm module cache disabled: folder C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-su80hs5r\trap-title\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+Horizon: wasm mods loaded (2): packages 359 ms, modules 7370 ms, linking 46 ms, instantiation 2 ms, subscriptions 0 ms, initialization 0 ms
+Horizon: content from 2 mod(s) in C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-su80hs5r\trap-title\.horizon-cache\mod-content\6d8d2486fd1433d7
+Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+load core tables: 32.68s
+load pack tables: 33.92s
+load items: 58.37s
+Horizon: resources loaded in 94.6s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+Horizon: control socket C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-su80hs5r\trap-title\ctl.json
+Horizon renderer: asking DirectX 12 for a graphics device
+Horizon renderer: NVIDIA GeForce RTX 3090 Ti (Dx12, DiscreteGpu)
+Horizon renderer: requesting the device (driver 32.0.16.2101) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | TIMESTAMP_QUERY_INSIDE_ENCODERS | TIMESTAMP_QUERY_INSIDE_PASSES | MAPPABLE_PRIMARY_BUFFERS | MULTI_DRAW_INDIRECT_COUNT | VERTEX_WRITABLE_STORAGE | CLEAR_TEXTURE | TEXTURE_ATOMIC | TIMESTAMP_QUERY | INDIRECT_FIRST_INSTANCE | RG11B10UFLOAT_RENDERABLE | FLOAT32_FILTERABLE | FLOAT32_BLENDABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 2147483644 bytes, 2048 texture layers)
+Horizon renderer: creating the pipelines
+Horizon renderer: pipelines ready (multi-draw on, occlusion culling on, GPU culling unavailable, GPU timer on)
+wasm mod libuwp_wasm_trap_probe.so stopped its group: Hook, depth 1, active epoch budget 100: wasm trap: wasm `unreachable` instruction executed: error while executing at wasm backtrace:
+    0: 0x157d09 - <unknown>!<wasm function 1618>
+    1: 0x7a2658 - <unknown>!<wasm function 10727>
+    2: 0x75e10c - <unknown>!<wasm function 10726>
+    3: 0x9b9824 - <unknown>!<wasm function 12626>: wasm trap: wasm `unreachable` instruction executed
+Horizon renderer: acquiring the first frame
+Horizon renderer: submitting the first frame
+Horizon: first frame after 15270 ms
+Horizon: worldgen data loaded in 692.7904ms

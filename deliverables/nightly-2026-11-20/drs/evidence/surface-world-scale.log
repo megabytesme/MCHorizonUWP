@@ -1,0 +1,18 @@
+UWP world scale probe startup
+adapter=AdapterInfo { name: "Qualcomm(R) Adreno(TM) 680 GPU", vendor: 1297040209, device: 1093874736, device_type: Other, device_pci_bus_id: "", driver: "D3D11", driver_info: "FL9_1; physical DXGI adapter; driver version 27.20.2160.0", backend: Dx11, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: None, limit_bucket: None }; max_texture_dimension_2d=2048
+Horizon renderer: FL9_1 world 161x95, output 161x95, selected scale 100%
+PASS: world color and depth 161x95, output 161x95, 1-pixel HUD and world gradient intact
+Horizon renderer: FL9_1 world 121x71, output 161x95, selected scale 75%
+PASS: world color and depth 121x71, output 161x95, 1-pixel HUD and world gradient intact
+Horizon renderer: FL9_1 world 108x64, output 161x95, selected scale 67%
+PASS: world color and depth 108x64, output 161x95, 1-pixel HUD and world gradient intact
+Horizon renderer: FL9_1 world 81x48, output 161x95, selected scale 50%
+PASS: world color and depth 81x48, output 161x95, 1-pixel HUD and world gradient intact
+PASS: world color and depth 81x48, output 161x95, 1-pixel HUD and world gradient intact
+Horizon renderer: FL9_1 world 48x81, output 95x161, selected scale 50%
+PASS: world color and depth 48x81, output 95x161, 1-pixel HUD and world gradient intact
+Horizon renderer: FL9_1 world 95x161, output 95x161, selected scale 100%
+PASS: world color and depth 95x161, output 95x161, 1-pixel HUD and world gradient intact
+Horizon renderer: FL9_1 world 1024x576, output 2048x1152, selected scale 50%
+PASS: world color and depth 1024x576, output 2048x1152, 1-pixel HUD and world gradient intact
+overall=PASS

@@ -1,0 +1,5 @@
+2026-11-21 Europe/London. Lumia pinned Windows Device Portal request to /api/os/devicefamily timed out before receiving an HTTP response.
+00:26:43 TCP 443 did not open in five seconds. Windows reported the configured IP neighbor as Reachable on Ethernet.
+Device state and installed package state were unavailable.
+00:44:37 Device Portal recovered. Package Manager registered the signed, isolated ARM32 probe and returned Success.
+00:45:18 Device Portal downloaded the complete probe report and confirmed the probe process had exited.

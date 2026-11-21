@@ -10,6 +10,7 @@ import tomllib
 
 
 UPSTREAM = "0b14f8acfd97fa2c750e42795249dcc981178ca4"
+NOV20_UPSTREAM = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
 MIXINS = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
 SDK_API = ".horizon/sdk/api/crates/horizon-mod-api"
 TARGETS = {"x64": "x86_64-uwp-windows-msvc", "x86": "i686-uwp-windows-msvc",
@@ -26,7 +27,7 @@ def plain_file(path):
     return path.read_bytes()
 
 
-def read_source(folder):
+def read_source(folder, upstream=UPSTREAM):
     for path in (folder, folder / "src"):
         meta = path.lstat()
         if not stat.S_ISDIR(meta.st_mode) or (
@@ -55,7 +56,7 @@ def read_source(folder):
             or mod_id in {"minecraft", "c", "horizon"} or not isinstance(mod_version, str)
             or not mod_version.strip() or any(ord(character) < 32 for character in mod_version)):
         raise ValueError(f"{folder}: invalid Horizon mod ID or version")
-    if (manifest.get("native") != {"game": "26.3", "horizon": UPSTREAM, "mixins": MIXINS}
+    if (manifest.get("native") != {"game": "26.3", "horizon": upstream, "mixins": MIXINS}
             or manifest.get("side") not in {"client", "both"}
             or manifest.get("api") != "0.2" or manifest.get("capabilities") != ["registries"]
             or any(manifest.get(key) for key in ("inject", "internals", "wasm", "jar"))
@@ -117,10 +118,12 @@ def stage(workspace, architecture, source_folders, game_build_id=None):
                                       ("0.1.8", "0.1.7"), ("0.1.9", "0.1.8"),
                                       ("0.1.10", "0.1.9"), ("0.1.11", "0.1.10"),
                                       ("0.1.12", "0.1.11"), ("0.1.13", "0.1.12"))]
+    expected.append(f"mchorizonuwp-0.1.14-patch-0.1.13-{architecture}-{NOV20_UPSTREAM}")
     game_build_id = game_build_id or expected[0]
     if game_build_id not in expected:
         raise ValueError("Build identity does not match the pinned UWP Nightly and architecture")
-    checked = [read_source(folder) for folder in source_folders]
+    upstream = game_build_id.rsplit("-", 1)[1]
+    checked = [read_source(folder, upstream) for folder in source_folders]
     ids = [manifest["id"] for _, manifest, _ in checked]
     names = [package["name"] for package, _, _ in checked]
     lock_path = bridge / "Cargo.lock"
@@ -208,7 +211,7 @@ pub fn start(startup: horizon_client::entry::Startup) -> horizon_client::Result<
                            '#[cfg(target_vendor = "uwp")]\npub use uwp::start_with_native;\n')
         (host / "embedded_host.rs").write_bytes(Path(__file__).with_name("embedded_host.rs").read_bytes())
     record = {"architecture": architecture, "rust_target": TARGETS[architecture], "rust_toolchain": "1.99.1",
-              "horizon": UPSTREAM, "mixins": MIXINS, "game_build_id": game_build_id,
+              "horizon": upstream, "mixins": MIXINS, "game_build_id": game_build_id,
               "cargo_lock_sha256": hashlib.sha256(lock_path.read_bytes()).hexdigest(), "mods": records}
     (snapshots / "build-record.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     print(f"Staged {len(checked)} trusted native source project(s).")

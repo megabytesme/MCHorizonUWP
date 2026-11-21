@@ -18,13 +18,15 @@ TOOLCHAIN = "1.99.1"
 def stage(workspace, architecture, sources, game_build_id):
     expected = (r"mchorizonuwp-[0-9]+\.[0-9]+\.[0-9]+-patch-[0-9]+\.[0-9]+\.[0-9]+-"
                 + architecture + "-" + STAGING["UPSTREAM"])
-    if not re.fullmatch(expected, game_build_id):
+    november20 = f"mchorizonuwp-0.1.14-patch-0.1.13-{architecture}-{STAGING['NOV20_UPSTREAM']}"
+    if not re.fullmatch(expected, game_build_id) and game_build_id != november20:
         raise ValueError("Expected the pinned UWP game build identity for this architecture")
     bridge = workspace / "uwp/game-bridge"
     output = bridge / "packaged-native"
     if output.exists():
         raise ValueError("Packaged native sources are already staged in this assembly")
-    checked = [STAGING["read_source"](source) for source in sources]
+    upstream = game_build_id.rsplit("-", 1)[1]
+    checked = [STAGING["read_source"](source, upstream) for source in sources]
     ids = {manifest["id"] for _, manifest, _ in checked}
     if len(ids) != len(checked):
         raise ValueError("Duplicate native mod ID")

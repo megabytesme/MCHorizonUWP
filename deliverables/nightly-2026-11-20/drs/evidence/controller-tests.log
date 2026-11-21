@@ -1,0 +1,14 @@
+
+running 10 tests
+test tests::paused_and_stalled_frames_do_not_carry_the_pressure_window_forward ... ok
+test tests::a_frame_near_the_target_stays_put ... ok
+test tests::it_starts_at_the_floor_and_climbs_while_there_is_room ... ok
+test tests::nothing_changes_at_or_above_100_or_without_gpu_times ... ok
+test tests::a_slow_frame_steps_down_but_never_below_the_floor ... ok
+test tests::reset_goes_back_to_the_floor ... ok
+test tests::frame_pressure_keeps_reductions_only_when_active_cost_falls ... ok
+test tests::the_gentle_pace_takes_big_steps_and_long_rests ... ok
+test tests::frame_pressure_warms_up_and_scales_up_when_active_work_fits ... ok
+test tests::a_slow_scene_still_steps_down ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

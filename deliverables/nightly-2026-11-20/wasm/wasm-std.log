@@ -1,0 +1,24 @@
+   Compiling compiler_builtins v0.1.160 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins)
+   Compiling libc v0.2.189
+   Compiling object v0.39.1
+   Compiling std v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\std)
+   Compiling rustc-std-workspace-core v1.99.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\rustc-std-workspace-core)
+   Compiling alloc v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\alloc)
+   Compiling memchr v2.8.3
+   Compiling adler2 v2.0.1
+   Compiling cfg-if v1.0.4
+   Compiling rustc-demangle v0.1.28
+   Compiling panic_abort v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\panic_abort)
+   Compiling rustc-literal-escaper v0.0.8
+   Compiling dlmalloc v0.2.14
+   Compiling unwind v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\unwind)
+   Compiling rustc-std-workspace-alloc v1.99.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\rustc-std-workspace-alloc)
+   Compiling panic_unwind v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\panic_unwind)
+   Compiling gimli v0.34.0
+   Compiling std_detect v0.1.5 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\std_detect)
+   Compiling miniz_oxide v0.9.1
+   Compiling hashbrown v0.17.1
+   Compiling addr2line v0.27.1
+   Compiling proc_macro v0.0.0 (C:\Users\ben\.rustup\toolchains\1.99.1-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\proc_macro)
+   Compiling horizon-wasm-std v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-upstream\horizon-0a875da\.local\guest\target\horizon-mod\horizon-wasm-std)
+    Finished `horizon-wasm` profile [optimized] target(s) in 21.10s

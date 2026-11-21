@@ -1,0 +1,7 @@
+
+running 3 tests
+test tests::calibration_rejects_motion_and_removes_stationary_bias ... ok
+test tests::camera_axes_turn_with_the_display ... ok
+test tests::motion_applies_per_axis_settings_and_stops_without_a_smoothing_tail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

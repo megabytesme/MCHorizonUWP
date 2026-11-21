@@ -1,0 +1,30 @@
+[
+  {
+    "Architecture": "arm",
+    "Machine": "01c4",
+    "AppContainer": true,
+    "GyroExports": true,
+    "SHA256": "9dc9592e6944b9f38104e169fb6e8e50a4bef938afe3b72b171f613ae2c3fbfe"
+  },
+  {
+    "Architecture": "arm64",
+    "Machine": "aa64",
+    "AppContainer": true,
+    "GyroExports": true,
+    "SHA256": "3f9f4acd68b4e6aa07412c5bdb2f6add3ebbba3dadc0e90c40a2cba3b2969225"
+  },
+  {
+    "Architecture": "x64",
+    "Machine": "8664",
+    "AppContainer": true,
+    "GyroExports": true,
+    "SHA256": "1949caf18c1b0895d876b31e7f911cd69d5672684f1afdf428696d215984e722"
+  },
+  {
+    "Architecture": "x86",
+    "Machine": "014c",
+    "AppContainer": true,
+    "GyroExports": true,
+    "SHA256": "dc61d19cd9d6417946538953228cb11e1d6b87082ac1a086955dcacd07b54c12"
+  }
+]

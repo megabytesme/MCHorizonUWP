@@ -1,0 +1,19 @@
+Horizon Nightly 2026-11-20 · 0a875da
+wasm module cache disabled: folder C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-5o9luyfi\disabled-title\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+load core tables: 2.77s
+load pack tables: 3.96s
+load items: 5.11s
+Horizon: resources loaded in 5.9s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+Horizon: control socket C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-5o9luyfi\disabled-title\ctl.json
+Horizon renderer: asking DirectX 12 for a graphics device
+Horizon renderer: NVIDIA GeForce RTX 3090 Ti (Dx12, DiscreteGpu)
+Horizon renderer: requesting the device (driver 32.0.16.2101) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | TIMESTAMP_QUERY_INSIDE_ENCODERS | TIMESTAMP_QUERY_INSIDE_PASSES | MAPPABLE_PRIMARY_BUFFERS | MULTI_DRAW_INDIRECT_COUNT | VERTEX_WRITABLE_STORAGE | CLEAR_TEXTURE | TEXTURE_ATOMIC | TIMESTAMP_QUERY | INDIRECT_FIRST_INSTANCE | RG11B10UFLOAT_RENDERABLE | FLOAT32_FILTERABLE | FLOAT32_BLENDABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 2147483644 bytes, 2048 texture layers)
+Horizon renderer: creating the pipelines
+Horizon renderer: pipelines ready (multi-draw on, occlusion culling on, GPU culling unavailable, GPU timer on)
+Horizon renderer: acquiring the first frame
+Horizon renderer: submitting the first frame
+Horizon: first frame after 8974 ms
+Horizon: worldgen data loaded in 459.6722ms

@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory)][string]$Workspace,
     [Parameter(Mandatory)][string]$WasmtimeArchive,
     [string]$Git = 'git',
-    [switch]$VendorOnly
+    [switch]$VendorOnly,
+    [switch]$LegacyArm32
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +15,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant
 }
 $enginePatch = Join-Path $PSScriptRoot 'horizon-uwp-wasm.patch'
 $runtimePatch = Join-Path $PSScriptRoot '../code-generation-probe/wasmtime/wasmtime-50.0.2-pulley-uwp.patch'
+$legacyPatch = Join-Path $PSScriptRoot 'wasmtime-pulley-legacy-arm32.patch'
 $vendorRoot = Join-Path $source 'third_party'
 $vendor = Join-Path $vendorRoot 'wasmtime-50.0.2'
 $config = Join-Path $source '.cargo/wasmtime-uwp.toml'
@@ -48,6 +50,10 @@ try {
             if ($LASTEXITCODE -ne 0) { throw 'Could not unpack the authenticated Wasmtime archive.' }
             & $Git -C $stagedVendor apply --whitespace=error-all $runtimePatch
             if ($LASTEXITCODE -ne 0) { throw 'Could not apply the Wasmtime Pulley patch.' }
+            if ($LegacyArm32) {
+                & $Git -C $stagedVendor apply --whitespace=error-all $legacyPatch
+                if ($LASTEXITCODE -ne 0) { throw 'Could not apply the legacy ARM32 Pulley patch.' }
+            }
             [IO.Directory]::Move($stagedVendor, $vendor)
         } finally {
             $actualStage = (Resolve-Path -LiteralPath $stageRoot).Path
@@ -57,7 +63,8 @@ try {
             }
         }
     } else {
-        & $Git -C $vendor apply --reverse --check $runtimePatch
+        $expectedPatch = if ($LegacyArm32) { $legacyPatch } else { $runtimePatch }
+        & $Git -C $vendor apply --reverse --check $expectedPatch
         if ($LASTEXITCODE -ne 0) { throw 'The existing Wasmtime directory has an unknown patch state.' }
     }
 } finally {

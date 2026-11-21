@@ -893,12 +893,12 @@ if (args.Length == 2 && args[0] == "--inspect-current-builder-catalog")
     return;
 }
 
-if (args.Length is 5 or 6 && args[0] == "--assemble-candidate")
+if (args.Length is 5 or 6 or 7 && args[0] == "--assemble-candidate")
 {
     static string HashInput(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git was not found.");
     await SourceAssembler.AssembleAsync(args[1], HashInput(args[1]), args[2], HashInput(args[2]), args[3], HashInput(args[3]), args[4], git,
-        args.Length == 6 ? args[5] : null);
+        args.Length >= 6 ? args[5] : null, args.Length == 7 ? args[6] : null);
     Console.WriteLine("Candidate source inputs assembled; this does not authenticate them or build a package.");
     return;
 }
@@ -2058,6 +2058,18 @@ static async Task TestReleaseSource()
             nightlyRecipe.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(nativeCandidate, trustedSourceSelection);
         LocalBuildRunner.ValidatePreparedRelease(nativeCandidate, new BuildSelection(TargetProfile.DesktopX64, true));
+        var november20 = new PreparedRelease(nativeCandidate.SourceDirectory,
+            nativeCandidate.Patch with { Version = NightlyUwp.November20Patch, UpstreamCommit = NightlyUwp.November20Commit },
+            nativeCandidate.Client with { Version = NightlyUwp.November20Client },
+            nativeCandidate.Compatibility, CatalogTrust.BuilderVersion, "x64");
+        LocalBuildRunner.ValidatePreparedRelease(november20, trustedSourceSelection);
+        Require(!NightlyUwp.MatchesRecipe(NightlyUwp.UpstreamCommit, NightlyUwp.November20Patch, NightlyUwp.November20Client)
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.CandidatePatchVersion, NightlyUwp.CandidateClientVersion),
+            "Nightly recipes reject source and SDK mismatches");
+        var november20Arm = new BuildSelection(TargetProfile.WindowsMobile, true);
+        Require(november20Arm.FeaturesForClient(NightlyUwp.November20Client).Contains("uwp-wasm")
+            && !november20Arm.FeaturesForClient(NightlyUwp.November20Client).Contains("uwp-native-mods"),
+            "November 20 ARM32 uses the Wasm runtime and build-time native embedding");
         try
         {
             LocalBuildRunner.ValidatePreparedRelease(nightlyRecipe, trustedSourceSelection);

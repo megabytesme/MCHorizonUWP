@@ -78,7 +78,7 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
         if (NightlyUwp.Matches(release.Patch.UpstreamCommit))
         {
-            if (!NightlyUwp.MatchesRecipe(release.Patch.Version, release.Client.Version))
+            if (!NightlyUwp.MatchesRecipe(release.Patch.UpstreamCommit, release.Patch.Version, release.Client.Version))
                 throw new InvalidOperationException("This UWP Nightly requires its matching patch and client.");
             if (selection.RegistryNativeMods is { Count: > 0 })
                 throw new InvalidOperationException(NightlyUwp.PublicNativeModsUnavailable);
@@ -87,7 +87,7 @@ public static class LocalBuildRunner
             throw new InvalidOperationException("This client requires the matching UWP Nightly.");
         if (selection.EmbedsNativeSources && (!NightlyUwp.Matches(release.Patch.UpstreamCommit)
             || !NightlyUwp.SupportsNativeSource(release.Patch.Version, release.Client.Version)))
-            throw new InvalidOperationException("Native source builds require a compatible Horizon Nightly 2026-11-18 patch and client.");
+            throw new InvalidOperationException("Native source builds require a compatible Horizon UWP Nightly patch and client.");
     }
 
     private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,
@@ -216,14 +216,17 @@ public static class LocalBuildRunner
         }
 
         var packagedCode = NightlyUwp.UsesPackagedCodeRuntime(release?.Client.Version, selection.Target);
-        if (packagedCode)
+        var wasmRuntime = NightlyUwp.UsesWasmRuntime(release?.Client.Version, selection.Target);
+        if (wasmRuntime)
         {
             var git = probe.FindOnPath("git.exe") ?? throw new InvalidOperationException("Git is required to stage Wasmtime.");
             progress?.Report("Staging the pinned Wasmtime runtime for the Horizon mod host.");
-            await RunProcess(powershell, snapshot, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+            var stageWasm = new List<string> { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                 "uwp/wasm-abi-probe/stage-runtime.ps1", "-Workspace", snapshot,
-                "-WasmtimeArchive", Path.Combine(snapshot, NightlyUwp.WasmtimeArchive), "-VendorOnly", "-Git", git],
-                progress: progress, captureFailureOutput: true);
+                "-WasmtimeArchive", Path.Combine(snapshot, NightlyUwp.WasmtimeArchive), "-VendorOnly", "-Git", git };
+            if (NightlyUwp.UsesLegacyArm32Wasm(release?.Client.Version, selection.Target))
+                stageWasm.Add("-LegacyArm32");
+            await RunProcess(powershell, snapshot, stageWasm, progress: progress, captureFailureOutput: true);
         }
 
         string? embeddedNative = null;
@@ -268,8 +271,9 @@ public static class LocalBuildRunner
         vcEnvironment["HORIZON_UPSTREAM_COMMIT"] = upstreamCommit;
         if (NightlyUwp.Matches(upstreamCommit))
         {
-            vcEnvironment["HORIZON_VERSION"] = "nightly-2026-11-18-" + upstreamShortCommit;
-            vcEnvironment["HORIZON_NIGHTLY"] = "2026-11-18 " + upstreamShortCommit;
+            var date = NightlyUwp.Date(upstreamCommit);
+            vcEnvironment["HORIZON_VERSION"] = $"nightly-{date}-{upstreamShortCommit}";
+            vcEnvironment["HORIZON_NIGHTLY"] = $"{date} {upstreamShortCommit}";
             vcEnvironment["HORIZON_GAME_BUILD_ID"] = NightlyUwp.GameBuildId(targetArchitecture, release!.Patch.Version, release.Client.Version);
         }
         vcEnvironment["HORIZON_UWP_PORT_REF"] = release is null ? LocalRecipe.SourceCommit : "client-v" + release.Client.Version;
@@ -421,7 +425,7 @@ public static class LocalBuildRunner
                 : identity is null ? "HorizonUWPPrototype" : LocalPackageInstaller.ClientPackageName, "-WinUIFramework", "2.7" };
         if (embeddedNative is not null) { packageArguments.Add("-EmbeddedNativeMods"); packageArguments.Add(embeddedNative); }
         if (gameBridge is not null) { packageArguments.Add("-GameBridge"); packageArguments.Add(gameBridge); }
-        if (packagedCode)
+        if (wasmRuntime)
         {
             packageArguments.Add("-WasmStandardLibrary");
             packageArguments.Add(Path.Combine(snapshot, NightlyUwp.WasmStandardLibrary));

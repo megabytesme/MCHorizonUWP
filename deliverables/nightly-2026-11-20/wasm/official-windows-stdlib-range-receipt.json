@@ -1,0 +1,14 @@
+{
+  "archive_bytes": 77548753,
+  "member": "horizon-windows-x64/horizon-wasm-std.wasm",
+  "central_directory_offset": 77200096,
+  "member_range": [
+    70932825,
+    71144793
+  ],
+  "compressed_size": 207872,
+  "expanded_size": 652958,
+  "crc32": "b3f50e54",
+  "sha256": "3c647d91c7c943ffb65a31ec406392de328daa7a6d2779e44e71c3561068b7dc",
+  "source": "HTTPS ranged ZIP member verified against central directory CRC32 and earlier signed launcher-installed copy"
+}

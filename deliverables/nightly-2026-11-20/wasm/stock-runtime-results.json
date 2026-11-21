@@ -1,0 +1,57 @@
+{
+  "game_sha256": "2b685d64b5c253eef2a03f7cc5ec7c141984fc543d18cd009079444ab3ef2e21",
+  "shared_std_sha256": "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f",
+  "fixture_sha256": "295326eb0dca7d0ffd9e7ca45b6a4aa31a7284ea818fafc50c804225dd89f3bc",
+  "runs": {
+    "enabled-world": {
+      "enabled": true,
+      "world": true,
+      "trap": false,
+      "pid": 58108,
+      "frames": 42,
+      "chunks": 49,
+      "exact_magenta_pixels_in_upper_right": 2304,
+      "seconds": 119.3,
+      "exit_code": 0,
+      "screen": "playing",
+      "capture_size_pixels": [
+        1440,
+        810
+      ]
+    },
+    "disabled-title": {
+      "enabled": false,
+      "world": false,
+      "trap": false,
+      "pid": 43756,
+      "frames": 4,
+      "chunks": 0,
+      "exact_magenta_pixels_in_upper_right": 0,
+      "seconds": 18.868,
+      "exit_code": 0,
+      "screen": "title",
+      "capture_size_pixels": [
+        1440,
+        810
+      ]
+    },
+    "trap-title": {
+      "enabled": true,
+      "world": false,
+      "trap": true,
+      "pid": 91732,
+      "frames": 5,
+      "screen": "title",
+      "chunks": 0,
+      "exact_magenta_pixels_in_upper_right": 2304,
+      "seconds": 122.777,
+      "exit_code": 0,
+      "trap_fixture_sha256": "7bbb95baf4117ee7495ec731f16e7c8ab3745862ef44de58efde53b832e7d53a",
+      "trap_reason": "Wasm unreachable stopped the trap fixture group. The visual mod kept rendering.",
+      "capture_size_pixels": [
+        1440,
+        810
+      ]
+    }
+  }
+}

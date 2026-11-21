@@ -1,0 +1,441 @@
+
+Dump of file C:\Users\ben\AppData\Local\Temp\mchorizon-gyro-api-20261121\prebuilt-host-kit\arm\HorizonUWP.exe
+
+File Type: EXECUTABLE IMAGE
+
+  Section contains the following imports:
+
+    api-ms-win-core-file-l1-1-0.dll
+                48F0E0 Import Address Table
+                4FBD14 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  406 SetFilePointerEx
+                  401 SetFileAttributesW
+                  3AC RemoveDirectoryW
+                  38D ReadFile
+                  1BA GetFileSizeEx
+                  4CA WriteFile
+                  118 FindNextFileW
+                   B2 DeleteFileW
+                  104 FindClose
+                  10D FindFirstFileW
+                   47 CompareFileTime
+
+    api-ms-win-core-file-l1-2-0.dll
+                48F110 Import Address Table
+                4FBD44 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   6B CreateFile2
+
+    api-ms-win-core-handle-l1-1-0.dll
+                48F120 Import Address Table
+                4FBD54 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   3A CloseHandle
+
+    api-ms-win-core-errorhandling-l1-1-0.dll
+                48F0D4 Import Address Table
+                4FBD08 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  1CD GetLastError
+                  37F RaiseException
+
+    api-ms-win-core-synch-l1-1-0.dll
+                48F158 Import Address Table
+                4FBD8C Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   66 CreateEventExA
+                    0 AcquireSRWLockExclusive
+                  3A6 ReleaseSRWLockExclusive
+                  495 WaitForSingleObject
+                  3FB SetEvent
+
+    api-ms-win-core-processthreads-l1-1-0.dll
+                48F130 Import Address Table
+                4FBD64 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  190 GetCurrentProcessId
+                  194 GetCurrentThreadId
+
+    api-ms-win-core-sysinfo-l1-1-0.dll
+                48F188 Import Address Table
+                4FBDBC Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  244 GetSystemTime
+                  246 GetSystemTimeAsFileTime
+                  265 GetTickCount64
+
+    api-ms-win-core-file-l2-1-0.dll
+                48F118 Import Address Table
+                4FBD4C Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   53 CopyFile2
+
+    api-ms-win-core-string-l1-1-0.dll
+                48F14C Import Address Table
+                4FBD80 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  4B9 WideCharToMultiByte
+                  32A MultiByteToWideChar
+
+    api-ms-win-core-com-l1-1-0.dll
+                48F0C0 Import Address Table
+                4FBCF4 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   1A CoGetContextToken
+                    7 CoCreateFreeThreadedMarshaler
+                   43 CoTaskMemFree
+                   42 CoTaskMemAlloc
+
+    api-ms-win-core-winrt-l1-1-0.dll
+                48F1B4 Import Address Table
+                4FBDE8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    7 RoUninitialize
+                    1 RoGetActivationFactory
+                    3 RoInitialize
+
+    XAudio2_9.dll
+                48F0B8 Import Address Table
+                4FBCEC Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                      Ordinal     1
+
+    api-ms-win-core-winrt-string-l1-1-0.dll
+                48F1C4 Import Address Table
+                4FBDF8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    B WindowsGetStringLen
+                    5 WindowsConcatString
+                    A WindowsDuplicateString
+                    8 WindowsDeleteString
+                    6 WindowsCreateString
+                    C WindowsGetStringRawBuffer
+                    4 WindowsCompareStringOrdinal
+                    7 WindowsCreateStringReference
+
+    horizon_uwp_game_bridge.dll
+                48F298 Import Address Table
+                4FBECC Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    D horizon_uwp_server_icon_read
+                   10 horizon_uwp_server_list_remove
+                    E horizon_uwp_server_list_add
+                   11 horizon_uwp_server_status
+                    F horizon_uwp_server_list_read
+                    9 horizon_uwp_probe_renderer
+                    6 horizon_uwp_port_ref
+                   17 horizon_uwp_world_summary
+                   16 horizon_uwp_upstream_release
+                    A horizon_uwp_release_label
+                    3 horizon_uwp_controller_navigation_stop
+                    2 horizon_uwp_controller_navigation_read
+                    0 horizon_uwp_bug_report_submit
+                   12 horizon_uwp_telemetry_delete
+                   13 horizon_uwp_telemetry_save
+                   14 horizon_uwp_telemetry_state
+                   15 horizon_uwp_upstream_ref
+                    C horizon_uwp_run_prepared
+                    7 horizon_uwp_prepare
+                    4 horizon_uwp_controller_test_read
+                    5 horizon_uwp_controller_test_stop
+                    1 horizon_uwp_controller_face_swap
+
+    vccorlib140_app.DLL
+                48F2F4 Import Address Table
+                4FBF28 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   5C ?CreateValue@Details@Platform@@YAP$AAVObject@2@W4TypeCode@2@PBX@Z
+                   EE ?__abi_make_type_id@@YAP$AAVType@Platform@@ABU__abi_type_descriptor@@@Z
+                   DB ?__abi_ObjectToString@__abi_details@@YAP$AAVString@Platform@@P$AAVObject@3@_N@Z
+                   EC ?__abi_cast_Object_to_String@__abi_details@@YAP$AAVString@Platform@@_NP$AAVObject@3@@Z
+                   ED ?__abi_cast_String_to_Object@__abi_details@@YAP$AAVObject@Platform@@P$AAVString@3@@Z
+                   2A ??0OutOfMemoryException@Platform@@Q$AAA@XZ
+                   B7 ?ReleaseInContextImpl@Details@Platform@@YAJPAUIUnknown@@0@Z
+                   9D ?GetProxyImpl@Details@Platform@@YAJPAUIUnknown@@ABU_GUID@@0PAPAU3@@Z
+                   9C ?GetObjectContext@Details@Platform@@YAPAUIUnknown@@XZ
+                   B3 ?ReCreateException@Exception@Platform@@SAP$AAV12@H@Z
+                   21 ??0Object@Platform@@Q$AAA@XZ
+                    F ??0DisconnectedException@Platform@@Q$AAA@XZ
+                   14 ??0FailureException@Platform@@Q$AAA@XZ
+                   19 ??0InvalidArgumentException@Platform@@Q$AAA@XZ
+                   12 ??0Exception@Platform@@Q$AAA@HP$AAVString@1@@Z
+                   B9 ?ResolveWeakReference@Details@Platform@@YAP$AAVObject@2@ABU_GUID@@PAPAU__abi_IUnknown@@@Z
+                   AD ?GetWeakReference@Details@Platform@@YAPAU__abi_IUnknown@@Q$ADVObject@2@@Z
+                   9A ?GetIBoxVtable@Details@Platform@@YAPAXPAX@Z
+                   EF ?__abi_translateCurrentException@@YAJ_N@Z
+                   5A ?CreateException@Exception@Platform@@SAP$AAV12@H@Z
+                   15 ??0GridLength@Xaml@UI@Windows@@QAA@NW4GridUnitType@123@@Z
+                   D4 ?UninitializeData@Details@Platform@@YAXH@Z
+                   AF ?InitializeData@Details@Platform@@YAJH@Z
+                   80 ?GetActivationFactoryByPCWSTR@@YAJPAXAAVGuid@Platform@@PAPAX@Z
+                   9B ?GetIidsFn@@YAJHPAKPBU__s_GUID@@PAPAVGuid@Platform@@@Z
+                   F9 ?get@Message@Exception@Platform@@Q$AAAP$AAVString@3@XZ
+                    D ??0Delegate@Platform@@Q$AAA@XZ
+                   99 ?GetIBoxArrayVtable@Details@Platform@@YAPAXPAX@Z
+                   57 ?AllocateException@Heap@Details@Platform@@SAPAXII@Z
+                   52 ?AlignedFree@Heap@Details@Platform@@SAXPAX@Z
+                   7D ?Free@Heap@Details@Platform@@SAXPAX@Z
+                   55 ?Allocate@Heap@Details@Platform@@SAPAXII@Z
+                   54 ?Allocate@Heap@Details@Platform@@SAPAXI@Z
+                   B8 ?ReleaseTarget@ControlBlock@Details@Platform@@AAAXXZ
+                   DE ?__abi_WinRTraiseCOMException@@YAXJ@Z
+                   E7 ?__abi_WinRTraiseObjectDisposedException@@YAXXZ
+                   E1 ?__abi_WinRTraiseDisconnectedException@@YAXXZ
+                   EB ?__abi_WinRTraiseWrongThreadException@@YAXXZ
+                   E0 ?__abi_WinRTraiseClassNotRegisteredException@@YAXXZ
+                   DF ?__abi_WinRTraiseChangedStateException@@YAXXZ
+                   E9 ?__abi_WinRTraiseOutOfBoundsException@@YAXXZ
+                   E3 ?__abi_WinRTraiseInvalidArgumentException@@YAXXZ
+                   EA ?__abi_WinRTraiseOutOfMemoryException@@YAXXZ
+                   DD ?__abi_WinRTraiseAccessDeniedException@@YAXXZ
+                   E2 ?__abi_WinRTraiseFailureException@@YAXXZ
+                   E8 ?__abi_WinRTraiseOperationCanceledException@@YAXXZ
+                   E6 ?__abi_WinRTraiseNullReferenceException@@YAXXZ
+                   E4 ?__abi_WinRTraiseInvalidCastException@@YAXXZ
+                   E5 ?__abi_WinRTraiseNotImplementedException@@YAXXZ
+                   AC ?GetTypeCode@Type@Platform@@SA?AW4TypeCode@2@P$AAV12@@Z
+                   81 ?GetCmdArguments@Details@Platform@@YAPAPA_WPAH@Z
+
+    MSVCP140_APP.dll
+                48F000 Import Address Table
+                4FBC34 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  295 ?__ExceptionPtrCopy@@YAXPAXPBX@Z
+                  589 _Mtx_unlock
+                  275 ?_Throw_Cpp_error@std@@YAXH@Z
+                  297 ?__ExceptionPtrCreate@@YAXPAX@Z
+                  299 ?__ExceptionPtrDestroy@@YAXPAX@Z
+                  298 ?__ExceptionPtrCurrentException@@YAXPAX@Z
+                  29A ?__ExceptionPtrRethrow@@YAXPBX@Z
+                  296 ?__ExceptionPtrCopyException@@YAXPAXPBX1@Z
+                  28E ?_Xlength_error@std@@YAXPBD@Z
+                  555 _Cnd_wait
+                  54B _Cnd_broadcast
+                  267 ?_Schedule_chore@details@Concurrency@@YAHPAU_Threadpool_chore@12@@Z
+                  25E ?_Release_chore@details@Concurrency@@YAXPAU_Threadpool_chore@12@@Z
+                  262 ?_ReportUnobservedException@details@Concurrency@@YAXXZ
+                  18E ?GetCurrentThreadId@platform@details@Concurrency@@YAJXZ
+                  28C ?_Xbad_function_call@std@@YAXXZ
+                  19A ?_CallInContext@_ContextCallback@details@Concurrency@@QBAXV?$function@$$A6AXXZ@std@@_N@Z
+                  264 ?_Reset@_ContextCallback@details@Concurrency@@AAAXXZ
+                  19C ?_Capture@_ContextCallback@details@Concurrency@@AAAXXZ
+                  190 ?ReportUnhandledError@_ExceptionHolder@details@Concurrency@@AAAXXZ
+                  231 ?_LogScheduleTask@_TaskEventLogger@details@Concurrency@@QAAX_N@Z
+                  230 ?_LogCancelTask@_TaskEventLogger@details@Concurrency@@QAAXXZ
+                  220 ?_IsNonBlockingThread@_Task_impl_base@details@Concurrency@@SA_NXZ
+                  194 ?_Assign@_ContextCallback@details@Concurrency@@AAAXPAX@Z
+                  21F ?_IsCurrentOriginSTA@_ContextCallback@details@Concurrency@@CA_NXZ
+                  232 ?_LogTaskCompleted@_TaskEventLogger@details@Concurrency@@QAAXXZ
+                  233 ?_LogTaskExecutionCompleted@_TaskEventLogger@details@Concurrency@@QAAXXZ
+                  235 ?_LogWorkItemStarted@_TaskEventLogger@details@Concurrency@@QAAXXZ
+                  234 ?_LogWorkItemCompleted@_TaskEventLogger@details@Concurrency@@QAAXXZ
+                  28F ?_Xout_of_range@std@@YAXPBD@Z
+                  585 _Mtx_lock
+
+    VCRUNTIME140_APP.dll
+                48F080 Import Address Table
+                4FBCB4 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   24 __std_terminate
+                    E __CxxFrameHandler3
+                   3E memset
+                   36 _purecall
+                   22 __std_exception_copy
+                   1C __current_exception_context
+                   1B __current_exception
+                    8 __C_specific_handler
+                   3B memcmp
+                   3C memcpy
+                   3D memmove
+                   23 __std_exception_destroy
+                    1 _CxxThrowException
+
+    api-ms-win-crt-stdio-l1-1-0.dll
+                48F264 Import Address Table
+                4FBE98 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   54 _set_fmode
+                   13 __stdio_common_vswprintf_s
+                    1 __p__commode
+                    F __stdio_common_vsprintf_s
+
+    api-ms-win-crt-string-l1-1-0.dll
+                48F278 Import Address Table
+                4FBEAC Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   89 strcpy_s
+                   A6 wcsncmp
+                   8B strlen
+                   9E wcscmp
+                   A3 wcslen
+                   7B iswspace
+                   86 strcmp
+
+    api-ms-win-crt-runtime-l1-1-0.dll
+                48F21C Import Address Table
+                4FBE50 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   2B _get_narrow_winmain_command_line
+                   55 exit
+                   42 _set_app_type
+                   40 _seh_filter_exe
+                   67 terminate
+                   16 _cexit
+                   23 _exit
+                   15 _c_exit
+                   1E _crt_atexit
+                   3C _register_onexit_function
+                   34 _initialize_onexit_table
+                   33 _initialize_narrow_environment
+                   18 _configure_narrow_argv
+                   3D _register_thread_local_exe_atexit_callback
+                   54 abort
+                   36 _initterm
+                   37 _initterm_e
+
+    api-ms-win-crt-heap-l1-1-0.dll
+                48F1F0 Import Address Table
+                4FBE24 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   19 malloc
+                   16 _set_new_mode
+                    8 _callnewh
+                   18 free
+
+    api-ms-win-crt-convert-l1-1-0.dll
+                48F1E8 Import Address Table
+                4FBE1C Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   3E _wcstoui64
+
+    api-ms-win-crt-math-l1-1-0.dll
+                48F20C Import Address Table
+                4FBE40 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   11 _dclass
+                    A __setusermatherr
+                   77 ceil
+
+    api-ms-win-crt-locale-l1-1-0.dll
+                48F204 Import Address Table
+                4FBE38 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    8 _configthreadlocale
+
+    api-ms-win-core-util-l1-1-0.dll
+                48F198 Import Address Table
+                4FBDCC Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   A7 DecodePointer
+
+    api-ms-win-core-synch-l1-2-0.dll
+                48F170 Import Address Table
+                4FBDA4 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  2A8 InitOnceBeginInitialize
+                  2AA InitOnceExecuteOnce
+                  49D WakeAllConditionVariable
+                  2A9 InitOnceComplete
+                  457 SleepConditionVariableSRW
+
+    api-ms-win-core-winrt-error-l1-1-0.dll
+                48F1A0 Import Address Table
+                4FBDD4 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    4 RoFailFastWithErrorContext
+                   12 SetRestrictedErrorInfo
+
+    api-ms-win-core-winrt-error-l1-1-1.dll
+                48F1AC Import Address Table
+                4FBDE0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    D RoReportUnhandledError
+
+    api-ms-win-core-processthreads-l1-1-1.dll
+                48F13C Import Address Table
+                4FBD70 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  2CB IsProcessorFeaturePresent
+
+    api-ms-win-core-profile-l1-1-0.dll
+                48F144 Import Address Table
+                4FBD78 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  374 QueryPerformanceCounter
+
+    api-ms-win-core-interlocked-l1-1-0.dll
+                48F128 Import Address Table
+                4FBD5C Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  2B4 InitializeSListHead
+
+  Summary
+
+       54000 .data
+        5000 .pdata
+       6F000 .rdata
+        9000 .reloc
+       8E000 .text

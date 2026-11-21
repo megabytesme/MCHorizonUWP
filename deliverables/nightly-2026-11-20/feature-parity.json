@@ -112,11 +112,11 @@
     },
     "arm32_dx12": {
       "short_name": "A32 12",
-      "description": "ARM32 D3D12 alternatives; earlier device probe rejected available adapter"
+      "description": "ARM32 D3D12 alternatives. Earlier device probe rejected available adapter"
     },
     "arm32_angle": {
       "short_name": "A32 GL",
-      "description": "ARM32 ANGLE alternatives; earlier device EGL surface probe failed"
+      "description": "ARM32 ANGLE alternatives. Earlier device EGL surface probe failed"
     }
   },
   "evidence": {
@@ -159,7 +159,7 @@
       "id": "world-entry",
       "category": "Core gameplay and networking",
       "official_behavior": "Open and play a saved single-player world",
-      "uwp_behavior_and_root_cause": "Integrated server and rendering were demonstrated in saved worlds on Surface D3D11 and Lumia. The Lumia passed a short run at two chunks. Existing x64 graphics evidence is multiplayer; it does not establish this exact signed build's single-player test.",
+      "uwp_behavior_and_root_cause": "Integrated server and rendering were demonstrated in saved worlds on Surface D3D11 and Lumia. The Lumia passed a short run at two chunks. Existing x64 graphics evidence is multiplayer. It does not establish this exact signed build's single-player test.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -189,7 +189,7 @@
       "id": "world-create",
       "category": "Core gameplay and networking",
       "official_behavior": "Create a new local world with seed, presets and data packs",
-      "uwp_behavior_and_root_cause": "World creation UI and server machinery ship. Prior Lumia world creation was initially blocked by a renderer panic; the fixed run opened a saved world, leaving new-world creation and data pack options to test.",
+      "uwp_behavior_and_root_cause": "World creation UI and server machinery ship. Prior Lumia world creation was initially blocked by a renderer panic. The fixed run opened a saved world, leaving new-world creation and data pack options to test.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -246,7 +246,7 @@
       "id": "creative",
       "category": "Core gameplay and networking",
       "official_behavior": "Creative mode, inventory, flight and building",
-      "uwp_behavior_and_root_cause": "The three desktop renderers joined a mode-creative scene; the scene does not cover every creative inventory operation. Record the per-mode gameplay test separately.",
+      "uwp_behavior_and_root_cause": "The three desktop renderers joined a mode-creative scene. The scene does not cover every creative inventory operation. Record the per-mode gameplay test separately.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -328,7 +328,7 @@
       "id": "chunks",
       "category": "Core gameplay and networking",
       "official_behavior": "Chunk generation, loading, meshing, uploads and persistence",
-      "uwp_behavior_and_root_cause": "ARM32 runs a compatibility path with constrained texture budget and upload batching. A 32-chunk run hit terrain allocation errors and device loss; short two-chunk play succeeded. Surface D3D11 saved-world coverage is limited to the projected path.",
+      "uwp_behavior_and_root_cause": "ARM32 runs a compatibility path with constrained texture budget and upload batching. A 32-chunk run hit terrain allocation errors and device loss. Short two-chunk play succeeded. Surface D3D11 saved-world coverage is limited to the projected path.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "V",
         "x64_dx12": "V",
@@ -723,7 +723,7 @@
       "id": "split-screen",
       "category": "Core gameplay and networking",
       "official_behavior": "Upstream splitscreen extra and multi-input seat routing",
-      "uwp_behavior_and_root_cause": "Upstream exposes the splitscreen extra. The UWP package uses one XAML/CoreWindow host; split-screen input and rendering were not exercised.",
+      "uwp_behavior_and_root_cause": "Upstream exposes the splitscreen extra. The UWP package uses one XAML/CoreWindow host. Split-screen input and rendering were not exercised.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "X",
         "x64_dx12": "X",
@@ -840,7 +840,7 @@
       "id": "renderer-angle",
       "category": "Graphics",
       "official_behavior": "UWP ANGLE over D3D11 with wgpu GLES",
-      "uwp_behavior_and_root_cause": "x64 signed package rendered a matched GLES3 multiplayer scene. It needs pinned DLLs and an EGL window configuration. No staged x86 or ARM64 runtime is verified. Lumia ANGLE surface probe failed; the evidence does not settle alternative driver paths.",
+      "uwp_behavior_and_root_cause": "x64 signed package rendered a matched GLES3 multiplayer scene. It needs pinned DLLs and an EGL window configuration. No staged x86 or ARM64 runtime is verified. Lumia ANGLE surface probe failed. The evidence does not settle alternative driver paths.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "X",
         "x64_dx12": "X",
@@ -855,7 +855,7 @@
         "arm32_angle": "H"
       },
       "engineering_priority": "P2",
-      "feasible_follow_up_and_acceptance": "Package and test the available alternatives separately; keep x64 ANGLE explicitly experimental.",
+      "feasible_follow_up_and_acceptance": "Package and test the available alternatives separately. Keep x64 ANGLE explicitly experimental.",
       "standard_mod_route": "no",
       "uwp_host_bridge_required": "yes",
       "evidence_refs": [
@@ -1093,7 +1093,7 @@
       "id": "fixed-scale",
       "category": "Graphics",
       "official_behavior": "Resolution Scale and native-resolution HUD",
-      "uwp_behavior_and_root_cause": "The baseline FL9_1 set_world_post returns before applying scale. The Lumia still presented 2561×1439 at its 50% setting. DX12 and GLES retain the ordinary world-post path; no fixed-scale measurement on those UWP configurations is in the baseline.",
+      "uwp_behavior_and_root_cause": "The baseline FL9_1 set_world_post returns before applying scale. The Lumia still presented 2561×1439 at its 50% setting. DX12 and GLES retain the ordinary world-post path. No fixed-scale measurement on those UWP configurations is in the baseline.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "U",
         "x64_dx12": "I",
@@ -1116,7 +1116,33 @@
         "https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-client-render/src/graphics.rs",
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "docs/nightly-mobile-2026-11-20.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "I",
+          "x64_dx12": "I",
+          "x64_angle": "I",
+          "x86_dx11_fl91": "I",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "Full-game candidate status. Production color/depth scaler and one-pixel HUD separation passed offscreen on x64 and x86 Win32 at actual FL9_1 and FL11_1 and signed ARM64 AppContainer at actual FL9_1. Signed ARM32 AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1. Lumia gameplay, output-surface scaling, sustained performance, touch and presentation remain unverified.",
+        "component_verification": {
+          "x64_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1",
+          "x86_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1",
+          "arm64_dx11_fl91": "Signed ARM64 AppContainer offscreen, 8/8 on Surface Pro X physical FL9_1",
+          "arm32_dx11_fl91": "Signed ARMNT AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1"
+        },
+        "evidence": [
+          "docs/nightly-drs-2026-11-20.md",
+          "deliverables/nightly-2026-11-20/drs/evidence/offscreen-readbacks.csv"
+        ]
+      }
     },
     {
       "id": "dynamic-scale",
@@ -1145,7 +1171,30 @@
         "https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-client-render/src/dynamic_resolution.rs",
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "docs/nightly-mobile-2026-11-20.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "I",
+          "x64_dx12": "I",
+          "x64_angle": "X",
+          "x86_dx11_fl91": "I",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "FL9_1 uses labeled frame pressure when GPU timestamps are unavailable, with bounded scale floor, warm-up, settled samples and confirmation of a scale trial. Ten controller tests and a sizing test passed. No sustained adaptive workload test on a physical game candidate is recorded here.",
+        "component_verification": {
+          "rules": "Warm-up, measured-pressure hysteresis, hold for CPU-bound work, confirmed and rejected reductions, stall and interrupted-window handling"
+        },
+        "evidence": [
+          "docs/nightly-drs-2026-11-20.md",
+          "deliverables/nightly-2026-11-20/drs/evidence/controller-tests.log"
+        ]
+      }
     },
     {
       "id": "fxaa",
@@ -1207,7 +1256,7 @@
       "id": "msaa4x",
       "category": "Graphics",
       "official_behavior": "4× opaque/cutout terrain MSAA including eligible native packs",
-      "uwp_behavior_and_root_cause": "The official target adds terrain multisampling and explicitly gates OpenGL; FL9_1 baseline predates this implementation and cannot be assumed to satisfy its resolve path. Modern UWP DX12 has source-level feasibility, pending post-migration tests.",
+      "uwp_behavior_and_root_cause": "The official target adds terrain multisampling and explicitly gates OpenGL. FL9_1 baseline predates this implementation and cannot be assumed to satisfy its resolve path. Modern UWP DX12 has source-level feasibility, pending post-migration tests.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "G",
         "x64_dx12": "I",
@@ -1235,7 +1284,7 @@
       "id": "fsr31",
       "category": "Graphics",
       "official_behavior": "FSR 3.1 frame generation",
-      "uwp_behavior_and_root_cause": "Existing FL9_1 capability gate forces it off. Modern UWP paths retain upstream source; there is no enabled-mode capture in the matched runs. The FL9_1 mission does not add this path.",
+      "uwp_behavior_and_root_cause": "Existing FL9_1 capability gate forces it off. Modern UWP paths retain upstream source. There is no enabled-mode capture in the matched runs. The FL9_1 mission does not add this path.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "G",
         "x64_dx12": "I",
@@ -1292,7 +1341,7 @@
       "id": "shader-pack-native",
       "category": "Graphics",
       "official_behavior": "Horizon WGSL .hshader packs and pack settings",
-      "uwp_behavior_and_root_cause": "FL9_1 rejects native shader packs. Modern renderers retain loader/pipeline code; OpenGL needs per-pack capability checks.",
+      "uwp_behavior_and_root_cause": "FL9_1 rejects native shader packs. Modern renderers retain loader/pipeline code. OpenGL needs per-pack capability checks.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "G",
         "x64_dx12": "I",
@@ -1348,7 +1397,7 @@
       "id": "shadows-post",
       "category": "Graphics",
       "official_behavior": "Pack shadow cache, mirrors, displacement, colored lights and post stages",
-      "uwp_behavior_and_root_cause": "These are pack-selected paths on eligible renderers. FL9_1 pack rejection and strict sampling/shader limits constrain them; ordinary entity shadow sprites are separate.",
+      "uwp_behavior_and_root_cause": "These are pack-selected paths on eligible renderers. FL9_1 pack rejection and strict sampling/shader limits constrain them. Ordinary entity shadow sprites are separate.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "G",
         "x64_dx12": "I",
@@ -1376,7 +1425,7 @@
       "id": "shader-rays",
       "category": "Graphics",
       "official_behavior": "Horizon pack ray-tracing stages and runtime resources",
-      "uwp_behavior_and_root_cause": "The official shader-pack API describes rays and layers. This is not evidence of DXR support. FL9_1 cannot use the pack pipeline; modern paths require the pack's declared capabilities and a runtime test.",
+      "uwp_behavior_and_root_cause": "The official shader-pack API describes rays and layers. This is not evidence of DXR support. FL9_1 cannot use the pack pipeline. Modern paths require the pack's declared capabilities and a runtime test.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "G",
         "x64_dx12": "I",
@@ -1403,7 +1452,7 @@
       "id": "shader-compute",
       "category": "Graphics",
       "official_behavior": "Pack compute stages and kept resources",
-      "uwp_behavior_and_root_cause": "The pack path depends on declared/adaptor support for compute and storage. FL9_1 rejects the pack and lacks compute; actual GLES support depends on context.",
+      "uwp_behavior_and_root_cause": "The pack path depends on declared/adaptor support for compute and storage. FL9_1 rejects the pack and lacks compute. Actual GLES support depends on context.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "G",
         "x64_dx12": "I",
@@ -1625,7 +1674,7 @@
       "id": "vsync",
       "category": "Graphics",
       "official_behavior": "VSync, present mode, limiter and frame pacing",
-      "uwp_behavior_and_root_cause": "x64 measured ~60 app Present starts/s with interval 1 in each renderer. That measures application submission, with no display scanout evidence. ARM reports FIFO at startup; other modes and refresh changes need tests.",
+      "uwp_behavior_and_root_cause": "x64 measured ~60 app Present starts/s with interval 1 in each renderer. That measures application submission, with no display scanout evidence. ARM reports FIFO at startup. Other modes and refresh changes need tests.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -1655,7 +1704,7 @@
       "id": "fullscreen",
       "category": "Graphics",
       "official_behavior": "Borderless fullscreen, exclusive fullscreen and mode selection",
-      "uwp_behavior_and_root_cause": "The UWP host controls fullscreen through Windows application view APIs; it presents using its XAML/CoreWindow composition path. There is no verified exclusive mode switch or refresh negotiation in the port.",
+      "uwp_behavior_and_root_cause": "The UWP host controls fullscreen through Windows application view APIs. It presents using its XAML/CoreWindow composition path. There is no verified exclusive mode switch or refresh negotiation in the port.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -1684,7 +1733,7 @@
       "id": "gpu-timer",
       "category": "Graphics",
       "official_behavior": "GPU query timestamps, pass timings and performance overlay",
-      "uwp_behavior_and_root_cause": "Compatibility renderers must show GPU n/a when queries are absent; Lumia physically did. Modern backends need adapter feature and valid sample verification. App Present intervals and CPU measurements are distinct metrics.",
+      "uwp_behavior_and_root_cause": "Compatibility renderers must show GPU n/a when queries are absent. Lumia physically did. Modern backends need adapter feature and valid sample verification. App Present intervals and CPU measurements are distinct metrics.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "I",
@@ -1713,7 +1762,7 @@
       "id": "advanced-buffers",
       "category": "Graphics",
       "official_behavior": "Texture arrays, floating-point depth, separate alpha and physical texture limits",
-      "uwp_behavior_and_root_cause": "FL9_1 substitutes packed sheets, Depth24Plus and coupled blending; it bounds cube and ordinary 2D texture size. HAL replay passed the retained depthless HUD path on ARM. Modern pipelines have independent feature limits.",
+      "uwp_behavior_and_root_cause": "FL9_1 substitutes packed sheets, Depth24Plus and coupled blending. It bounds cube and ordinary 2D texture size. HAL replay passed the retained depthless HUD path on ARM. Modern pipelines have independent feature limits.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "I",
@@ -1770,7 +1819,7 @@
       "id": "mouse",
       "category": "Input and accessibility",
       "official_behavior": "Absolute cursor, raw deltas, look, capture, scroll and sensitivity",
-      "uwp_behavior_and_root_cause": "The UWP Winit/window bridge owns the OS event feed. The shared client retains menu/control routing; screenshots do not validate mouse capture and raw input.",
+      "uwp_behavior_and_root_cause": "The UWP Winit/window bridge owns the OS event feed. The shared client retains menu/control routing. Screenshots do not validate mouse capture and raw input.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -1854,7 +1903,7 @@
       "id": "touch",
       "category": "Input and accessibility",
       "official_behavior": "Touch menu taps, MOVE, camera, HUD and input switching",
-      "uwp_behavior_and_root_cause": "Lumia hardware verified menu taps, movement and switch-away-on-GameSir; inventory, text entry and every gesture have no equivalent coverage.",
+      "uwp_behavior_and_root_cause": "Lumia hardware verified menu taps, movement and switch-away-on-GameSir. Inventory, text entry and every gesture have no equivalent coverage.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -1881,7 +1930,7 @@
       "id": "gamepad",
       "category": "Input and accessibility",
       "official_behavior": "Controller sticks, bindings, glyphs, face button swap, radial menu",
-      "uwp_behavior_and_root_cause": "UWP selects its gilrs/platform bridge. Shared mappings remain; GameSir input/handoff is physically proved and mapping/save/load corrections have automated coverage. Individual controller families and radial bindings are unverified.",
+      "uwp_behavior_and_root_cause": "UWP selects its gilrs/platform bridge. Shared mappings remain. GameSir input/handoff is physically proved and mapping/save/load corrections have automated coverage. Individual controller families and radial bindings are unverified.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -1995,7 +2044,7 @@
       "id": "dual-sense",
       "category": "Input and accessibility",
       "official_behavior": "DualSense adaptive triggers, shape haptics, lightbar and LEDs",
-      "uwp_behavior_and_root_cause": "Upstream HID extensions are behind the desktop controller dependency; the default UWP game bridge enables uwp-controller instead. The manifest's generic gamepad declaration is not an implementation of those control writes.",
+      "uwp_behavior_and_root_cause": "Upstream HID extensions are behind the desktop controller dependency. The default UWP game bridge enables uwp-controller instead. The manifest's generic gamepad declaration is not an implementation of those control writes.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "U",
         "x64_dx12": "U",
@@ -2052,7 +2101,7 @@
       "id": "debug-f3",
       "category": "Input and accessibility",
       "official_behavior": "F3 debug visibility, overlays, touch button and bindable pad action",
-      "uwp_behavior_and_root_cause": "Stock F3/overlay content is available; Lumia implements a touch F3 action and controller binding. Debug output shows unavailable GPU timing correctly.",
+      "uwp_behavior_and_root_cause": "Stock F3/overlay content is available. Lumia implements a touch F3 action and controller binding. Debug output shows unavailable GPU timing correctly.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -2161,13 +2210,38 @@
         "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
         "uwp/gyro-bridge/host/Gyrometer.cpp",
         "https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-mod-api/src/lib.rs"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "I",
+          "x64_dx12": "I",
+          "x64_angle": "I",
+          "x86_dx11_fl91": "I",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "Standalone standard native client mod, default off. Uses existing typed render_frame_pre and local rotation methods plus the narrow Gyrometer provider. ARM32 delivery uses Builder native embedding. ARM64, x64 and x86 use signed related-set DLLs or embedding. Physical sensor availability alone does not verify movement, orientation sign, controls, focus or enable/disable behavior in an isolated world.",
+        "component_verification": {
+          "arm64": "Surface Pro X WinRT GetDefault found a gyrometer (2 ms minimum report interval), orientation sensor and accelerometer",
+          "desktop": "Ben-Desktop WinRT GetDefault returned no gyrometer",
+          "arm32": "Host kit strict-linked with compatible clock import. Physical sensor and aim proof pending"
+        },
+        "evidence": [
+          "uwp/mods/horizon-gyro-aim/README.md",
+          "docs/nightly-integration-2026-11-20.md"
+        ]
+      }
     },
     {
       "id": "music",
       "category": "Audio",
       "official_behavior": "Music, menus and in-world track playback",
-      "uwp_behavior_and_root_cause": "The signed Lumia 1.0.0.8 run produced audible menu music. ARM64 mod captures used an audio-disabled fixture; desktop parity tests did not verify audio.",
+      "uwp_behavior_and_root_cause": "The signed Lumia 1.0.0.8 run produced audible menu music. ARM64 mod captures used an audio-disabled fixture. Desktop parity tests did not verify audio.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -2195,7 +2269,7 @@
       "id": "sound-effects",
       "category": "Audio",
       "official_behavior": "Sound effects and category/master volume",
-      "uwp_behavior_and_root_cause": "The user heard sound effects during the phone test; the same shared mixer owns volume. Exact setting tests and a cross-architecture audio run are missing.",
+      "uwp_behavior_and_root_cause": "The user heard sound effects during the phone test. The same shared mixer owns volume. Exact setting tests and a cross-architecture audio run are missing.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -2223,7 +2297,7 @@
       "id": "music-stream",
       "category": "Audio",
       "official_behavior": "Bounded music decode/streaming, loop, pause and end-of-stream",
-      "uwp_behavior_and_root_cause": "The adapted game decodes into a bounded ~480 KiB stereo PCM queue; the earlier whole-track decode could consume ~61 MiB. Six focused tests and audible phone playback establish this baseline route.",
+      "uwp_behavior_and_root_cause": "The adapted game decodes into a bounded ~480 KiB stereo PCM queue. The earlier whole-track decode could consume ~61 MiB. Six focused tests and audible phone playback establish this baseline route.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -2424,7 +2498,7 @@
       "id": "wasm-toggle",
       "category": "Mods",
       "official_behavior": "Mods enabled state, toggle persistence and restart",
-      "uwp_behavior_and_root_cause": "Signed x64/x86 preserved exact marker counts across enabled, disabled and re-enabled runs. Lumia first in-process restart hit a global registration seal and required a new process; ARM toggle sequence is unverified.",
+      "uwp_behavior_and_root_cause": "Signed x64/x86 preserved exact marker counts across enabled, disabled and re-enabled runs. Lumia first in-process restart hit a global registration seal and required a new process. ARM toggle sequence is unverified.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "V",
         "x64_dx12": "I",
@@ -2631,7 +2705,7 @@
       "id": "mod-ren",
       "category": "Mods",
       "official_behavior": "Mod pipeline registration, native shader APIs, custom renderers and advanced drawing",
-      "uwp_behavior_and_root_cause": "The portable GUI hook works on FL9_1. Advanced rendering and .hshader stages have different caps; no package's GUI marker establishes arbitrary pipelines, scene access or shader compatibility.",
+      "uwp_behavior_and_root_cause": "The portable GUI hook works on FL9_1. Advanced rendering and .hshader stages have different caps. No package's GUI marker establishes arbitrary pipelines, scene access or shader compatibility.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "I",
@@ -2661,7 +2735,7 @@
       "id": "mod-mixins",
       "category": "Mods",
       "official_behavior": "Native registration, generated injections, slots, advanced mixin-style hooks and unsafe trust boundaries",
-      "uwp_behavior_and_root_cause": "Trusted Rust and generated engine contracts exist, with different paths for attached native DLLs and embedded packages. Wasm is limited to the portable contract; no broad fixture coverage proves advanced injections on UWP.",
+      "uwp_behavior_and_root_cause": "Trusted Rust and generated engine contracts exist, with different paths for attached native DLLs and embedded packages. Wasm is limited to the portable contract. No broad fixture coverage proves advanced injections on UWP.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -2747,7 +2821,7 @@
       "id": "mod-browser",
       "category": "Mods",
       "official_behavior": "Official catalog, native bundle trust and launcher-driven install/update",
-      "uwp_behavior_and_root_cause": "Builder has registry browsing and trusted native source selection. UWP has import routes; no proof of the desktop launcher's full catalogue/update, author trust, or server modpack export workflow on any UWP cell.",
+      "uwp_behavior_and_root_cause": "Builder has registry browsing and trusted native source selection. UWP has import routes. No proof of the desktop launcher's full catalogue/update, author trust, or server modpack export workflow on any UWP cell.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -2777,7 +2851,7 @@
       "id": "uwp-package",
       "category": "Platform, performance and diagnostics",
       "official_behavior": "Signed client deployment, pinned assets framework and platform dependencies",
-      "uwp_behavior_and_root_cause": "Signed x64/x86/ARM64/ARM32 development installations exist with distinct evidence. Neutral asset framework reuse and strict link are packaging steps. These are prior artifacts; November 20 signatures and install proof require new packages.",
+      "uwp_behavior_and_root_cause": "Signed x64/x86/ARM64/ARM32 development installations exist with distinct evidence. Neutral asset framework reuse and strict link are packaging steps. These are prior artifacts. November 20 signatures and install proof require new packages.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -2807,7 +2881,7 @@
       "id": "sandbox",
       "category": "Platform, performance and diagnostics",
       "official_behavior": "AppContainer filesystem, installation resources and writable LocalState",
-      "uwp_behavior_and_root_cause": "Host resolves packaged assets through the package graph, stores mutable files in isolated data and patches filesystem access for legacy Mobile. Arbitrary desktop paths and roaming data are not equivalent; previous font fallback was necessary.",
+      "uwp_behavior_and_root_cause": "Host resolves packaged assets through the package graph, stores mutable files in isolated data and patches filesystem access for legacy Mobile. Arbitrary desktop paths and roaming data are not equivalent. Previous font fallback was necessary.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -2867,7 +2941,7 @@
       "id": "uri",
       "category": "Platform, performance and diagnostics",
       "official_behavior": "Open external HTTPS links and launcher actions",
-      "uwp_behavior_and_root_cause": "The shell uses Windows.System.Launcher.LaunchUriAsync; the gaming path and app availability on Mobile still matter.",
+      "uwp_behavior_and_root_cause": "The shell uses Windows.System.Launcher.LaunchUriAsync. The gaming path and app availability on Mobile still matter.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -2895,7 +2969,7 @@
       "id": "lifecycle",
       "category": "Platform, performance and diagnostics",
       "official_behavior": "Activate, suspend, resume, resize, visibility, orientation and save on exit",
-      "uwp_behavior_and_root_cause": "CoreWindow handlers and renderer surface lifetime code are carried. Mobile landscape and device launch exist; repeated suspend/resume and resize recovery are open.",
+      "uwp_behavior_and_root_cause": "CoreWindow handlers and renderer surface lifetime code are carried. Mobile landscape and device launch exist. Repeated suspend/resume and resize recovery are open.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "I",
         "x64_dx12": "I",
@@ -3068,7 +3142,7 @@
       "id": "cpu-times",
       "category": "Platform, performance and diagnostics",
       "official_behavior": "CPU timing, frame-time overlay, diagnostic metrics and worker pools",
-      "uwp_behavior_and_root_cause": "ARM uses port worker/thread/stack limits and default supportable graphics settings. Baseline reports actual CPU/wall intervals; raw DXGI measures application Present cadence. Their timing domains differ.",
+      "uwp_behavior_and_root_cause": "ARM uses port worker/thread/stack limits and default supportable graphics settings. Baseline reports actual CPU/wall intervals. Raw DXGI measures application Present cadence. Their timing domains differ.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -3216,7 +3290,7 @@
       "id": "shader-cache",
       "category": "Platform, performance and diagnostics",
       "official_behavior": "Pipeline/shader compilation, persistence and cold/first startup cost",
-      "uwp_behavior_and_root_cause": "Surfaces and compilation are functional in multiple signed runs. Lumia reports about 45 s first D3D11 pipeline creation; Wasm and resource staging may overlap. No exact target clock comparison exists.",
+      "uwp_behavior_and_root_cause": "Surfaces and compilation are functional in multiple signed runs. Lumia reports about 45 s first D3D11 pipeline creation. Wasm and resource staging may overlap. No exact target clock comparison exists.",
       "baseline_status_by_profile": {
         "x64_dx11_fl91": "L",
         "x64_dx12": "L",
@@ -7311,5 +7385,12 @@
         "runtime_evidence": null
       }
     ]
+  },
+  "target_candidate": {
+    "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "builder": "1.0.7",
+    "patch": "0.1.13",
+    "client": "0.1.14",
+    "status_scope": "Full-game feature acceptance on the November 20 UWP candidate. Component and stock tests stay scoped in their qualifications."
   }
 }

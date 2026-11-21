@@ -1,0 +1,63 @@
+{
+  "official_control_succeeded": true,
+  "client_kind": "stock desktop x64",
+  "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "builder_std_sha256": "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f",
+  "published_std_sha256": "3c647d91c7c943ffb65a31ec406392de328daa7a6d2779e44e71c3561068b7dc",
+  "shared_std_diffs": {
+    "octets": 252,
+    "sections": [
+      "11"
+    ]
+  },
+  "mismatched_byte_pairs": {
+    "backslash_to_slash": 252
+  },
+  "stdlib_size": 652958,
+  "fixtures": {
+    "uwp_wasm_hook_probe.hmod": {
+      "sha256": "295326eb0dca7d0ffd9e7ca45b6a4aa31a7284ea818fafc50c804225dd89f3bc",
+      "bytes": 2851960,
+      "wasm_sha512": "be99cdacf46444f83a1ef041d1e49127c273f61b968b7bf2830a2497139c5e70a453f3065bc06e7a2a338707c315af92aa43f34d15cfbb3c95856721c2dbb014",
+      "module_path": "mod.wasm",
+      "manifest": {
+        "id": "uwp_wasm_hook_probe",
+        "name": "UWP Wasm Hook Probe",
+        "version": "0.1.0",
+        "description": "Draws a small magenta square with Horizon's client GUI hook.",
+        "api": "0.2",
+        "side": "client",
+        "capabilities": [
+          "registries"
+        ],
+        "wasm_memory_mib": 32,
+        "wasm": {
+          "sha512": "be99cdacf46444f83a1ef041d1e49127c273f61b968b7bf2830a2497139c5e70a453f3065bc06e7a2a338707c315af92aa43f34d15cfbb3c95856721c2dbb014",
+          "toolchain": "1.99.1 58cf8f9c35b355199727627d07ae34a4e2846d67"
+        }
+      }
+    },
+    "uwp_wasm_trap_probe.hmod": {
+      "sha256": "7bbb95baf4117ee7495ec731f16e7c8ab3745862ef44de58efde53b832e7d53a",
+      "bytes": 2851895,
+      "wasm_sha512": "6e5a155c5cd0fa24532e47aaaf6421a545f9617c57d17fb9a24db79b615eaadc020af2979ed77fdc65c39265f57d84cb9ec5019ae60e249cf4bc15b63f833908",
+      "module_path": "mod.wasm",
+      "manifest": {
+        "id": "uwp_wasm_trap_probe",
+        "name": "UWP Wasm Trap Probe",
+        "version": "0.1.0",
+        "description": "Deliberately traps in the standard client GUI hook for runtime verification.",
+        "api": "0.2",
+        "side": "client",
+        "capabilities": [
+          "registries"
+        ],
+        "wasm_memory_mib": 32,
+        "wasm": {
+          "sha512": "6e5a155c5cd0fa24532e47aaaf6421a545f9617c57d17fb9a24db79b615eaadc020af2979ed77fdc65c39265f57d84cb9ec5019ae60e249cf4bc15b63f833908",
+          "toolchain": "1.99.1 58cf8f9c35b355199727627d07ae34a4e2846d67"
+        }
+      }
+    }
+  }
+}

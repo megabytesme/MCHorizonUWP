@@ -1,0 +1,24 @@
+Horizon Nightly 2026-11-20 · 0a875da
+wasm module cache disabled: folder C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-5o9luyfi\enabled-world\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+Horizon: wasm mods loaded (1): packages 333 ms, modules 6803 ms, linking 39 ms, instantiation 2 ms, subscriptions 0 ms, initialization 0 ms
+Horizon: content from 1 mod(s) in C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-5o9luyfi\enabled-world\.horizon-cache\mod-content\2cb4b774fd78b0d0
+Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+load core tables: 41.62s
+load pack tables: 42.54s
+Horizon: worldgen data loaded in 2.0082532s
+load items: 56.09s
+Horizon: world data preloaded for the launch's world in 16703 ms
+Horizon: resources loaded in 62.8s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+Horizon: no sound: audio off: HORIZON_NO_AUDIO is set
+Horizon: control socket C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\wasm-nov20\stock-wasm-5o9luyfi\enabled-world\ctl.json
+Horizon renderer: asking DirectX 12 for a graphics device
+Horizon renderer: NVIDIA GeForce RTX 3090 Ti (Dx12, DiscreteGpu)
+Horizon renderer: requesting the device (driver 32.0.16.2101) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | TIMESTAMP_QUERY_INSIDE_ENCODERS | TIMESTAMP_QUERY_INSIDE_PASSES | MAPPABLE_PRIMARY_BUFFERS | MULTI_DRAW_INDIRECT_COUNT | VERTEX_WRITABLE_STORAGE | CLEAR_TEXTURE | TEXTURE_ATOMIC | TIMESTAMP_QUERY | INDIRECT_FIRST_INSTANCE | RG11B10UFLOAT_RENDERABLE | FLOAT32_FILTERABLE | FLOAT32_BLENDABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 2147483644 bytes, 2048 texture layers)
+Horizon renderer: creating the pipelines
+Horizon renderer: pipelines ready (multi-draw on, occlusion culling on, GPU culling unavailable, GPU timer on)
+Horizon: live features ready in 127.028ms
+Horizon renderer: acquiring the first frame
+Horizon renderer: submitting the first frame
+Horizon: first frame after 42684 ms
+Horizon: disconnected: Server closed

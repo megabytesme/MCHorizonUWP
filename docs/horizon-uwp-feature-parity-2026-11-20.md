@@ -15,7 +15,16 @@ The official SDK metadata identifies Rust 1.99.1, package format 6, content API 
 - **Visible gaps backed by code.** The UWP bridge turns off upstream client defaults and omits the Play with Friends tunnel and desktop HID output extensions. The UWP narrator is inactive. UWP XAudio2 opens default output and the non-CPAL settings implementation cannot enumerate or switch devices. The desktop launcher's provisioning, versions, CLI and modpack workflow are split between Builder and the XAML shell, with partial coverage. [Bridge features](../uwp/game-bridge/Cargo.toml) · [Pre-game shell](../uwp/pregame/README.md) · [Baseline patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 - **FL9_1 compatibility affects all packaged D3D11 profiles.** The baseline `Fl91Caps::from_adapter` checks the backend rather than the physical feature level. Its restricted world-post and atlas paths disable actual fixed world scaling, adaptive scaling, FXAA/TAA, HDR, shader packs, menu blur, spectator post and FSR frame generation in those packaging profiles. The official November 20 source adds 4× terrain MSAA and TAA upscaling under suitable packs. Those features have backend and format gates and require dedicated validation on modern UWP paths. [Baseline patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [Pinned graphics](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md)
 - **Mods have different installation constraints.** Pulley runs interpreted Wasm with the matching shared standard library in AppContainer. Native Rust needs the exact patched engine identity. x64, x86 and ARM64 can use signed executable optional packages with related-set metadata. The verified ARM32 route embeds trusted source at Builder time, and requires a rebuild for code changes. The previous Lumia process hit a registration seal on re-entering the game, then succeeded after full restart. [Native packaging](native-mods-uwp-2026-11-19.md) · [Mod runtime](nightly-mod-runtime-2026-11-20.md)
-- **Hardware limits with observed evidence.** The Lumia's 32-chunk test lost the D3D11 device after allocation failures. A backed-up test profile ran in the same saved world at two chunks with a 16 MiB texture budget. The GPU overlay said `n/a`; the reported 64 ms wall and 43 ms CPU measurements cannot be subtracted to infer GPU time. The prior test stayed near 2561×1439 with the configured scale at 50%. [Lumia follow-up](nightly-mobile-2026-11-20.md)
+- **Hardware limits with observed evidence.** The Lumia's 32-chunk test lost the D3D11 device after allocation failures. A backed-up test profile ran in the same saved world at two chunks with a 16 MiB texture budget. The GPU overlay said `n/a`. The reported 64 ms wall and 43 ms CPU measurements cannot be subtracted to infer GPU time. The prior test stayed near 2561×1439 with the configured scale at 50%. [Lumia follow-up](nightly-mobile-2026-11-20.md)
+
+## November 20 UWP candidate
+
+Builder 1.0.7, patch 0.1.13 and client 0.1.14 use the pinned November 20 source. The baseline cells below describe earlier signed packages. The JSON entries for fixed scale, adaptive scaling and gyro aiming give candidate statuses and the scope of each verification.
+
+- **Fixed world scaling** uses a separate color and depth target on the compatibility renderer and draws the HUD at output resolution. Win32 x64 and x86 each passed eight readback cases at hardware FL9_1 and eight with the compatibility projection on FL11_1. The signed Surface Pro X AppContainer probe passed eight at physical FL9_1. The signed ARM32 AppContainer probe passed eight offscreen cases on the Lumia’s physical Adreno 430 FL9_1. Full-game Lumia scene measurements and the native HUD, touch and swapchain checks remain open. [DRS report](nightly-drs-2026-11-20.md)
+- **Adaptive scaling** applies the configured floor and target FPS with a conservative frame-pressure policy when the adapter cannot supply timestamps. Ten controller tests passed. The full candidate still needs matched sustained runs showing scale changes, the timing behind each change and the resulting frame pacing. [Controller evidence](../deliverables/nightly-2026-11-20/drs/evidence/controller-tests.log)
+- **Gyroscope aiming** is now a native client mod using the standard frame hook and local rotation API. The sensor provider stays inside the UWP host. The Surface reported a gyrometer with a 2 ms minimum report interval. Ben-Desktop reported no gyrometer. In-world motion, orientation and input coexistence still need physical verification. [Mod instructions](../uwp/mods/horizon-gyro-aim/README.md)
+- **Wasm ABI**. The exact November 20 stock x64 game loaded the rebuilt standard Wasm library and the new hook fixture in a scratch world. This exercises the official desktop host. AppContainer, Pulley and the four signed UWP packages have their own release gates. [Stock ABI evidence](nightly-2026-11-20-wasm.md)
 
 ## Highest-priority work
 
@@ -55,8 +64,8 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 | A64 11 | ARM64 D3D11 compatibility path, Surface Adreno 680 |
 | A64 12 | ARM64 D3D12, Surface Adreno 680 |
 | A32 11 | ARM32 D3D11 FL9_1, Lumia Adreno 430 |
-| A32 12 | ARM32 D3D12 alternatives; earlier device probe rejected available adapter |
-| A32 GL | ARM32 ANGLE alternatives; earlier device EGL surface probe failed |
+| A32 12 | ARM32 D3D12 alternatives. Earlier device probe rejected available adapter |
+| A32 GL | ARM32 ANGLE alternatives. Earlier device EGL surface probe failed |
 
 ## Core gameplay and networking
 
@@ -85,12 +94,12 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 | split-screen | Upstream splitscreen extra and multi-input seat routing | X | X | X | X | X | X | X | X | X | X | X |
 | starling-touch | Horizon touch paths where supplied by target platform | I | I | I | I | I | X | I | I | V | X | X |
 
-**world-entry**. Integrated server and rendering were demonstrated in saved worlds on Surface D3D11 and Lumia. The Lumia passed a short run at two chunks. Existing x64 graphics evidence is multiplayer; it does not establish this exact signed build's single-player test.
+**world-entry**. Integrated server and rendering were demonstrated in saved worlds on Surface D3D11 and Lumia. The Lumia passed a short run at two chunks. Existing x64 graphics evidence is multiplayer. It does not establish this exact signed build's single-player test.
 
 **P0**. Retest single player and clean exit on all four native targets. Standard mod route **no**. UWP host bridge **no**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [world-data.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/world-data.md) · [nightly-arm-hud-2026-11-20.md](../docs/nightly-arm-hud-2026-11-20.md) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
 
-**world-create**. World creation UI and server machinery ship. Prior Lumia world creation was initially blocked by a renderer panic; the fixed run opened a saved world, leaving new-world creation and data pack options to test.
+**world-create**. World creation UI and server machinery ship. Prior Lumia world creation was initially blocked by a renderer panic. The fixed run opened a saved world, leaving new-world creation and data pack options to test.
 
 **P0**. Create a disposable world per architecture, save, quit and reopen. Standard mod route **no**. UWP host bridge **no**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [world-data.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/world-data.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
@@ -100,7 +109,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P1**. Run a representative survival loop on desktop and mobile. Standard mod route **no**. UWP host bridge **no**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
 
-**creative**. The three desktop renderers joined a mode-creative scene; the scene does not cover every creative inventory operation. Record the per-mode gameplay test separately.
+**creative**. The three desktop renderers joined a mode-creative scene. The scene does not cover every creative inventory operation. Record the per-mode gameplay test separately.
 
 **P1**. Verify create, place, break, fly and inventory in isolated worlds. Standard mod route **no**. UWP host bridge **no**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
@@ -115,7 +124,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Run vanilla-parity harnesses and a small end-to-end gameplay suite against signed candidates. Standard mod route **no**. UWP host bridge **no**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [world-data.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/world-data.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**chunks**. ARM32 runs a compatibility path with constrained texture budget and upload batching. A 32-chunk run hit terrain allocation errors and device loss; short two-chunk play succeeded. Surface D3D11 saved-world coverage is limited to the projected path.
+**chunks**. ARM32 runs a compatibility path with constrained texture budget and upload batching. A 32-chunk run hit terrain allocation errors and device loss. Short two-chunk play succeeded. Surface D3D11 saved-world coverage is limited to the projected path.
 
 **P0**. Measure native target allocation and sustained play at increasing distances. Standard mod route **no**. UWP host bridge **no**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md) · [nightly-arm-hud-2026-11-20.md](../docs/nightly-arm-hud-2026-11-20.md) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
@@ -185,7 +194,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Verify stock extras individually and install the currently documented official mod equivalents. Standard mod route **yes**. UWP host bridge **conditional**.
 [extras.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/extras.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
 
-**split-screen**. Upstream exposes the splitscreen extra. The UWP package uses one XAML/CoreWindow host; split-screen input and rendering were not exercised.
+**split-screen**. Upstream exposes the splitscreen extra. The UWP package uses one XAML/CoreWindow host. Split-screen input and rendering were not exercised.
 
 **P2**. Inspect per-seat surfaces and run two local controllers on a standalone profile. Standard mod route **conditional**. UWP host bridge **conditional**.
 [extras.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/extras.md) · [README.md](../uwp/pregame/README.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
@@ -244,9 +253,9 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P0**. Verify x86 and Surface world plus valid timing on hardware DX12. Standard mod route **no**. UWP host bridge **yes**.
 [RENDERER_BACKENDS.md](../uwp/RENDERER_BACKENDS.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md) · [nightly-surface-2026-11-20.md](../docs/nightly-surface-2026-11-20.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md) · [nightly-2026-11-18.md](../docs/nightly-2026-11-18.md)
 
-**renderer-angle**. x64 signed package rendered a matched GLES3 multiplayer scene. It needs pinned DLLs and an EGL window configuration. No staged x86 or ARM64 runtime is verified. Lumia ANGLE surface probe failed; the evidence does not settle alternative driver paths.
+**renderer-angle**. x64 signed package rendered a matched GLES3 multiplayer scene. It needs pinned DLLs and an EGL window configuration. No staged x86 or ARM64 runtime is verified. Lumia ANGLE surface probe failed. The evidence does not settle alternative driver paths.
 
-**P2**. Package and test the available alternatives separately; keep x64 ANGLE explicitly experimental. Standard mod route **no**. UWP host bridge **yes**.
+**P2**. Package and test the available alternatives separately. Keep x64 ANGLE explicitly experimental. Standard mod route **no**. UWP host bridge **yes**.
 [RENDERER_BACKENDS.md](../uwp/RENDERER_BACKENDS.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
 
 **renderer-vulkan**. UWP build excludes wgpu Vulkan. The XAML launcher picks a packaged backend independently of vanilla graphics API preferences.
@@ -289,7 +298,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Expose the FL9_1 limitation and test mipmap/filter distinctions independently. Standard mod route **no**. UWP host bridge **no**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
 
-**fixed-scale**. The baseline FL9_1 set_world_post returns before applying scale. The Lumia still presented 2561×1439 at its 50% setting. DX12 and GLES retain the ordinary world-post path; no fixed-scale measurement on those UWP configurations is in the baseline.
+**fixed-scale**. The baseline FL9_1 set_world_post returns before applying scale. The Lumia still presented 2561×1439 at its 50% setting. DX12 and GLES retain the ordinary world-post path. No fixed-scale measurement on those UWP configurations is in the baseline.
 
 **P0**. Instrument world target versus surface dimensions and verify four fixed scales before adaptive policy. Standard mod route **no**. UWP host bridge **yes**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [graphics.rs](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-client-render/src/graphics.rs) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
@@ -309,12 +318,12 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Verify native DX12 and scope ANGLE support via feature checks first. Standard mod route **no**. UWP host bridge **no**.
 [Official releases](https://github.com/horizon-rust/horizon/releases/tag/nightly) · [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**msaa4x**. The official target adds terrain multisampling and explicitly gates OpenGL; FL9_1 baseline predates this implementation and cannot be assumed to satisfy its resolve path. Modern UWP DX12 has source-level feasibility, pending post-migration tests.
+**msaa4x**. The official target adds terrain multisampling and explicitly gates OpenGL. FL9_1 baseline predates this implementation and cannot be assumed to satisfy its resolve path. Modern UWP DX12 has source-level feasibility, pending post-migration tests.
 
 **P2**. Verify the target's resolve formats on DX12, with its documented single-sample fallback. Standard mod route **no**. UWP host bridge **no**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [Official releases](https://github.com/horizon-rust/horizon/releases/tag/nightly) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**fsr31**. Existing FL9_1 capability gate forces it off. Modern UWP paths retain upstream source; there is no enabled-mode capture in the matched runs. The FL9_1 mission does not add this path.
+**fsr31**. Existing FL9_1 capability gate forces it off. Modern UWP paths retain upstream source. There is no enabled-mode capture in the matched runs. The FL9_1 mission does not add this path.
 
 **P3**. Retain the gate and test capable backends independently of DRS. Standard mod route **no**. UWP host bridge **no**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
@@ -324,7 +333,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Verify in an HDR-capable Windows session and keep SDR behavior separately verified. Standard mod route **no**. UWP host bridge **conditional**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [hdr-passes.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/hdr-passes.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
 
-**shader-pack-native**. FL9_1 rejects native shader packs. Modern renderers retain loader/pipeline code; OpenGL needs per-pack capability checks.
+**shader-pack-native**. FL9_1 rejects native shader packs. Modern renderers retain loader/pipeline code. OpenGL needs per-pack capability checks.
 
 **P2**. Run a representative stock pack on DX12 and an eligible GLES pack. Standard mod route **conditional**. UWP host bridge **no**.
 [shaders.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/shaders.md) · [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
@@ -334,17 +343,17 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Verify terrain, shadows and composite outputs with a known fixture on eligible backends. Standard mod route **conditional**. UWP host bridge **no**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [shaders.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/shaders.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**shadows-post**. These are pack-selected paths on eligible renderers. FL9_1 pack rejection and strict sampling/shader limits constrain them; ordinary entity shadow sprites are separate.
+**shadows-post**. These are pack-selected paths on eligible renderers. FL9_1 pack rejection and strict sampling/shader limits constrain them. Ordinary entity shadow sprites are separate.
 
 **P2**. Report availability per stage and backend rather than per pack extension alone. Standard mod route **conditional**. UWP host bridge **no**.
 [shaders.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/shaders.md) · [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**shader-rays**. The official shader-pack API describes rays and layers. This is not evidence of DXR support. FL9_1 cannot use the pack pipeline; modern paths require the pack's declared capabilities and a runtime test.
+**shader-rays**. The official shader-pack API describes rays and layers. This is not evidence of DXR support. FL9_1 cannot use the pack pipeline. Modern paths require the pack's declared capabilities and a runtime test.
 
 **P3**. Validate a documented pack scene only on a compatible backend. Standard mod route **conditional**. UWP host bridge **no**.
 [shaders.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/shaders.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**shader-compute**. The pack path depends on declared/adaptor support for compute and storage. FL9_1 rejects the pack and lacks compute; actual GLES support depends on context.
+**shader-compute**. The pack path depends on declared/adaptor support for compute and storage. FL9_1 rejects the pack and lacks compute. Actual GLES support depends on context.
 
 **P2**. Check pipeline feature flags before making stages selectable. Standard mod route **conditional**. UWP host bridge **no**.
 [shaders.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/shaders.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
@@ -384,22 +393,22 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P1**. Verify F2 and mod hook in isolated LocalState, normal and high-resolution modes. Standard mod route **yes**. UWP host bridge **conditional**.
 [Official releases](https://github.com/horizon-rust/horizon/releases/tag/nightly) · [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md) · [nightly-arm-hud-2026-11-20.md](../docs/nightly-arm-hud-2026-11-20.md) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
 
-**vsync**. x64 measured ~60 app Present starts/s with interval 1 in each renderer. That measures application submission, with no display scanout evidence. ARM reports FIFO at startup; other modes and refresh changes need tests.
+**vsync**. x64 measured ~60 app Present starts/s with interval 1 in each renderer. That measures application submission, with no display scanout evidence. ARM reports FIFO at startup. Other modes and refresh changes need tests.
 
 **P1**. Verify toggle/state persistence and collect display cadence evidence separately. Standard mod route **no**. UWP host bridge **conditional**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [RENDERER_BACKENDS.md](../uwp/RENDERER_BACKENDS.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md) · [nightly-surface-2026-11-20.md](../docs/nightly-surface-2026-11-20.md) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
 
-**fullscreen**. The UWP host controls fullscreen through Windows application view APIs; it presents using its XAML/CoreWindow composition path. There is no verified exclusive mode switch or refresh negotiation in the port.
+**fullscreen**. The UWP host controls fullscreen through Windows application view APIs. It presents using its XAML/CoreWindow composition path. There is no verified exclusive mode switch or refresh negotiation in the port.
 
 **P2**. Test borderless resizing, verify explicit exclusive-mode UI rejection if unavailable. Standard mod route **no**. UWP host bridge **yes**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [RENDERER_BACKENDS.md](../uwp/RENDERER_BACKENDS.md) · [window.rs](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-client-input/src/window.rs) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**gpu-timer**. Compatibility renderers must show GPU n/a when queries are absent; Lumia physically did. Modern backends need adapter feature and valid sample verification. App Present intervals and CPU measurements are distinct metrics.
+**gpu-timer**. Compatibility renderers must show GPU n/a when queries are absent. Lumia physically did. Modern backends need adapter feature and valid sample verification. App Present intervals and CPU measurements are distinct metrics.
 
 **P0**. Check sample validity and truthful labeled DRS fallback on each hardware profile. Standard mod route **no**. UWP host bridge **no**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
 
-**advanced-buffers**. FL9_1 substitutes packed sheets, Depth24Plus and coupled blending; it bounds cube and ordinary 2D texture size. HAL replay passed the retained depthless HUD path on ARM. Modern pipelines have independent feature limits.
+**advanced-buffers**. FL9_1 substitutes packed sheets, Depth24Plus and coupled blending. It bounds cube and ordinary 2D texture size. HAL replay passed the retained depthless HUD path on ARM. Modern pipelines have independent feature limits.
 
 **P0**. Verify scaled render targets stay within adapter texture and memory limits. Standard mod route **no**. UWP host bridge **yes**.
 [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-arm-hud-2026-11-20.md](../docs/nightly-arm-hud-2026-11-20.md) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
@@ -429,7 +438,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P0**. Verify gameplay keys, rebinding, shortcuts and held-key release on focus changes. Standard mod route **yes**. UWP host bridge **yes**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [controllers.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/controllers.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-2026-11-18.md](../docs/nightly-2026-11-18.md)
 
-**mouse**. The UWP Winit/window bridge owns the OS event feed. The shared client retains menu/control routing; screenshots do not validate mouse capture and raw input.
+**mouse**. The UWP Winit/window bridge owns the OS event feed. The shared client retains menu/control routing. Screenshots do not validate mouse capture and raw input.
 
 **P0**. Exercise focus loss, relative camera and wheel on each desktop and tablet backend. Standard mod route **yes**. UWP host bridge **yes**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [mouse.rs](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-client-input/src/mouse.rs) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
@@ -444,12 +453,12 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P1**. Verify composition/commit with a second language and open the OS keyboard from chat. Standard mod route **no**. UWP host bridge **yes**.
 [architecture.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/architecture.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
 
-**touch**. Lumia hardware verified menu taps, movement and switch-away-on-GameSir; inventory, text entry and every gesture have no equivalent coverage.
+**touch**. Lumia hardware verified menu taps, movement and switch-away-on-GameSir. Inventory, text entry and every gesture have no equivalent coverage.
 
 **P0**. Repeat filmed tests for menus, look, movement, inventory, F3 and handoff. Standard mod route **conditional**. UWP host bridge **yes**.
 [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
 
-**gamepad**. UWP selects its gilrs/platform bridge. Shared mappings remain; GameSir input/handoff is physically proved and mapping/save/load corrections have automated coverage. Individual controller families and radial bindings are unverified.
+**gamepad**. UWP selects its gilrs/platform bridge. Shared mappings remain. GameSir input/handoff is physically proved and mapping/save/load corrections have automated coverage. Individual controller families and radial bindings are unverified.
 
 **P0**. Test GameSir and representative Windows pad families, reload settings and validate F3. Standard mod route **yes**. UWP host bridge **yes**.
 [controllers.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/controllers.md) · [Cargo.toml](../uwp/game-bridge/Cargo.toml) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
@@ -469,7 +478,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Observe phone vibration and controller motors on known supported devices. Standard mod route **conditional**. UWP host bridge **yes**.
 [controllers.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/controllers.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-2026-11-18.md](../docs/nightly-2026-11-18.md)
 
-**dual-sense**. Upstream HID extensions are behind the desktop controller dependency; the default UWP game bridge enables uwp-controller instead. The manifest's generic gamepad declaration is not an implementation of those control writes.
+**dual-sense**. Upstream HID extensions are behind the desktop controller dependency. The default UWP game bridge enables uwp-controller instead. The manifest's generic gamepad declaration is not an implementation of those control writes.
 
 **P2**. Map the supported Windows HID APIs to a narrowly scoped backend with a real DualSense. Standard mod route **no**. UWP host bridge **yes**.
 [controllers.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/controllers.md) · [Cargo.toml](../uwp/game-bridge/Cargo.toml) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [AppxManifest.xml](../uwp/host/AppxManifest.xml)
@@ -479,7 +488,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Evaluate Windows-compatible actuator control with actual hardware. Standard mod route **no**. UWP host bridge **yes**.
 [controllers.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/controllers.md) · [Cargo.toml](../uwp/game-bridge/Cargo.toml) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**debug-f3**. Stock F3/overlay content is available; Lumia implements a touch F3 action and controller binding. Debug output shows unavailable GPU timing correctly.
+**debug-f3**. Stock F3/overlay content is available. Lumia implements a touch F3 action and controller binding. Debug output shows unavailable GPU timing correctly.
 
 **P1**. Verify default/unassigned behavior and enable/disable through all three input routes. Standard mod route **yes**. UWP host bridge **conditional**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
@@ -509,17 +518,17 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 | positional-audio | Spatial attenuation, stereo panning, listener updates and mod sound changes | I | I | I | I | I | X | I | I | I | X | X |
 | audio-routing | Explicit device picker, switching and hotplug | U | U | U | U | U | U | U | U | U | U | U |
 
-**music**. The signed Lumia 1.0.0.8 run produced audible menu music. ARM64 mod captures used an audio-disabled fixture; desktop parity tests did not verify audio.
+**music**. The signed Lumia 1.0.0.8 run produced audible menu music. ARM64 mod captures used an audio-disabled fixture. Desktop parity tests did not verify audio.
 
 **P0**. Record in-world music and menu transitions with sound enabled on every native target. Standard mod route **conditional**. UWP host bridge **yes**.
 [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-surface-2026-11-20.md](../docs/nightly-surface-2026-11-20.md)
 
-**sound-effects**. The user heard sound effects during the phone test; the same shared mixer owns volume. Exact setting tests and a cross-architecture audio run are missing.
+**sound-effects**. The user heard sound effects during the phone test. The same shared mixer owns volume. Exact setting tests and a cross-architecture audio run are missing.
 
 **P0**. A/B master and category controls and confirm no startup mute or sound dropouts. Standard mod route **conditional**. UWP host bridge **yes**.
 [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-surface-2026-11-20.md](../docs/nightly-surface-2026-11-20.md)
 
-**music-stream**. The adapted game decodes into a bounded ~480 KiB stereo PCM queue; the earlier whole-track decode could consume ~61 MiB. Six focused tests and audible phone playback establish this baseline route.
+**music-stream**. The adapted game decodes into a bounded ~480 KiB stereo PCM queue. The earlier whole-track decode could consume ~61 MiB. Six focused tests and audible phone playback establish this baseline route.
 
 **P0**. Preserve bounded streaming and measure continuity during world entry and DRS. Standard mod route **conditional**. UWP host bridge **yes**.
 [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md)
@@ -575,7 +584,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P1**. Keep no-JIT route and measure memory, cold startup and failure behavior independently. Standard mod route **no**. UWP host bridge **conditional**.
 [SUMMARY.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md) · [README.md](../uwp/code-generation-probe/README.md)
 
-**wasm-toggle**. Signed x64/x86 preserved exact marker counts across enabled, disabled and re-enabled runs. Lumia first in-process restart hit a global registration seal and required a new process; ARM toggle sequence is unverified.
+**wasm-toggle**. Signed x64/x86 preserved exact marker counts across enabled, disabled and re-enabled runs. Lumia first in-process restart hit a global registration seal and required a new process. ARM toggle sequence is unverified.
 
 **P0**. Retest x64/x86 toggles and complete clean process restart behavior on Surface and Lumia. Standard mod route **yes**. UWP host bridge **no**.
 [SUMMARY.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
@@ -610,12 +619,12 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P1**. Exercise exact target hook families in world, including new screenshot and quit calls. Standard mod route **yes**. UWP host bridge **conditional**.
 [Official releases](https://github.com/horizon-rust/horizon/releases/tag/nightly) · [SUMMARY.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md) · [lib.rs](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-mod-api/src/lib.rs) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
 
-**mod-ren**. The portable GUI hook works on FL9_1. Advanced rendering and .hshader stages have different caps; no package's GUI marker establishes arbitrary pipelines, scene access or shader compatibility.
+**mod-ren**. The portable GUI hook works on FL9_1. Advanced rendering and .hshader stages have different caps. No package's GUI marker establishes arbitrary pipelines, scene access or shader compatibility.
 
 **P2**. Test a typed custom renderer without replacing stock drawing and separately test each allowed backend. Standard mod route **yes**. UWP host bridge **conditional**.
 [SUMMARY.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md) · [lib.rs](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-mod-api/src/lib.rs) · [shaders.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/shaders.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
 
-**mod-mixins**. Trusted Rust and generated engine contracts exist, with different paths for attached native DLLs and embedded packages. Wasm is limited to the portable contract; no broad fixture coverage proves advanced injections on UWP.
+**mod-mixins**. Trusted Rust and generated engine contracts exist, with different paths for attached native DLLs and embedded packages. Wasm is limited to the portable contract. No broad fixture coverage proves advanced injections on UWP.
 
 **P1**. Build architecture-specific registration plus representative mutation/injection fixtures. Standard mod route **yes**. UWP host bridge **conditional**.
 [SUMMARY.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md) · [lib.rs](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/crates/horizon-mod-api/src/lib.rs) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [native-mods-uwp-2026-11-19.md](../docs/native-mods-uwp-2026-11-19.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
@@ -630,7 +639,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P0**. Check dependency/version failures and safe restart/reopen without mutating original saves. Standard mod route **yes**. UWP host bridge **no**.
 [SUMMARY.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
 
-**mod-browser**. Builder has registry browsing and trusted native source selection. UWP has import routes; no proof of the desktop launcher's full catalogue/update, author trust, or server modpack export workflow on any UWP cell.
+**mod-browser**. Builder has registry browsing and trusted native source selection. UWP has import routes. No proof of the desktop launcher's full catalogue/update, author trust, or server modpack export workflow on any UWP cell.
 
 **P2**. Document available routes and test known public catalog content with explicit fixture versions. Standard mod route **conditional**. UWP host bridge **conditional**.
 [SUMMARY.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/modding/src/SUMMARY.md) · [launcher-commands.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/launcher-commands.md) · [README.md](../uwp/builder/README.md) · [native-mods-uwp-2026-11-19.md](../docs/native-mods-uwp-2026-11-19.md) · [validation.md](../docs/validation.md)
@@ -656,12 +665,12 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 | telemetry | Consent, activity heartbeat, crash/benchmark reporting and platform identity | I | I | I | I | I | X | I | I | I | X | X |
 | shader-cache | Pipeline/shader compilation, persistence and cold/first startup cost | L | L | L | L | L | X | L | L | L | X | X |
 
-**uwp-package**. Signed x64/x86/ARM64/ARM32 development installations exist with distinct evidence. Neutral asset framework reuse and strict link are packaging steps. These are prior artifacts; November 20 signatures and install proof require new packages.
+**uwp-package**. Signed x64/x86/ARM64/ARM32 development installations exist with distinct evidence. Neutral asset framework reuse and strict link are packaging steps. These are prior artifacts. November 20 signatures and install proof require new packages.
 
 **P0**. Strict-link, sign, verify hashes and install each candidate without touching original identities. Standard mod route **no**. UWP host bridge **yes**.
 [README.md](../uwp/builder/README.md) · [AppxManifest.xml](../uwp/host/AppxManifest.xml) · [nightly-2026-11-18.md](../docs/nightly-2026-11-18.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md)
 
-**sandbox**. Host resolves packaged assets through the package graph, stores mutable files in isolated data and patches filesystem access for legacy Mobile. Arbitrary desktop paths and roaming data are not equivalent; previous font fallback was necessary.
+**sandbox**. Host resolves packaged assets through the package graph, stores mutable files in isolated data and patches filesystem access for legacy Mobile. Arbitrary desktop paths and roaming data are not equivalent. Previous font fallback was necessary.
 
 **P0**. Verify packaged reads, LocalState writes, font fallback and out-of-sandbox error handling. Standard mod route **conditional**. UWP host bridge **yes**.
 [README.md](../uwp/builder/README.md) · [README.md](../uwp/pregame/README.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-arm-hud-2026-11-20.md](../docs/nightly-arm-hud-2026-11-20.md) · [nightly-2026-11-18.md](../docs/nightly-2026-11-18.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)
@@ -671,12 +680,12 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P1**. Round-trip worlds, mods, packs and a report using platform picker APIs. Standard mod route **conditional**. UWP host bridge **yes**.
 [README.md](../uwp/pregame/README.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md) · [nightly-2026-11-18.md](../docs/nightly-2026-11-18.md)
 
-**uri**. The shell uses Windows.System.Launcher.LaunchUriAsync; the gaming path and app availability on Mobile still matter.
+**uri**. The shell uses Windows.System.Launcher.LaunchUriAsync. The gaming path and app availability on Mobile still matter.
 
 **P2**. Open a public link and return without game/session loss. Standard mod route **conditional**. UWP host bridge **yes**.
 [XamlShell.cpp](../uwp/pregame/host/XamlShell.cpp) · [README.md](../uwp/pregame/README.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch)
 
-**lifecycle**. CoreWindow handlers and renderer surface lifetime code are carried. Mobile landscape and device launch exist; repeated suspend/resume and resize recovery are open.
+**lifecycle**. CoreWindow handlers and renderer surface lifetime code are carried. Mobile landscape and device launch exist. Repeated suspend/resume and resize recovery are open.
 
 **P0**. Suspend during world play, resume, rotate and quit on isolated packages with stage logging. Standard mod route **no**. UWP host bridge **yes**.
 [App.cpp](../uwp/host/App.cpp) · [RENDERER_BACKENDS.md](../uwp/RENDERER_BACKENDS.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-surface-2026-11-20.md](../docs/nightly-surface-2026-11-20.md)
@@ -706,7 +715,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Verify local scratch automation through supported UWP transport and report the allowed command subset. Standard mod route **conditional**. UWP host bridge **yes**.
 [agent-control.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/agent-control.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md) · [README.md](../uwp/pregame/README.md) · [AppxManifest.xml](../uwp/host/AppxManifest.xml)
 
-**cpu-times**. ARM uses port worker/thread/stack limits and default supportable graphics settings. Baseline reports actual CPU/wall intervals; raw DXGI measures application Present cadence. Their timing domains differ.
+**cpu-times**. ARM uses port worker/thread/stack limits and default supportable graphics settings. Baseline reports actual CPU/wall intervals. Raw DXGI measures application Present cadence. Their timing domains differ.
 
 **P0**. Collect matched medians and p95/p99 with CPU, wall and GPU kept separate. Standard mod route **no**. UWP host bridge **conditional**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-desktop-graphics-2026-11-20.md](../docs/nightly-desktop-graphics-2026-11-20.md) · [memory.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/memory.md)
@@ -731,7 +740,7 @@ Each cell describes the tested scope for the listed feature and backend. A verif
 **P2**. Verify local consent behavior and non-transmission paths with test transport. Standard mod route **no**. UWP host bridge **yes**.
 [telemetry.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/telemetry.md) · [README.md](../uwp/pregame/README.md) · [Cargo.toml](../uwp/game-bridge/Cargo.toml) · [validation.md](../docs/validation.md) · [nightly-surface-2026-11-20.md](../docs/nightly-surface-2026-11-20.md)
 
-**shader-cache**. Surfaces and compilation are functional in multiple signed runs. Lumia reports about 45 s first D3D11 pipeline creation; Wasm and resource staging may overlap. No exact target clock comparison exists.
+**shader-cache**. Surfaces and compilation are functional in multiple signed runs. Lumia reports about 45 s first D3D11 pipeline creation. Wasm and resource staging may overlap. No exact target clock comparison exists.
 
 **P1**. Compare cold/warm shader, guest and content sections without double-counting overlap. Standard mod route **no**. UWP host bridge **conditional**.
 [graphics.md](https://github.com/horizon-rust/horizon/blob/0a875da91dbb0fdcb7ba8c42c11341aa229af51a/docs/graphics.md) · [horizon-uwp-0.1.12.patch](../patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch) · [nightly-mobile-2026-11-20.md](../docs/nightly-mobile-2026-11-20.md) · [nightly-surface-2026-11-20.md](../docs/nightly-surface-2026-11-20.md) · [nightly-mod-runtime-2026-11-20.md](../docs/nightly-mod-runtime-2026-11-20.md)

@@ -1,0 +1,1 @@
+{"ok":true,"report":{"api":"0.2","capabilities":["registries"],"game":null,"id":"uwp_wasm_hook_probe","kind":"mod","requires":[],"sha256":"295326eb0dca7d0ffd9e7ca45b6a4aa31a7284ea818fafc50c804225dd89f3bc","side":"client","signed":false,"size":2851960,"version":"0.1.0","wasm":true}}
