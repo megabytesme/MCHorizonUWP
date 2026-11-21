@@ -1,0 +1,32 @@
+Horizon Nightly 2026-11-20 · 0a875da
+wasm module cache disabled: folder C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-desktop-runtime-validation\multiplayer-x64-20261121-031258744\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+Horizon: content from 1 mod(s) in C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-desktop-runtime-validation\multiplayer-x64-20261121-031258744\.horizon-cache\mod-content\42c324f4596251f9
+Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+load core tables: 4.39s
+load pack tables: 4.45s
+load items: 15.03s
+Horizon: resources loaded in 28.1s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[03:13:28] [Server thread/INFO]: Starting minecraft server version 26.3
+[03:13:28] [Server thread/INFO]: Loading properties
+[03:13:28] [Server thread/INFO]: Default game type: CREATIVE
+[03:13:28] [Server thread/INFO]: Generating keypair
+[03:13:28] [Server thread/INFO]: Starting Minecraft server on 127.0.0.1:58048
+[03:13:28] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!
+[03:13:28] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.
+[03:13:28] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.
+[03:13:28] [Server thread/WARN]: To change this, set "online-mode" to "true" in the server.properties file.
+[03:13:28] [Server thread/INFO]: Preparing level "Nov20Smoke"
+Horizon: worldgen data loaded in 445.4999ms
+Horizon: live features ready in 486.2289ms
+[03:13:44] [Server thread/INFO]: Chat filter on: 45 words (server.toml [chat_filter]; enabled = false turns it off)
+[03:13:44] [Server thread/INFO]: Done (45.242s)! For help, type "help"
+[03:13:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Nov20Smoke]'/minecraft:overworld
+[03:13:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Nov20Smoke]'/minecraft:the_nether
+[03:13:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Nov20Smoke]'/minecraft:the_end
+[03:13:45] [Server thread/INFO]: System chat: Game rule advance_time is now set to false
+[03:13:45] [Server thread/INFO]: System chat: Game rule advance_weather is now set to false
+[03:13:45] [Server thread/INFO]: System chat: Set minecraft:overworld to time marker minecraft:noon
+[03:13:45] [Server thread/INFO]: System chat: Set the weather to clear
+[03:14:34] [Server thread/INFO]: Player19150[/127.0.0.1:50073] logged in with entity id 1 at (-527.5, 69.0, 64.5)
+[03:14:34] [Server thread/INFO]: System chat: Player19150 joined the game
+[03:14:41] [Server thread/INFO]: [Not Secure] <Player19150> novnightlyprobe

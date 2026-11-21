@@ -476,7 +476,7 @@
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "Both signed November 20 D3D11 host-fix clients joined the exact stock 26.3 dedicated server, moved in the world, disconnected and rejoined in a fresh process with position preserved. These tests used a temporary exact-package loopback exemption. The x64 same-host wired-address attempt got as far as a TCP connection timeout. Separate-LAN-host and online sign-in routes remain open.",
+        "qualification": "Both signed November 20 D3D11 host-fix clients joined the exact stock 26.3 dedicated server, moved in the world, disconnected and rejoined in a fresh process with position preserved. These tests used a temporary exact-package loopback exemption. The x64 same-host wired-address attempt got as far as a TCP connection timeout. Separate-LAN-host and online sign-in routes remain open. The signed x64 and stock server also produced byte-identical generated tables for the shared content fixture and exchanged a test chat line.",
         "evidence": [
           "docs/nightly-cross-architecture-2026-11-20.md",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-multiplayer-lan/game.log",
@@ -484,7 +484,8 @@
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/host-fix-multiplayer/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/host-fix-multiplayer-reconnect/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x86/host-fix-multiplayer/result.json",
-          "deliverables/nightly-2026-11-20/runtime-evidence/x86/host-fix-multiplayer-reconnect/result.json"
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/host-fix-multiplayer-reconnect/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/multiplayer-matching-content/matching-content-proof.json"
         ]
       }
     },
@@ -2278,7 +2279,7 @@
           "x86_angle": "X",
           "arm64_dx11_fl91": "I",
           "arm64_dx12": "I",
-          "arm32_dx11_fl91": "I",
+          "arm32_dx11_fl91": "L",
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
@@ -2286,12 +2287,13 @@
         "component_verification": {
           "arm64": "Surface Pro X WinRT GetDefault found a gyrometer (2 ms minimum report interval), orientation sensor and accelerometer",
           "desktop": "Ben-Desktop WinRT GetDefault returned no gyrometer; the installed signed game displayed the unavailable-sensor status in a saved world",
-          "arm32": "Signed ARM32 AppContainer found Gyrometer.GetDefault (4 ms minimum) and received event and polled samples. In-world aim proof pending"
+          "arm32": "The signed embedded gyro 0.1.1 build visibly controlled both in-world camera axes in Ben's physical no-touch check at approximately 03:09 UTC. Alternate landscape, enabled/disabled restart and the numerical trace are separate unverified checks."
         },
         "evidence": [
           "uwp/mods/horizon-gyro-aim/README.md",
           "docs/nightly-integration-2026-11-20.md",
-          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/f3.png"
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/f3.png",
+          "deliverables/nightly-2026-11-20/drs/lumia-runtime/gyro-physical-provenance.json"
         ]
       }
     },

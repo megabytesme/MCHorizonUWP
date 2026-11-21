@@ -1,0 +1,37 @@
+{
+  "ServerTables": [
+    {
+      "Table": "entity-types.json",
+      "Hash": "5A068D74273407CBAFEB0275BEEC45F41AB3471E1AADCD515CEE965EDA989DB9",
+      "Probe": "uwp_smoke:probe"
+    },
+    {
+      "Table": "command-registries.json",
+      "Hash": "7840123783FF16CD3E9160C19CD44B409C2EA036D752C58A57346DFD85834EF6",
+      "Probe": "uwp_smoke:probe"
+    }
+  ],
+  "ClientTables": [
+    {
+      "Generation": "9410930610b7e9a6",
+      "Table": "entity-types.json",
+      "Hash": "5A068D74273407CBAFEB0275BEEC45F41AB3471E1AADCD515CEE965EDA989DB9"
+    },
+    {
+      "Generation": "9410930610b7e9a6",
+      "Table": "command-registries.json",
+      "Hash": "7840123783FF16CD3E9160C19CD44B409C2EA036D752C58A57346DFD85834EF6"
+    }
+  ],
+  "SameNamedTablesMatch": 2,
+  "ProtocolLogin": "[03:14:34] [Server thread/INFO]: Player19150[/127.0.0.1:50073] logged in with entity id 1 at (-527.5, 69.0, 64.5)",
+  "ServerChat": "[03:14:41] [Server thread/INFO]: [Not Secure] <Player19150> novnightlyprobe",
+  "NativeMarker": 4096,
+  "WasmMarker": 4096,
+  "Cleanup": {
+    "verified_utc": "2026-11-21T03:14:42.8075674Z",
+    "family": "MCHorizonUWP.NightlyNov20.HostFix.x64_4pd4jeb6snrqw",
+    "temporary_exemption_removed": true
+  },
+  "ServerExit": 0
+}
