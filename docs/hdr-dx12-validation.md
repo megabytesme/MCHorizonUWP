@@ -24,6 +24,10 @@ Ben-Desktop built each host from `C:\dev\personal\MCHorizonUWP-HDR-Nov20` with `
 | ARM32 | 10.0.19041.0 | `d9c320fd0ada9c8ff39ceeadfa42c9b0bec37fa3eb63833cc026412f60fc671f` |
 | ARM64 | 10.0.26100.0 | `9176bdaf1b3db1b3203a84923e464604a801a88c2778131ae6ca5a18872fcad8` |
 
+## Signed x64 development candidate
+
+The offline release build ran in `%TEMP%\mchorizon-hdr-nov20\assembled` on Ben-Desktop with 32 jobs, a separate `target-x64` and patched Rust 1.99.1 standard-library sources. Cargo finished in 19 minutes 10 seconds. The strict x64 game-bridge link passed. The package `MCHorizonUWP.HdrDev.x64` version `1.0.0.0` contains patch `0.1.16` and client `0.1.18`. SignTool verified the development APPX and its preserved copy. [Build receipt](../deliverables/hdr/x64/build-receipt.json) · [Package hashes and source commits](../deliverables/hdr/x64/package.json) · [APPX](../deliverables/hdr/x64/HorizonUWP-HDR-x64.appx)
+
 ## Checking the game surface
 
 The primary XAML view samples `DisplayInformation.GetAdvancedColorInfo` after activation and on advanced-color or visibility changes. Game threads read the cached kind, SDR white, peak and minimum in nits. Kind 2 means that HDR is active. Kind 1 means wide-gamut SDR, kind 0 means SDR, and −1 means that the API or reading is unavailable. The query and event belong to UniversalApiContract v6, introduced in Windows 10 build 17134. [Windows API contract](https://learn.microsoft.com/en-us/uwp/api/windows.graphics.display.displayinformation.getadvancedcolorinfo)

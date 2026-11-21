@@ -1,0 +1,28 @@
+{
+  "source": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-hdr-nov20\\assembled",
+  "target": "x86_64-uwp-windows-msvc",
+  "build_id": "mchorizonuwp-0.1.18-patch-0.1.16-x64-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "cargo_arguments": [
+    "+1.99.1-x86_64-pc-windows-msvc",
+    "--config",
+    ".cargo/wasmtime-uwp.toml",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "uwp/game-bridge/Cargo.toml",
+    "-Z",
+    "build-std=std,panic_abort",
+    "--target",
+    "x86_64-uwp-windows-msvc",
+    "--release",
+    "--target-dir",
+    "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-hdr-nov20\\target-x64",
+    "--features",
+    "uwp-dx11-renderer,uwp-dx12-renderer,native-touch-mod,native-device-vibration-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell,uwp-wasm"
+  ],
+  "cargo_log": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-hdr-nov20\\build-x64\\cargo-build-20261121-065609.log",
+  "bridge_archive": "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-hdr-nov20\\target-x64\\x86_64-uwp-windows-msvc\\release\\horizon_uwp_game_bridge.lib",
+  "bridge_sha256": "d29cd8bde0f7ceeb2720b540d6cea908c81bd19e22c07606f5bdb3e2a4de02e2",
+  "result": "passed"
+}

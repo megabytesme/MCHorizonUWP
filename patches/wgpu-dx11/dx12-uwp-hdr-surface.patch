@@ -1,0 +1,61 @@
+diff --git a/wgpu-hal/src/dx12/mod.rs b/wgpu-hal/src/dx12/mod.rs
+index 1203c483f..b0521b382 100644
+--- a/wgpu-hal/src/dx12/mod.rs
++++ b/wgpu-hal/src/dx12/mod.rs
+@@ -116,6 +116,11 @@ use windows::{
+ unsafe extern "C" {
+     fn horizon_uwp_attach_game_swapchain(swap_chain: *mut core::ffi::c_void) -> i32;
+     fn horizon_uwp_detach_game_swapchain() -> i32;
++    fn horizon_uwp_record_swapchain_color(
++        swap_chain: *mut core::ffi::c_void,
++        color_space: i32,
++        status: i32,
++    );
+     fn horizon_uwp_get_surface_metrics(
+         width: *mut u32,
+         height: *mut u32,
+@@ -1756,16 +1761,35 @@ impl crate::Surface for Surface {
+         // Apply the color space unconditionally (even for sRGB) so that
+         // reconfiguring away from HDR10 resets the swapchain's state.
+         //
+-        // We deliberately skip `CheckColorSpaceSupport`: a color space reporting as
+-        // unsupported is not a failure. Windows composites in scRGB and tone-maps
+-        // the color space down to the output, so `SetColorSpace1` still presents
+-        // correctly even when the check returns false (as the MS docs note). This
+-        // lets an app configure e.g. BT.2100 PQ on an SDR output and let the
+-        // compositor map it.
++        // Other targets can ask Windows to map HDR buffers to an SDR output.
++        // The UWP panel uses this path for actual HDR presentation only.
+         let color_space = map_surface_color_space(config.color_space);
+-        // SAFETY: `swap_chain` is a live `IDXGISwapChain3`; `color_space` is a
+-        // valid `DXGI_COLOR_SPACE_TYPE`.
+-        unsafe { swap_chain.SetColorSpace1(color_space) }.map_err(|err| {
++        #[cfg(target_vendor = "uwp")]
++        let uwp_panel = matches!(&self.target, SurfaceTarget::SwapChainPanel(_));
++        #[cfg(target_vendor = "uwp")]
++        if uwp_panel && config.color_space != wgt::SurfaceColorSpace::Srgb {
++            let support = unsafe { swap_chain.CheckColorSpaceSupport(color_space) };
++            let present = Dxgi::DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT.0 as u32;
++            if !support.as_ref().is_ok_and(|flags| flags & present != 0) {
++                log::warn!("UWP HDR swapchain color space {color_space:?} lacks DXGI present support: {support:?}");
++                return Err(crate::SurfaceError::Other(
++                    "UWP DXGI HDR color space is unavailable for presentation",
++                ));
++            }
++        }
++        let color_result = unsafe { swap_chain.SetColorSpace1(color_space) };
++        #[cfg(target_vendor = "uwp")]
++        if uwp_panel {
++            use windows::core::Interface as _;
++            let status = color_result
++                .as_ref()
++                .err()
++                .map_or(0, |error| error.code().0);
++            unsafe {
++                horizon_uwp_record_swapchain_color(swap_chain.as_raw(), color_space.0, status);
++            }
++        }
++        color_result.map_err(|err| {
+             log::error!("SetColorSpace1 failed: {err}");
+             crate::SurfaceError::Other("IDXGISwapChain3::SetColorSpace1")
+         })?;
