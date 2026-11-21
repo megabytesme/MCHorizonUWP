@@ -12,6 +12,8 @@ On the same adapter a native D3D12 command queue created flip-model composition 
 | R16G16B16A16_FLOAT (10) | RGB_FULL_G10_NONE_P709 (1) | IGNORE and PREMULTIPLIED | 0x1 (PRESENT) | S_OK |
 | R10G10B10A2_UNORM (24) | RGB_FULL_G2084_NONE_P2020 (12) | IGNORE and PREMULTIPLIED | 0x1 (PRESENT) | S_OK |
 
+The probe ran from `%TEMP%\mchorizon-hdr-nov20` with Visual Studio 2022 Build Tools MSVC 14.44 and SDK 26100. In a Developer Command Prompt, run `cl /nologo /std:c++17 /W4 /EHsc /O2 /Fe:probe.exe <product>\tools\hdr_dxgi_probe.cpp /link dxgi.lib d3d11.lib d3d12.lib user32.lib`, then run `probe.exe` with the desktop GPU lock held. The executable SHA-256 was `f18187dc74dc905b4f87bf87015233c1bf30cff36c3f0b8d1fed0765e25904bb`. The raw log SHA-256 was `7f88d50373a85fe1d0d75bf5acb4f4219cbb8e2ee8e47cdbc0f7cf0b035447bf`. [Probe source](../tools/hdr_dxgi_probe.cpp) · [Raw log](../deliverables/hdr/dxgi-baseline.log) · [Machine-readable results](../deliverables/hdr/swapchain-probe-results.json)
+
 ## Native host verification
 
 Ben-Desktop built each host from `C:\dev\personal\MCHorizonUWP-HDR-Nov20` with `tools/build_host_artifact_kit.ps1 -Architecture <arch> -OutputDirectory "$env:TEMP/mchorizon-hdr-nov20/host-kit-<arch>"`. All three strict AppContainer links succeeded. `dumpbin /exports` found both `horizon_uwp_get_advanced_color` and `horizon_uwp_record_swapchain_color` on each executable.
