@@ -1,0 +1,17 @@
+{
+  "architecture": "arm",
+  "name": "MCHorizonUWP.Nov20.normal.arm",
+  "version": "1.0.2.0",
+  "source_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "build_id": "mchorizonuwp-0.1.17-patch-0.1.15-arm-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "bridge_sha256": "680cd889475f85b624ed6c90d03b614463ed558c323b8aa7d369a075724a748f",
+  "native_dlls_sha256": null,
+  "packages": [
+    {
+      "name": "HorizonUWP-arm.appx",
+      "role": "game",
+      "bytes": 42713812,
+      "sha256": "54bd37a55b635775b7bf8539394c71909af850751524bbcb08b8bffa43d6ccd1"
+    }
+  ]
+}
