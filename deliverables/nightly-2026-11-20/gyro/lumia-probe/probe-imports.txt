@@ -1,0 +1,397 @@
+
+Dump of file stage\GyrometerProbe.exe
+
+PE signature found
+
+File Type: EXECUTABLE IMAGE
+
+FILE HEADER VALUES
+             1C4 machine (ARM)
+               5 number of sections
+        75322F90 time date stamp
+               0 file pointer to symbol table
+               0 number of symbols
+              E0 size of optional header
+             122 characteristics
+                   Executable
+                   Application can handle large (>2GB) addresses
+                   32 bit word machine
+
+OPTIONAL HEADER VALUES
+             10B magic # (PE32)
+           14.44 linker version
+            5200 size of code
+            7C00 size of initialized data
+               0 size of uninitialized data
+            53F5 entry point (004053F5)
+            1000 base of code
+            7000 base of data
+          400000 image base (00400000 to 00410FFF)
+            1000 section alignment
+             200 file alignment
+            6.02 operating system version
+            0.00 image version
+            6.02 subsystem version
+               0 Win32 version
+           11000 size of image
+             400 size of headers
+               0 checksum
+               2 subsystem (Windows GUI)
+            9140 DLL characteristics
+                   Dynamic base
+                   NX compatible
+                   App Container
+                   Terminal Server Aware
+          100000 size of stack reserve
+            1000 size of stack commit
+          100000 size of heap reserve
+            1000 size of heap commit
+               0 loader flags
+              10 number of directories
+               0 [       0] RVA [size] of Export Directory
+            B028 [     1B8] RVA [size] of Import Directory
+               0 [       0] RVA [size] of Resource Directory
+            F000 [     5A8] RVA [size] of Exception Directory
+               0 [       0] RVA [size] of Certificates Directory
+           10000 [     B10] RVA [size] of Base Relocation Directory
+            93D0 [      38] RVA [size] of Debug Directory
+               0 [       0] RVA [size] of Architecture Directory
+               0 [       0] RVA [size] of Global Pointer Directory
+               0 [       0] RVA [size] of Thread Storage Directory
+            9310 [      C0] RVA [size] of Load Configuration Directory
+               0 [       0] RVA [size] of Bound Import Directory
+            7000 [     1D0] RVA [size] of Import Address Table Directory
+               0 [       0] RVA [size] of Delay Import Directory
+               0 [       0] RVA [size] of COM Descriptor Directory
+               0 [       0] RVA [size] of Reserved Directory
+
+
+SECTION HEADER #1
+   .text name
+    516C virtual size
+    1000 virtual address (00401000 to 0040616B)
+    5200 size of raw data
+     400 file pointer to raw data (00000400 to 000055FF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+60000020 flags
+         Code
+         Execute Read
+
+SECTION HEADER #2
+  .rdata name
+    5118 virtual size
+    7000 virtual address (00407000 to 0040C117)
+    5200 size of raw data
+    5600 file pointer to raw data (00005600 to 0000A7FF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+40000040 flags
+         Initialized Data
+         Read Only
+
+  Debug Directories
+
+        Time Type        Size      RVA  Pointer
+    -------- ------- -------- -------- --------
+    75322F90 coffgrp      2F0 0000A4E4     8AE4
+    75322F90 repro         24 0000A7D4     8DD4    30 38 7F 59 83 9B 82 C5 A6 58 6F 16 F1 9D 6F AC D4 1E 03 19 2A D6 74 86 F1 1B 10 CB 90 2F 32 75
+
+  Section contains the following imports:
+
+    api-ms-win-core-file-l1-2-1.dll
+                407040 Import Address Table
+                40B220 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   59 WriteFile
+                   1E FlushFileBuffers
+                    4 CreateFile2
+
+    api-ms-win-core-handle-l1-1-0.dll
+                407050 Import Address Table
+                40B230 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    0 CloseHandle
+
+    api-ms-win-core-synch-l1-2-0.dll
+                407078 Import Address Table
+                40B258 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    5 CreateEventExW
+                   24 ReleaseSRWLockExclusive
+                    0 AcquireSRWLockExclusive
+                   15 InitOnceExecuteOnce
+                   29 SetEvent
+                   37 WaitForSingleObjectEx
+
+    vccorlib140_app.DLL
+                407154 Import Address Table
+                40B334 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   D4 ?UninitializeData@Details@Platform@@YAXH@Z
+                   AF ?InitializeData@Details@Platform@@YAJH@Z
+                   80 ?GetActivationFactoryByPCWSTR@@YAJPAXAAVGuid@Platform@@PAPAX@Z
+                   9B ?GetIidsFn@@YAJHPAKPBU__s_GUID@@PAPAVGuid@Platform@@@Z
+                    F ??0DisconnectedException@Platform@@Q$AAA@XZ
+                    D ??0Delegate@Platform@@Q$AAA@XZ
+                   99 ?GetIBoxArrayVtable@Details@Platform@@YAPAXPAX@Z
+                   57 ?AllocateException@Heap@Details@Platform@@SAPAXII@Z
+                   52 ?AlignedFree@Heap@Details@Platform@@SAXPAX@Z
+                   7D ?Free@Heap@Details@Platform@@SAXPAX@Z
+                   55 ?Allocate@Heap@Details@Platform@@SAPAXII@Z
+                   E1 ?__abi_WinRTraiseDisconnectedException@@YAXXZ
+                   B8 ?ReleaseTarget@ControlBlock@Details@Platform@@AAAXXZ
+                   DE ?__abi_WinRTraiseCOMException@@YAXJ@Z
+                   E7 ?__abi_WinRTraiseObjectDisposedException@@YAXXZ
+                   EB ?__abi_WinRTraiseWrongThreadException@@YAXXZ
+                   E0 ?__abi_WinRTraiseClassNotRegisteredException@@YAXXZ
+                   DF ?__abi_WinRTraiseChangedStateException@@YAXXZ
+                   E9 ?__abi_WinRTraiseOutOfBoundsException@@YAXXZ
+                   E3 ?__abi_WinRTraiseInvalidArgumentException@@YAXXZ
+                   EA ?__abi_WinRTraiseOutOfMemoryException@@YAXXZ
+                   DD ?__abi_WinRTraiseAccessDeniedException@@YAXXZ
+                   E2 ?__abi_WinRTraiseFailureException@@YAXXZ
+                   E8 ?__abi_WinRTraiseOperationCanceledException@@YAXXZ
+                   E6 ?__abi_WinRTraiseNullReferenceException@@YAXXZ
+                   E4 ?__abi_WinRTraiseInvalidCastException@@YAXXZ
+                   E5 ?__abi_WinRTraiseNotImplementedException@@YAXXZ
+                   21 ??0Object@Platform@@Q$AAA@XZ
+                   EF ?__abi_translateCurrentException@@YAJ_N@Z
+                   81 ?GetCmdArguments@Details@Platform@@YAPAPA_WPAH@Z
+
+    MSVCP140_APP.dll
+                407000 Import Address Table
+                40B1E0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                  28E ?_Xlength_error@std@@YAXPBD@Z
+
+    VCRUNTIME140_APP.dll
+                407008 Import Address Table
+                40B1E8 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   24 __std_terminate
+                   22 __std_exception_copy
+                    8 __C_specific_handler
+                   3E memset
+                   3D memmove
+                   3C memcpy
+                    E __CxxFrameHandler3
+                   23 __std_exception_destroy
+                    1 _CxxThrowException
+
+    api-ms-win-crt-stdio-l1-1-0.dll
+                407134 Import Address Table
+                40B314 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   54 _set_fmode
+                    F __stdio_common_vsprintf_s
+                    1 __p__commode
+
+    api-ms-win-crt-string-l1-1-0.dll
+                407144 Import Address Table
+                40B324 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   A3 wcslen
+                   8B strlen
+                   9E wcscmp
+
+    api-ms-win-crt-heap-l1-1-0.dll
+                4070D0 Import Address Table
+                40B2B0 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   19 malloc
+                   16 _set_new_mode
+                    8 _callnewh
+                   18 free
+
+    api-ms-win-crt-runtime-l1-1-0.dll
+                4070F4 Import Address Table
+                40B2D4 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   40 _seh_filter_exe
+                   18 _configure_narrow_argv
+                   33 _initialize_narrow_environment
+                   2B _get_narrow_winmain_command_line
+                   36 _initterm
+                   37 _initterm_e
+                   55 exit
+                   23 _exit
+                   1E _crt_atexit
+                   16 _cexit
+                   15 _c_exit
+                   3D _register_thread_local_exe_atexit_callback
+                   42 _set_app_type
+                   34 _initialize_onexit_table
+                   3C _register_onexit_function
+
+    api-ms-win-crt-math-l1-1-0.dll
+                4070EC Import Address Table
+                40B2CC Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    A __setusermatherr
+
+    api-ms-win-crt-locale-l1-1-0.dll
+                4070E4 Import Address Table
+                40B2C4 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    8 _configthreadlocale
+
+    api-ms-win-core-winrt-string-l1-1-0.dll
+                4070BC Import Address Table
+                40B29C Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    C WindowsGetStringRawBuffer
+                    6 WindowsCreateString
+                    8 WindowsDeleteString
+                    A WindowsDuplicateString
+
+    api-ms-win-core-com-l1-1-1.dll
+                407030 Import Address Table
+                40B210 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   40 CoTaskMemAlloc
+                    7 CoCreateFreeThreadedMarshaler
+                   41 CoTaskMemFree
+
+    api-ms-win-core-util-l1-1-0.dll
+                40709C Import Address Table
+                40B27C Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    1 DecodePointer
+
+    api-ms-win-core-winrt-error-l1-1-1.dll
+                4070A4 Import Address Table
+                40B284 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    4 RoFailFastWithErrorContext
+                   12 SetRestrictedErrorInfo
+                    D RoReportUnhandledError
+
+    api-ms-win-core-profile-l1-1-0.dll
+                407070 Import Address Table
+                40B250 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    0 QueryPerformanceCounter
+
+    api-ms-win-core-processthreads-l1-1-2.dll
+                407060 Import Address Table
+                40B240 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    D GetCurrentProcessId
+                   11 GetCurrentThreadId
+                   2F IsProcessorFeaturePresent
+
+    api-ms-win-core-sysinfo-l1-2-1.dll
+                407094 Import Address Table
+                40B274 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                   14 GetSystemTimeAsFileTime
+
+    api-ms-win-core-interlocked-l1-2-0.dll
+                407058 Import Address Table
+                40B238 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    0 InitializeSListHead
+
+    api-ms-win-core-winrt-l1-1-0.dll
+                4070B4 Import Address Table
+                40B294 Import Name Table
+                     0 time date stamp
+                     0 Index of first forwarder reference
+
+                    3 RoInitialize
+
+SECTION HEADER #3
+   .data name
+    1730 virtual size
+    D000 virtual address (0040D000 to 0040E72F)
+    1600 size of raw data
+    A800 file pointer to raw data (0000A800 to 0000BDFF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+C0000040 flags
+         Initialized Data
+         Read Write
+
+SECTION HEADER #4
+  .pdata name
+     5A8 virtual size
+    F000 virtual address (0040F000 to 0040F5A7)
+     600 size of raw data
+    BE00 file pointer to raw data (0000BE00 to 0000C3FF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+40000040 flags
+         Initialized Data
+         Read Only
+
+SECTION HEADER #5
+  .reloc name
+     B10 virtual size
+   10000 virtual address (00410000 to 00410B0F)
+     C00 size of raw data
+    C400 file pointer to raw data (0000C400 to 0000CFFF)
+       0 file pointer to relocation table
+       0 file pointer to line numbers
+       0 number of relocations
+       0 number of line numbers
+42000040 flags
+         Initialized Data
+         Discardable
+         Read Only
+
+  Summary
+
+        2000 .data
+        1000 .pdata
+        6000 .rdata
+        1000 .reloc
+        6000 .text

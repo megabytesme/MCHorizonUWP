@@ -1,0 +1,9 @@
+Gyrometer capability probe 1.0.0.0
+Gyrometer.GetDefault=available
+MinimumReportIntervalMs=4
+ReportIntervalMs=16
+ReadingChanged=sample
+GetCurrentReading=sample
+Timestamp100ns=134396956988761977
+AngularVelocityDegreesPerSecond=-0.426641,-0.609362,0.426641
+probe complete

@@ -2229,7 +2229,7 @@
         "component_verification": {
           "arm64": "Surface Pro X WinRT GetDefault found a gyrometer (2 ms minimum report interval), orientation sensor and accelerometer",
           "desktop": "Ben-Desktop WinRT GetDefault returned no gyrometer",
-          "arm32": "Host kit strict-linked with compatible clock import. Physical sensor and aim proof pending"
+          "arm32": "Signed ARM32 AppContainer found Gyrometer.GetDefault (4 ms minimum) and received event and polled samples. In-world aim proof pending"
         },
         "evidence": [
           "uwp/mods/horizon-gyro-aim/README.md",

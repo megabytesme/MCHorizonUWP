@@ -1,0 +1,7 @@
+# Lumia 950 XL gyrometer capability probe
+
+On 21 November 2026, the isolated ARM32 AppContainer `MCHorizonUWP.GyrometerProbe` 1.0.0.0 installed successfully through the pinned Lumia Device Portal. Activation was accepted at 00:48:30 UTC. The probe recorded a real WinRT `ReadingChanged` sample and a `GetCurrentReading` sample. The device reported a 4 ms minimum interval, and the probe requested 16 ms. Device Portal confirmed that the process had exited by 00:48:32 UTC. The probe used its own package identity and LocalState.
+
+Ben-Desktop compiled `gyrometer-probe.cpp` as C++/CX with ARM32 MSVC 14.44.35207 and the Windows SDK 19041 headers. The executable linked with `/APPCONTAINER /MACHINE:ARM /NODEFAULTLIB:kernel32.lib` and Windows SDK 15063 `WindowsApp.lib`. The product's ARM32 dead-import sentinel was present at link time and had no retained imports. The manifest uses a Windows 10 build 15063 minimum and the existing ARM32 VCLibs dependency. SignTool verified the package with the same device test publisher used for the world scale probe. The signed SHA-256 is `C16F247F96F66243AD36DBC47A3F0F395A6B239628D8981A341A71F5B536FFCB`.
+
+The raw report is in `gyro-probe.txt`. The request upload had a transient package-inventory response error, then Package Manager returned Success and the launch completed on retry. `deployment.log` records both attempts. In-world yaw, pitch, orientation mapping and input coexistence remain to be verified in the signed game candidate.

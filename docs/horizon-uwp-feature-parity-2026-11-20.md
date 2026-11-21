@@ -25,6 +25,7 @@ Builder 1.0.7, patch 0.1.13 and client 0.1.14 use the pinned November 20 source.
 - **Adaptive scaling** applies the configured floor and target FPS with a conservative frame-pressure policy when the adapter cannot supply timestamps. Ten controller tests passed. The full candidate still needs matched sustained runs showing scale changes, the timing behind each change and the resulting frame pacing. [Controller evidence](../deliverables/nightly-2026-11-20/drs/evidence/controller-tests.log)
 - **Gyroscope aiming** is now a native client mod using the standard frame hook and local rotation API. The sensor provider stays inside the UWP host. The Surface reported a gyrometer with a 2 ms minimum report interval. Ben-Desktop reported no gyrometer. In-world motion, orientation and input coexistence still need physical verification. [Mod instructions](../uwp/mods/horizon-gyro-aim/README.md)
 - **Wasm ABI**. The exact November 20 stock x64 game loaded the rebuilt standard Wasm library and the new hook fixture in a scratch world. This exercises the official desktop host. AppContainer, Pulley and the four signed UWP packages have their own release gates. [Stock ABI evidence](nightly-2026-11-20-wasm.md)
+- **Lumia sensor probe**. The signed Lumia sensor probe reported a 4 ms minimum gyrometer interval and received both an event and a polled sample. [Sensor evidence](../deliverables/nightly-2026-11-20/gyro/lumia-probe/gyro-probe.txt)
 
 ## Highest-priority work
 

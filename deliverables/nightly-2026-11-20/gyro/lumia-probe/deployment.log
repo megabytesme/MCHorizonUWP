@@ -1,0 +1,24 @@
+{"Reason" : "Deploy request accepted and being processed"}
+Package upload accepted at 2026-11-21T00:48:06.2195830+00:00
+Invoke-LumiaPortal : Exception calling "GetResponse" with "0" argument(s): "The server committed a protocol violation.
+Section=ResponseStatusLine"
+At C:\Users\ben\AppData\Local\Temp\mchorizon-gyro-api-20261121\lumia-sensor-probe\run-lumia-gyro-probe.ps1:18 char:17
++ ... $packages = Invoke-LumiaPortal -Path '/api/app/packagemanager/package ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [Invoke-LumiaPortal], MethodInvocationException
+    + FullyQualifiedErrorId : WebException,Invoke-LumiaPortal
+
+state={"Code" : 0, "CodeText" : "The operation completed successfully.\r\n", "Reason" : "Success", "Success" : true}
+
+package=MCHorizonUWP.GyrometerProbe_1.0.0.0_arm__4pd4jeb6snrqw
+Activation accepted at 2026-11-21T00:48:30.0533603+00:00
+Gyrometer capability probe 1.0.0.0
+Gyrometer.GetDefault=available
+MinimumReportIntervalMs=4
+ReportIntervalMs=16
+ReadingChanged=sample
+GetCurrentReading=sample
+Timestamp100ns=134396956988761977
+AngularVelocityDegreesPerSecond=-0.426641,-0.609362,0.426641
+probe complete
+Probe process exited at check 2026-11-21T00:48:32.7084251+00:00

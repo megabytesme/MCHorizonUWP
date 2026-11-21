@@ -1,0 +1,759 @@
+warning: patch `windows-sys v0.60.2 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.60.2)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+            C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.52.0
+            C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.59.0
+            C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.61.2
+warning: patch `windows-sys v0.52.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.52.0)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+            C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\windows-sys
+warning: patch `windows-sys v0.59.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.59.0)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+            C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\windows-sys
+warning: patch `windows-sys v0.60.2 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.60.2)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+            C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\windows-sys
+warning: patch `windows-sys v0.61.2 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.61.2)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+            C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\windows-sys
+warning: patch `ureq v2.12.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\ureq-2.12.1-offline)` was not used in the crate graph
+warning: patch `wasmtime v50.0.2 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wasmtime-50.0.2)` was not used in the crate graph
+warning: patch `xxhash-rust v0.8.19 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\xxhash-rust-0.8.19-arm32)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling compiler_builtins v0.1.160 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\compiler-builtins\compiler-builtins)
+   Compiling core v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\core)
+   Compiling object v0.39.1
+   Compiling std v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\std)
+   Compiling windows-link v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\windows_link)
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling version_check v0.9.5
+   Compiling cfg-if v1.0.5
+   Compiling zmij v1.0.23
+   Compiling libm v0.2.16
+   Compiling log v0.4.35
+   Compiling memchr v2.8.3
+   Compiling foldhash v0.2.0
+   Compiling anyhow v1.0.104
+   Compiling semver v1.0.28
+   Compiling heck v0.5.0
+   Compiling thiserror v2.0.21
+   Compiling typenum v1.20.1
+   Compiling serde_json v1.0.154
+   Compiling equivalent v1.0.3
+   Compiling itoa v1.0.18
+   Compiling zerocopy v0.8.63
+   Compiling winnow v1.0.5
+   Compiling cpufeatures v0.2.17
+   Compiling toml_writer v1.2.0+spec-1.1.0
+   Compiling siphasher v1.0.4
+   Compiling crc32fast v1.5.4
+   Compiling getrandom v0.2.17
+   Compiling bitflags v2.13.2
+   Compiling prettyplease v0.2.37
+   Compiling hashbrown v0.17.1
+   Compiling rand_core v0.6.4
+   Compiling id-arena v2.3.0
+   Compiling rustversion v1.0.23
+   Compiling wasmparser v0.261.0
+   Compiling generic-array v0.14.7
+   Compiling toml_parser v1.1.5+spec-1.1.0
+   Compiling phf_shared v0.11.3
+   Compiling cfg_aliases v0.2.2
+   Compiling autocfg v1.5.1
+   Compiling getrandom v0.4.3
+   Compiling regex-syntax v0.8.11
+   Compiling either v1.19.0
+   Compiling fnv v1.0.7
+   Compiling rustc_version v0.4.1
+   Compiling icu_normalizer_data v2.4.0
+   Compiling naga v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\naga)
+   Compiling aho-corasick v1.1.5
+   Compiling num-traits v0.2.19
+   Compiling icu_properties_data v2.4.0
+   Compiling itertools v0.15.0
+   Compiling khronos_api v3.1.0
+   Compiling bytes v1.12.1
+   Compiling beef v0.5.2
+   Compiling libc v0.2.191
+   Compiling lazy_static v1.5.1
+   Compiling xml-rs v0.8.29
+   Compiling horizon-world v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-world)
+   Compiling unicode-width v0.1.14
+   Compiling logos-codegen v0.15.1
+   Compiling wasmtime-internal-core v50.0.2
+   Compiling windows-link v0.2.1
+   Compiling prettyplease v0.3.0
+   Compiling cranelift-srcgen v0.137.2
+   Compiling parking_lot_core v0.9.12 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core)
+   Compiling foldhash v0.1.5
+   Compiling windows-sys v0.61.2 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.61.2)
+   Compiling hashbrown v0.15.5
+   Compiling fastrand v2.5.0
+   Compiling fixedbitset v0.5.9
+   Compiling khronos-egl v6.0.0
+   Compiling regex-automata v0.4.18
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling gl_generator v0.14.0
+   Compiling syn v3.0.9
+   Compiling syn v2.0.119
+   Compiling cranelift-assembler-x64-meta v0.137.2
+   Compiling getrandom v0.3.4
+   Compiling once_cell v1.21.4
+   Compiling wgpu-hal v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-hal)
+   Compiling multiversion_no_op v1.0.0
+   Compiling crossbeam-utils v0.8.23
+   Compiling constant_time_eq v0.6.1
+   Compiling encoding_rs v0.8.44
+   Compiling ipconfig v0.3.4
+   Compiling multimap v0.10.1
+   Compiling digest v0.10.7
+   Compiling crossbeam-epoch v0.9.21
+   Compiling cranelift-isle v0.137.2
+   Compiling wgpu-core v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-core)
+   Compiling indexmap v2.14.2
+   Compiling toml_datetime v1.1.3+spec-1.1.0
+   Compiling serde_spanned v1.1.3
+   Compiling cranelift-codegen-shared v0.137.2
+   Compiling litrs v1.0.1
+   Compiling sha2 v0.10.9
+   Compiling target-lexicon v0.13.6
+   Compiling glutin_wgl_sys v0.6.1
+   Compiling crossbeam-deque v0.8.8
+   Compiling wgpu v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu)
+   Compiling toml v1.2.1+spec-1.1.0
+   Compiling cranelift-bitset v0.137.2
+   Compiling winit v0.30.13 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\winit)
+   Compiling rayon-core v1.13.0
+   Compiling tempfile v3.27.0
+   Compiling find-msvc-tools v0.1.15
+   Compiling shlex v2.0.1
+   Compiling wasmtime-internal-unwinder v50.0.2
+   Compiling petgraph v0.8.3
+   Compiling wasmtime-internal-cranelift v50.0.2
+   Compiling gilrs v0.11.2
+   Compiling horizon-mod-host v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-host)
+   Compiling document-features v0.2.12
+   Compiling winresource v0.1.34
+   Compiling ppv-lite86 v0.2.21
+   Compiling cranelift-assembler-x64 v0.137.2
+   Compiling cc v1.11.1
+   Compiling regex v1.13.1
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.8.8
+   Compiling logos-codegen v0.16.1
+   Compiling phf_generator v0.11.3
+   Compiling synstructure v0.14.0
+   Compiling phf_codegen v0.11.3
+   Compiling unicode_names2_generator v2.0.0
+   Compiling unicode_names2 v2.0.0
+   Compiling rustc-std-workspace-core v1.99.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\rustc-std-workspace-core)
+   Compiling alloc v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\alloc)
+   Compiling adler2 v2.0.1
+   Compiling unwind v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\unwind)
+   Compiling panic_abort v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\panic_abort)
+   Compiling rustc-demangle v0.1.28
+   Compiling cfg-if v1.0.4
+   Compiling rustc-literal-escaper v0.0.8
+   Compiling rustc-std-workspace-alloc v1.99.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\rustc-std-workspace-alloc)
+   Compiling panic_unwind v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\panic_unwind)
+   Compiling zeroize_derive v1.5.0
+   Compiling zerocopy-derive v0.8.63
+   Compiling windows-implement v0.60.2
+   Compiling windows-interface v0.59.3
+   Compiling prost-derive v0.14.6
+   Compiling miette-derive v7.6.0
+   Compiling logos-derive v0.15.1
+   Compiling logos-derive v0.16.1
+   Compiling gimli v0.34.0
+   Compiling miniz_oxide v0.9.1
+   Compiling std_detect v0.1.5 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\std_detect)
+   Compiling logos v0.15.1
+   Compiling logos v0.16.1
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling bytemuck_derive v1.12.1
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.7
+   Compiling displaydoc v0.2.7
+   Compiling pulley-macros v50.0.2
+   Compiling wasmtime-internal-versioned-export-macros v50.0.2
+   Compiling async-trait v0.1.92
+   Compiling miette v7.6.0
+   Compiling pulley-interpreter v50.0.2
+   Compiling prost v0.14.6
+   Compiling wasmtime v50.0.2 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wasmtime-50.0.2)
+   Compiling addr2line v0.27.1
+   Compiling prost-types v0.14.6
+   Compiling protox-parse v0.9.0
+   Compiling prost-reflect v0.16.5
+   Compiling prost-build v0.14.6
+   Compiling cranelift-codegen-meta v0.137.2
+   Compiling horizon-mod-surface v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-surface)
+   Compiling horizon-mod-point-shape v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-point-shape)
+   Compiling wit-parser v0.261.0
+   Compiling proc_macro v0.0.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\check-x64\rust-src\library\proc_macro)
+   Compiling horizon-mod-api-macros v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-api-macros)
+   Compiling zeroize v1.9.1
+   Compiling allocator-api2 v0.2.21
+   Compiling const-oid v0.9.6
+   Compiling subtle v2.6.1
+   Compiling bytemuck v1.25.2
+   Compiling simd-adler32 v0.3.10
+   Compiling zlib-rs v0.6.8
+   Compiling windows-result v0.4.1
+   Compiling windows-strings v0.5.1
+   Compiling arrayvec v0.7.8
+   Compiling stable_deref_trait v1.2.1
+   Compiling zerofrom v0.1.8
+   Compiling cobs v0.3.0
+   Compiling phf v0.11.3
+   Compiling bumpalo v3.20.3
+   Compiling typed-path v0.13.0
+   Compiling rustc-hash v1.1.0
+   Compiling hashbrown v0.16.1
+   Compiling yoke v0.8.4
+   Compiling unicode-width v0.2.3
+   Compiling zopfli v0.8.4
+   Compiling unicode-xid v0.2.6
+   Compiling bit-vec v0.9.1
+   Compiling zerovec v0.11.9
+   Compiling spirv v0.4.0+sdk-1.4.341.0
+   Compiling glam v0.30.10
+   Compiling pp-rs v0.2.1
+   Compiling windows-core v0.62.2
+   Compiling writeable v0.6.4
+   Compiling scopeguard v1.2.0
+   Compiling litemap v0.8.3
+   Compiling bit-set v0.10.0
+   Compiling utf_types v1.0.0
+   Compiling zerotrie v0.2.5
+   Compiling flate2 v1.1.11
+   Compiling utf8_iter v1.1.0
+   Compiling tinystr v0.8.5
+   Compiling potential_utf v0.1.6
+   Compiling horizon-guest-stack v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-guest-stack)
+   Compiling windows-threading v0.2.1
+   Compiling icu_locale_core v2.4.0
+   Compiling icu_collections v2.4.0
+   Compiling windows-future v0.3.2
+   Compiling windows-collections v0.3.2
+   Compiling windows-numerics v0.3.1
+warning: function `refuse` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-guest-stack\src\lib.rs:134:4
+    |
+134 | fn refuse(why: String) -> Result<(), &'static str> {
+    |    ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `too_small` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-guest-stack\src\lib.rs:147:4
+    |
+147 | fn too_small(size: usize, measured_by: &str) -> Result<(), &'static str> {
+    |    ^^^^^^^^^
+
+   Compiling horizon-mod-source v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-source)
+   Compiling fdeflate v0.3.7
+   Compiling miniz_oxide v0.8.9
+warning: `horizon-guest-stack` (lib) generated 2 warnings
+   Compiling horizon-game-discovery v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-game-discovery)
+   Compiling horizon-mod-api-gen v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-api-gen)
+   Compiling png v0.18.1
+   Compiling smallvec v1.16.5
+   Compiling postcard v1.1.3
+   Compiling icu_provider v2.4.0
+   Compiling windows v0.62.2
+   Compiling horizon-core v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-core)
+   Compiling icu_properties v2.4.0
+   Compiling icu_normalizer v2.4.0
+   Compiling raw-window-handle v0.6.2
+   Compiling xxhash-rust v0.8.19 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\xxhash-rust-0.8.19-arm32)
+   Compiling lz4_flex v0.14.0
+   Compiling static_assertions v1.1.0
+   Compiling inout v0.1.4
+warning: use of deprecated constant `std::u32::MAX`: replaced by the `MAX` associated constant on this type
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core\src\thread_parker\windows\waitaddress.rs:99:39
+   |
+99 |                     if ms > std::u32::MAX as u64 {
+   |                                       ^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: variant `KeyedEvent` is never constructed
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core\src\thread_parker\windows\mod.rs:19:5
+   |
+18 | enum Backend {
+   |      ------- variant in this enum
+19 |     KeyedEvent(keyed_event::KeyedEvent),
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `GENERIC_READ` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core\src\thread_parker\windows\bindings.rs:10:11
+   |
+10 | pub const GENERIC_READ: u32 = 2147483648;
+   |           ^^^^^^^^^^^^
+
+warning: constant `GENERIC_WRITE` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core\src\thread_parker\windows\bindings.rs:11:11
+   |
+11 | pub const GENERIC_WRITE: u32 = 1073741824;
+   |           ^^^^^^^^^^^^^
+
+warning: type alias `HINSTANCE` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core\src\thread_parker\windows\bindings.rs:16:10
+   |
+16 | pub type HINSTANCE = isize;
+   |          ^^^^^^^^^
+
+warning: type alias `FARPROC` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core\src\thread_parker\windows\bindings.rs:20:10
+   |
+20 | pub type FARPROC = Option<unsafe extern "system" fn() -> isize>;
+   |          ^^^^^^^
+
+warning: associated function `create` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\parking_lot_core\src\thread_parker\windows\keyed_event.rs:51:12
+   |
+39 | impl KeyedEvent {
+   | --------------- associated function in this implementation
+...
+51 |     pub fn create() -> Option<KeyedEvent> {
+   |            ^^^^^^
+
+   Compiling lock_api v0.4.14
+   Compiling libloading v0.8.9
+   Compiling naga-types v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\naga-types)
+   Compiling half v2.7.1
+   Compiling windows-targets v0.52.6
+   Compiling presser v0.3.1
+   Compiling idna_adapter v1.2.2
+   Compiling percent-encoding v2.3.2
+   Compiling idna v1.1.0
+   Compiling wgpu-types v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-types)
+   Compiling bitflags v1.3.2
+warning: `parking_lot_core` (lib) generated 7 warnings
+   Compiling windows-sys v0.52.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\windows-sys-0.52.0)
+   Compiling parking_lot v0.12.5
+   Compiling form_urlencoded v1.2.2
+   Compiling symphonia-core v0.5.5
+   Compiling cipher v0.4.4
+   Compiling ordered-float v5.5.1
+   Compiling protox v0.9.1
+   Compiling windows-registry v0.6.1
+   Compiling widestring v1.2.1
+   Compiling glow v0.17.0
+   Compiling range-alloc v0.1.5
+   Compiling minisign-verify v0.3.0
+   Compiling renderdoc-sys v1.1.0
+   Compiling profiling v1.0.18
+   Compiling socket2 v0.5.10
+   Compiling url v2.5.8
+   Compiling aes v0.8.4
+   Compiling sha1 v0.10.7
+   Compiling base64 v0.22.1
+   Compiling horizon-uwp-network v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\network-bridge)
+   Compiling cranelift-entity v0.137.2
+   Compiling horizon-system v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-system)
+   Compiling horizon-hooks v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-hooks)
+   Compiling horizon-perf-format v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-perf-format)
+   Compiling horizon-mod-runtime v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-runtime)
+   Compiling symphonia-metadata v0.5.5
+   Compiling ureq v2.12.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\ureq-2.12.1-offline)
+   Compiling winapi-util v0.1.11
+warning: unnecessary parentheses around type
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\.local\arm32-windows-sys\ureq-2.12.1-offline\src\middleware.rs:136:31
+    |
+136 |     pub(crate) chain: &'a mut (dyn Iterator<Item = &'a dyn Middleware>),
+    |                               ^                                       ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+136 -     pub(crate) chain: &'a mut (dyn Iterator<Item = &'a dyn Middleware>),
+136 +     pub(crate) chain: &'a mut dyn Iterator<Item = &'a dyn Middleware>,
+    |
+
+   Compiling zip v9.4.2
+   Compiling termcolor v1.4.1
+   Compiling horizon-threads v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-threads)
+   Compiling socket2 v0.6.5
+   Compiling codespan-reporting v0.13.1
+   Compiling symphonia-utils-xiph v0.5.5
+   Compiling pin-project-lite v0.2.17
+   Compiling tracing-core v0.1.36
+   Compiling cranelift-bforest v0.137.2
+   Compiling gimli v0.33.0
+   Compiling horizon-assets v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-assets)
+   Compiling tracing v0.1.44
+   Compiling cranelift-codegen v0.137.2
+   Compiling arbitrary v1.5.0
+   Compiling smol_str v0.2.2
+   Compiling dpi v0.1.2
+   Compiling cursor-icon v1.2.0
+   Compiling rustc-hash v2.1.3
+   Compiling ttf-parser v0.25.1
+   Compiling symphonia-codec-vorbis v0.5.5
+   Compiling regalloc2 v0.15.3
+   Compiling cranelift-control v0.137.2
+   Compiling symphonia-format-ogg v0.5.5
+   Compiling horizon-uwp-https-bridge v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\https-bridge)
+   Compiling quick-error v2.0.1
+   Compiling ab_glyph_rasterizer v0.1.10
+warning: field `inner` is never read
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\winit\src\cursor.rs:112:16
+    |
+111 | pub struct CustomCursorSource {
+    |            ------------------ field in this struct
+112 |     pub(crate) inner: PlatformCustomCursorSource,
+    |                ^^^^^
+    |
+    = note: `CustomCursorSource` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `new` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\winit\src\event.rs:986:19
+    |
+984 | impl InnerSizeWriter {
+    | -------------------- associated function in this implementation
+985 |     #[cfg(not(orbital_platform))]
+986 |     pub(crate) fn new(new_inner_size: Weak<Mutex<PhysicalSize<u32>>>) -> Self {
+    |                   ^^^
+
+   Compiling horizon-java-properties v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-java-properties)
+   Compiling byteorder-lite v0.1.0
+   Compiling zune-core v0.4.12
+   Compiling symphonia v0.5.5
+   Compiling horizon-polytone v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-polytone)
+   Compiling owned_ttf_parser v0.25.1
+   Compiling image-webp v0.2.4
+   Compiling ab_glyph v0.2.32
+warning: `ureq` (lib) generated 1 warning (run `cargo fix --lib -p ureq` to apply 1 suggestion)
+   Compiling zune-jpeg v0.4.21
+   Compiling horizon-optifine v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-optifine)
+   Compiling rayon v1.12.0
+warning: `winit` (lib) generated 2 warnings
+   Compiling horizon-bench v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-bench)
+   Compiling chrono v0.4.45
+   Compiling der v0.7.10
+   Compiling horizon-uwp-xaudio-stream v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\xaudio-stream)
+   Compiling pollster v0.4.0
+   Compiling leb128fmt v0.1.0
+   Compiling horizon-addresses v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-addresses)
+   Compiling twox-hash v2.1.5
+   Compiling unicode-bidi v0.3.18
+   Compiling wasm-encoder v0.261.0
+   Compiling horizon-platform v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-platform)
+   Compiling wasmprinter v0.261.0
+   Compiling horizon-client-lib v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-lib)
+   Compiling ruzstd v0.9.1
+   Compiling object v0.40.0
+   Compiling wasmtime-internal-component-util v50.0.2
+   Compiling spki v0.7.3
+   Compiling ff v0.13.1
+   Compiling mio v1.2.4
+   Compiling fs4 v1.1.0
+   Compiling horizon-anticheat v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-anticheat)
+   Compiling horizon-mcp v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mcp)
+   Compiling base16ct v0.2.0
+   Compiling group v0.13.0
+   Compiling pkcs8 v0.10.2
+   Compiling horizon-telemetry v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-telemetry)
+   Compiling sec1 v0.7.3
+   Compiling crypto-bigint v0.5.5
+   Compiling itertools v0.14.0
+   Compiling uuid v1.29.1
+   Compiling hmac v0.12.1
+   Compiling horizon-uwp-device-vibration v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\device-vibration-bridge)
+   Compiling vec_map v0.8.2
+   Compiling rfc6979 v0.4.0
+   Compiling horizon-uwp-device-vibration-service v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\device-vibration)
+   Compiling horizon-cosmetics v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-cosmetics)
+   Compiling signature v2.2.0
+   Compiling horizon-uwp-picker v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\picker)
+   Compiling horizon-theme v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-theme)
+   Compiling horizon-native-window v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\native-window)
+   Compiling horizon-uwp-touch-controls v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\touch-controls)
+   Compiling horizon-uwp-gamepad v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\gamepad-bridge)
+   Compiling horizon-uwp-credential-store v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\credential-store)
+   Compiling horizon-account-core v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-account-core)
+   Compiling elliptic-curve v0.13.8
+   Compiling primeorder v0.13.6
+   Compiling ecdsa v0.16.9
+   Compiling p256 v0.13.2
+   Compiling gpu-allocator v0.28.0
+   Compiling horizon-narrator v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-narrator)
+   Compiling horizon-shader-api v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-shader-api)
+   Compiling wgpu-naga-bridge v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-naga-bridge)
+warning: struct `Sapi` is never constructed
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-narrator\src\speech\windows.rs:14:19
+   |
+14 | pub(super) struct Sapi {
+   |                   ^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `open` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-narrator\src\speech\windows.rs:24:19
+   |
+19 | impl Sapi {
+   | --------- associated function in this implementation
+...
+24 |     pub(super) fn open() -> Result<Sapi, String> {
+   |                   ^^^^
+
+   Compiling horizon-shaders v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-shaders)
+   Compiling wasmtime-environ v50.0.2
+   Compiling gilrs-core v0.6.8 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\gilrs-core)
+warning: variants `Missing`, `Enumeration`, `EnumerationLimit`, and `InvalidKey` are never constructed
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-world\src\native_load_context.rs:462:5
+    |
+461 | enum SnapshotError {
+    |      ------------- variants in this enum
+462 |     Missing,
+    |     ^^^^^^^
+463 |     Directory(std::io::Error),
+464 |     Enumeration {
+    |     ^^^^^^^^^^^
+...
+468 |     EnumerationLimit(Vec<OsString>),
+    |     ^^^^^^^^^^^^^^^^
+469 |     InvalidKey {
+    |     ^^^^^^^^^^
+    |
+    = note: `SnapshotError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `settings_directory` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-world\src\native_load_context.rs:483:4
+    |
+483 | fn settings_directory<T>(result: std::io::Result<T>) -> Result<T, SnapshotError> {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `sorted_names` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-world\src\native_load_context.rs:495:4
+    |
+495 | fn sorted_names(
+    |    ^^^^^^^^^^^^
+
+warning: unused import: `IUnknown`
+ --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-hal\src\dx12\instance.rs:5:21
+  |
+5 | use windows::core::{IUnknown, Interface};
+  |                     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unnecessary qualification
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-hal\src\dx12\mod.rs:117:59
+    |
+117 |     fn horizon_uwp_attach_game_swapchain(swap_chain: *mut core::ffi::c_void) -> i32;
+    |                                                           ^^^^^^^^^^^^^^^^^
+    |
+note: the lint level is defined here
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-hal\src\lib.rs:238:5
+    |
+238 |     unused_qualifications
+    |     ^^^^^^^^^^^^^^^^^^^^^
+help: remove the unnecessary path segments
+    |
+117 -     fn horizon_uwp_attach_game_swapchain(swap_chain: *mut core::ffi::c_void) -> i32;
+117 +     fn horizon_uwp_attach_game_swapchain(swap_chain: *mut ffi::c_void) -> i32;
+    |
+
+warning: `horizon-narrator` (lib) generated 2 warnings
+warning: variant `CoreWindow` is never constructed
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-hal\src\dx12\mod.rs:670:5
+    |
+667 | enum SurfaceTarget {
+    |      ------------- variant in this enum
+...
+670 |     CoreWindow(windows::core::IUnknown),
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling wgpu-core-deps-windows-linux-android v30.0.1 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-core\platform-deps\windows-linux-android)
+   Compiling horizon-protocol v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-protocol)
+   Compiling horizon-client-core v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-core)
+warning: this lint expectation is unfulfilled
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\third_party\wgpu-dx11\wgpu-core\src\lock\ranked.rs:83:34
+   |
+83 |     #[cfg_attr(not(miri), expect(unused))] // but `Drop` has important side effects
+   |                                  ^^^^^^
+   |
+   = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+
+   Compiling cranelift-frontend v0.137.2
+   Compiling cranelift-native v0.137.2
+warning: `wgpu-hal` (lib) generated 3 warnings (run `cargo fix --lib -p wgpu-hal` to apply 2 suggestions)
+   Compiling horizon-server-files v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-server-files)
+   Compiling horizon-chat-filter v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-chat-filter)
+   Compiling horizon-hdr v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-hdr)
+warning: `wgpu-core` (lib) generated 1 warning
+warning: `horizon-world` (lib) generated 3 warnings
+   Compiling horizon-mod-vocab v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-vocab)
+   Compiling horizon-engine-slots v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-engine-slots)
+   Compiling horizon-mod-api v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-api)
+   Compiling horizon-mod-points v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-points)
+   Compiling horizon-mod-render v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-render)
+   Compiling horizon-client v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client)
+   Compiling horizon-mod-wasm v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-wasm)
+   Compiling horizon-mod-package v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-package)
+   Compiling mod-uwp-native-after-probe v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\game-bridge\embedded-native\crates\uwp_native_after_probe)
+   Compiling mod-horizon-gyro-aim v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\game-bridge\embedded-native\crates\horizon_gyro_aim)
+   Compiling mod-uwp-native-hook-probe v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\game-bridge\embedded-native\crates\uwp_native_hook_probe)
+   Compiling horizon-items v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-items)
+   Compiling horizon-mod-point-emit v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-mod-point-emit)
+   Compiling horizon-command v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-command)
+   Compiling horizon-client-input v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-input)
+   Compiling horizon-client-render v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render)
+warning: unused variable: `hdr_write_const`
+    --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx.rs:4196:13
+     |
+4196 |         let hdr_write_const = [(
+     |             ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_hdr_write_const`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `additive_blend`
+    --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx.rs:4200:13
+     |
+4200 |         let additive_blend = fl91::couple_blend(
+     |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_additive_blend`
+
+warning: function `limit_mesh_candidates` is never used
+    --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\streaming.rs:3356:4
+     |
+3356 | fn limit_mesh_candidates(candidates: &mut Vec<(i64, i32, i32, SectionMask)>, room: usize) {
+     |    ^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `couple_blend_opt` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\fl91.rs:118:8
+    |
+118 | pub fn couple_blend_opt(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `views` is never read
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\fl91.rs:182:9
+    |
+180 | pub struct SpriteSheets {
+    |            ------------ field in this struct
+181 |     pub textures: [wgpu::Texture; SPRITE_SHEETS],
+182 |     pub views: [wgpu::TextureView; SPRITE_SHEETS],
+    |         ^^^^^
+
+warning: method `write_subrect` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\fl91.rs:489:12
+    |
+375 | impl TiledAtlas {
+    | --------------- method in this implementation
+...
+489 |     pub fn write_subrect(&self, queue: &wgpu::Queue, x: u32, y: u32, w: u32, h: u32, rgba: &[u8]) {
+    |            ^^^^^^^^^^^^^
+
+warning: function `fit_rgba8_pot` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\fl91.rs:717:8
+    |
+717 | pub fn fit_rgba8_pot(png_bytes_or_rgba: &[u8], max_dim: u32) -> Option<(u32, u32, Vec<u8>)> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `pipeline` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\fluid.rs:17:15
+   |
+17 | pub(super) fn pipeline(
+   |               ^^^^^^^^
+
+warning: function `pipelines` is never used
+ --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\terrain_model.rs:2:15
+  |
+2 | pub(super) fn pipelines(
+  |               ^^^^^^^^^
+
+warning: function `pipeline` is never used
+ --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\world_text.rs:2:15
+  |
+2 | pub(super) fn pipeline(
+  |               ^^^^^^^^
+
+warning: associated function `new` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\celestial.rs:15:19
+   |
+14 | impl Celestial {
+   | -------------- associated function in this implementation
+15 |     pub(super) fn new(
+   |                   ^^^
+
+warning: associated function `new` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\panorama.rs:182:19
+    |
+181 | impl Panorama {
+    | ------------- associated function in this implementation
+182 |     pub(super) fn new(
+    |                   ^^^
+
+warning: associated function `new` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\stars.rs:63:19
+   |
+61 | impl Stars {
+   | ---------- associated function in this implementation
+62 |     /// The stars onto a frame of `format`, holding linear light when `linear`.
+63 |     pub(super) fn new(
+   |                   ^^^
+
+warning: function `array_texture_with_data` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\upload.rs:19:15
+   |
+19 | pub(super) fn array_texture_with_data(
+   |               ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `gather_mip_layers` is never used
+  --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-render\src\gfx\upload.rs:83:4
+   |
+83 | fn gather_mip_layers(
+   |    ^^^^^^^^^^^^^^^^^
+
+   Compiling horizon-client-gameplay v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client-gameplay)
+   Compiling horizon-gameplay v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-gameplay)
+warning: `horizon-client-render` (lib) generated 15 warnings (run `cargo fix --lib -p horizon-client-render` to apply 2 suggestions)
+warning: function `uwp_uses_native_d3d11` is never used
+   --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client\src\game.rs:210:4
+    |
+210 | fn uwp_uses_native_d3d11() -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `hwnd` is never used
+     --> C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client\src\game.rs:11146:4
+      |
+11146 | fn hwnd(window: &Window) -> Option<isize> {
+      |    ^^^^
+
+warning: method `adopt_gilrs` is never used
+   --> \\?\C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\crates\horizon-client\src\game\interface\pad\uwp.rs:133:28
+    |
+132 | impl Pads {
+    | --------- method in this implementation
+133 |     pub(in crate::game) fn adopt_gilrs(
+    |                            ^^^^^^^^^^^
+
+warning: `horizon-client` (lib) generated 3 warnings
+   Compiling horizon-uwp-game-bridge v0.1.0 (C:\Users\ben\AppData\Local\Temp\mchorizon-nov20-integration\arm32\uwp\game-bridge)
+    Finished `release` profile [optimized] target(s) in 21m 25s

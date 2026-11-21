@@ -55,5 +55,5 @@ The pinned official source is `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` under `
 | --- | --- | --- |
 | Integration | Semantic migration | Tracked November 18 patch applied with a three-way merge. Resolved renderer, input, staging, allocator and guest-stack conflicts against the November 20 implementations. |
 | Renderer | FL9_1 world scaling and fallback timing | 32 desktop offscreen probe cases and eight signed hardware cases on each of Surface Pro X and Lumia 950 XL passed. Lumia gameplay and adaptive performance remain open. |
-| Native input | Gyroscope aiming mod | Standard typed-hook mod, focused tests and four strict-linked UWP host kits. Surface WinRT reports an available physical gyrometer. In-world motion verification remains open. |
+| Native input | Gyroscope aiming mod | Standard typed-hook mod, focused tests and four strict-linked UWP host kits. The Surface Pro X reported a gyrometer and the Lumia delivered real WinRT samples. In-world motion verification remains open. |
 | Audit and QA | Feature matrix | [108 feature groups across 11 profiles](horizon-uwp-feature-parity-2026-11-20.md). November 18 runtime observations are identified separately from November 20 source findings. |
