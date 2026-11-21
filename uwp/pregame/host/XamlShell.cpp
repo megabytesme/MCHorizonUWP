@@ -338,6 +338,14 @@ bool has_winui = false;
 std::atomic<bool> update_checks_enabled{true};
 Platform::String^ update_notice_text;
 std::atomic<int> game_exit_behavior{0};
+bool supports_game_restart() {
+#if defined(_M_ARM)
+    return false;
+#else
+    return Windows::Foundation::Metadata::ApiInformation::IsMethodPresent(
+        L"Windows.ApplicationModel.Core.CoreApplication", L"RequestRestartAsync");
+#endif
+}
 unsigned profile_kind = 0;
 unsigned live_tile_options = 7;
 bool tile_skin_available = false;
@@ -2710,24 +2718,29 @@ void refresh() {
         panel->Children->Append(card(benchmark_card));
         auto exit_card = ref new StackPanel();
         exit_card->Children->Append(text(L"When Minecraft quits", 18));
-        auto exit_behavior = ref new ComboBox();
-        exit_behavior->Header = L"After selecting Quit Game";
-        for (auto label : { L"Return to Horizon home page", L"Close Horizon" }) {
-            auto item = ref new ComboBoxItem(); item->Content = ref new Platform::String(label);
-            exit_behavior->Items->Append(item);
+        if (supports_game_restart()) {
+            auto exit_behavior = ref new ComboBox();
+            exit_behavior->Header = L"After selecting Quit Game";
+            for (auto label : { L"Return to Horizon home page", L"Close Horizon" }) {
+                auto item = ref new ComboBoxItem(); item->Content = ref new Platform::String(label);
+                exit_behavior->Items->Append(item);
+            }
+            exit_behavior->SelectedIndex = game_exit_behavior.load(std::memory_order_acquire);
+            exit_behavior->SelectionChanged += ref new SelectionChangedEventHandler(
+                [exit_behavior](Platform::Object^, SelectionChangedEventArgs^) {
+                    const int selected = exit_behavior->SelectedIndex;
+                    if (selected < 0 || selected > 1) return;
+                    game_exit_behavior.store(selected, std::memory_order_release);
+                    ApplicationData::Current->LocalSettings->Values->Insert(
+                        L"game-quit-behavior", PropertyValue::CreateInt32(selected));
+                });
+            exit_card->Children->Append(exit_behavior);
+            exit_card->Children->Append(text(
+                L"Returning to Horizon restarts the launcher so the next game uses a fresh mod session.", 14));
+        } else {
+            exit_card->Children->Append(text(
+                L"Quit Game closes Horizon. Open Horizon again to start another game.", 14));
         }
-        exit_behavior->SelectedIndex = game_exit_behavior.load(std::memory_order_acquire);
-        exit_behavior->SelectionChanged += ref new SelectionChangedEventHandler(
-            [exit_behavior](Platform::Object^, SelectionChangedEventArgs^) {
-                const int selected = exit_behavior->SelectedIndex;
-                if (selected < 0 || selected > 1) return;
-                game_exit_behavior.store(selected, std::memory_order_release);
-                ApplicationData::Current->LocalSettings->Values->Insert(
-                    L"game-quit-behavior", PropertyValue::CreateInt32(selected));
-            });
-        exit_card->Children->Append(exit_behavior);
-        exit_card->Children->Append(text(
-            L"Returning to Horizon ends the current game session and lets you start again with another account or the available renderer settings.", 14));
         panel->Children->Append(card(exit_card));
 #ifdef HORIZON_UWP_TOUCH_MOD
         auto touch_card = ref new StackPanel();
@@ -3748,7 +3761,7 @@ extern "C" size_t __cdecl horizon_uwp_page_switch_error(unsigned char* buffer, s
     return length;
 }
 extern "C" int __cdecl horizon_uwp_page_exit_after_game() {
-    return game_exit_behavior.load(std::memory_order_acquire) == 1 ? 1 : 0;
+    return !supports_game_restart() || game_exit_behavior.load(std::memory_order_acquire) == 1 ? 1 : 0;
 }
 extern "C" int __cdecl horizon_uwp_page_selected_renderer() {
     return static_cast<int>(selected_renderer.load(std::memory_order_acquire));

@@ -16,6 +16,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include "../window-bridge/CoreWindowEvents.h"
 #include <wrl/client.h>
 #include <windows.applicationmodel.h>
+#include <windows.applicationmodel.core.h>
 #include <windows.applicationmodel.datatransfer.h>
 #include <windows.foundation.metadata.h>
 #include <windows.graphics.display.h>
@@ -52,7 +53,6 @@ static bool game_was_full_screen = false;
 static bool game_page_hidden = false;
 static bool game_gyro_visible = false;
 static std::atomic<bool> game_running{false};
-static std::atomic<bool> session_preparation_running{false};
 #endif
 static std::atomic<bool> pregame_input{true};
 extern "C" void __cdecl horizon_uwp_page_event(const HorizonUwpEvent* event);
@@ -487,7 +487,6 @@ extern "C" int __cdecl horizon_uwp_xaml_start();
 extern "C" void __cdecl horizon_uwp_page_refresh_tile();
 extern "C" int32_t __cdecl horizon_uwp_page_show_game(int);
 extern "C" int __cdecl horizon_uwp_page_exit_after_game();
-extern "C" int __cdecl horizon_uwp_prepare(const uint16_t*, size_t);
 extern "C" void __cdecl horizon_uwp_open_game_view();
 extern "C" void __cdecl horizon_uwp_trace_shell_event(const char* event);
 extern "C" size_t __cdecl horizon_uwp_page_switch_error(uint8_t*, size_t);
@@ -875,59 +874,36 @@ public:
 #endif
 
 #ifdef HORIZON_UWP_XAML_SHELL
-static void prepare_next_game_session() {
-    if (horizon_uwp_page_exit_after_game() != 0) return;
-    bool expected = false;
-    if (!session_preparation_running.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) return;
-    horizon_uwp_trace_shell_event("next game-session preparation queued");
-    try {
-        Windows::System::Threading::ThreadPool::RunAsync(
-            ref new Windows::System::Threading::WorkItemHandler([](Windows::Foundation::IAsyncAction^) {
-                int result = -1;
-                horizon_uwp_trace_shell_event("next game-session preparation started");
-                try {
-                    auto local = Windows::Storage::ApplicationData::Current->LocalFolder->Path;
-                    auto game = Platform::String::Concat(local, L"\\game");
-                    result = horizon_uwp_prepare(
-                        reinterpret_cast<const uint16_t*>(game->Data()), game->Length());
-                } catch (Platform::Exception^ error) {
-                    char message[192];
-                    sprintf_s(message, "Horizon could not prepare the next game session (0x%08X). A diagnostic was saved in app storage.",
-                        static_cast<unsigned>(error->HResult));
-                    report_native_failure(message);
-                } catch (...) {
-                    report_native_failure("Horizon could not prepare the next game session. A diagnostic was saved in app storage.");
-                }
-                char event[96];
-                sprintf_s(event, "next game-session preparation returned %d", result);
-                horizon_uwp_trace_shell_event(event);
-                if (result == 1 && primary_dispatcher) {
-                    primary_dispatcher->RunAsync(
-                        Windows::UI::Core::CoreDispatcherPriority::Normal,
-                        ref new Windows::UI::Core::DispatchedHandler([]() {
-                            session_preparation_running.store(false, std::memory_order_release);
-                            if (horizon_uwp_page_exit_after_game() == 0) {
-                                horizon_uwp_trace_shell_event("prepared session accepted; opening game view");
-                                horizon_uwp_open_game_view();
-                            }
-                        }));
-                } else {
-                    session_preparation_running.store(false, std::memory_order_release);
-                }
-            }),
-            Windows::System::Threading::WorkItemPriority::Normal,
-            Windows::System::Threading::WorkItemOptions::TimeSliced);
-    } catch (...) {
-        session_preparation_running.store(false, std::memory_order_release);
-        report_native_failure("Horizon could not start the next game-session worker.");
+static void close_game_process(bool return_home) {
+#if !defined(_M_ARM)
+    if (return_home) {
+        try {
+            auto restart = CoreApplication::RequestRestartAsync(L"");
+            restart->Completed = ref new AsyncOperationCompletedHandler<AppRestartFailureReason>(
+                [](IAsyncOperation<AppRestartFailureReason>^ action, Windows::Foundation::AsyncStatus status) {
+                    try {
+                        if (status == Windows::Foundation::AsyncStatus::Completed &&
+                            action->GetResults() == AppRestartFailureReason::RestartPending) return;
+                    } catch (Platform::Exception^) {}
+                    horizon_uwp_trace_shell_event("Windows declined the launcher restart; closing app");
+                    CoreApplication::Exit();
+                });
+            return;
+        } catch (Platform::Exception^) {
+            horizon_uwp_trace_shell_event("Windows could not request a launcher restart; closing app");
+        }
     }
+#else
+    (void)return_home;
+#endif
+    CoreApplication::Exit();
 }
 
-static void finish_game_in_primary_view() {
+static void finish_game_in_primary_view(bool clean_exit) {
     if (GetCurrentThreadId() != primary_window_thread) {
         if (primary_dispatcher) primary_dispatcher->RunAsync(
             Windows::UI::Core::CoreDispatcherPriority::Normal,
-            ref new Windows::UI::Core::DispatchedHandler([]() { finish_game_in_primary_view(); }));
+            ref new Windows::UI::Core::DispatchedHandler([clean_exit]() { finish_game_in_primary_view(clean_exit); }));
         return;
     }
 #ifdef HORIZON_UWP_TOUCH_MOD
@@ -935,10 +911,12 @@ static void finish_game_in_primary_view() {
     horizon_uwp_gyro_enable(0);
     game_gyro_visible = false;
 #endif
-    const bool exit_after_game = horizon_uwp_page_exit_after_game() != 0;
-    horizon_uwp_trace_shell_event(exit_after_game
-        ? "game ended; quit behavior is close app"
-        : "game ended; returning to Horizon home");
+    // Mod registration and the engine point table are sealed for the life of
+    // the process. Only a fresh process can start another game session.
+    const bool return_home = clean_exit && horizon_uwp_page_exit_after_game() == 0;
+    horizon_uwp_trace_shell_event(return_home
+        ? "game ended; restarting the launcher in a fresh process"
+        : "game ended; closing the game process");
     if (active_game_events) {
         delete active_game_events;
         active_game_events = nullptr;
@@ -949,7 +927,7 @@ static void finish_game_in_primary_view() {
         catch (Platform::Exception^) {}
     }
     if (game_page_hidden && !account_window_closed.load()) {
-        const int32_t page_result = horizon_uwp_page_show_game(exit_after_game ? -1 : 0);
+        const int32_t page_result = horizon_uwp_page_show_game(return_home ? 0 : -1);
         if (page_result < 0)
             report_native_failure("Horizon could not restore the pre-game page after the game stopped.");
     }
@@ -957,9 +935,8 @@ static void finish_game_in_primary_view() {
     game_phone = false;
     game_was_full_screen = false;
     game_application_view = nullptr;
-    game_running.store(false, std::memory_order_release);
-    if (exit_after_game) Windows::ApplicationModel::Core::CoreApplication::Exit();
-    else prepare_next_game_session();
+    // Keep the launch guard set while Windows finishes the restart or exit.
+    close_game_process(return_home);
 }
 
 static void run_game_in_primary_view() {
@@ -1046,14 +1023,15 @@ static void run_game_in_primary_view() {
         stage = "starting Horizon on the game worker";
         Windows::System::Threading::ThreadPool::RunAsync(
             ref new Windows::System::Threading::WorkItemHandler([resources, game, renderer](Windows::Foundation::IAsyncAction^) {
+                bool clean_exit = false;
                 try {
                     const int32_t result = horizon_uwp_run_prepared(
                         reinterpret_cast<const uint16_t*>(resources->Data()), resources->Length(),
                         reinterpret_cast<const uint16_t*>(game->Data()), game->Length(), renderer);
-                      char finish_event[96];
-                      sprintf_s(finish_event, "game bridge returned %d", result);
-                      horizon_uwp_trace_shell_event(finish_event);
-                    (void)result;
+                    clean_exit = result == 0;
+                    char finish_event[96];
+                    sprintf_s(finish_event, "game bridge returned %d", result);
+                    horizon_uwp_trace_shell_event(finish_event);
                     horizon_uwp_page_refresh_tile();
                 } catch (Platform::Exception^ error) {
                     char message[320];
@@ -1073,7 +1051,7 @@ static void run_game_in_primary_view() {
                 }
                 if (primary_dispatcher) primary_dispatcher->RunAsync(
                     Windows::UI::Core::CoreDispatcherPriority::Normal,
-                    ref new Windows::UI::Core::DispatchedHandler([]() { finish_game_in_primary_view(); }));
+                    ref new Windows::UI::Core::DispatchedHandler([clean_exit]() { finish_game_in_primary_view(clean_exit); }));
             }), Windows::System::Threading::WorkItemPriority::High,
             Windows::System::Threading::WorkItemOptions::TimeSliced);
         worker_started = true;
