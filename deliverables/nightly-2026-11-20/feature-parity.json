@@ -192,19 +192,21 @@
           "x86_dx11_fl91": "V",
           "x86_dx12": "I",
           "x86_angle": "X",
-          "arm64_dx11_fl91": "I",
-          "arm64_dx12": "I",
+          "arm64_dx11_fl91": "V",
+          "arm64_dx12": "V",
           "arm32_dx11_fl91": "I",
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "Signed AppContainer saved-world entry verified with the synthetic two-chunk save. ARM64 registration succeeded while the console remained locked. ARM32 installed and presented in the D3D11 launcher probe. Mobile world entry is pending.",
+        "qualification": "Signed AppContainer saved-world entry verified on x64, x86 D3D11 and Surface Pro X D3D11 and hardware D3D12. The Surface used November 20 client 0.1.14. Lumia ARM32 presented a launcher probe; full world screenshots and interactive HUD require separate evidence.",
         "evidence": [
           "docs/nightly-cross-architecture-2026-11-20.md",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx12-world-100/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/angle-world-100/result.json",
-          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json"
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67-interactive/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-world-100/result.json"
         ]
       }
     },
@@ -1169,7 +1171,7 @@
           "x86_dx11_fl91": "V",
           "x86_dx12": "I",
           "x86_angle": "X",
-          "arm64_dx11_fl91": "I",
+          "arm64_dx11_fl91": "V",
           "arm64_dx12": "I",
           "arm32_dx11_fl91": "I",
           "arm32_dx12": "X",
@@ -1179,14 +1181,15 @@
         "component_verification": {
           "x64_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 770 × 510 internal, 1539 × 1020 output, with native and Wasm HUD markers at 50%",
           "x86_dx11_fl91": "Win32 offscreen, 8/8 native FL9_1 and 8/8 compatibility projection on hardware FL11_1; signed UWP saved world 1154 × 765 internal, 1539 × 1020 output with both HUD markers at 75%",
-          "arm64_dx11_fl91": "Signed ARM64 AppContainer offscreen, 8/8 on Surface Pro X physical FL9_1",
+          "arm64_dx11_fl91": "8/8 signed offscreen checks at actual FL9_1. Two signed game runs at the 67% compatibility projection: 1372 x 1029 world, 2048 x 1536 output, with both HUD markers. Resize and restore updated and recovered both targets.",
           "arm32_dx11_fl91": "Signed ARMNT AppContainer offscreen, 8/8 on Lumia 950 XL physical Adreno 430 FL9_1"
         },
         "evidence": [
           "docs/nightly-drs-2026-11-20.md",
           "deliverables/nightly-2026-11-20/drs/evidence/offscreen-readbacks.csv",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
-          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json"
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67-interactive/result.json"
         ]
       }
     },
@@ -2490,20 +2493,22 @@
           "x86_dx11_fl91": "L",
           "x86_dx12": "I",
           "x86_angle": "X",
-          "arm64_dx11_fl91": "I",
-          "arm64_dx12": "I",
+          "arm64_dx11_fl91": "L",
+          "arm64_dx12": "L",
           "arm32_dx11_fl91": "I",
           "arm32_dx12": "X",
           "arm32_angle": "X"
         },
-        "qualification": "The exact rebuilt standard library and Pulley guest displayed the Wasm GUI marker in each signed desktop saved-world test. The stock desktop trap fixture was isolated. UWP fault recovery, resource limits and mobile runtime acceptance require their own game tests.",
+        "qualification": "Exact regenerated standard library and Pulley guest drew the Wasm GUI marker on each signed desktop and Surface saved-world run. Lumia runtime acceptance and resource fault cases have their own gates.",
         "evidence": [
           "docs/nightly-2026-11-20-wasm.md",
           "docs/nightly-cross-architecture-2026-11-20.md",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx12-world-100/result.json",
           "deliverables/nightly-2026-11-20/runtime-evidence/x64/angle-world-100/result.json",
-          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json"
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67-interactive/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx12-world-100/result.json"
         ]
       }
     },

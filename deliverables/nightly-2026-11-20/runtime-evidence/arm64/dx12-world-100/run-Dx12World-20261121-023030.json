@@ -1,0 +1,34 @@
+{
+    "Case":  "Dx12World",
+    "RunId":  "20261121-023030",
+    "Machine":  "BEN-TABLET",
+    "Session":  1,
+    "StartUtc":  "2026-11-21T02:30:32.9677635Z",
+    "Passed":  true,
+    "MainSha256":  "5565C5D0528D2472F6AC40B3C686166129B46E83D099B35C48E415A069E9A689",
+    "OptionalSha256":  "BDDFA8B2E4AAE3988BC7D70F6775477824DD69B8156D732BC42E523AD52EE605",
+    "ResourceFramework":  "Horizon.Asset.26-3.98ccbead789d397639d5badd0bb805_1.0.0.0_neutral__4pd4jeb6snrqw",
+    "Main":  "MCHorizonUWP.NightlyNov20.arm64_1.0.1.0_arm64__4pd4jeb6snrqw",
+    "Native":  "MCHorizonUWP.NightlyNov20.arm64.NativeMods_1.0.1.0_arm64__4pd4jeb6snrqw",
+    "Test":  {
+                 "Mode":  "World",
+                 "TimeoutSeconds":  360,
+                 "Architecture":  "arm64",
+                 "ExerciseControls":  true,
+                 "Backend":  "Dx12",
+                 "StrictFl91":  false,
+                 "Audio":  true,
+                 "Scale":  100,
+                 "Hooks":  "Enabled",
+                 "PackageVersion":  {
+                                        "Major":  1,
+                                        "Minor":  0,
+                                        "Build":  1,
+                                        "Revision":  0,
+                                        "MajorRevision":  0,
+                                        "MinorRevision":  0
+                                    }
+             },
+    "Evidence":  "capture-20261121-023037-553-arm64-Dx12-World-Enabled-100",
+    "EndUtc":  "2026-11-21T02:32:13.7392106Z"
+}
