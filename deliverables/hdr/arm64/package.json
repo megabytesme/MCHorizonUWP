@@ -1,0 +1,18 @@
+{
+  "application": "MCHorizonUWP.HdrDev.arm64",
+  "version": "1.0.0.0",
+  "architecture": "arm64",
+  "patch": "0.1.16",
+  "client": "0.1.18",
+  "filename": "HorizonUWP-HDR-arm64.appx",
+  "size_bytes": 45235141,
+  "package_sha256": "666ac947b355daf873a41e6ecf52cf29576e5f5793132925d44568731f163ebf",
+  "bridge_sha256": "a59b9dfc95ce59cad0b0eb10bb0e756a35f8b76c0b13bd61ea609b446a9c4377",
+  "host_sha256": "9176bdaf1b3db1b3203a84923e464604a801a88c2778131ae6ca5a18872fcad8",
+  "horizon_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "engine_product_commit": "9ec7803fc0c585717b16c8e6ac0224ca9585473e",
+  "host_product_commit": "da3b6df642d9f81e594c468d8005216cfa5355d7",
+  "wgpu_fork_commit": "432a009d8d44aa2b5988668bb9620d975a275a00",
+  "signature": "SignTool verify /pa succeeded",
+  "resource_framework": "Horizon.Asset.26-3.98ccbead789d397639d5badd0bb805"
+}

@@ -1,0 +1,6 @@
+File: C:\dev\personal\MCHorizonUWP-HDR-Nov20\deliverables\hdr\arm64/HorizonUWP-HDR-arm64.appx
+Index  Algorithm  Timestamp
+========================================
+0      sha256     None
+
+Successfully verified: C:\dev\personal\MCHorizonUWP-HDR-Nov20\deliverables\hdr\arm64/HorizonUWP-HDR-arm64.appx
