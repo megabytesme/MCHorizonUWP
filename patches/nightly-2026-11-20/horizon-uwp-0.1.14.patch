@@ -5971,7 +5971,7 @@ index fc3816cc04c..50e111443e1 100644
          } else {
              log::error!(
 diff --git a/crates/horizon-client-render/src/dynamic_resolution.rs b/crates/horizon-client-render/src/dynamic_resolution.rs
-index feaf8027734..35861fa3377 100644
+index feaf8027734..33de4793db4 100644
 --- a/crates/horizon-client-render/src/dynamic_resolution.rs
 +++ b/crates/horizon-client-render/src/dynamic_resolution.rs
 @@ -14,8 +14,9 @@
@@ -6032,10 +6032,17 @@ index feaf8027734..35861fa3377 100644
  }
  
  impl DynamicResolution {
-@@ -136,6 +169,102 @@ impl DynamicResolution {
+@@ -136,6 +169,109 @@ impl DynamicResolution {
          self.since_change_ms = 0.0;
          Some(next)
      }
++
++    /// A timed window cannot span an interval when frame pressure controls the scale.
++    pub fn suspend_gpu_timing(&mut self) {
++        self.gpu.clear();
++        self.window_ms = 0.0;
++        self.since_change_ms = 0.0;
++    }
 +
 +    /// A pause, focus change, or interval with no settled gameplay invalidates a pressure sample.
 +    pub fn suspend_frame_pressure(&mut self) {
@@ -6135,7 +6142,7 @@ index feaf8027734..35861fa3377 100644
  }
  
  fn median(mut values: Vec<f32>) -> f32 {
-@@ -238,4 +367,51 @@ mod tests {
+@@ -238,4 +374,65 @@ mod tests {
          d.reset();
          assert_eq!(d.scale(70), 70);
      }
@@ -6171,6 +6178,20 @@ index feaf8027734..35861fa3377 100644
 +        assert_eq!(pressure_run(&mut d, 4.0, 14.0, 42.0), vec![95]);
 +        assert!(pressure_run(&mut d, 60.0, 14.0, 42.0).is_empty());
 +        assert_eq!(d.scale(50), 95);
++    }
++
++    #[test]
++    fn switching_away_from_gpu_timing_preserves_scale_but_drops_old_samples() {
++        let mut d = DynamicResolution::new();
++        assert_eq!(run(&mut d, 1_200.0, 8.0, 8.0, 70, Pace::Quick), Some(75));
++        assert_eq!(d.scale(70), 75);
++        assert_eq!(run(&mut d, 80.0, 30.0, 8.0, 70, Pace::Quick), None);
++        assert!(!d.gpu.is_empty());
++        d.suspend_gpu_timing();
++        assert_eq!(d.scale(70), 75);
++        assert!(d.gpu.is_empty());
++        assert_eq!(d.window_ms, 0.0);
++        assert_eq!(d.since_change_ms, 0.0);
 +    }
 +
 +    #[test]
@@ -6647,7 +6668,7 @@ index 190fb30d805..f4c3bfcbdea 100644
          let sets = ids
              .into_iter()
 diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
-index ade12170054..f6a05c5c240 100644
+index ade12170054..f363226d394 100644
 --- a/crates/horizon-client-render/src/gfx.rs
 +++ b/crates/horizon-client-render/src/gfx.rs
 @@ -170,6 +170,32 @@ fn entity_pipeline_factory<'a>(
@@ -7819,7 +7840,7 @@ index ade12170054..f6a05c5c240 100644
          let static_entity_bindings =
              device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                  label: Some("Static block-entity transform"),
-@@ -3350,54 +3740,100 @@ impl Renderer {
+@@ -3350,109 +3740,118 @@ impl Renderer {
                      },
                  )],
              });
@@ -7878,6 +7899,60 @@ index ade12170054..f6a05c5c240 100644
 -                },
 -            ],
 -        });
+-        let static_entity_transform =
+-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+-                label: Some("Static block-entity camera position"),
+-                contents: bytemuck::bytes_of(&StaticEntityUniform {
+-                    camera_block: [0; 4],
+-                    camera_fraction: [0.0; 4],
+-                }),
+-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+-            });
+-        let static_entity_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+-            label: Some("Static block-entity transform"),
+-            layout: &static_entity_bindings,
+-            entries: &[wgpu::BindGroupEntry {
+-                binding: 0,
+-                resource: static_entity_transform.as_entire_binding(),
+-            }],
+-        });
+-        let hand_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+-            label: Some("First-person hand resources"),
+-            layout: &entity_bindings,
+-            entries: &[
+-                wgpu::BindGroupEntry {
+-                    binding: 0,
+-                    resource: hand_globals.as_entire_binding(),
+-                },
+-                wgpu::BindGroupEntry {
+-                    binding: 1,
+-                    resource: wgpu::BindingResource::TextureView(&atlas_view),
+-                },
+-                wgpu::BindGroupEntry {
+-                    binding: 2,
+-                    resource: wgpu::BindingResource::Sampler(&atlas_sampler),
+-                },
+-                wgpu::BindGroupEntry {
+-                    binding: 3,
+-                    resource: wgpu::BindingResource::TextureView(&lightmap_view),
+-                },
+-                wgpu::BindGroupEntry {
+-                    binding: 4,
+-                    resource: wgpu::BindingResource::Sampler(&lightmap_sampler),
+-                },
+-                wgpu::BindGroupEntry {
+-                    binding: 5,
+-                    resource: wgpu::BindingResource::TextureView(&glint_view),
+-                },
+-                wgpu::BindGroupEntry {
+-                    binding: 6,
+-                    resource: wgpu::BindingResource::Sampler(&glint_sampler),
+-                },
+-                wgpu::BindGroupEntry {
+-                    binding: 7,
+-                    resource: wgpu::BindingResource::TextureView(&glint_armor_view),
+-                },
+-            ],
 +                    resource: uniform_buf.as_entire_binding(),
 +                }];
 +                for (i, view) in tiled.views.iter().enumerate() {
@@ -7955,51 +8030,23 @@ index ade12170054..f6a05c5c240 100644
 +            }
 +        };
 +        let entity_group = make_entity_group("Entity resources", &globals);
-         let static_entity_transform =
-             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                 label: Some("Static block-entity camera position"),
-@@ -3415,44 +3851,7 @@ impl Renderer {
-                 resource: static_entity_transform.as_entire_binding(),
-             }],
++        let static_entity_transform =
++            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
++                label: Some("Static block-entity camera position"),
++                contents: bytemuck::bytes_of(&StaticEntityUniform {
++                    camera_block: [0; 4],
++                    camera_fraction: [0.0; 4],
++                }),
++                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
++            });
++        let static_entity_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
++            label: Some("Static block-entity transform"),
++            layout: &static_entity_bindings,
++            entries: &[wgpu::BindGroupEntry {
++                binding: 0,
++                resource: static_entity_transform.as_entire_binding(),
++            }],
          });
--        let hand_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
--            label: Some("First-person hand resources"),
--            layout: &entity_bindings,
--            entries: &[
--                wgpu::BindGroupEntry {
--                    binding: 0,
--                    resource: hand_globals.as_entire_binding(),
--                },
--                wgpu::BindGroupEntry {
--                    binding: 1,
--                    resource: wgpu::BindingResource::TextureView(&atlas_view),
--                },
--                wgpu::BindGroupEntry {
--                    binding: 2,
--                    resource: wgpu::BindingResource::Sampler(&atlas_sampler),
--                },
--                wgpu::BindGroupEntry {
--                    binding: 3,
--                    resource: wgpu::BindingResource::TextureView(&lightmap_view),
--                },
--                wgpu::BindGroupEntry {
--                    binding: 4,
--                    resource: wgpu::BindingResource::Sampler(&lightmap_sampler),
--                },
--                wgpu::BindGroupEntry {
--                    binding: 5,
--                    resource: wgpu::BindingResource::TextureView(&glint_view),
--                },
--                wgpu::BindGroupEntry {
--                    binding: 6,
--                    resource: wgpu::BindingResource::Sampler(&glint_sampler),
--                },
--                wgpu::BindGroupEntry {
--                    binding: 7,
--                    resource: wgpu::BindingResource::TextureView(&glint_armor_view),
--                },
--            ],
--        });
 +        let hand_group = make_entity_group("First-person hand resources", &hand_globals);
          let entity_layout = kept.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
              label: Some("Entity layout"),
@@ -8656,18 +8703,24 @@ index ade12170054..f6a05c5c240 100644
          self.world_post.set_sharpness(&self.device, sharpness);
          let taa = taa && self.world_post.supports_taa();
          self.world_post.scale = scale.clamp(0.25, 2.0);
-@@ -6284,6 +6880,10 @@ impl Renderer {
+@@ -6284,6 +6880,16 @@ impl Renderer {
          self.world_post.taa = taa;
          self.world_post.upscale = if taa { upscale.clamp(1.0, 4.0) } else { 1.0 };
      }
-+    /// This renderer scales the world, but has no GPU timestamp source.
++    /// Uses measured frame pressure on FL9_1 without timestamps or when a UWP timestamp
++    /// source repeatedly returns invalid frame timings.
 +    pub fn world_scale_uses_frame_pressure(&self) -> bool {
-+        self.fl91_world_scale.is_some() && self.gpu_timer.is_none()
++        (self.fl91_world_scale.is_some() && self.gpu_timer.is_none())
++            || (cfg!(target_vendor = "uwp")
++                && self
++                    .gpu_timer
++                    .as_ref()
++                    .is_some_and(timing::GpuTimer::unreliable))
 +    }
      /// Runs `post` over the world from now on (`None`: no pack), for the dimension `dimension`;
      /// `block_ids` gives each source state its model and fluid material ids (two values
      /// per state); emission and ownership come from the mesher's quad records.
-@@ -6295,6 +6895,12 @@ impl Renderer {
+@@ -6295,6 +6901,12 @@ impl Renderer {
          pack: Option<horizon_shaders::Post>,
          block_ids: &[i32],
      ) -> std::result::Result<Option<(Vec<String>, Vec<String>)>, pack_post::Refused> {
@@ -8680,7 +8733,7 @@ index ade12170054..f6a05c5c240 100644
          if pack.is_none() {
              self.pack_atlas = None;
              self.pack_material_atlases = None;
-@@ -6569,7 +7175,14 @@ impl Renderer {
+@@ -6569,7 +7181,14 @@ impl Renderer {
          let clouds = self.cloud_bindings.clone();
          let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
          let cancelled = cancel.clone();
@@ -8695,7 +8748,7 @@ index ade12170054..f6a05c5c240 100644
              let instance = wgpu::vertex_attr_array![5=>Float32x4];
              let vertex = wgpu::VertexBufferLayout {
                  array_stride: std::mem::size_of::<TerrainVertex>() as u64,
-@@ -6706,6 +7319,9 @@ impl Renderer {
+@@ -6706,6 +7325,9 @@ impl Renderer {
              block_light::LightTable,
          )>,
      ) -> std::result::Result<Vec<String>, String> {
@@ -8705,7 +8758,7 @@ index ade12170054..f6a05c5c240 100644
          self.world_held = false;
          let linear = pack.is_some();
          if (linear || self.output.frame.format == LINEAR_FRAME)
-@@ -6894,7 +7510,7 @@ impl Renderer {
+@@ -6894,7 +7516,7 @@ impl Renderer {
      /// or sampleRGSS for RGSS.
      pub fn set_texture_filtering(&mut self, filtering: i32, bit: i32) {
          let filtering = filtering.clamp(0, 2) as u32;
@@ -8714,7 +8767,7 @@ index ade12170054..f6a05c5c240 100644
              sampler_anisotropy(bit)
          } else {
              1
-@@ -6904,16 +7520,21 @@ impl Renderer {
+@@ -6904,16 +7526,21 @@ impl Renderer {
          }
          self.texture_filtering = filtering;
          self.max_anisotropy = anisotropy;
@@ -8739,7 +8792,7 @@ index ade12170054..f6a05c5c240 100644
          );
          self.group = terrain_group(
              &self.device,
-@@ -6925,6 +7546,7 @@ impl Renderer {
+@@ -6925,6 +7552,7 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8747,7 +8800,7 @@ index ade12170054..f6a05c5c240 100644
          );
          self.fluid_group = terrain_group(
              &self.device,
-@@ -6936,17 +7558,29 @@ impl Renderer {
+@@ -6936,17 +7564,29 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8778,7 +8831,7 @@ index ade12170054..f6a05c5c240 100644
          );
      }
      /// Block sprite layers per array on this device: a sprite's array is its layer over it, its
-@@ -6958,9 +7592,14 @@ impl Renderer {
+@@ -6958,9 +7598,14 @@ impl Renderer {
      /// reduced copies (0: none).
      pub fn set_mipmap_levels(&mut self, levels: u32) {
          self.mipmap_option = levels;
@@ -8794,7 +8847,7 @@ index ade12170054..f6a05c5c240 100644
              self.sprite_minimum_size,
              self.mip_levels,
          );
-@@ -7242,7 +7881,12 @@ impl Renderer {
+@@ -7242,7 +7887,12 @@ impl Renderer {
          // tried again at half the size next frame; the window keeps its last one.
          let checks = GpuChecks::push(&self.device);
          let target = (!layered).then(|| Self::offscreen_target(&self.device, &config));
@@ -8808,7 +8861,7 @@ index ade12170054..f6a05c5c240 100644
          if let Some(e) = checks.pop() {
              log::warn!(
                  "Horizon renderer: no memory for a {}x{} screenshot ({e}); trying half the size",
-@@ -7655,8 +8299,14 @@ impl Renderer {
+@@ -7655,8 +8305,14 @@ impl Renderer {
              view_origin: [0.0; 4],
              world_view: [0.0; 4],
          };
@@ -8825,7 +8878,7 @@ index ade12170054..f6a05c5c240 100644
          // The sunrise fan as sixteen triangles. Its clip positions use the sky's
          // own view (no TAA jitter; the bob and the spin, as `fs_sky`'s `view_ray`),
          // and its apex weight interpolates the barycentric the shader used to
-@@ -7692,12 +8342,22 @@ impl Renderer {
+@@ -7692,12 +8348,22 @@ impl Renderer {
              view_proj: hand_view_proj.to_cols_array_2d(),
              ..globals
          };
@@ -8854,7 +8907,7 @@ index ade12170054..f6a05c5c240 100644
          // GameRenderer.render3dHud: DebugCrosshairRenderer draws with the
          // hand's projection but no bob, and FogMode.NONE (no fog colour).
          let crosshair_globals = Globals {
-@@ -7705,12 +8365,22 @@ impl Renderer {
+@@ -7705,12 +8371,22 @@ impl Renderer {
              fog_color: [0.0; 4],
              ..globals
          };
@@ -8883,7 +8936,7 @@ index ade12170054..f6a05c5c240 100644
          // 4x MSAA, unless a classic shader pack runs (a failed or refused one leaves `None`):
          // it and native displacement keep their single-sample pipelines, as does a material
          // whose four-sample layers the driver refused. Nor where its targets ran out of video
-@@ -8036,9 +8706,7 @@ impl Renderer {
+@@ -8036,9 +8712,7 @@ impl Renderer {
              self.instances = self.device.create_buffer(&wgpu::BufferDescriptor {
                  label: Some("Section origins"),
                  size: self.instance_capacity * 16,
@@ -8894,7 +8947,7 @@ index ade12170054..f6a05c5c240 100644
                  mapped_at_creation: false,
              });
          }
-@@ -8916,13 +9584,22 @@ impl Renderer {
+@@ -8916,13 +9590,22 @@ impl Renderer {
                      .entry(snapshot.section)
                      .or_insert_with(|| {
                          let capacity = vertices.next_power_of_two().max(4);
@@ -8919,7 +8972,7 @@ index ade12170054..f6a05c5c240 100644
                          static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                          GpuStaticEntitySection {
                              buffer: self.device.create_buffer(&wgpu::BufferDescriptor {
-@@ -8939,13 +9616,22 @@ impl Renderer {
+@@ -8939,13 +9622,22 @@ impl Renderer {
                          }
                      });
                  if gpu.origin != snapshot.origin {
@@ -8944,7 +8997,7 @@ index ade12170054..f6a05c5c240 100644
                      gpu.origin = snapshot.origin;
                      static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                  }
-@@ -8999,21 +9685,40 @@ impl Renderer {
+@@ -8999,21 +9691,40 @@ impl Renderer {
                  frame.camera.y.floor() as i32,
                  frame.camera.z.floor() as i32,
              ];
@@ -9000,7 +9053,7 @@ index ade12170054..f6a05c5c240 100644
              static_bytes_uploaded += std::mem::size_of::<StaticEntityUniform>() as u64;
              self.static_entity_camera = Some(frame.camera);
          }
-@@ -9303,12 +10008,21 @@ impl Renderer {
+@@ -9303,12 +10014,21 @@ impl Renderer {
                  .as_ref()
                  .and_then(|p| p.1.as_ref())
                  .is_some_and(|p| p.has_weather());
@@ -9028,7 +9081,7 @@ index ade12170054..f6a05c5c240 100644
          let (world_view, world_depth) = match &scaled {
              Some((color, depth)) => (color, depth),
              None => (&view_target, &self.depth),
-@@ -9431,6 +10145,11 @@ impl Renderer {
+@@ -9431,6 +10151,11 @@ impl Renderer {
                      indices: &self.indices,
                      flat: self.flat.as_ref(),
                      multi_draw: self.multi_draw,
@@ -9040,7 +9093,7 @@ index ade12170054..f6a05c5c240 100644
                      looks: self.look_groups.as_ref(),
                  },
                  flat_frame,
-@@ -9502,7 +10221,7 @@ impl Renderer {
+@@ -9502,7 +10227,7 @@ impl Renderer {
                      ),
                      depth: target(
                          "Water mirror depth",
@@ -9049,7 +9102,7 @@ index ade12170054..f6a05c5c240 100644
                          wgpu::TextureUsages::RENDER_ATTACHMENT,
                      ),
                  });
-@@ -9530,12 +10249,22 @@ impl Renderer {
+@@ -9530,12 +10255,22 @@ impl Renderer {
                      hdr_light: [0.0, 0.0, globals.hdr_light[2], 0.0],
                      ..globals
                  };
@@ -9078,7 +9131,7 @@ index ade12170054..f6a05c5c240 100644
                  let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                      label: Some("Water mirror"),
                      timestamp_writes: self
-@@ -9564,6 +10293,9 @@ impl Renderer {
+@@ -9564,6 +10299,9 @@ impl Renderer {
                  pass.set_bind_group(0, &self.mirror_group, &[]);
                  if sky_visible && frame.skybox {
                      pass.set_pipeline(&self.sky);
@@ -9088,7 +9141,7 @@ index ade12170054..f6a05c5c240 100644
                      pass.draw(0..3, 0..1);
                  }
                  // The solid terrain: occlusion culling is off with a mirror, so every draw
-@@ -9729,6 +10461,9 @@ impl Renderer {
+@@ -9729,6 +10467,9 @@ impl Renderer {
                          }
                          None => {
                              pass.set_pipeline(&self.sky_base);
@@ -9098,7 +9151,7 @@ index ade12170054..f6a05c5c240 100644
                              pass.draw(0..3, 0..1);
                          }
                      }
-@@ -9793,6 +10528,9 @@ impl Renderer {
+@@ -9793,6 +10534,9 @@ impl Renderer {
                  }
                  if !frame.title && frame.dark_disc && !pack_draws_sky {
                      pass.set_pipeline(&self.dark_disc);
@@ -9108,7 +9161,7 @@ index ade12170054..f6a05c5c240 100644
                      pass.draw(0..3, 0..1);
                  }
              }
-@@ -10780,6 +11518,9 @@ impl Renderer {
+@@ -10780,6 +11524,9 @@ impl Renderer {
                  pass.stage(self.own_timing.as_mut(), "hand");
                  pass.set_pipeline(&self.depth_reset);
                  pass.set_bind_group(0, &self.group, &[]);
@@ -9118,7 +9171,7 @@ index ade12170054..f6a05c5c240 100644
                  pass.draw(0..3, 0..1);
                  self.draw_hand(&mut pass, hand_quads, world_quads + additive_quads);
              }
-@@ -10978,17 +11719,21 @@ impl Renderer {
+@@ -10978,17 +11725,21 @@ impl Renderer {
              let onto = (&view_target, &target_texture, generated);
              fg_made = self.draw_generated(&mut encoder, frame, &camera, &overlay, onto);
          } else if scaled.is_some() {
@@ -9147,7 +9200,7 @@ index ade12170054..f6a05c5c240 100644
                  None => (&self.depth, size),
              };
              native_render::world_drawn(&mut native_render::WorldDrawn {
-@@ -11376,6 +12121,7 @@ impl Renderer {
+@@ -11376,6 +12127,7 @@ impl Renderer {
              .and_then(|request| self.take_readback(request, encoder, target_texture));
          // GameRenderer.render: applyPostEffects, after the level and before the GUI.
          if !frame.title
@@ -9155,7 +9208,7 @@ index ade12170054..f6a05c5c240 100644
              && !frame.post_effects.effects.is_empty()
              && target_texture
                  .usage()
-@@ -11501,13 +12247,18 @@ impl Renderer {
+@@ -11501,13 +12253,18 @@ impl Renderer {
                      .unwrap_or(&self.debug_lines_on_top),
              });
              pass.set_bind_group(0, &self.crosshair_group, &[]);
@@ -9178,7 +9231,7 @@ index ade12170054..f6a05c5c240 100644
          let blur_at = menu_blur.map_or(0, |_| frame.hud.blur_at);
          self.hud.draw_range(
              encoder,
-@@ -12215,6 +12966,17 @@ mod tests {
+@@ -12215,6 +12972,17 @@ mod tests {
          assert!(u64::from(super::padded_row(w)) * u64::from(h) <= max, "{f}");
          assert!(f > 3.7, "{f}");
      }
@@ -12386,10 +12439,10 @@ index 95b9ac17ab6..4371c2b671f 100644
                  depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                  stencil: Default::default(),
 diff --git a/crates/horizon-client-render/src/gfx/timing.rs b/crates/horizon-client-render/src/gfx/timing.rs
-index d90cd826b8a..527cb339b98 100644
+index d90cd826b8a..b2d072aa918 100644
 --- a/crates/horizon-client-render/src/gfx/timing.rs
 +++ b/crates/horizon-client-render/src/gfx/timing.rs
-@@ -33,6 +33,20 @@ const MAPPED: u8 = 4;
+@@ -33,6 +33,45 @@ const MAPPED: u8 = 4;
  /// Readback failed; stop timing rather than reuse an invalid buffer.
  const FAILED: u8 = 5;
  
@@ -12407,24 +12460,77 @@ index d90cd826b8a..527cb339b98 100644
 +    (ms <= MAX_FRAME_GPU_MS).then_some(ms as f32)
 +}
 +
++/// Wait for repeated invalid readbacks before changing timing sources, and for repeated
++/// valid readbacks before returning to GPU timing.
++const TIMESTAMP_HEALTH_CONFIRMATIONS: u8 = 3;
++
++#[derive(Default)]
++struct TimestampHealth {
++    consecutive: u8,
++    unreliable: bool,
++}
++
++impl TimestampHealth {
++    fn observe(&mut self, valid: bool) {
++        let unreliable = !valid;
++        if unreliable == self.unreliable {
++            self.consecutive = 0;
++            return;
++        }
++        self.consecutive += 1;
++        if self.consecutive == TIMESTAMP_HEALTH_CONFIRMATIONS {
++            self.unreliable = unreliable;
++            self.consecutive = 0;
++        }
++    }
++}
++
  struct Slot {
      buffer: wgpu::Buffer,
      state: Arc<AtomicU8>,
-@@ -260,9 +274,10 @@ impl GpuTimer {
+@@ -46,6 +85,7 @@ pub struct GpuTimer {
+     current: Option<usize>,
+     next: usize,
+     period_ns: f32,
++    health: TimestampHealth,
+     /// Timestamps between commands, or else these passes' boundaries.
+     markers: Option<Markers>,
+     /// Slots resolved in this frame's commands, read back once it is submitted.
+@@ -108,6 +148,7 @@ impl GpuTimer {
+             current: None,
+             next: 0,
+             period_ns: queue.get_timestamp_period(),
++            health: TimestampHealth::default(),
+             markers: (!device
+                 .features()
+                 .contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS))
+@@ -241,6 +282,10 @@ impl GpuTimer {
+         }
+         self.next = (slot + 1) % SLOTS;
+     }
++    pub(super) fn unreliable(&self) -> bool {
++        self.health.unreliable
++    }
++
+     /// GPU milliseconds of frames whose timestamps have arrived, oldest first.
+     pub fn collect(&mut self, device: &wgpu::Device, out: &mut Vec<f32>) {
+         if device.poll(wgpu::PollType::Poll).is_err() {
+@@ -260,9 +305,11 @@ impl GpuTimer {
                  };
                  // Read unaligned: the mapping isn't guaranteed to be 8-byte aligned.
                  let stamps: [u64; 2] = bytemuck::pod_read_unaligned(&data[..16]);
 -                // A start marker that ran late (rare on Metal) leaves the frame untimed.
 -                if let Some(ticks) = stamps[1].checked_sub(stamps[0]) {
 -                    out.push((ticks as f64 * f64::from(self.period_ns) / 1e6) as f32);
-+                if let Some(ms) = timestamp_duration_ms(stamps[0], stamps[1], self.period_ns)
-+                    .filter(|&ms| ms > 0.0)
-+                {
++                let sample = timestamp_duration_ms(stamps[0], stamps[1], self.period_ns)
++                    .filter(|&ms| ms > 0.0);
++                self.health.observe(sample.is_some());
++                if let Some(ms) = sample {
 +                    out.push(ms);
                  }
              }
              slot.buffer.unmap();
-@@ -308,6 +323,21 @@ pub(super) fn end_pipeline(
+@@ -308,6 +355,38 @@ pub(super) fn end_pipeline(
  mod tests {
      use super::*;
  
@@ -12441,6 +12547,23 @@ index d90cd826b8a..527cb339b98 100644
 +        assert_eq!(timestamp_duration_ms(10, 20, f32::INFINITY), None);
 +        assert_eq!(timestamp_duration_ms(10, 20, 0.0), None);
 +        assert_eq!(timestamp_duration_ms(10, 20, -1.0), None);
++    }
++
++    #[test]
++    fn sustained_bad_readbacks_switch_timing_source_and_valid_readbacks_recover() {
++        let mut health = TimestampHealth::default();
++        for valid in [false, false, true, false, false] {
++            health.observe(valid);
++            assert!(!health.unreliable);
++        }
++        health.observe(false);
++        assert!(health.unreliable);
++        for valid in [true, true, false, true, true] {
++            health.observe(valid);
++            assert!(health.unreliable);
++        }
++        health.observe(true);
++        assert!(!health.unreliable);
 +    }
 +
      fn mapped_timer() -> Option<(wgpu::Device, wgpu::Queue, GpuTimer)> {
@@ -19044,7 +19167,7 @@ index 9ba700236de..aa19f12fc9a 100644
          let mut physical_keys: Vec<_> = self
              .physical_keys
 diff --git a/crates/horizon-client/src/game/runtime/frame_autotune.rs b/crates/horizon-client/src/game/runtime/frame_autotune.rs
-index 37af01257cc..d269cb56fa8 100644
+index 37af01257cc..af062f80a49 100644
 --- a/crates/horizon-client/src/game/runtime/frame_autotune.rs
 +++ b/crates/horizon-client/src/game/runtime/frame_autotune.rs
 @@ -13,6 +13,7 @@ use horizon_client::perf_overlay::FrameGraph;
@@ -19068,11 +19191,12 @@ index 37af01257cc..d269cb56fa8 100644
          return;
      }
      let gpu_ms = r.gpu_times.last().copied();
-@@ -45,6 +50,26 @@ pub(super) fn observe(
+@@ -45,6 +50,28 @@ pub(super) fn observe(
      // Dynamic Resolution: gentle while a shader pack runs (its history starts over at each
      // change), quick for Horizon's own renderer.
      if g.dynamic_resolution {
 +        if pressure {
++            dynamic.suspend_gpu_timing();
 +            let wait_ms = r.last_wait.as_secs_f32() * 1000.0;
 +            if let Some(change) = dynamic.observe_frame_pressure(
 +                cpu_ms,
@@ -19092,6 +19216,7 @@ index 37af01257cc..d269cb56fa8 100644
 +            }
 +            return;
 +        }
++        dynamic.suspend_frame_pressure();
          let pace = if r.shader_pack_kind().is_some() {
              Pace::Gentle
          } else {
