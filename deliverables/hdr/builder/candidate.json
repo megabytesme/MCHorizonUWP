@@ -1,0 +1,61 @@
+{
+  "product_commit": "3b09323fdbe8f7ae24f760393f86d5f4b2aad042",
+  "upstream_commit": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "wgpu_base_commit": "aa7b65c43ef008d0a92d20fcdf9f10fa0883f157",
+  "wgpu_final_commit": "432a009d8",
+  "wgpu_final_tree": "6c871af7ecf48892e47e09d3babbdf96d4eb6785",
+  "wgpu_overlay_sha256": "4c31f9349e28d294fa6d1663a6c4d3cacc134a9a4c8b1e2aea63688230e0c934",
+  "recipe": {
+    "patch": "0.1.16",
+    "client": "0.1.18",
+    "builder": "1.0.10"
+  },
+  "candidate_directory": "E:\\Temp\\mchorizon-hdr-finish\\builder\\candidate",
+  "assembled_directory": "E:\\Temp\\mchorizon-hdr-finish\\builder\\assembled",
+  "candidate_sha256": {
+    "catalog.UNSIGNED.json": "5b5e09817a66d8367fb16c0eedf475c7b1a2cd539212fbe0417f562cb4030c5a",
+    "horizon-uwp-0.1.16.patch": "16592441a1b4948f772ce21332816bb85f2645f18438fe2a13735403ee7b10bf",
+    "uwp-client-0.1.18.zip": "1deff898b06f13daf8552502777d8d38055ea59583aa50f1ef909c4206f98d26"
+  },
+  "host_kit_sha256": {
+    "arm/dead-import-sentinels.obj": "e2e6be74bb0469030ebe3bf4ac1a792c693bf27fe8b6ba1ff2b84521c4eb13bf",
+    "arm/HorizonUWP.exe": "d9c320fd0ada9c8ff39ceeadfa42c9b0bec37fa3eb63833cc026412f60fc671f",
+    "arm/HorizonUWP.winmd": "7d79ccf2fdecbde223a95f9f9db349cd0cd22d8fadd9c1651fb8e5c72d82684c",
+    "arm/HorizonUWPHost.lib": "4b0538e3bb95877c668f749df8dabcf0447739788c12c2b368e125675b574fdf",
+    "arm/link/libcmt.lib": "3cc4245e3d683c7049be979120a4520619bdb2f8b19fb6acc67ef1ac69e5bae4",
+    "arm/link/tls_index.obj": "015b7bb4c6b7cb3a8da96df73b9d01d1d382acd679b257da6f24c89f7b4b698b",
+    "arm64/dead-import-sentinels.obj": "2de69891656d84c6fe99a5ba672c73a3919541162cd37fb0640363e8b4f6d82c",
+    "arm64/HorizonUWP.exe": "9176bdaf1b3db1b3203a84923e464604a801a88c2778131ae6ca5a18872fcad8",
+    "arm64/HorizonUWP.winmd": "5e48e68515dd129c8df9ce176e2c9e9ba7685916ff4d4ad2ca6b019063808279",
+    "arm64/HorizonUWPHost.lib": "cc9470d6754eb32592fbf2e64910cd814d94b1d0c6dcc2d908a5d443d6b9410f",
+    "arm64/link/libcmt.lib": "fac113dc3740345dd82f7361c54fb7e0636e78d77b5db23db60f55c4c0303d7d",
+    "arm64/link/tls_index.obj": "d2c24baecc69a166ca22e3755657efb98382290df3c498584a943afb288304aa",
+    "README.txt": "c202620ef4369bc726f560c4c654a9d1eeaae9782fc7fc3cda1845ba0e03b5ca",
+    "x64/dead-import-sentinels.obj": "679c4a009f5db930fd2fd486a874539c81b68375eab3b81afbaf69b458f37142",
+    "x64/HorizonUWP.exe": "936369d1676fb1fab76b9a52c900c712164d50e930807e8b6216eb58b5883746",
+    "x64/HorizonUWP.winmd": "4792f75c962b3e337b2b682914ed3d380756d2c0792ad8052456a482ade70324",
+    "x64/HorizonUWPHost.lib": "03810d7655f7802b33f34a5cd067f328083817ac141fe97fb4d37c24080b71a4",
+    "x64/link/libcmt.lib": "4fa0a0900de2790b638d4f073d9e814d8aaaf5c649cede76b88095a2916b7d98",
+    "x64/link/tls_index.obj": "dd00e83cd98ad7164901ddc4f76a4ea03d17ddb74fd2c904c5084623ff8a8217",
+    "x86/dead-import-sentinels.obj": "208a4aeea1b6432f73cfc8ec3645d78ae0ef12645a349c0ba3cdf6e25412659e",
+    "x86/HorizonUWP.exe": "ee8159cdb990f5c44eb0b28cd406ed7c5b3bb57790fe6df356cdb38f055c5d4e",
+    "x86/HorizonUWP.winmd": "f1fcbdecbb5c51fa064a780ba5affa39ae770ac256251a68752cdcf386369ca6",
+    "x86/HorizonUWPHost.lib": "9bf2a1a1cd050f844d335782f904100dc31533498b8c735e31f52c19ac8324a1",
+    "x86/link/libcmt.lib": "2c42d407fec7ac32fd068b7ae30aa5653be94bc718359ef470e9f874c9e87409",
+    "x86/link/tls_index.obj": "9b5460deccd4517f2f50ec8f070db6211432b0d56fb427c87a8f6fec99be01d2"
+  },
+  "verification": {
+    "builder_tests": "passed",
+    "winui_release": "passed; two MSB3884 missing ManagedMinimumRules.ruleset warnings",
+    "candidate_catalog": "all four architectures compatible; unsigned",
+    "candidate_assembly": "passed",
+    "wgpu_source": "2561 regular files matched pinned Git archive after line-ending normalization",
+    "engine_hdr_overlay": "7 files matched earlier x64 build source after line-ending normalization",
+    "wgpu_overlay_tree": "temporary index tree matches 432a009d8 tree"
+  },
+  "host_kit_sources": {
+    "x86": "new build from product worktree using tools/build_host_artifact_kit.ps1 -Architecture x86",
+    "x64_arm_arm64": "preserved %TEMP%/mchorizon-hdr-nov20/host-kit-{architecture}"
+  },
+  "scope": "Local unsigned candidate; no publication or new hardware certification."
+}
