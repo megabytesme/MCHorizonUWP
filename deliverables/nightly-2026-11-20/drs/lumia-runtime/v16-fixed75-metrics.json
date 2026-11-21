@@ -1,0 +1,51 @@
+{
+  "package_sha256": "64C7298D328B12470665CE365DF41BE2B7524862AE56DDFA2F30A9CE7B202EC9",
+  "native_build_id": "mchorizonuwp-0.1.16-patch-0.1.14-arm-0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "capture": {
+    "sha256": "4c9f37ced13bbecc82ec77c76edd9415a04e95e953f5260240bbecb01b44bef9",
+    "gzip_complete": true,
+    "compressed_bytes": 1003124,
+    "decoded_protobuf_bytes": 1782338,
+    "client_stop_present": true
+  },
+  "examined_window": {
+    "source": "intervals between game-thread submit spans of successive recorded rendered frames",
+    "thread": "Horizon game",
+    "frames": 513,
+    "duration_s": 29.937132,
+    "average_fps": 17.135910013023295,
+    "median_fps": 19.925081692834176,
+    "p50_ms": 50.18800000000192,
+    "p95_ms": 63.625,
+    "p99_ms": 79.60199999999895,
+    "median_of_one_second_cpu_medians_ms": 32.44445514678955,
+    "median_of_one_second_gpu_medians_ms": null,
+    "sampled_max_rss_mb": 801.0
+  },
+  "renderer": {
+    "selected_scale_percent": 75,
+    "texture_budget_mib": 4,
+    "render_distance_chunks": 2,
+    "simulation_distance_chunks": 2,
+    "target_fps": 30,
+    "dynamic_resolution": false,
+    "world_color": [
+      1921,
+      1079
+    ],
+    "world_depth": [
+      1921,
+      1079
+    ],
+    "output": [
+      2561,
+      1439
+    ],
+    "physical_screen_utc": "2026-11-21T03:37:06.7817842Z",
+    "physical_screen_sha256": "EB8F29A253DC6C7F2A39FB6C2E4825F5ED2D5371F9C79BC9B07838B83E1D2E25",
+    "mod_screenshot_access_denied": true
+  },
+  "peak_portal_working_set_bytes": 826920960,
+  "game_reported_non_silent_audio": true,
+  "test_class": "warm; camera untouched until normal exit; preserves prior adaptive gameplay test profile"
+}
