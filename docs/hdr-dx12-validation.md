@@ -64,6 +64,14 @@ The package uses its own AppContainer and the existing `Horizon.Asset.26-3.98ccb
 
 For the physical HDR trial, select the HDR monitor with `-Display`, use `-Hdr On -ExpectHdr` and take the F2 capture with `f2.hmod` and `-AutomaticCapture` omitted. For a monitor move, supply the SDR monitor as `-FallbackDisplay`. Native rejection of HDR configuration, successful SDR recovery and repeated detach retries still need targeted fault injection.
 
+### Follow-up on the physical HDR console
+
+The signed PanelRollback package played the isolated world on the PG32UCDM with D3D12 scRGB, D3D12 SDR, D3D11 FL9_1 compatibility SDR, and ANGLE SDR. The same D3D12 process switched to BGRA8/sRGB after Windows HDR was disabled, returned to FP16/scRGB after HDR was restored, and configured scRGB again after Windows PLM suspend and resume. The harness verified the original Windows HDR mode was restored.
+
+The separate signed DeviceLoss diagnostic on the established Builder wgpu overlay removed the game's D3D12 device on the physical HDR view. DXGI returned `DXGI_ERROR_DEVICE_REMOVED`. The same process rebuilt world meshes, presented a fresh FP16/scRGB frame and saved a new F2 SDR/HDR pair. An initial run archived a zero-byte SDR file while its writer was still open. The harness now waits for a complete PNG and the matching HDR companion before copying. An independent rerun passed with freshly recorded screenshots and the installed host and bridge matched the signed APPX.
+
+On the PanelRollback package, matched Off and On trials used the same test save, display, backend, fixed scale and window size. Five WDDM samples per trial showed 334.3 MiB dedicated GPU usage in SDR and 346.9 MiB in scRGB. The samples describe these two runs. [Verify archived runs](hdr-run-evidence.md)
+
 ## Surface Pro X
 
 The strict ARM64 release built, signed and installed on the physical Adreno 680 Surface. Its internal panel reported 8-bit SDR only. The native DXGI probe accepted FP16/scRGB and RGB10/PQ formats on the same machine, which confirms that swapchain-format support alone cannot establish HDR output. The signed game's startup configured BGRA8/sRGB with an SDR view. Windows suspended the 31-thread game process in the locked console before a world frame. [Signed ARM64 APPX](../deliverables/hdr/arm64/HorizonUWP-HDR-arm64.appx) · [Surface build, transfer and hardware record](../deliverables/hdr/arm64/README.md) · [Locked activation receipt](../deliverables/hdr/arm64/locked-game-attempt.json)

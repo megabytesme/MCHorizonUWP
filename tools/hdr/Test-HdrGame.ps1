@@ -19,10 +19,14 @@ param(
     [string]$WasmFixture,
     [switch]$AutomaticCapture,
     [string]$ShaderFixture,
-    [ValidatePattern('^(horizon:)?[A-Za-z0-9_-]+$')][string]$ShaderPack
+    [ValidatePattern('^(horizon:)?[A-Za-z0-9_-]+$')][string]$ShaderPack,
+    [switch]$ExpectClassicPackRefusal
 )
 
 $ErrorActionPreference = 'Stop'
+if ($ExpectClassicPackRefusal -and ($Backend -ne 'Dx11' -or !$ShaderPack -or $ShaderPack.StartsWith('horizon:') -or $AutomaticCapture)) {
+    throw 'Classic shader pack refusal requires D3D11, a classic pack ID and direct F2 capture after refusal.'
+}
 if ($DisplayModeTool -and (!$MonitorFriendlyName -or $FallbackDisplay -or !$ExpectHdr)) {
     throw 'The display-mode test requires an HDR game, a named monitor and no monitor move.'
 }
@@ -169,6 +173,26 @@ function Find-ChainAfter([string]$Pattern, [DateTime]$Since) {
             [DateTimeOffset]::Parse($Matches[1]).UtcDateTime -ge $Since
     } | Select-Object -Last 1)
 }
+function Test-CompletePng([string]$Path) {
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        try {
+            $header = New-Object byte[] 8
+            $footer = New-Object byte[] 12
+            if ($stream.Length -lt 45 -or $stream.Read($header, 0, $header.Length) -ne $header.Length) {
+                return $false
+            }
+            $null = $stream.Seek(-$footer.Length, [IO.SeekOrigin]::End)
+            return $stream.Read($footer, 0, $footer.Length) -eq $footer.Length -and
+                [BitConverter]::ToString($header) -eq '89-50-4E-47-0D-0A-1A-0A' -and
+                [BitConverter]::ToString($footer) -eq '00-00-00-00-49-45-4E-44-AE-42-60-82'
+        } finally {
+            $stream.Dispose()
+        }
+    } catch [IO.IOException] {
+        return $false
+    }
+}
 function Capture-Game([string]$Label, [bool]$HdrExpected) {
     $trigger = $begin
     if (!$AutomaticCapture) {
@@ -188,9 +212,10 @@ function Capture-Game([string]$Label, [bool]$HdrExpected) {
         $new = @(Get-ChildItem -LiteralPath "$game/screenshots" -Filter '*.png' -File -ErrorAction SilentlyContinue |
             Where-Object LastWriteTimeUtc -GT $trigger | Sort-Object Name)
         if ($new.Count -eq 0) { return }
-        $hasHdr = @($new | Where-Object Name -Like '*-hdr.png').Count -ne 0
-        $hasSdr = @($new | Where-Object Name -NotLike '*-hdr.png').Count -ne 0
-        if ($hasSdr -and (!$HdrExpected -or $hasHdr)) { return $new }
+        if (@($new | Where-Object { !(Test-CompletePng $_.FullName) }).Count -ne 0) { return }
+        foreach ($sdr in ($new | Where-Object Name -NotLike '*-hdr.png')) {
+            if (!$HdrExpected -or $new.Name -contains "$($sdr.BaseName)-hdr.png") { return $new }
+        }
     })
     $index = 0
     foreach ($file in $files) {
@@ -241,8 +266,11 @@ try {
     }
     if ($ShaderPack) {
         $packName = [regex]::Escape(($ShaderPack -split ':')[-1])
+        $pattern = if ($ExpectClassicPackRefusal) {
+            "shader pack $($packName): turned off: Shader packs are unavailable on DirectX 11 FL9_1"
+        } else { "shader pack $packName(?: |:)" }
         $report.checks.shaderPack = Wait-For 'requested shader pack' 40 {
-            Find-RecentLine $log "shader pack $packName(?: |:)" $begin
+            Find-RecentLine $log $pattern $begin
         }
     }
     Start-Sleep -Seconds $(if ($AutomaticCapture) { 5 } else { 12 })
