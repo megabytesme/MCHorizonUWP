@@ -13,7 +13,8 @@ param(
     [string]$EmbeddedNativeMods,
     [switch]$LegacyArm32Wasm,
     [string]$AngleBin,
-    [string]$HostExecutable
+    [string]$HostExecutable,
+    [switch]$NormalProfile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -98,7 +99,9 @@ if ($LegacyArm32Wasm) {
     }
     $manifest.Save($path)
 }
-'Private Nightly runtime test' | Set-Content -LiteralPath "$output/package/horizon-isolated-test.flag" -Encoding ascii
+if (!$NormalProfile) {
+    'Private Nightly runtime test' | Set-Content -LiteralPath "$output/package/horizon-isolated-test.flag" -Encoding ascii
+}
 $sdkBin = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Windows Kits/10/bin/10.0.26100.0/x64'
 $appx = Join-Path $output "HorizonUWP-$Architecture.appx"
 & "$sdkBin/makeappx.exe" pack /o /d "$output/package" /p $appx *> "$output/pack-isolated.log"

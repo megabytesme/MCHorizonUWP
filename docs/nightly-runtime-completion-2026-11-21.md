@@ -74,3 +74,5 @@ dotnet run --project uwp/builder/Tests/Horizon.Builder.Tests.csproj -c Release -
 ```
 
 Use the existing locked release build and strict package scripts with `-PatchVersion 0.1.15 -ClientVersion 0.1.17 -UpstreamCommit 0a875da91dbb0fdcb7ba8c42c11341aa229af51a`. Optional native packages are staged from trusted sources using each architecture's matching build identity. ARM32 embeds those sources and uses the legacy Wasmtime link profile. [Build and staging procedure](nightly-cross-architecture-2026-11-20.md)
+
+Pass `-NormalProfile` to `tools/package_nightly_runtime.ps1` for a playable development APPX with its own package identity, normal sound and launcher settings. The default diagnostic packaging supplies the isolation marker so test harnesses can stage fixtures and explicitly enable audio. An ARM32 packaging smoke test signed the normal profile and confirmed its manifest and release metadata were present and the diagnostic marker was absent.
