@@ -18,7 +18,9 @@ NIGHTLY_UPSTREAM_ARCHIVE_SHA256 = "1a73fb817549e9b0ec8870b8aec7efd1ea4e274e8be75
 NOV20_UPSTREAM = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
 NOV20_UPSTREAM_ARCHIVE_SHA256 = "abd6a91c41407522f9b0ec43d16555f46cd76832625645658bee57e2ab49da3d"
 NOV20_INITIAL_PATCH = "0.1.13"
-NOV20_PATCH = "0.1.14"
+NOV20_DRS_PATCH = "0.1.14"
+NOV20_PATCH = "0.1.15"
+NOV20_PATCHES = (NOV20_INITIAL_PATCH, NOV20_DRS_PATCH, NOV20_PATCH)
 NOV20_INITIAL_RECIPE = ("0.1.14", "1.0.7")
 NOV20_WASM_STANDARD_LIBRARY_SHA256 = "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f"
 NIGHTLY_RECIPES = {
@@ -31,12 +33,13 @@ NIGHTLY_RECIPES = {
     "0.1.11": ("0.1.12", "1.0.6"),
     "0.1.12": ("0.1.13", "1.0.6"),
     NOV20_INITIAL_PATCH: ("0.1.15", "1.0.8"),
-    NOV20_PATCH: ("0.1.16", "1.0.8"),
+    NOV20_DRS_PATCH: ("0.1.16", "1.0.8"),
+    NOV20_PATCH: ("0.1.17", "1.0.9"),
 }
 WASMTIME_ARCHIVE_SHA256 = "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
 WASM_STANDARD_LIBRARY_SHA256 = "123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b"
 WGPU_ARCHIVE_SHA256 = "4c8769b47eea565ca994d4699ff72e70f6647613b6205c8daa52f2b04a743eaa"
-FIXED_WGPU_PATCH_VERSIONS = ("0.1.11", "0.1.12", NOV20_INITIAL_PATCH, NOV20_PATCH)
+FIXED_WGPU_PATCH_VERSIONS = ("0.1.11", "0.1.12", *NOV20_PATCHES)
 FIXED_WGPU_ARCHIVE_SHA256 = "8de8795116083533812728a855144a5f5e229d0562ef07990393bc5124c48c2e"
 WGPU_PATCH_PATH = "patches/wgpu-dx11/reuse-upload-buffer-shadow.patch"
 WGPU_PATCH_SHA256 = "ee0a57e971221a3b705ca8434b67ea2f2909fb8b3b21444163e0bf5be44046e4"
@@ -55,7 +58,8 @@ PATCH_PATHS = {
     "0.1.11": "patches/nightly-2026-11-18/horizon-uwp-0.1.11.patch",
     "0.1.12": "patches/nightly-2026-11-18/horizon-uwp-0.1.12.patch",
     NOV20_INITIAL_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.13.patch",
-    NOV20_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.14.patch",
+    NOV20_DRS_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.14.patch",
+    NOV20_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.15.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -206,7 +210,7 @@ def main():
     parser.add_argument("--upstream-repo", required=True, type=Path, help="Git repository containing the pinned upstream commit")
     args = parser.parse_args()
     nightly = NIGHTLY_RECIPES.get(args.patch_version)
-    nov20 = args.patch_version in (NOV20_INITIAL_PATCH, NOV20_PATCH)
+    nov20 = args.patch_version in NOV20_PATCHES
     nightly_source = NOV20_UPSTREAM if nov20 else NIGHTLY_UPSTREAM
     nightly_archive_hash = NOV20_UPSTREAM_ARCHIVE_SHA256 if nov20 else NIGHTLY_UPSTREAM_ARCHIVE_SHA256
     upstream_commit = (args.upstream_commit or (nightly_source if nightly else UPSTREAM)).lower()

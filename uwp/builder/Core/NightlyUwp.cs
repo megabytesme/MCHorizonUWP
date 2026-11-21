@@ -5,11 +5,13 @@ public static class NightlyUwp
     public const string UpstreamCommit = "0b14f8acfd97fa2c750e42795249dcc981178ca4";
     public const string November20Commit = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a";
     public const string November20SourceTag = "nightly-source/2026-11-20-0a875da";
-    public const string November20Patch = "0.1.14";
-    public const string November20Client = "0.1.16";
+    public const string November20Patch = "0.1.15";
+    public const string November20Client = "0.1.17";
     private const string November20InitialPatch = "0.1.13";
     private const string November20InitialClient = "0.1.14";
     private const string November20RuntimeClient = "0.1.15";
+    private const string November20DrsPatch = "0.1.14";
+    private const string November20DrsClient = "0.1.16";
     public const string PatchVersion = "0.1.5";
     public const string ClientVersion = "0.1.6";
     public const string CandidatePatchVersion = "0.1.12";
@@ -44,10 +46,11 @@ public static class NightlyUwp
     private static bool IsNovember20(string? commit) => string.Equals(commit, November20Commit, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsNovember20Client(string? client) =>
-        client is November20InitialClient or November20RuntimeClient or November20Client;
+        client is November20InitialClient or November20RuntimeClient or November20DrsClient or November20Client;
 
     private static bool IsNovember20Recipe(string patch, string client) =>
         (patch, client) is (November20InitialPatch, November20InitialClient or November20RuntimeClient)
+            or (November20DrsPatch, November20DrsClient)
             or (November20Patch, November20Client);
 
     public static bool Matches(string? commit) =>

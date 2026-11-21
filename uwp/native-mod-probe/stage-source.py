@@ -108,7 +108,8 @@ pub fn start_with_native(
 
 def november20_build_ids(architecture):
     return tuple(f"mchorizonuwp-{client}-patch-{patch}-{architecture}-{NOV20_UPSTREAM}"
-                 for client, patch in (("0.1.14", "0.1.13"), ("0.1.15", "0.1.13"), ("0.1.16", "0.1.14")))
+                 for client, patch in (("0.1.14", "0.1.13"), ("0.1.15", "0.1.13"),
+                                       ("0.1.16", "0.1.14"), ("0.1.17", "0.1.15")))
 
 
 def stage(workspace, architecture, source_folders, game_build_id=None):
