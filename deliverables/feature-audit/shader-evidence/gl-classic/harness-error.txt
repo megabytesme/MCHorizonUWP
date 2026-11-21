@@ -1,0 +1,8 @@
+﻿Candidate exited before gameplay capture.
+At C:\Users\ben\AppData\Local\Temp\horizon-nov20-audit-shader-runtime\Test-Nov20Desktop.ps1:415 char:32
++ ... process.HasExited){throw 'Candidate exited before gameplay capture.'}
++                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Candidate exite...meplay capture.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Candidate exited before gameplay capture.
+ 
+

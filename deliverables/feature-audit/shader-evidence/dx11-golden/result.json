@@ -1,0 +1,52 @@
+{
+  "Name": "MCHorizonUWP.Nov20.qa.x64",
+  "MainOnlyControl": false,
+  "Family": "MCHorizonUWP.Nov20.qa.x64_4pd4jeb6snrqw",
+  "Package": "MCHorizonUWP.Nov20.qa.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+  "Pid": 100548,
+  "BeginUtc": "2026-11-21T07:05:55.1913106Z",
+  "Mode": "World",
+  "Backend": "Dx11",
+  "Scale": 100,
+  "Hooks": "Enabled",
+  "Trial": "Warm",
+  "StrictFl91": false,
+  "Content": false,
+  "AudioTest": false,
+  "Gyro": false,
+  "Ready": true,
+  "ExpectedNativeRejection": false,
+  "Renderer": "[07:06:13] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+  "FirstFrame": "[07:06:16] [Horizon game/INFO]: Horizon: first frame after 689 ms",
+  "StartupObservedMs": 22117,
+  "CaptureMethod": "game mod screenshot",
+  "Capture": {
+    "Path": "world.png",
+    "Width": 1800,
+    "Height": 1350,
+    "Cyan": 6400,
+    "Magenta": 6400,
+    "SceneColors": 2335,
+    "SHA256": "5B0D4329B810347263ADB876611A6937F04171633C1163BE99F9E68CCE844EFD"
+  },
+  "NativeLoad": "[07:05:57] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+  "WasmLoad": "[07:06:00] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 182 ms, modules 2652 ms, linking 37 ms, instantiation 3 ms, subscriptions 0 ms, initialization 0 ms",
+  "EnabledFixtureInventory": [
+    "uwp_native_hook_probe",
+    "uwp_wasm_hook_probe"
+  ],
+  "ResolutionEvidence": [
+    "[07:06:16] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%"
+  ],
+  "RenderArea": {
+    "World": [
+      1800,
+      1350
+    ],
+    "Output": [
+      1800,
+      1350
+    ]
+  },
+  "Exit": "closed"
+}
