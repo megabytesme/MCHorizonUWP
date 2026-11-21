@@ -20,7 +20,8 @@ NOV20_UPSTREAM_ARCHIVE_SHA256 = "abd6a91c41407522f9b0ec43d16555f46cd768326256456
 NOV20_INITIAL_PATCH = "0.1.13"
 NOV20_DRS_PATCH = "0.1.14"
 NOV20_PATCH = "0.1.15"
-NOV20_PATCHES = (NOV20_INITIAL_PATCH, NOV20_DRS_PATCH, NOV20_PATCH)
+HDR_PATCH = "0.1.16"
+NOV20_PATCHES = (NOV20_INITIAL_PATCH, NOV20_DRS_PATCH, NOV20_PATCH, HDR_PATCH)
 NOV20_INITIAL_RECIPE = ("0.1.14", "1.0.7")
 NOV20_WASM_STANDARD_LIBRARY_SHA256 = "c1d04e08fb402134fb849ae6cb5d5af518c1e5612d715a75b3757c2a5bd3ec5f"
 NIGHTLY_RECIPES = {
@@ -35,12 +36,15 @@ NIGHTLY_RECIPES = {
     NOV20_INITIAL_PATCH: ("0.1.15", "1.0.8"),
     NOV20_DRS_PATCH: ("0.1.16", "1.0.8"),
     NOV20_PATCH: ("0.1.17", "1.0.9"),
+    HDR_PATCH: ("0.1.18", "1.0.10"),
 }
 WASMTIME_ARCHIVE_SHA256 = "9e32e3ce9a15d2ddedfeae38437a4fe52ed9c59ac878e3131e5a840068faf44e"
 WASM_STANDARD_LIBRARY_SHA256 = "123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b"
 WGPU_ARCHIVE_SHA256 = "4c8769b47eea565ca994d4699ff72e70f6647613b6205c8daa52f2b04a743eaa"
 FIXED_WGPU_PATCH_VERSIONS = ("0.1.11", "0.1.12", *NOV20_PATCHES)
 FIXED_WGPU_ARCHIVE_SHA256 = "8de8795116083533812728a855144a5f5e229d0562ef07990393bc5124c48c2e"
+HDR_WGPU_PATCH_PATH = "patches/wgpu-dx11/dx12-uwp-hdr-surface.patch"
+HDR_WGPU_PATCH_SHA256 = "4c31f9349e28d294fa6d1663a6c4d3cacc134a9a4c8b1e2aea63688230e0c934"
 WGPU_PATCH_PATH = "patches/wgpu-dx11/reuse-upload-buffer-shadow.patch"
 WGPU_PATCH_SHA256 = "ee0a57e971221a3b705ca8434b67ea2f2909fb8b3b21444163e0bf5be44046e4"
 PATCH_PATHS = {
@@ -60,6 +64,7 @@ PATCH_PATHS = {
     NOV20_INITIAL_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.13.patch",
     NOV20_DRS_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.14.patch",
     NOV20_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.15.patch",
+    HDR_PATCH: "patches/nightly-2026-11-20/horizon-uwp-0.1.16.patch",
 }
 REPOSITORY = "https://github.com/megabytesme/MCHorizonUWP"
 
@@ -118,7 +123,7 @@ def verify_upstream(archive_path, repository, commit):
         raise ValueError("Upstream ZIP contents do not match the pinned Git commit: " + ", ".join(samples))
 
 
-def client_archive(revision, host_artifacts=None, wgpu_archive=None, wasm_inputs=(), fixed_wgpu=False):
+def client_archive(revision, host_artifacts=None, wgpu_archive=None, wasm_inputs=(), fixed_wgpu=False, hdr_wgpu=False):
     archive = git("archive", "--format=tar", revision, "uwp", "LICENSE", "THIRD_PARTY_NOTICES.md")
     output = io.BytesIO()
     with tarfile.open(fileobj=io.BytesIO(archive)) as source, zipfile.ZipFile(
@@ -147,6 +152,11 @@ def client_archive(revision, host_artifacts=None, wgpu_archive=None, wasm_inputs
                 if digest(wgpu_patch) != WGPU_PATCH_SHA256:
                     raise ValueError("The Nightly wgpu patch does not match its pinned SHA-256")
                 wgpu_inputs.append(("reuse-upload-buffer-shadow.patch", wgpu_patch))
+            if hdr_wgpu:
+                hdr_patch = git("show", f"{revision}:{HDR_WGPU_PATCH_PATH}")
+                if digest(hdr_patch) != HDR_WGPU_PATCH_SHA256:
+                    raise ValueError("The HDR wgpu patch does not match its pinned SHA-256")
+                wgpu_inputs.append(("dx12-uwp-hdr-surface.patch", hdr_patch))
             for name, data in wgpu_inputs:
                 item = zipfile.ZipInfo(f"uwp/wgpu-dx11/{name}", (1980, 1, 1, 0, 0, 0))
                 item.external_attr = 0o100644 << 16
@@ -266,7 +276,8 @@ def main():
         raise ValueError("Every client release requires --host-artifacts for its prebuilt hosts")
     client = None if args.patch_only else client_archive(
         revision, args.host_artifacts, args.wgpu_archive, wasm_inputs,
-        fixed_wgpu=args.patch_version in FIXED_WGPU_PATCH_VERSIONS
+        fixed_wgpu=args.patch_version in FIXED_WGPU_PATCH_VERSIONS,
+        hdr_wgpu=args.patch_version == HDR_PATCH
     )
     verify_upstream(args.upstream_archive, args.upstream_repo, upstream_commit)
     upstream_hash = digest(args.upstream_archive.read_bytes())

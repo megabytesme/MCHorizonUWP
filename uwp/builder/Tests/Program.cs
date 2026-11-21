@@ -2067,6 +2067,10 @@ static async Task TestReleaseSource()
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.CandidatePatchVersion, NightlyUwp.CandidateClientVersion),
             "Nightly recipes reject source and SDK mismatches");
         var november20Arm = new BuildSelection(TargetProfile.WindowsMobile, true);
+        Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.HdrPatch, NightlyUwp.HdrClient)
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, NightlyUwp.HdrClient)
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.HdrPatch, NightlyUwp.November20Client)
+            && NightlyUwp.UsesFixedWgpu(NightlyUwp.HdrClient), "HDR recipe is paired and uses the fixed wgpu base");
         Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.14")
             && NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.15")
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, "0.1.14")

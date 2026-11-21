@@ -6,6 +6,9 @@ public static class NightlyUwp
     public const string November20Commit = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a";
     public const string November20SourceTag = "nightly-source/2026-11-20-0a875da";
     public const string November20Patch = "0.1.15";
+    public const string HdrPatch = "0.1.16";
+    public const string HdrClient = "0.1.18";
+    internal const string HdrWgpuPatchHash = "4c31f9349e28d294fa6d1663a6c4d3cacc134a9a4c8b1e2aea63688230e0c934";
     public const string November20Client = "0.1.17";
     private const string November20InitialPatch = "0.1.13";
     private const string November20InitialClient = "0.1.14";
@@ -46,12 +49,13 @@ public static class NightlyUwp
     private static bool IsNovember20(string? commit) => string.Equals(commit, November20Commit, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsNovember20Client(string? client) =>
-        client is November20InitialClient or November20RuntimeClient or November20DrsClient or November20Client;
+        client is November20InitialClient or November20RuntimeClient or November20DrsClient or November20Client or HdrClient;
 
     private static bool IsNovember20Recipe(string patch, string client) =>
         (patch, client) is (November20InitialPatch, November20InitialClient or November20RuntimeClient)
             or (November20DrsPatch, November20DrsClient)
-            or (November20Patch, November20Client);
+            or (November20Patch, November20Client)
+            or (HdrPatch, HdrClient);
 
     public static bool Matches(string? commit) =>
         IsNovember20(commit) || string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);

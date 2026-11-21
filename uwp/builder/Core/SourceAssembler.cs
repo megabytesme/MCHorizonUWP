@@ -29,16 +29,18 @@ public static class SourceAssembler
             var bundle = Path.Combine(root, "uwp", "wgpu-dx11");
             var fixedWgpu = NightlyUwp.UsesFixedWgpu(clientVersion);
             await StageNightlyWgpuAsync(root, Path.Combine(bundle, "wgpu.zip"),
-                fixedWgpu ? null : Path.Combine(bundle, "reuse-upload-buffer-shadow.patch"), git,
-                fixedWgpu ? NightlyUwp.FixedWgpuArchiveHash : NightlyUwp.WgpuArchiveHash);
+                clientVersion == NightlyUwp.HdrClient ? Path.Combine(bundle, "dx12-uwp-hdr-surface.patch") :
+                    fixedWgpu ? null : Path.Combine(bundle, "reuse-upload-buffer-shadow.patch"), git,
+                fixedWgpu ? NightlyUwp.FixedWgpuArchiveHash : NightlyUwp.WgpuArchiveHash,
+                clientVersion == NightlyUwp.HdrClient ? NightlyUwp.HdrWgpuPatchHash : NightlyUwp.WgpuPatchHash);
         }
     }
 
     internal static async Task StageNightlyWgpuAsync(string source, string archive, string? patch, string git,
-        string expectedArchiveHash = NightlyUwp.WgpuArchiveHash)
+        string expectedArchiveHash = NightlyUwp.WgpuArchiveHash, string expectedPatchHash = NightlyUwp.WgpuPatchHash)
     {
         await VerifyAsync(archive, expectedArchiveHash);
-        if (patch is not null) await VerifyAsync(patch, NightlyUwp.WgpuPatchHash);
+        if (patch is not null) await VerifyAsync(patch, expectedPatchHash);
         var destination = Path.Combine(Path.GetFullPath(source), "third_party", "wgpu-dx11");
         if (Directory.Exists(destination) || File.Exists(destination))
             throw new IOException("The Nightly wgpu source destination already exists.");
