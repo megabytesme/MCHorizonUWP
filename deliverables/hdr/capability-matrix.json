@@ -22,6 +22,12 @@
       "presentation": "XAML SwapChainPanel",
       "display": "PG32UCDM / OS HDR active / 10 bits / PQ BT.2020",
       "status": "signed_hdr_gameplay_and_sdr_fallback_verified",
+      "panel_rollback_candidate": {
+        "branch": "codex/hdr-dx12-panel-rollback-nov21",
+        "commit": "4ca69dcdedd39e0bd5193fbcdf033e8bdce4b06d",
+        "verified": "x64 UWP DX12 HAL Cargo check and Clippy",
+        "remaining": "Signed link and physical configuration-failure injection"
+      },
       "evidence": [
         "swapchain-probe-results.json",
         "../../docs/hdr-dx12-validation.md",
