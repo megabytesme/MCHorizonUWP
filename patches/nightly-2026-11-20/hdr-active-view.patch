@@ -1,0 +1,209 @@
+diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
+index f363226d394..205f6be4530 100644
+--- a/crates/horizon-client-render/src/gfx.rs
++++ b/crates/horizon-client-render/src/gfx.rs
+@@ -2506,7 +2506,7 @@ impl Renderer {
+             (None, _) => None,
+         };
+         let (config, present_modes, hdr_output) = if let Some((config, caps)) = configured {
+-            let hdr_output = if fl91 { None } else { hdr::output(&caps) };
++            let hdr_output = hdr::output(&caps, info.backend);
+             if previous.is_none() {
+                 log::info!(
+                     "Horizon renderer: HDR output {}",
+@@ -14280,7 +14280,14 @@ impl DisplayReading {
+     /// What wgpu reads from the OS for `surface`'s display; without one, `hdr::offscreen_display`.
+     fn read(surface: Option<&wgpu::Surface>, adapter: &wgpu::Adapter) -> Self {
+         surface.map_or_else(hdr::offscreen_display, |s| {
+-            Self::os(&s.display_hdr_info(adapter))
++            #[cfg(target_vendor = "uwp")]
++            let info = {
++                let _ = (s, adapter);
++                horizon_hdr::uwp::display_info()
++            };
++            #[cfg(not(target_vendor = "uwp"))]
++            let info = s.display_hdr_info(adapter);
++            Self::os(&info)
+         })
+     }
+     fn os(info: &wgpu::DisplayHdrInfo) -> Self {
+diff --git a/crates/horizon-client-render/src/gfx/fl91.rs b/crates/horizon-client-render/src/gfx/fl91.rs
+index 4a415b76a18..816c59dcb79 100644
+--- a/crates/horizon-client-render/src/gfx/fl91.rs
++++ b/crates/horizon-client-render/src/gfx/fl91.rs
+@@ -62,8 +62,12 @@ pub struct Fl91Caps {
+ }
+ 
+ impl Fl91Caps {
++    pub(super) fn uses_fl91(backend: wgpu::Backend) -> bool {
++        backend == wgpu::Backend::Dx11
++    }
++
+     pub fn from_adapter(adapter: &wgpu::Adapter) -> Self {
+-        let fl91 = adapter.get_info().backend == wgpu::Backend::Dx11;
++        let fl91 = Self::uses_fl91(adapter.get_info().backend);
+         let downlevel = adapter.get_downlevel_capabilities().flags;
+         let depth_format = if fl91 {
+             wgpu::TextureFormat::Depth24Plus
+diff --git a/crates/horizon-client-render/src/gfx/hdr.rs b/crates/horizon-client-render/src/gfx/hdr.rs
+index 2d5a3138990..7ff01784c17 100644
+--- a/crates/horizon-client-render/src/gfx/hdr.rs
++++ b/crates/horizon-client-render/src/gfx/hdr.rs
+@@ -188,8 +188,30 @@ const NAMES: [(Output, &str); 2] = [(Output::Pq, "pq"), (Output::ScRgb, "scrgb")
+ 
+ /// The HDR output `caps` can present: HDR10 where offered, else scRGB.
+ /// `HORIZON_HDR_OUTPUT=pq` or `scrgb` allows only that one.
+-pub fn output(caps: &wgpu::SurfaceCapabilities) -> Option<Output> {
+-    pick(caps, std::env::var("HORIZON_HDR_OUTPUT").ok().as_deref())
++pub fn output(caps: &wgpu::SurfaceCapabilities, backend: wgpu::Backend) -> Option<Output> {
++    if super::fl91::Fl91Caps::uses_fl91(backend) {
++        return None;
++    }
++    // UWP can expose a floating-point surface on a desktop in SDR mode. An
++    // offer requires the current game's view and a DXGI-backed color-space path.
++    #[cfg(target_vendor = "uwp")]
++    if !matches!(backend, wgpu::Backend::Dx12 | wgpu::Backend::Dx11)
++        || !horizon_hdr::uwp::supports_hdr()
++    {
++        return None;
++    }
++    let requested = std::env::var("HORIZON_HDR_OUTPUT").ok();
++    #[cfg(target_vendor = "uwp")]
++    {
++        // The XAML composition path negotiates FP16 scRGB. A request for another
++        // encoding must never silently switch the physical presentation format.
++        if requested.as_deref().is_some_and(|name| name != "scrgb") {
++            return None;
++        }
++        pick(caps, Some("scrgb"))
++    }
++    #[cfg(not(target_vendor = "uwp"))]
++    pick(caps, requested.as_deref())
+ }
+ fn pick(caps: &wgpu::SurfaceCapabilities, only: Option<&str>) -> Option<Output> {
+     NAMES
+diff --git a/crates/horizon-client-render/src/gfx/output_apply.rs b/crates/horizon-client-render/src/gfx/output_apply.rs
+index aea14dee417..744be52ee76 100644
+--- a/crates/horizon-client-render/src/gfx/output_apply.rs
++++ b/crates/horizon-client-render/src/gfx/output_apply.rs
+@@ -308,7 +308,10 @@ impl Drop for DisplayReader {
+ /// What `surface` offers now (`None` offscreen): Vulkan's offered formats can change with
+ /// desktop HDR or the window's output, and a display can offer the other encoding.
+ fn offer(surface: Option<&wgpu::Surface>, adapter: &wgpu::Adapter) -> Option<Option<hdr::Output>> {
+-    Some(hdr::output(&surface?.get_capabilities(adapter)))
++    Some(hdr::output(
++        &surface?.get_capabilities(adapter),
++        adapter.get_info().backend,
++    ))
+ }
+ 
+ /// Takes what a due poll read into `reading` and `caps`: the display's report `now`, and what
+diff --git a/crates/horizon-client-render/src/gfx/surface_setup.rs b/crates/horizon-client-render/src/gfx/surface_setup.rs
+index 21300cf242d..7bbfdd71b61 100644
+--- a/crates/horizon-client-render/src/gfx/surface_setup.rs
++++ b/crates/horizon-client-render/src/gfx/surface_setup.rs
+@@ -37,6 +37,14 @@ pub(super) fn set_up_surface(
+         )
+         .ok_or("surface has no supported configuration")?;
+     config.format = surface_format(&caps.formats, config.format);
++    // SwapChainPanel presents Horizon's already-composited world and HUD.
++    // Alpha mode is fixed when the swapchain is created, including in SDR.
++    #[cfg(target_vendor = "uwp")]
++    if adapter.get_info().backend == wgpu::Backend::Dx12
++        && caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::Opaque)
++    {
++        config.alpha_mode = wgpu::CompositeAlphaMode::Opaque;
++    }
+     config.view_formats = if adapter.get_info().backend == wgpu::Backend::Dx11 {
+         Vec::new()
+     } else {
+diff --git a/crates/horizon-hdr/src/lib.rs b/crates/horizon-hdr/src/lib.rs
+index fe2bcf93946..aafc3fd414c 100644
+--- a/crates/horizon-hdr/src/lib.rs
++++ b/crates/horizon-hdr/src/lib.rs
+@@ -6,6 +6,9 @@
+ #[cfg(target_os = "linux")]
+ pub mod wayland;
+ 
++#[cfg(any(target_vendor = "uwp", test))]
++pub mod uwp;
++
+ /// Opens a Vulkan device with `VK_EXT_hdr_metadata` too, when the GPU offers
+ /// it, so [`set_metadata`] can tell the compositor the real peak brightness.
+ /// `None` leaves opening to wgpu.
+diff --git a/crates/horizon-hdr/src/uwp.rs b/crates/horizon-hdr/src/uwp.rs
+new file mode 100644
+index 00000000000..881894f6073
+--- /dev/null
++++ b/crates/horizon-hdr/src/uwp.rs
+@@ -0,0 +1,70 @@
++//! The current XAML game's display. The host observes its view on the UI thread.
++
++#[cfg(target_vendor = "uwp")]
++unsafe extern "C" {
++    fn horizon_uwp_get_advanced_color(white: *mut f32, peak: *mut f32, min: *mut f32) -> i32;
++}
++
++/// The OS must currently be presenting HDR on the view hosting the game.
++#[cfg(target_vendor = "uwp")]
++pub fn supports_hdr() -> bool {
++    // SAFETY: all three luminance outputs are optional in the host ABI.
++    let mode = unsafe {
++        horizon_uwp_get_advanced_color(
++            std::ptr::null_mut(),
++            std::ptr::null_mut(),
++            std::ptr::null_mut(),
++        )
++    };
++    active_hdr(mode) == Some(true)
++}
++
++/// Translate the view's report into the same display information Horizon uses
++/// on desktop, so all luminance validation and calibration defaults are shared.
++#[cfg(target_vendor = "uwp")]
++pub fn display_info() -> wgpu::DisplayHdrInfo {
++    let (mut white, mut peak) = (0.0, 0.0);
++    // SAFETY: the host takes a synchronized snapshot and writes only the supplied
++    // outputs before returning. Black level is the player's calibration setting.
++    let mode =
++        unsafe { horizon_uwp_get_advanced_color(&mut white, &mut peak, std::ptr::null_mut()) };
++    let hdr = active_hdr(mode);
++    wgpu::DisplayHdrInfo {
++        coarse: hdr.map(|active| wgpu::DisplayCoarseRange {
++            high_dynamic_range: Some(active),
++            ..Default::default()
++        }),
++        luminance: (hdr == Some(true)).then_some(wgpu::DisplayLuminance {
++            sdr_white_nits: Some(white),
++            max_nits: Some(peak),
++            ..Default::default()
++        }),
++        ..Default::default()
++    }
++}
++
++fn active_hdr(mode: i32) -> Option<bool> {
++    match mode {
++        0 | 1 => Some(false), // SDR and wide-gamut SDR
++        2 => Some(true),
++        _ => None,
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::active_hdr;
++
++    #[test]
++    fn only_an_active_hdr_view_reports_hdr() {
++        for (mode, hdr) in [
++            (-1, None),
++            (0, Some(false)),
++            (1, Some(false)),
++            (2, Some(true)),
++            (3, None),
++        ] {
++            assert_eq!(active_hdr(mode), hdr);
++        }
++    }
++}
