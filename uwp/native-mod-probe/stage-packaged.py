@@ -18,8 +18,7 @@ TOOLCHAIN = "1.99.1"
 def stage(workspace, architecture, sources, game_build_id):
     expected = (r"mchorizonuwp-[0-9]+\.[0-9]+\.[0-9]+-patch-[0-9]+\.[0-9]+\.[0-9]+-"
                 + architecture + "-" + STAGING["UPSTREAM"])
-    november20 = f"mchorizonuwp-0.1.14-patch-0.1.13-{architecture}-{STAGING['NOV20_UPSTREAM']}"
-    if not re.fullmatch(expected, game_build_id) and game_build_id != november20:
+    if not re.fullmatch(expected, game_build_id) and game_build_id not in STAGING["november20_build_ids"](architecture):
         raise ValueError("Expected the pinned UWP game build identity for this architecture")
     bridge = workspace / "uwp/game-bridge"
     output = bridge / "packaged-native"

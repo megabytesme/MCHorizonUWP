@@ -106,6 +106,11 @@ pub fn start_with_native(
     return platform
 
 
+def november20_build_ids(architecture):
+    return tuple(f"mchorizonuwp-{client}-patch-0.1.13-{architecture}-{NOV20_UPSTREAM}"
+                 for client in ("0.1.14", "0.1.15"))
+
+
 def stage(workspace, architecture, source_folders, game_build_id=None):
     bridge = workspace / "uwp/game-bridge"
     host = workspace / "crates/horizon-mod-host/src"
@@ -118,7 +123,7 @@ def stage(workspace, architecture, source_folders, game_build_id=None):
                                       ("0.1.8", "0.1.7"), ("0.1.9", "0.1.8"),
                                       ("0.1.10", "0.1.9"), ("0.1.11", "0.1.10"),
                                       ("0.1.12", "0.1.11"), ("0.1.13", "0.1.12"))]
-    expected.append(f"mchorizonuwp-0.1.14-patch-0.1.13-{architecture}-{NOV20_UPSTREAM}")
+    expected.extend(november20_build_ids(architecture))
     game_build_id = game_build_id or expected[0]
     if game_build_id not in expected:
         raise ValueError("Build identity does not match the pinned UWP Nightly and architecture")
