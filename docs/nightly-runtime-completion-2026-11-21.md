@@ -60,6 +60,7 @@ The local development export from product commit `c9dd7523c0a99fe130a5faa09383f6
 
 ```powershell
 & ./tools/build_host_artifact_kit.ps1 -OutputDirectory $HostKit
+& ./uwp/builder/build.ps1 -Configuration Release
 python tools/prepare_candidate.py --revision c9dd7523c0a99fe130a5faa09383f69cb2b3b7c5 `
   --patch-version 0.1.15 --client-version 0.1.17 --builder-version 1.0.9 `
   --upstream-repo $HorizonGit --upstream-archive $HorizonZip --wgpu-archive $WgpuZip `
@@ -76,3 +77,5 @@ dotnet run --project uwp/builder/Tests/Horizon.Builder.Tests.csproj -c Release -
 Use the existing locked release build and strict package scripts with `-PatchVersion 0.1.15 -ClientVersion 0.1.17 -UpstreamCommit 0a875da91dbb0fdcb7ba8c42c11341aa229af51a`. Optional native packages are staged from trusted sources using each architecture's matching build identity. ARM32 embeds those sources and uses the legacy Wasmtime link profile. [Build and staging procedure](nightly-cross-architecture-2026-11-20.md)
 
 Pass `-NormalProfile` to `tools/package_nightly_runtime.ps1` for a playable development APPX with its own package identity, normal sound and launcher settings. The default diagnostic packaging supplies the isolation marker so test harnesses can stage fixtures and explicitly enable audio. An ARM32 packaging smoke test signed the normal profile and confirmed its manifest and release metadata were present and the diagnostic marker was absent.
+
+The Builder 1.0.9 WinUI Release build completed on Ben-Desktop. It produced the x64 app and XAML resource index. MSBuild logged two warnings about a missing `ManagedMinimumRules.ruleset` and zero errors.
