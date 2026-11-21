@@ -1,0 +1,47 @@
+{
+  "Name": "MCHorizonUWP.NightlyNov20.arm64",
+  "Family": "MCHorizonUWP.NightlyNov20.arm64_4pd4jeb6snrqw",
+  "Package": "MCHorizonUWP.NightlyNov20.arm64_1.0.1.0_arm64__4pd4jeb6snrqw",
+  "Pid": 21052,
+  "BeginUtc": "/Date(1795227615953)/",
+  "Mode": "World",
+  "Backend": "Dx11",
+  "Scale": 67,
+  "Hooks": "Enabled",
+  "StrictFl91": false,
+  "Content": false,
+  "AudioTest": false,
+  "Ready": true,
+  "Renderer": "[02:22:10] [Horizon game/INFO]: Horizon renderer: Qualcomm(R) Adreno(TM) 680 GPU (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x41333430, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 27.20.2160.0\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+  "Capture": {
+    "Path": "C:\\Users\\ben\\AppData\\Local\\Temp\\MCHorizonUWP-NightlyNov20-ARM64\\capture-20261121-022014-903-arm64-Dx11-World-Enabled-67\\world.png",
+    "Width": 2074,
+    "Height": 1614,
+    "Cyan": 9216,
+    "Magenta": 6432
+  },
+  "DebugCapture": {
+    "Path": "C:\\Users\\ben\\AppData\\Local\\Temp\\MCHorizonUWP-NightlyNov20-ARM64\\capture-20261121-022014-903-arm64-Dx11-World-Enabled-67\\f3.png",
+    "Width": 2074,
+    "Height": 1614,
+    "Cyan": 9216,
+    "Magenta": 6432
+  },
+  "ResolutionEvidence": [
+    "[02:21:08] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2048x1536, output 2048x1536, selected scale 100%",
+    "[02:21:41] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2048x1536, output 2048x1536, selected scale 100%",
+    "[02:22:28] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2048x1536, output 2048x1536, selected scale 100%",
+    "[02:22:43] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1372x1029, output 2048x1536, selected scale 67%"
+  ],
+  "RenderArea": {
+    "World": [
+      1372,
+      1029
+    ],
+    "Output": [
+      2048,
+      1536
+    ]
+  },
+  "Exit": "closed"
+}

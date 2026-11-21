@@ -1,0 +1,23 @@
+# November 20 Nightly runtime follow-up
+
+Initial product worktree `codex/nightly-2026-11-20` started at `15625f842f81b13cc29e4829c73ffa5d8d419e79`. The Horizon source pin remains `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`. D3D11 still uses wgpu `aa7b65c43ef008d0a92d20fcdf9f10fa0883f157`. The November 18 product baseline at `2e98d4555313e2d9485c207ddc1962e2636001bd` and the dedicated wgpu worktree were clean. The separate wgpu checkout retained its two previous unstaged modifications. [Prior candidate, signatures and source checks](nightly-integration-2026-11-20.md)
+
+## Milestones
+
+| Lane | Scope | First new evidence |
+| --- | --- | --- |
+| Lumia performance and DRS | Device access, signed saved world and matched scale runs | The paired Device Portal responded. The signed isolated DrsSmoke package bootstrapped the copied two-chunk save. The user heard world audio while the pre-title launcher spinner stayed visible. |
+| Gyroscope aiming and controls | Sensor path, motion evidence and input checks | Compiled the host report-order and orientation-generation fix on all four architectures. Four focused Rust tests passed against the pinned mod API. The optional mod trace records before/after yaw and pitch once enabled. |
+| Surface Pro X | Signed D3D11 and D3D12 interactive play | D3D11 at 67% rendered a saved world and both mod markers. The first D3D12 capture showed real world geometry under the terrain-loading screen. It was captured before both markers appeared. |
+| Desktop graphics, mods and multiplayer | Stalled startup, repeated launches, hooks and dedicated-server join | Suspended thread snapshots put the render worker in the XAML swapchain-attachment handoff and the XAML owner in a synchronous SecondaryTile activation call. |
+| Builder and release checks | Immutable source and local candidate | Added a compatible 0.1.15 client and Builder 1.0.8 recipe on the same verified patch 0.1.13. The Builder test suite passed. Older November 20 package inputs still resolve to the original SDK identity. |
+
+## Surface gameplay
+
+The existing signed `MCHorizonUWP.NightlyNov20.arm64` 1.0.1.0 package and its related native-mod bundle ran on Ben-Tablet in console session 1. Hardware D3D11 reported the Qualcomm Adreno 680, with the game using the FL9_1 compatibility path on FL11_1 hardware. At fixed 67%, the world target was 1372 × 1029 and the output was 2048 × 1536. The saved world presented 9,216 exact cyan and 6,432 exact magenta pixels in the sampled HUD region. F3 rendered and the test exited cleanly. This run had audio disabled. [Signed run and graphics receipt](../deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67/result.json) · [World and HUD](../deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67/world.png) · [F3 capture](../deliverables/nightly-2026-11-20/runtime-evidence/arm64/dx11-world-67/f3.png)
+
+## Process lifetime and mod settings
+
+At the pinned upstream revision, the engine seal, point table and platform provider are process globals. The old XAML return-to-home flow cleared a host flag and queued another game within the same process. The second engine startup would try to install its already-installed registration provider. The host now completes view and input cleanup, holds its launch guard, and requests a fresh launcher process on Windows versions that support the restart API. The legacy ARM32 route closes after Quit Game so the next activation starts with a new process. Both retain the ordinary in-game return-to-title behavior until the player quits the game. The modern route falls back to closing if Windows rejects the restart. [WinRT restart API](https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.core.coreapplication.requestrestartasync?view=winrt-19041)
+
+The scoped quit lifecycle change strict-linked in x64 and ARM32 host builds before integration with the remaining runtime changes. Physical restart verification uses the signed package and records both process identities.
