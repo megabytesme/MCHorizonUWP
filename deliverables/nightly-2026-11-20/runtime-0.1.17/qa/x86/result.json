@@ -1,0 +1,59 @@
+﻿{
+    "Name":  "MCHorizonUWP.Nov20.qa.x86",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.Nov20.qa.x86_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.Nov20.qa.x86_1.0.2.0_x86__4pd4jeb6snrqw",
+    "Pid":  47468,
+    "BeginUtc":  "2026-11-21T05:19:51.6391328Z",
+    "Mode":  "World",
+    "Backend":  "Dx11",
+    "Scale":  75,
+    "Hooks":  "Enabled",
+    "Trial":  "Cold",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  true,
+    "Gyro":  false,
+    "Ready":  true,
+    "ExpectedNativeRejection":  false,
+    "Renderer":  "[05:22:40] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+    "FirstFrame":  "[05:23:14] [Horizon game/INFO]: Horizon: first frame after 29366 ms",
+    "StartupObservedMs":  203151,
+    "CaptureMethod":  "game mod screenshot",
+    "Capture":  {
+                    "Path":  "C:\\Users\\ben\\AppData\\Local\\Temp\\mchorizon-nov20-v17-desktop-qa\\capture-20261121-051949-469-x86-Dx11-World-Enabled-75\\world.png",
+                    "Width":  1800,
+                    "Height":  1350,
+                    "Cyan":  6400,
+                    "Magenta":  6400,
+                    "SceneColors":  1730
+                },
+    "NativeLoad":  "[05:19:58] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0",
+    "WasmLoad":  "[05:20:05] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 582 ms, modules 6000 ms, linking 161 ms, instantiation 4 ms, subscriptions 2 ms, initialization 15 ms",
+    "EnabledFixtureInventory":  [
+                                    "uwp_native_hook_probe",
+                                    "uwp_wasm_hook_probe"
+                                ],
+    "ResolutionEvidence":  [
+                               "[05:20:19] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+                               "[05:21:56] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+                               "[05:23:14] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1800x1350, output 1800x1350, selected scale 100%",
+                               "[05:23:45] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1350x1013, output 1800x1350, selected scale 75%"
+                           ],
+    "RenderArea":  {
+                       "World":  [
+                                     1350,
+                                     1013
+                                 ],
+                       "Output":  [
+                                      1800,
+                                      1350
+                                  ]
+                   },
+    "AudioOutput":  [
+                        "[05:22:45] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)",
+                        "[05:23:19] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio"
+                    ],
+    "AudioNonSilent":  true,
+    "Exit":  "closed"
+}
