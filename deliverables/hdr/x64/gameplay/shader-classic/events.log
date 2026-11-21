@@ -1,0 +1,36 @@
+[07:39:33] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 127 ms, modules 1699 ms, linking 18 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms
+[07:39:41] [Horizon game/INFO]: Horizon renderer: HDR on: scRGB (Rgba16Float), 160/450 nits
+[07:39:41] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[07:39:41] [Horizon game/INFO]: Horizon renderer: HDR output presented its first frame
+[07:39:41] [Horizon game/INFO]: Horizon: first frame after 252 ms
+[07:39:45] [Horizon game/INFO]: shader pack terrain-test: mc_Entity for 308 of 35723 block states in 7 ms
+[07:39:45] [Horizon game/INFO]: shader pack terrain-test: folder ``, building its pipelines
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: terrain draws with gbuffers_terrain
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: translucent terrain draws with gbuffers_terrain
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: the sky draw with gbuffers_skybasic
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: the sun and moon draw with gbuffers_textured
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: clouds draw with gbuffers_textured
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: the hand draws with gbuffers_textured
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: translucent held items draw with gbuffers_textured
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: rain and snow draw with gbuffers_textured
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: entities draw with gbuffers_textured
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: block entities draw with gbuffers_terrain
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: translucent entities draw with gbuffers_textured
+[07:39:46] [Horizon game/WARN]: shader pack terrain-test: particles draw with gbuffers_textured
+[07:39:46] [Horizon game/INFO]: shader pack terrain-test: 1 programs (composite) in 1298 ms
+[07:39:48] [Screenshot writer/INFO]: Saved HDR screenshot to C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.HdrDev.x64_4pd4jeb6snrqw\LocalState\game\screenshots\2026-11-21_07.39.48-hdr.png
+[07:39:48] [Horizon game/INFO]: Saved screenshot to C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.HdrDev.x64_4pd4jeb6snrqw\LocalState\game\screenshots\2026-11-21_07.39.48.png
+2026-11-21T07:39:30.730Z tid=79152 DXGI color configure: desc_hr=0x00000000 format=87 alpha=0 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:33.595Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.603Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.607Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.611Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.615Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=790 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.621Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.625Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.629Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=742 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.633Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.637Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:39.694Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:40.028Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000
+2026-11-21T07:39:41.122Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000

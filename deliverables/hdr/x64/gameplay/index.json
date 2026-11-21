@@ -1,0 +1,110 @@
+[
+  {
+    "trial": "auto-100",
+    "backend": "Dx12",
+    "mode": "Auto",
+    "scale": 100,
+    "anti_alias": "None",
+    "shader_pack": "",
+    "gameplay_and_capture": "passed",
+    "result": "auto-100/result.json",
+    "hdr_png": "auto-100/hdr-png.json",
+    "sdr_png": "auto-100/sdr-png.json"
+  },
+  {
+    "trial": "on-75-taa",
+    "backend": "Dx12",
+    "mode": "On",
+    "scale": 75,
+    "anti_alias": "Taa",
+    "shader_pack": "",
+    "gameplay_and_capture": "passed",
+    "result": "on-75-taa/result.json",
+    "hdr_png": "on-75-taa/hdr-png.json",
+    "sdr_png": "on-75-taa/sdr-png.json"
+  },
+  {
+    "trial": "on-50-msaa",
+    "backend": "Dx12",
+    "mode": "On",
+    "scale": 50,
+    "anti_alias": "Msaa4x",
+    "shader_pack": "",
+    "gameplay_and_capture": "passed",
+    "result": "on-50-msaa/result.json",
+    "hdr_png": "on-50-msaa/hdr-png.json",
+    "sdr_png": "on-50-msaa/sdr-png.json"
+  },
+  {
+    "trial": "off-100",
+    "backend": "Dx12",
+    "mode": "Off",
+    "scale": 100,
+    "anti_alias": "None",
+    "shader_pack": "",
+    "gameplay_and_capture": "passed",
+    "result": "off-100/result.json",
+    "hdr_png": null,
+    "sdr_png": "off-100/sdr-png.json"
+  },
+  {
+    "trial": "dx11-on-sdr",
+    "backend": "Dx11",
+    "mode": "On",
+    "scale": 100,
+    "anti_alias": "None",
+    "shader_pack": "",
+    "gameplay_and_capture": "passed",
+    "result": "dx11-on-sdr/result.json",
+    "hdr_png": null,
+    "sdr_png": "dx11-on-sdr/sdr-png.json"
+  },
+  {
+    "trial": "angle-auto-sdr",
+    "backend": "Gl",
+    "mode": "Auto",
+    "scale": 100,
+    "anti_alias": "None",
+    "shader_pack": "",
+    "gameplay_and_capture": "passed",
+    "result": "angle-auto-sdr/result.json",
+    "hdr_png": null,
+    "sdr_png": "angle-auto-sdr/sdr-png.json"
+  },
+  {
+    "trial": "shader-api-02",
+    "backend": "Dx12",
+    "mode": "On",
+    "scale": 100,
+    "anti_alias": "None",
+    "shader_pack": "horizon:horizon_hdr",
+    "gameplay_and_capture": "passed",
+    "result": "shader-api-02/result.json",
+    "hdr_png": "shader-api-02/hdr-png.json",
+    "sdr_png": "shader-api-02/sdr-png.json"
+  },
+  {
+    "trial": "shader-classic",
+    "backend": "Dx12",
+    "mode": "On",
+    "scale": 100,
+    "anti_alias": "None",
+    "shader_pack": "terrain-test",
+    "gameplay_and_capture": "passed",
+    "result": "shader-classic/result.json",
+    "hdr_png": "shader-classic/hdr-png.json",
+    "sdr_png": "shader-classic/sdr-png.json"
+  },
+  {
+    "trial": "mode-transition",
+    "backend": "Dx12",
+    "mode": "Auto",
+    "scale": 100,
+    "anti_alias": "None",
+    "shader_pack": "",
+    "gameplay_and_capture": "passed",
+    "result": "mode-transition/result.json",
+    "hdr_png": "mode-transition/hdr-png.json",
+    "sdr_png": "mode-transition/sdr-png.json"
+  }
+]

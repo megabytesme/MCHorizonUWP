@@ -333,5 +333,18 @@
       "metadataInterface": "0x00000000"
     }
   ],
-  "signed_game": []
+  "signed_game": [
+    {
+      "architecture": "x64",
+      "package": "MCHorizonUWP.HdrDev.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+      "package_receipt": "x64/package.json",
+      "display": "PG32UCDM",
+      "hardware": "NVIDIA GeForce RTX 3090 Ti",
+      "active_hdr": "2026-11-21T07:40:41.948Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+      "sdr_fallback": "2026-11-21T07:40:49.981Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=87 alpha=3 width=1178 height=791 space=0 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=0 white_nits=80.00 peak_nits=455.00 min_nits=0.0000",
+      "restored_hdr": "2026-11-21T07:40:50.716Z tid=119972 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+      "display_setting_restored": true,
+      "receipt": "x64/gameplay/mode-transition/result.json"
+    }
+  ]
 }

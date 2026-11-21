@@ -1,0 +1,11 @@
+{
+  "file": "world-sdr.png",
+  "sha256": "40c3941ec682efe4f024dcde69245e85183ae4f87d7aa5c2d13fed8cc3db1ac0",
+  "kind": "sdr",
+  "size": [
+    1178,
+    791
+  ],
+  "bits_per_channel": 8,
+  "png_color_type": 6
+}

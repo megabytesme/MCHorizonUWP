@@ -1,0 +1,13 @@
+graphicsApi:auto
+hdr:auto
+hdrLook:horizon
+hdrPaperWhite:160
+hdrUiNits:120
+hdrPeak:450
+hdrBlackLevel:0
+presentMode:fifo
+resolutionScale:100
+dynamicResolution:false
+taa:false
+msaa4x:false
+pickedShaderPack:

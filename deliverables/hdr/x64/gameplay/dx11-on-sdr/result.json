@@ -1,0 +1,26 @@
+{
+  "package": "MCHorizonUWP.HdrDev.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+  "pid": 113200,
+  "started": "2026-11-21T07:38:17.9564594Z",
+  "mode": "On",
+  "backend": "Dx11",
+  "scale": 100,
+  "antiAlias": "None",
+  "shaderPack": "",
+  "requestedDisplay": "\\\\.\\DISPLAY2",
+  "expectedHdr": false,
+  "captureMethod": "Wasm screenshot fixture",
+  "wasmFixtureSha256": "57144EC183896C6B553E1A407FC7D7CE92D308C8043B5396289C40075CD1E456",
+  "checks": {
+    "renderer": "[07:38:32] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver=\"D3D11\", driver_info=\"FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101\", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)",
+    "capture": [
+      {
+        "original": "2026-11-21_07.38.41.png",
+        "sha256": "5084E9F4224407B3A1E0F8165AE1FA5C8671CD5EFECAE8D84FAEBB160DEF7AFD",
+        "name": "world-sdr.png"
+      }
+    ]
+  },
+  "passed": true,
+  "closed": true
+}

@@ -1,0 +1,28 @@
+{
+  "file": "world-hdr.png",
+  "sha256": "7956fadc220237b5decf269e8a06181e471153fbc48c457ea705a8046d684edf",
+  "kind": "hdr",
+  "size": [
+    1178,
+    791
+  ],
+  "bits_per_channel": 16,
+  "png_color_type": 2,
+  "cICP": [
+    9,
+    16,
+    0,
+    1
+  ],
+  "max_cll_nits": 160.3899,
+  "max_fall_nits": 70.5835,
+  "icc_sha256": "8114d1a9e2f58514a86d350b198158bd9d87db4dcc033366c76ee16028dacce2",
+  "mastering_display": null,
+  "decoded_light": {
+    "max_rgb_nits": 160.38988341575458,
+    "average_max_rgb_nits": 70.58346100071726,
+    "paper_white_nits": 160.0,
+    "pixels_above_paper_white": 18,
+    "total_pixels": 931798
+  }
+}

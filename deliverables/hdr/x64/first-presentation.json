@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "package": "MCHorizonUWP.HdrDev.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+  "package_sha256": "772d298e03ab22abc31e75a80d79c4de2cec5b836ffe6e0240eb16a60dfa3f5b",
+  "os": "Windows 11 Pro 26H2 26300.9818",
+  "display": "PG32UCDM",
+  "mode": "Auto",
+  "scale_percent": 100,
+  "game": [
+    "[07:28:22] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "[07:29:18] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "[07:29:50] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "[07:29:52] [Horizon game/INFO]: Horizon renderer: HDR on: scRGB (Rgba16Float), 160/450 nits",
+    "[07:29:53] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "[07:29:58] [Horizon game/INFO]: Horizon renderer: HDR on: scRGB (Rgba16Float), 160/450 nits",
+    "[07:29:58] [Server thread/INFO]: Starting integrated minecraft server version 26.3",
+    "[07:29:58] [Horizon game/INFO]: Horizon renderer: HDR output presented its first frame",
+    "[07:29:58] [World initialization/INFO]: Horizon: live features ready in 140.085ms"
+  ],
+  "dxgi_panel": [
+    "2026-11-21T07:29:52.989Z tid=89892 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1800 height=1350 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+    "2026-11-21T07:29:58.788Z tid=89892 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1800 height=1350 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+    "2026-11-21T07:29:59.177Z tid=89892 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1800 height=1350 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+    "2026-11-21T07:29:59.188Z tid=89892 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000"
+  ],
+  "focus_test": "Windows PickerHost held the foreground; direct F2 timed out."
+}

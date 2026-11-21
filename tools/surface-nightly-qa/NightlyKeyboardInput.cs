@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 
 public sealed class ScratchKeyboardInput {
@@ -10,6 +11,8 @@ public sealed class ScratchKeyboardInput {
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr window);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window, int command);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder buffer, int capacity);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flags);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] static extern IntPtr GetKeyboardLayout(uint thread);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
@@ -64,25 +67,38 @@ public sealed class ScratchKeyboardInput {
 
     public static void EnablePhysicalPixels() { SetProcessDpiAwarenessContext(new IntPtr(-4)); }
 
+    static int FramePreference(IntPtr window, IntPtr foreground) {
+        if (window == foreground) return 3;
+        var name = new StringBuilder(128);
+        GetClassName(window, name, name.Capacity);
+        return name.ToString() == "ApplicationFrameWindow" ? 2 : 1;
+    }
+
     public ScratchKeyboardInput(int processId) {
         IntPtr foundFrame = IntPtr.Zero, foundGame = IntPtr.Zero;
+        IntPtr foreground = GetForegroundWindow();
+        int best = 0;
         EnumWindows((window, _) => {
             if (!IsWindowVisible(window)) return true;
+            int score = FramePreference(window, foreground);
+            if (score <= best) return true;
             uint owner;
             GetWindowThreadProcessId(window, out owner);
             if (owner == processId) {
                 foundFrame = window;
                 foundGame = window;
-                return false;
+                best = score;
+                return true;
             }
             EnumChildWindows(window, (child, unused) => {
                 GetWindowThreadProcessId(child, out owner);
                 if (owner != processId || !IsWindowVisible(child)) return true;
                 foundFrame = window;
                 foundGame = child;
+                best = score;
                 return false;
             }, IntPtr.Zero);
-            return foundFrame == IntPtr.Zero;
+            return true;
         }, IntPtr.Zero);
         if (foundFrame == IntPtr.Zero) throw new InvalidOperationException("Could not find a visible scratch game window.");
         frame = foundFrame;
@@ -142,8 +158,11 @@ public sealed class ScratchKeyboardInput {
         savedWindowPlacement = false;
     }
     public void CheckForeground() {
-        if (GetForegroundWindow() != frame) throw new InvalidOperationException("Keyboard test stopped because its own game window is no longer in the foreground.");
+        IntPtr foreground = GetForegroundWindow();
+        if (foreground != frame && GetAncestor(foreground, 2) != frame)
+            throw new InvalidOperationException("Keyboard test stopped because its own game window is no longer in the foreground.");
     }
+    public IntPtr FrameHandle() { return frame; }
     public void Close() {
         if (!PostMessageW(frame, 0x0010, UIntPtr.Zero, IntPtr.Zero))
             throw new Win32Exception(Marshal.GetLastWin32Error(), "The scratch window could not be closed.");

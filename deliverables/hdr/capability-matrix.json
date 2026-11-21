@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "product_branch": "codex/hdr-nov20",
+  "baseline": "5c26a8060c1cf2dce20ee5707e84699ed0879e5c",
+  "horizon": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+  "wgpu_baseline": "aa7b65c43ef008d0a92d20fcdf9f10fa0883f157",
+  "wgpu_hdr": "432a009d8d44aa2b5988668bb9620d975a275a00",
+  "development": {
+    "patch": "0.1.16",
+    "client": "0.1.18"
+  },
+  "backends": [
+    {
+      "backend": "D3D12",
+      "architecture": "x64",
+      "device": "Ben-Desktop / NVIDIA GeForce RTX 3090 Ti",
+      "driver": "32.0.16.2101",
+      "os": "Windows 11 Pro 26H2 26300.9818",
+      "candidate_hdr": "Rgba16Float / ExtendedSrgbLinear",
+      "presentation": "XAML SwapChainPanel",
+      "display": "PG32UCDM / OS HDR active / 10 bits / PQ BT.2020",
+      "status": "signed_hdr_gameplay_and_sdr_fallback_verified",
+      "evidence": [
+        "swapchain-probe-results.json",
+        "../../docs/hdr-dx12-validation.md",
+        "x64/gameplay/index.json",
+        "x64/gameplay/mode-transition/result.json",
+        "official-desktop/receipt.json"
+      ]
+    },
+    {
+      "backend": "D3D12",
+      "architecture": "arm64",
+      "device": "Surface Pro X / Qualcomm Adreno 680",
+      "driver": "27.20.2160.0",
+      "os": "Windows build 26320",
+      "display": "LGD0555 internal 2880x1920",
+      "status": "signed_surface_install_and_native_display_probe_verified",
+      "blocker": "Surface internal display reports SDR-only. An external HDR display is needed for physical HDR presentation.",
+      "evidence": [
+        "../../docs/hdr-dx12-validation.md",
+        "arm64/package.json",
+        "arm64/dxgi-native.log",
+        "arm64/status.json"
+      ]
+    },
+    {
+      "backend": "D3D11",
+      "architecture": "x64",
+      "device": "Ben-Desktop / NVIDIA GeForce RTX 3090 Ti",
+      "driver": "32.0.16.2101",
+      "os": "Windows 11 Pro 26H2 26300.9818",
+      "native_level": "11_1",
+      "product_projection": "FL9_1",
+      "product_format": "Bgra8Unorm / Srgb",
+      "status": "signed_sdr_gameplay_verified",
+      "blocker": "Native HDR composition formats are accepted on FL11_1. The game and fork expose only the FL9_1 renderer and BGRA8/sRGB surface pair.",
+      "evidence": [
+        "swapchain-probe-results.json",
+        "../../docs/hdr-dx11-validation.md",
+        "x64/gameplay/dx11-on-sdr/result.json"
+      ]
+    },
+    {
+      "backend": "D3D11",
+      "architecture": "x64",
+      "device": "Ben-Desktop / NVIDIA GeForce RTX 3090 Ti",
+      "native_level": "9_1 (forced)",
+      "product_format": "Bgra8Unorm / Srgb",
+      "status": "sdr_only",
+      "blocker": "Both native HDR swapchain creates returned E_INVALIDARG.",
+      "evidence": [
+        "swapchain-probe-results.json"
+      ]
+    },
+    {
+      "backend": "ANGLE",
+      "architecture": "x64",
+      "device": "Ben-Desktop / NVIDIA GeForce RTX 3090 Ti",
+      "runtime": "ANGLE 2.1.7258 d9fc4a372074",
+      "product_format": "Bgra8Unorm / Srgb",
+      "status": "signed_sdr_gameplay_verified",
+      "blocker": "Packaged EGL cannot negotiate scRGB, PQ or P3. The tested default FP16 DXGI chain has no explicit color-space operation and is unverified for extended-range compositor output.",
+      "evidence": [
+        "angle/x64-swapchainpanel-egl.txt",
+        "angle/x64-dxgi-swapchains.json",
+        "../../docs/hdr-angle-validation.md",
+        "x64/gameplay/angle-auto-sdr/result.json"
+      ]
+    },
+    {
+      "backend": "D3D11",
+      "architecture": "arm",
+      "device": "Lumia 950 XL / Qualcomm Adreno 430",
+      "driver": "11.18.1078.53",
+      "os": "Windows 10 Mobile 16241.1001",
+      "native_level": "11_1",
+      "product_projection": "FL9_1",
+      "product_format": "Bgra8Unorm / Srgb",
+      "status": "prior_signed_sdr_only",
+      "blocker": "This OS predates the active-view Advanced Color contract. Fresh Device Portal TCP/443 timed out.",
+      "evidence": [
+        "../../docs/hdr-lumia-capabilities.md"
+      ]
+    }
+  ],
+  "color_vectors": {
+    "status": "passed",
+    "scope": "Pinned shader GPU API exercised with a software D3D12 adapter, offscreen readback",
+    "evidence": "color-validation.json"
+  },
+  "x64_gameplay": {
+    "evidence": "x64/gameplay/index.json",
+    "hdrcapture": "RGB16 BT.2020/PQ with ICC and cLLI",
+    "sdrcapture": "RGBA8",
+    "physical_f2": "Unverified on the candidate while Windows PickerHost held the foreground.",
+    "monitor_move": "The SDR U32J59x became inactive before gameplay. A same-monitor Windows HDR off/on transition passed."
+  }
+}

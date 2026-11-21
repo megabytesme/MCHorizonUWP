@@ -1,0 +1,34 @@
+{
+  "package": "MCHorizonUWP.HdrDev.x64_1.0.0.0_x64__4pd4jeb6snrqw",
+  "pid": 73772,
+  "started": "2026-11-21T07:39:30.0889196Z",
+  "mode": "On",
+  "backend": "Dx12",
+  "scale": 100,
+  "antiAlias": "None",
+  "shaderPack": "terrain-test",
+  "requestedDisplay": "\\\\.\\DISPLAY2",
+  "expectedHdr": true,
+  "captureMethod": "Wasm screenshot fixture",
+  "wasmFixtureSha256": "57144EC183896C6B553E1A407FC7D7CE92D308C8043B5396289C40075CD1E456",
+  "checks": {
+    "renderer": "[07:39:40] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx12, device_type=DiscreteGpu, vendor=0x10de, device=0x2203, driver=\"32.0.16.2101\", driver_info=\"\", feature_level=native, hardware=true, software=false)",
+    "swapchain": "2026-11-21T07:39:41.122Z tid=115332 DXGI color configure: desc_hr=0x00000000 format=10 alpha=3 width=1178 height=791 space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x1 view_kind=2 white_nits=480.00 peak_nits=455.00 min_nits=0.0000",
+    "firstHdrFrame": "[07:39:41] [Horizon game/INFO]: Horizon renderer: HDR output presented its first frame",
+    "shaderPack": "[07:39:45] [Horizon game/INFO]: shader pack terrain-test: folder ``, building its pipelines",
+    "capture": [
+      {
+        "original": "2026-11-21_07.39.48.png",
+        "sha256": "D54B30744CD2919024DE3758DB42873D72B364C2DE6133711FE31A183290A40F",
+        "name": "world-sdr.png"
+      },
+      {
+        "original": "2026-11-21_07.39.48-hdr.png",
+        "sha256": "7956FADC220237B5DECF269E8A06181E471153FBC48C457EA705A8046D684EDF",
+        "name": "world-hdr.png"
+      }
+    ]
+  },
+  "passed": true,
+  "closed": true
+}
