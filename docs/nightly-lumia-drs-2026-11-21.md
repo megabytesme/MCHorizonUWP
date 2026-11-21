@@ -35,6 +35,16 @@ At approximately 03:09 UTC, Ben reported holding the Lumia still, turning and ti
 
 [Package and physical observation record](../deliverables/nightly-2026-11-20/drs/lumia-runtime/gyro-physical-provenance.json) · [Gyro session lifecycle](../deliverables/nightly-2026-11-20/drs/lumia-runtime/gyro-lifecycle.log) · [Completed gyro-session game log](../deliverables/nightly-2026-11-20/drs/lumia-runtime/gyro-completed-game.log) · [Interactive session trace](../deliverables/nightly-2026-11-20/drs/lumia-runtime/gyro-interactive.hzperf.partial)
 
+## Client 0.1.16 adaptive world run
+
+The signed 0.1.16 test played the same two-chunk world with a 4 MiB texture budget, a 50% scale floor, and a target of 30 FPS. The app stayed active for more than six minutes after its first rendered game frame and returned successfully to Horizon home when Ben quit normally. The fallback chose 55% at 03:25:38 UTC, reporting 20.4 ms active frame time, 11.4 ms CPU work and 8.0 ms waiting for the renderer. At landscape orientation the world used 1409×791 color and depth and the swapchain remained 2561×1439. GPU timing remained unavailable. The trace and game log record an actual automatic scale increase above the floor. A controlled transition and sustained recovery check remain pending.
+
+The complete gzip capture contains a normal client stop and 434 game-thread submit intervals in the selected 29.70-second client timeline. Mean and median FPS were 14.61 and 19.79, P95 and P99 were 67.39 and 95.67 ms, and median one-second CPU frame time was 37.58 ms. Ben changed orientation and moved the player during this run. Its timing window includes settling after world load, so it is unsuitable as a matched fixed-scale comparison. The largest Portal sample reached 814,886,912 bytes.
+
+Ben's device screenshot at 03:28:03 UTC shows terrain, clouds, the player's hand, the hotbar, F3 diagnostic text, and the native and Wasm hook markers. The application's own screenshot attempt logged `Couldn't save screenshot: Access is denied. (os error 5)` at 03:26:11 UTC. XAudio2 reported non-silent output. The game log carries the startup, DRS decision, screenshot and normal end-of-game evidence.
+
+[Adaptive raw capture](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-adaptive.hzperf) · [Adaptive metrics](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-adaptive-metrics.json) · [Sampled process memory](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-adaptive-memory.csv) · [Game log](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-adaptive-game.log) · [Device screenshot](../deliverables/nightly-2026-11-20/drs/lumia-runtime/v16-adaptive-world-screen.png)
+
 ## Repeatable physical sweep
 
 Use a separate signed `MCHorizonUWP.NightlyNov20.DrsTrace.arm` diagnostic host version with the same synthetic world and the installed resource framework. Start from a warm run with a two-chunk render distance, the same budget, frame pacing, fixed camera, and a 30 FPS target. The device must stay in the foreground. Treat a suspend, foreground change, or settings mismatch as an interrupted trial. A diagnostic host may request an active display while it is foregrounded. It leaves system timeout settings alone.

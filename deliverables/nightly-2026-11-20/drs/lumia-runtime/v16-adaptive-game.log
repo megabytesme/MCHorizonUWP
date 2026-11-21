@@ -1,0 +1,115 @@
+[03:22:41] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[03:22:41] [Horizon game/INFO]: Embedded native mod: horizon_gyro_aim 0.1.1
+[03:22:41] [Horizon game/INFO]: Embedded native mod: uwp_native_hook_probe 0.1.0
+[03:22:41] [Horizon game/INFO]: Embedded native mod: uwp_native_after_probe 0.1.0
+[03:22:41] [Horizon game/WARN]: wasm module cache disabled: folder C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsTrace.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[03:23:15] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 1146 ms, modules 31679 ms, linking 191 ms, instantiation 8 ms, subscriptions 0 ms, initialization 1 ms
+[03:23:15] [Horizon game/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[03:23:15] [Horizon game/INFO]: Horizon renderer: asking DirectX 11 for a graphics device
+[03:23:15] [Horizon game/WARN]: [wgpu_core::instance] DX11 is experimental and exposes a restricted FL9_1 graphics backend with constrained owner-thread HWND and CoreWindow surfaces
+[03:23:15] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[03:23:15] [Horizon game/INFO]: Horizon renderer: requesting the device (driver D3D11 FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53) with features [] and the adapter's limits (buffers up to 4294967291 bytes, storage bindings up to 0 bytes, 6 texture layers)
+[03:23:15] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1440x2560 Bgra8Unorm, Fifo)
+[03:23:15] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[03:23:15] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[03:23:15] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 98 ms
+[03:23:15] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[03:23:16] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsTrace.arm_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\d09a04189f2241a3
+[03:23:16] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[03:23:27] [resource-loader/INFO]: Horizon: UI bundle ready after 12323 ms
+[03:23:34] [load-render/INFO]: Horizon: block sprites: 1301 layers at 16 px (largest 64 px, budget 4 MiB)
+[03:23:36] [resource-loader/INFO]: load core tables: 21.44s
+[03:23:43] [World data preload/INFO]: Horizon: worldgen data loaded in 6.908126979s
+[03:23:43] [resource-loader/INFO]: load pack tables: 28.47s
+[03:23:43] [resource-loader/INFO]: Horizon: core-ready after 28723 ms
+[03:23:44] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 745 ms
+[03:23:51] [load-items/INFO]: load items: 36.49s
+[03:23:52] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 16167 ms
+[03:23:53] [world-rest-loader/INFO]: Horizon: resources loaded in 38.4s; 35723 block states, 1658 items, 67 biomes; 2 worker threads
+[03:23:53] [world-rest-loader/INFO]: Horizon: rest-ready after 38441 ms
+[03:23:53] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[03:24:16] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[03:24:18] [Horizon game/INFO]: Horizon: loading the title artwork after 63130 ms
+[03:24:18] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[03:24:48] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[03:24:50] [Horizon game/INFO]: Horizon renderer: Qualcomm Adreno 430 (backend=Dx11, device_type=Other, vendor=0x4d4f4351, device=0x46363432, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 11.18.1078.53", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[03:25:19] [Horizon game/INFO]: Horizon renderer: rebuilt on the same device (51 shader modules, layouts and pipelines kept)
+[03:25:21] [Horizon game/INFO]: Horizon: world renderer ready after 126563 ms
+[03:25:22] [Horizon game/INFO]: Horizon: XAudio2 default output (48000 Hz, stereo)
+[03:25:23] [Horizon game/INFO]: Horizon: waiting for world resources
+[03:25:23] [Horizon game/INFO]: Horizon: world resources joined after 1 ms
+[03:25:23] [Horizon game/INFO]: Horizon: startup handoff 34173 ms (renderer 32265 ms, start_game 923 ms)
+[03:25:23] [Server thread/INFO]: Starting integrated minecraft server version 26.3
+[03:25:23] [Horizon game/INFO]: Controller connected: GameSir X2 Type-C
+[03:25:24] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1440x2560, output 1440x2560, selected scale 100%
+[03:25:24] [Horizon game/INFO]: Horizon: profiling the client to C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsTrace.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json
+[03:25:24] [Horizon game/INFO]: Horizon: first frame after 1599 ms
+[03:25:24] [World initialization/INFO]: Horizon: live features ready in 1.023807031s
+[03:25:28] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:25:28] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x9b3066a0
+[03:25:28] [unnamed/INFO]: Horizon: XAudio2 is playing non-silent game audio
+[03:25:38] [Horizon game/INFO]: Horizon: Dynamic Resolution frame pressure selects 55% (active 20.4 ms, CPU 11.4 ms, renderer waits 8.0 ms)
+[03:25:46] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[03:25:46] [Services keys/ERROR]: Horizon: Failed to request Minecraft Services public key
+[03:25:50] [Server thread/INFO]: Horizon: profiling the server thread to C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsTrace.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json
+[03:25:52] [Horizon game/INFO]: Horizon renderer: FL9_1 world 1409x791, output 2561x1439, selected scale 55%
+[03:25:59] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:25:59] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x6d6b1231
+[03:26:00] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:00] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xfd54d806
+[03:26:11] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:11] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x7ceca852
+[03:26:11] [Horizon game/INFO]: [CHAT] Couldn't save screenshot: Access is denied. (os error 5)
+[03:26:11] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:11] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x2d71a8cd
+[03:26:12] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:12] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xa3db80de
+[03:26:14] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:14] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x7f3958c8
+[03:26:15] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:15] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x2c146bab
+[03:26:17] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:17] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x1dabf1bc
+[03:26:18] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:18] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x5add74ad
+[03:26:27] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:27] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x1587536e
+[03:26:37] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:26:37] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x42016f1e
+[03:27:22] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:27:22] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xebb5529
+[03:28:44] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:28:44] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xe2230a1
+[03:31:16] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:16] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x6867965b
+[03:31:18] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:18] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:18] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x74681714
+[03:31:18] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x74681714
+[03:31:24] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:24] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x65e2ec2a
+[03:31:24] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:24] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x65e2ec2a
+[03:31:29] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:29] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x60d8a662
+[03:31:29] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:29] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x1583f288
+[03:31:29] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:29] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x1583f288
+[03:31:32] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:32] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x3de4a80b
+[03:31:32] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:32] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x3de4a80b
+[03:31:36] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:36] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x3de4a80b
+[03:31:36] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:36] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x3de4a80b
+[03:31:40] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:40] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x1544306e
+[03:31:40] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:40] [sound stream decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0x1544306e
+[03:31:53] [Server thread/INFO]: Saving and pausing game...
+[03:31:57] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] starting new physical stream
+[03:31:57] [sound decoder/INFO]: [symphonia_format_ogg::demuxer] selected vorbis mapper for stream with serial=0xcd002f70
+[03:31:58] [Horizon game/INFO]: Horizon renderer: FL9_1 world 2561x1439, output 2561x1439, selected scale 100%
+[03:32:04] [Horizon game/INFO]: Horizon: Saved C:\Data\Users\DefApps\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.DrsTrace.arm_4pd4jeb6snrqw\LocalState\game\performance-trace.json (the file stays on your computer)
