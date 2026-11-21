@@ -58,6 +58,9 @@ if ($setup.display -ne $Display -or $setup.width -ne $Width -or $setup.height -n
     $setup.clientSha256 -ne $clientHash -or $setup.resources -ne $resources -or
     $setup.fixture -ne (Resolve-Path -LiteralPath $FixtureWorld).Path -or
     $setup.graphicsSha256 -ne (Get-FileHash "$game/horizon-graphics.txt").Hash) { throw 'Reference inputs changed.' }
+[void][IO.Directory]::CreateDirectory("$game/telemetry")
+@{ schema=1; status='answered'; performance='denied'; diagnostics='denied'; surveys='denied' } |
+    ConvertTo-Json | Set-Content -LiteralPath "$game/telemetry/consent.json" -Encoding ASCII
 if ($PrepareOnly) { Write-Output $prepared; return }
 if (Test-Path -LiteralPath $stdout) { throw 'This run already started. Supply a fresh directory for another capture.' }
 

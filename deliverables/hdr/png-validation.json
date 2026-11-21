@@ -20,7 +20,14 @@
       "max_cll_nits": 10000.0,
       "max_fall_nits": 2216.1777,
       "icc_sha256": "8114d1a9e2f58514a86d350b198158bd9d87db4dcc033366c76ee16028dacce2",
-      "mastering_display": null
+      "mastering_display": null,
+      "decoded_light": {
+        "max_rgb_nits": 10000.0,
+        "average_max_rgb_nits": 2216.177665080697,
+        "paper_white_nits": 160,
+        "pixels_above_paper_white": 2,
+        "total_pixels": 5
+      }
     }
   },
   "previous_lumia_signed_0_1_17": {
@@ -52,5 +59,6 @@
     "corrupt_IDAT_crc": "Bad b'IDAT' CRC",
     "truncated_file": "Truncated chunk header",
     "wrong_transfer_with_valid_CRC": "Expected BT.2020, PQ, identity matrix, full range"
-  }
+  },
+  "decoded_scanline_test": "All five PNG filter modes reconstructed the same color levels as the unfiltered 3 x 5 test image."
 }

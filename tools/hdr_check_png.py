@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import struct
 import zlib
@@ -28,7 +29,46 @@ def chunks(data):
         pos = end + 4
 
 
-def inspect(path, kind):
+def hdr_pixels(filtered, width, height, paper):
+    """Reconstruct RGB16 and verify Horizon's MaxRGB content-light statistics."""
+    histogram = [0] * 65536
+    stride = width * 6
+    above = bytearray(stride)
+    for y in range(height):
+        start = y * (stride + 1)
+        mode = filtered[start]
+        row = bytearray(filtered[start + 1:start + 1 + stride])
+        for i in range(stride) if mode else ():
+            left = row[i - 6] if i >= 6 else 0
+            top = above[i]
+            if mode == 1:
+                predictor = left
+            elif mode == 2:
+                predictor = top
+            elif mode == 3:
+                predictor = (left + top) // 2
+            else:
+                corner = above[i - 6] if i >= 6 else 0
+                base = left + top - corner
+                dl, dt, dc = abs(base - left), abs(base - top), abs(base - corner)
+                predictor = left if dl <= dt and dl <= dc else (top if dt <= dc else corner)
+            row[i] = (row[i] + predictor) & 255
+        for rgb in struct.iter_unpack(">3H", row):
+            histogram[max(rgb)] += 1
+        above = row
+    levels = []
+    for code, count in enumerate(histogram):
+        if count:
+            p = (code / 65535) ** (32 / 2523)
+            nits = 10_000 * (max(0, p - 3424 / 4096) / (2413 / 128 - 2392 / 128 * p)) ** (16384 / 2610)
+            levels.append((nits, count))
+    total = width * height
+    over = sum(count for nits, count in levels if nits > paper)
+    return dict(max_rgb_nits=levels[-1][0], average_max_rgb_nits=math.fsum(n * c for n, c in levels) / total,
+                paper_white_nits=paper, pixels_above_paper_white=over, total_pixels=total)
+
+
+def inspect(path, kind, paper_white=None):
     data = path.read_bytes()
     tags = []
     meta = {}
@@ -75,6 +115,12 @@ def inspect(path, kind):
             "Unexpected Horizon ICC profile")
     report.update(cICP=list(meta[b"cICP"]), max_cll_nits=max_cll / 10_000, max_fall_nits=max_fall / 10_000,
                   icc_sha256=hashlib.sha256(profile).hexdigest(), mastering_display=None)
+    if paper_white is not None:
+        require(math.isfinite(paper_white) and paper_white > 0, "Invalid paper white")
+        stats = hdr_pixels(pixels, width, height, paper_white)
+        for nits, encoded in [(stats["max_rgb_nits"], max_cll), (stats["average_max_rgb_nits"], max_fall)]:
+            require(abs(nits * 10_000 - encoded) <= 1.0, "cLLI disagrees with decoded HDR pixels")
+        report["decoded_light"] = stats
     if b"mDCV" in meta:
         *chroma, maximum, minimum = struct.unpack(">8H2I", meta[b"mDCV"])
         require(max(chroma) <= 50_000 and minimum <= maximum, "Invalid mastering display")
@@ -88,9 +134,12 @@ if __name__ == "__main__":
     parser.add_argument("kind", choices=("sdr", "hdr"))
     parser.add_argument("png", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--paper-white", type=float, help="Decode HDR pixels and compare cLLI against measured codes")
     args = parser.parse_args()
+    if args.paper_white is not None and args.kind != "hdr":
+        parser.error("--paper-white requires an HDR capture")
     try:
-        result = inspect(args.png, args.kind)
+        result = inspect(args.png, args.kind, args.paper_white)
     except (KeyError, ValueError, struct.error, zlib.error) as exc:
         parser.exit(1, f"PNG check failed: {exc}\n")
     text = json.dumps(result, indent=2)
