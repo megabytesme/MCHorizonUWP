@@ -1,0 +1,12 @@
+id = "horizon_gyro_aim"
+name = "Gyroscope Aiming"
+version = "0.1.0"
+description = "Aim the local player by rotating a UWP device with a gyroscope. Off by default."
+api = "0.2"
+side = "client"
+capabilities = ["registries"]
+
+[native]
+game = "26.3"
+horizon = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"

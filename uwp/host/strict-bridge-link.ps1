@@ -58,7 +58,7 @@ $arguments = @(
     "/LIBPATH:$sdk\Lib\10.0.19041.0\um\$sdkArchitecture",
     "/OUT:$outputPath", "/IMPLIB:$outputPath.lib", "/MAP:$outputPath.map", "/DEF:$bridgeExports",
     $tlsObject, $rust,
-    $(if (-not $NativeMod) { $hostImport }),
+    $hostImport,
     $sentinel,
     'WindowsApp.lib', 'ntdll.lib', 'd3d11.lib', 'd3d12.lib', 'dxgi.lib', 'xaudio2.lib', 'iphlpapi.lib'
 )

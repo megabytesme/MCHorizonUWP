@@ -6,7 +6,7 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include <windows.devices.sensors.h>
 #include <windows.graphics.display.h>
 #include <algorithm>
-#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
@@ -16,18 +16,38 @@ using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
 
 namespace {
+using Clock = std::chrono::steady_clock;
+constexpr auto max_sample_age = std::chrono::milliseconds(240);
+std::mutex lifecycle;
 std::mutex mutex;
-std::atomic<int> display_orientation{0};
+int display_orientation = 0;
 Gyrometer^ sensor;
 Windows::Foundation::EventRegistrationToken reading_token{};
 bool requested = false;
 bool visible = true;
-bool starting = false;
 bool running = false;
+bool aligned = false;
+int aligned_orientation = 0;
 std::uint32_t generation = 0;
 std::int64_t previous_timestamp = 0;
 float turned_x = 0.0f;
 float turned_y = 0.0f;
+Clock::time_point batch_begin{};
+
+void clear_samples() {
+    previous_timestamp = 0;
+    turned_x = 0.0f;
+    turned_y = 0.0f;
+    batch_begin = {};
+}
+
+bool align(Gyrometer^ device) {
+    try {
+        auto orientation = static_cast<DisplayOrientations>(display_orientation);
+        if (orientation != DisplayOrientations::None) device->ReadingTransform = orientation;
+        return true;
+    } catch (...) { return false; }
+}
 
 void reading_changed(std::uint32_t expected_generation, GyrometerReadingChangedEventArgs^ args) {
     try {
@@ -35,7 +55,7 @@ void reading_changed(std::uint32_t expected_generation, GyrometerReadingChangedE
         if (reading == nullptr) return;
         const auto timestamp = reading->Timestamp.UniversalTime;
         std::lock_guard<std::mutex> guard(mutex);
-        if (!running || generation != expected_generation) return;
+        if (!running || !aligned || generation != expected_generation) return;
         if (previous_timestamp != 0 && timestamp > previous_timestamp) {
             const double seconds = static_cast<double>(timestamp - previous_timestamp) / 10000000.0;
             if (seconds > 0.0 && seconds <= 0.1) {
@@ -43,6 +63,12 @@ void reading_changed(std::uint32_t expected_generation, GyrometerReadingChangedE
                 const double x = reading->AngularVelocityX * seconds * radians_per_degree;
                 const double y = reading->AngularVelocityY * seconds * radians_per_degree;
                 if (std::isfinite(x) && std::isfinite(y)) {
+                    const auto now = Clock::now();
+                    if (batch_begin == Clock::time_point{} || now - batch_begin > max_sample_age) {
+                        batch_begin = now;
+                        turned_x = 0.0f;
+                        turned_y = 0.0f;
+                    }
                     turned_x = std::clamp(turned_x + static_cast<float>(x), -6.2831853f, 6.2831853f);
                     turned_y = std::clamp(turned_y + static_cast<float>(y), -6.2831853f, 6.2831853f);
                 }
@@ -58,15 +84,12 @@ void stop_sensor() {
     {
         std::lock_guard<std::mutex> guard(mutex);
         ++generation;
-        starting = false;
         running = false;
         old_sensor = sensor;
         old_token = reading_token;
         sensor = nullptr;
         reading_token = Windows::Foundation::EventRegistrationToken{};
-        previous_timestamp = 0;
-        turned_x = 0.0f;
-        turned_y = 0.0f;
+        clear_samples();
     }
     if (old_sensor != nullptr) {
         try { old_sensor->ReadingChanged -= old_token; } catch (...) {}
@@ -74,84 +97,61 @@ void stop_sensor() {
     }
 }
 
-bool start_sensor() {
-    std::uint32_t started_generation = 0;
-    {
-        std::lock_guard<std::mutex> guard(mutex);
-        if (!requested || !visible || running) return running;
-        if (starting) return false;
-        starting = true;
-        started_generation = ++generation;
-    }
-
+void start_sensor() {
     Gyrometer^ candidate = nullptr;
     Windows::Foundation::EventRegistrationToken token{};
     try {
         candidate = Gyrometer::GetDefault();
-        if (candidate == nullptr) {
-            std::lock_guard<std::mutex> guard(mutex);
-            if (generation == started_generation) starting = false;
-            return false;
-        }
-        // GetForCurrentView requires a UI view; this function also runs on
-        // the game worker, so use the orientation last reported by the shell.
-        try {
-            auto orientation = static_cast<DisplayOrientations>(display_orientation.load());
-            if (orientation != DisplayOrientations::None) candidate->ReadingTransform = orientation;
-        } catch (Platform::Exception^) { /* Orientation is optional for sensor startup. */ }
+        if (candidate == nullptr || !align(candidate)) return;
         candidate->ReportInterval = (std::max)(16u, candidate->MinimumReportInterval);
+        std::uint32_t started_generation;
+        {
+            std::lock_guard<std::mutex> guard(mutex);
+            started_generation = ++generation;
+        }
         token = candidate->ReadingChanged += ref new TypedEventHandler<Gyrometer^, GyrometerReadingChangedEventArgs^>(
             [started_generation](Gyrometer^, GyrometerReadingChangedEventArgs^ args) {
                 reading_changed(started_generation, args);
             });
     } catch (...) {
-        std::lock_guard<std::mutex> guard(mutex);
-        if (generation == started_generation) starting = false;
-        return false;
+        if (candidate != nullptr) {
+            try { candidate->ReportInterval = 0; } catch (...) {}
+        }
+        return;
     }
 
-    bool keep = false;
-    {
-        std::lock_guard<std::mutex> guard(mutex);
-        keep = generation == started_generation && requested && visible;
-        starting = false;
-        if (keep) {
-            sensor = candidate;
-            reading_token = token;
-            running = true;
-            previous_timestamp = 0;
-            turned_x = 0.0f;
-            turned_y = 0.0f;
-        }
-    }
-    if (!keep) {
-        try { candidate->ReadingChanged -= token; } catch (...) {}
-        try { candidate->ReportInterval = 0; } catch (...) {}
-    }
-    return keep;
+    std::lock_guard<std::mutex> guard(mutex);
+    sensor = candidate;
+    reading_token = token;
+    running = true;
+    aligned = true;
+    aligned_orientation = display_orientation;
+    clear_samples();
 }
 
 void reconcile() {
-    bool should_run = false;
-    bool is_running = false;
-    {
-        std::lock_guard<std::mutex> guard(mutex);
-        should_run = requested && visible;
-        is_running = running || starting;
-    }
-    if (should_run && !is_running) start_sensor();
-    else if (!should_run && is_running) stop_sensor();
+    const bool wanted = requested && visible;
+    if (running && (!wanted || !aligned)) stop_sensor();
+    if (wanted && !running) start_sensor();
 }
 }
 
 extern "C" void __cdecl horizon_uwp_gyro_set_orientation(int value) {
-    display_orientation.store(value);
-    Gyrometer^ current = nullptr;
-    { std::lock_guard<std::mutex> guard(mutex); current = sensor; }
-    if (current != nullptr) {
-        try { current->ReadingTransform = static_cast<DisplayOrientations>(value); }
-        catch (Platform::Exception^) {}
-    }
+    try {
+        std::lock_guard<std::mutex> transition(lifecycle);
+        if (value == display_orientation) return;
+        display_orientation = value;
+        if (!running) return;
+        {
+            std::lock_guard<std::mutex> guard(mutex);
+            aligned = false;
+        }
+        const bool ready = align(sensor);
+        std::lock_guard<std::mutex> guard(mutex);
+        clear_samples();
+        aligned = ready;
+        aligned_orientation = display_orientation;
+    } catch (...) {}
 }
 
 extern "C" int __cdecl horizon_uwp_gyro_available() {
@@ -161,22 +161,17 @@ extern "C" int __cdecl horizon_uwp_gyro_available() {
 
 extern "C" int __cdecl horizon_uwp_gyro_enable(int enabled) {
     try {
-        {
-            std::lock_guard<std::mutex> guard(mutex);
-            requested = enabled != 0;
-        }
+        std::lock_guard<std::mutex> transition(lifecycle);
+        requested = enabled != 0;
         reconcile();
-        std::lock_guard<std::mutex> guard(mutex);
-        return running ? 1 : 0;
+        return running && aligned ? 1 : 0;
     } catch (...) { return 0; }
 }
 
 extern "C" void __cdecl horizon_uwp_gyro_set_visible(int is_visible) {
     try {
-        {
-            std::lock_guard<std::mutex> guard(mutex);
-            visible = is_visible != 0;
-        }
+        std::lock_guard<std::mutex> transition(lifecycle);
+        visible = is_visible != 0;
         reconcile();
     } catch (...) {}
 }
@@ -185,10 +180,17 @@ extern "C" int __cdecl horizon_uwp_gyro_take(float* x, float* y, int* rotation) 
     if (x == nullptr || y == nullptr || rotation == nullptr) return 0;
     try {
         std::lock_guard<std::mutex> guard(mutex);
-        if (!running) return 0;
+        if (!running || !aligned || batch_begin == Clock::time_point{}) return 0;
+        if (Clock::now() - batch_begin > max_sample_age) {
+            clear_samples();
+            return 0;
+        }
         *x = turned_x;
         *y = turned_y;
-        *rotation = 0;
+        // Legacy callers use the low two bits for an extra quarter turn. New
+        // callers can reset their filters when the display orientation changes.
+        *rotation = aligned_orientation << 2;
+        batch_begin = {};
         turned_x = 0.0f;
         turned_y = 0.0f;
         return 1;
