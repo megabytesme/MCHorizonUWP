@@ -183,7 +183,30 @@
         "docs/nightly-arm-hud-2026-11-20.md",
         "docs/nightly-mobile-2026-11-20.md",
         "docs/nightly-desktop-graphics-2026-11-20.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "V",
+          "x64_dx12": "V",
+          "x64_angle": "V",
+          "x86_dx11_fl91": "V",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "Signed AppContainer saved-world entry verified with the synthetic two-chunk save. ARM64 registration succeeded while the console remained locked. ARM32 installed and presented in the D3D11 launcher probe. Mobile world entry is pending.",
+        "evidence": [
+          "docs/nightly-cross-architecture-2026-11-20.md",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx12-world-100/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/angle-world-100/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json"
+        ]
+      }
     },
     {
       "id": "world-create",
@@ -435,7 +458,28 @@
         "docs/nightly-desktop-graphics-2026-11-20.md",
         "docs/nightly-mod-runtime-2026-11-20.md",
         "docs/nightly-mobile-2026-11-20.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "I",
+          "x64_dx12": "I",
+          "x64_angle": "I",
+          "x86_dx11_fl91": "I",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "The November 20 signed x64 D3D12 and x86 D3D11 localhost runs timed out in graphics startup. x64 D3D11 reached the server connector over the private wired route; no login or connection error appeared in the observation window. Prior Nightly multiplayer entries describe the November 18 baseline.",
+        "evidence": [
+          "docs/nightly-cross-architecture-2026-11-20.md",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-multiplayer-lan/game.log",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-multiplayer-lan/server.log"
+        ]
+      }
     },
     {
       "id": "server-discovery",
@@ -2437,7 +2481,31 @@
         "docs/nightly-mod-runtime-2026-11-20.md",
         "docs/nightly-arm-hud-2026-11-20.md",
         "docs/nightly-surface-2026-11-20.md"
-      ]
+      ],
+      "candidate_statuses": {
+        "status_by_profile": {
+          "x64_dx11_fl91": "L",
+          "x64_dx12": "L",
+          "x64_angle": "L",
+          "x86_dx11_fl91": "L",
+          "x86_dx12": "I",
+          "x86_angle": "X",
+          "arm64_dx11_fl91": "I",
+          "arm64_dx12": "I",
+          "arm32_dx11_fl91": "I",
+          "arm32_dx12": "X",
+          "arm32_angle": "X"
+        },
+        "qualification": "The exact rebuilt standard library and Pulley guest displayed the Wasm GUI marker in each signed desktop saved-world test. The stock desktop trap fixture was isolated. UWP fault recovery, resource limits and mobile runtime acceptance require their own game tests.",
+        "evidence": [
+          "docs/nightly-2026-11-20-wasm.md",
+          "docs/nightly-cross-architecture-2026-11-20.md",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx11-world-50/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/dx12-world-100/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x64/angle-world-100/result.json",
+          "deliverables/nightly-2026-11-20/runtime-evidence/x86/dx11-world-75/result.json"
+        ]
+      }
     },
     {
       "id": "wasm-safety",

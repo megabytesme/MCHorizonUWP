@@ -1,0 +1,24 @@
+[01:35:53] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[01:35:53] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[01:35:53] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.x86_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[01:35:56] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 293 ms, modules 2259 ms, linking 28 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms
+[01:35:56] [Horizon game/INFO]: Horizon renderer: asking DirectX 11 for a graphics device
+[01:35:56] [Horizon game/WARN]: [wgpu_core::instance] DX11 is experimental and exposes a restricted FL9_1 graphics backend with constrained owner-thread HWND and CoreWindow surfaces
+[01:35:56] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 7 ms
+[01:35:56] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[01:35:56] [Horizon game/INFO]: Horizon renderer: NVIDIA GeForce RTX 3090 Ti (backend=Dx11, device_type=Other, vendor=0x10de, device=0x2203, driver="D3D11", driver_info="FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101", feature_level=FL9_1 (hardware L11_1), hardware=true, software=false)
+[01:35:56] [Horizon game/INFO]: Horizon renderer: requesting the device (driver D3D11 FL9_1 (hardware L11_1); physical DXGI adapter; driver version 32.0.16.2101) with features [] and the adapter's limits (buffers up to 4294967291 bytes, storage bindings up to 0 bytes, 6 texture layers)
+[01:35:56] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1539x1020 Bgra8Unorm, Fifo)
+[01:35:56] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.x86_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\416c7f29cdd1cf4c
+[01:35:56] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[01:35:57] [resource-loader/INFO]: Horizon: UI bundle ready after 912 ms
+[01:35:58] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[01:35:58] [resource-loader/INFO]: load core tables: 2.04s
+[01:35:58] [resource-loader/INFO]: load pack tables: 2.55s
+[01:35:58] [resource-loader/INFO]: Horizon: core-ready after 2573 ms
+[01:35:58] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 34 ms
+[01:35:59] [load-items/INFO]: load items: 3.12s
+[01:35:59] [world-rest-loader/INFO]: Horizon: resources loaded in 3.6s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[01:35:59] [world-rest-loader/INFO]: Horizon: rest-ready after 3594 ms
+[01:36:02] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[01:36:26] [horizon-worker-gpu-watchdog/ERROR]: Horizon could not get a graphics device: the graphics driver stopped answering while the game was picking a GPU (30s). The last "Horizon renderer:" line in the log names the graphics API it was asking. Update your GPU driver and start again; to try another API meanwhile, set graphicsApi to opengl, dx12 or vulkan in options.txt, or start the game with HORIZON_GRAPHICS_API=opengl (or dx12, or vulkan)

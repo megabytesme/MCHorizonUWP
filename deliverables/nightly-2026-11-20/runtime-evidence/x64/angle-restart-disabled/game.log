@@ -1,0 +1,25 @@
+[01:40:32] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[01:40:32] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[01:40:33] [Horizon game/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[01:40:33] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[01:40:33] [unnamed/INFO]: [wgpu_hal::gles::egl] EGL says it can present to the window but not natively
+[01:40:33] [unnamed/INFO]: [wgpu_hal::gles::egl] UWP ANGLE EGL selected window-presentable config: true
+[01:40:33] [Horizon game/INFO]: Horizon renderer: ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Ti (0x00002203) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101) (backend=Gl, device_type=Other, vendor=0x10de, device=0x0000, driver="", driver_info="OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)", feature_level=native, hardware=true, software=false)
+[01:40:33] [Horizon game/INFO]: Horizon renderer: requesting the device (driver OpenGL ES 3.0.0 (ANGLE 2.1.7258 git hash: d9fc4a372074)) with features [TEXTURE_FORMAT_16BIT_NORM | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | CLEAR_TEXTURE | FLOAT32_FILTERABLE] and the adapter's limits (buffers up to 2147483647 bytes, storage bindings up to 0 bytes, 2048 texture layers)
+[01:40:33] [Horizon game/INFO]: Horizon renderer: device ready; configuring the surface (1478x941 Bgra8Unorm, Fifo)
+[01:40:33] [Horizon game/INFO]: Horizon renderer: HDR output not offered by this display
+[01:40:33] [Horizon game/INFO]: Horizon renderer: creating the pipelines
+[01:40:33] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[01:40:33] [resource-loader/INFO]: Horizon: UI bundle ready after 962 ms
+[01:40:34] [World data preload/INFO]: Horizon: worldgen data loaded in 608.9274ms
+[01:40:34] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[01:40:34] [resource-loader/INFO]: load core tables: 1.95s
+[01:40:35] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 1811 ms
+[01:40:35] [resource-loader/INFO]: load pack tables: 2.48s
+[01:40:35] [resource-loader/INFO]: Horizon: core-ready after 2499 ms
+[01:40:35] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 39 ms
+[01:40:35] [load-items/INFO]: load items: 3.00s
+[01:40:36] [world-rest-loader/INFO]: Horizon: resources loaded in 3.6s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[01:40:36] [world-rest-loader/INFO]: Horizon: rest-ready after 3581 ms
+[01:40:39] [Horizon game/INFO]: Horizon renderer: pipelines ready (multi-draw off, occlusion culling off, GPU culling unavailable, GPU timer off)
+[01:40:39] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)

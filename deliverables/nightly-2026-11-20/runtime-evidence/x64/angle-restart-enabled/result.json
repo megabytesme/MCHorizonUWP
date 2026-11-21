@@ -1,0 +1,18 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  26208,
+    "BeginUtc":  "\/Date(1795225332804)\/",
+    "Mode":  "World",
+    "Backend":  "Gl",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  false,
+    "Exit":  "closed"
+}

@@ -33,4 +33,6 @@ The exact Nightly binary was copied to a private test folder with the regenerate
 
 [Enabled world capture](../deliverables/nightly-2026-11-20/wasm/stock-enabled-world.png) · [Disabled control](../deliverables/nightly-2026-11-20/wasm/stock-disabled-title.png) · [Runtime results](../deliverables/nightly-2026-11-20/wasm/stock-runtime-results.json) · [Trap log](../deliverables/nightly-2026-11-20/wasm/stock-trap-title.log)
 
-The candidate UWP release needs the same in-world GUI check on x64, x86, ARM64 and ARM32 with the matching package identity, alongside its content and native fixtures. Host limits, trap isolation and enabled-state restart remain separate runtime cases.
+## Signed UWP game runs
+
+The final signed x64 and x86 packages consumed the locally regenerated standard library and loaded the pinned GUI fixture through Pulley. The Wasm marker and the native marker drew together in actual saved worlds on x64 D3D11, D3D12 and ANGLE, and x86 D3D11. Mobile in-world hooks, UWP host limits and trap isolation require separate runtime evidence. The desktop restart controls changed the enable settings but failed to produce the world frame needed for visual comparison. [Signed game evidence](nightly-cross-architecture-2026-11-20.md)

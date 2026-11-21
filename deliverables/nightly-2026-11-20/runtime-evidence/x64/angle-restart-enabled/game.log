@@ -1,0 +1,23 @@
+[01:42:14] [Horizon game/INFO]: Horizon Nightly 2026-11-20 · 0a875da
+[01:42:14] [Horizon game/INFO]: Packaged native mod: uwp_native_hook_probe 0.1.0
+[01:42:14] [Horizon game/WARN]: wasm module cache disabled: folder C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache/wasm: Windows owner/DACL/inheritance trust is not verified; compiling wasm
+[01:42:16] [Horizon game/INFO]: Horizon: wasm mods loaded (1): packages 133 ms, modules 2227 ms, linking 17 ms, instantiation 1 ms, subscriptions 0 ms, initialization 0 ms
+[01:42:16] [Horizon game/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[01:42:16] [Horizon game/INFO]: Horizon renderer: asking graphics for a graphics device
+[01:42:16] [resource-loader/INFO]: Horizon: fingerprinted mod staging inputs in 7 ms
+[01:42:16] [resource-loader/INFO]: Horizon: reused prepared mod staging generation
+[01:42:17] [resource-loader/INFO]: Horizon: content from 4 mod(s) in C:\Users\ben\AppData\Local\Packages\MCHorizonUWP.NightlyNov20.x64_4pd4jeb6snrqw\LocalState\game\.horizon-cache\mod-content\ba6c4146d97cc26a
+[01:42:17] [resource-loader/WARN]: Horizon: ignoring minecraft:ambient_entity_effect: no such vanilla particle in this version
+[01:42:17] [resource-loader/INFO]: Horizon: UI bundle ready after 758 ms
+[01:42:18] [load-render/INFO]: Horizon: block sprites: 1301 layers at 64 px (largest 64 px, budget 256 MiB)
+[01:42:18] [resource-loader/INFO]: load core tables: 1.73s
+[01:42:18] [World data preload/INFO]: Horizon: worldgen data loaded in 383.1227ms
+[01:42:19] [resource-loader/INFO]: load pack tables: 2.25s
+[01:42:19] [resource-loader/INFO]: Horizon: core-ready after 2273 ms
+[01:42:19] [resource-loader/INFO]: Horizon: handoff CPU resources prepared on worker in 41 ms
+[01:42:19] [load-items/INFO]: load items: 2.98s
+[01:42:19] [World data preload/INFO]: Horizon: world data preloaded for the launch's world in 1309 ms
+[01:42:19] [world-rest-loader/INFO]: Horizon: resources loaded in 3.1s; 35723 block states, 1658 items, 67 biomes; 31 worker threads
+[01:42:19] [world-rest-loader/INFO]: Horizon: rest-ready after 3149 ms
+[01:42:22] [Prepared data file/INFO]: Horizon: horizon-data.bin not written: Access is denied. (os error 5)
+[01:42:46] [horizon-worker-gpu-watchdog/ERROR]: Horizon could not get a graphics device: the graphics driver stopped answering while the game was picking a GPU (30s). The last "Horizon renderer:" line in the log names the graphics API it was asking. Update your GPU driver and start again; to try another API meanwhile, set graphicsApi to opengl, dx12 or vulkan in options.txt, or start the game with HORIZON_GRAPHICS_API=opengl (or dx12, or vulkan)

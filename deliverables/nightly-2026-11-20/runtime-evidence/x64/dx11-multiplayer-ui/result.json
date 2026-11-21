@@ -1,0 +1,18 @@
+{
+    "Name":  "MCHorizonUWP.NightlyNov20.x64",
+    "MainOnlyControl":  false,
+    "Family":  "MCHorizonUWP.NightlyNov20.x64_4pd4jeb6snrqw",
+    "Package":  "MCHorizonUWP.NightlyNov20.x64_1.0.2.0_x64__4pd4jeb6snrqw",
+    "Pid":  91976,
+    "BeginUtc":  "\/Date(1795224841976)\/",
+    "Mode":  "Multiplayer",
+    "Backend":  "Dx11",
+    "Scale":  100,
+    "Hooks":  "Enabled",
+    "StrictFl91":  false,
+    "Content":  false,
+    "AudioTest":  false,
+    "Gyro":  false,
+    "Ready":  false,
+    "Exit":  "forced isolated candidate shutdown"
+}
