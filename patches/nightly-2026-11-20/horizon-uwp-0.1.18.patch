@@ -125686,7 +125686,7 @@ index a6aa821e45f4bbeeefcba83117fbabfada44c527..4c3ab30db38afef611676fbabf4dfd5d
      }
  }
 diff --git a/crates/horizon-client-render/src/gfx/pack_post.rs b/crates/horizon-client-render/src/gfx/pack_post.rs
-index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..2b3b4acbbce40ed796273e57d6d03711526e22a2 100644
+index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..c01de61558007d583d8492dd5483057d1f03083e 100644
 --- a/crates/horizon-client-render/src/gfx/pack_post.rs
 +++ b/crates/horizon-client-render/src/gfx/pack_post.rs
 @@ -1124,26 +1124,37 @@ fn helper(
@@ -125787,7 +125787,56 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..2b3b4acbbce40ed796273e57d6d03711
          interface,
          &name,
          group,
-@@ -2958,8 +2983,9 @@ impl PackPost {
+@@ -2456,15 +2481,45 @@ impl PackPost {
+             return Err(Refused::cancelled(built.notes));
+         }
+         let Some((program, refused)) = refused else {
+-            return Ok(built);
++            return built.require_program();
+         };
+         log::warn!(
+             "shader pack: {program} was refused ({refused}): building it again a program at a time"
+         );
+         drop((built, jobs));
+         let (post, world) = spare;
+-        Self::build(device, queue, adapter, post, screen, world, false, cancel)
+-            .map(|(built, _)| built)
++        let (built, _) = Self::build(device, queue, adapter, post, screen, world, false, cancel)?;
++        built.require_program()
++    }
++
++    /// A failed or unsupported pack must not take over the world with no running programs.
++    /// Check the built passes, not just the post-processing list: geometry-only and shadow-only
++    /// packs are valid, and the fallback rebuild can discard programs the translator accepted.
++    fn require_program(self) -> Result<Self, Refused> {
++        let present = [
++            !self.passes.is_empty(),
++            self.terrain.is_some(),
++            self.terrain_cutout.is_some(),
++            self.water.is_some(),
++            self.sky.is_some(),
++            self.entities.is_some(),
++            self.clouds.is_some(),
++            self.lines.is_some(),
++            self.weather.is_some(),
++            self.hand.is_some(),
++            self.hand_water.is_some(),
++            self.shadow_terrain.is_some(),
++            self.shadow_water.is_some(),
++            !self.shadow_comp.is_empty(),
++        ];
++        if present.into_iter().any(|p| p) {
++            Ok(self)
++        } else {
++            Err(Refused {
++                reason: "no usable shader programs".into(),
++                notes: self.notes,
++            })
++        }
+     }
+ 
+     /// `new`'s work: with `defer`, the pipelines are left to make (the jobs returned).
+@@ -2958,8 +3013,9 @@ impl PackPost {
              ids: None,
              cull: false,
          });
@@ -125799,7 +125848,7 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..2b3b4acbbce40ed796273e57d6d03711
              .then(|| super::pack_hand::PackHand::new(device, &draws.layout));
          let hand = post.hand.zip(hand_geometry).and_then(|(p, geometry)| {
              let g = Geometry {
-@@ -3325,6 +3351,7 @@ impl PackPost {
+@@ -3325,6 +3381,7 @@ impl PackPost {
                  texture_entry(0, float),
                  entry(
                      2,
@@ -125807,7 +125856,7 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..2b3b4acbbce40ed796273e57d6d03711
                      wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                  ),
              ],
-@@ -3339,6 +3366,7 @@ impl PackPost {
+@@ -3339,6 +3396,7 @@ impl PackPost {
                  texture_entry(0, float),
                  entry(
                      2,
@@ -125815,7 +125864,7 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..2b3b4acbbce40ed796273e57d6d03711
                      wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                  ),
              ],
-@@ -3370,6 +3398,7 @@ impl PackPost {
+@@ -3370,6 +3428,7 @@ impl PackPost {
                          texture_entry(0, float),
                          entry(
                              2,
@@ -125823,6 +125872,52 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..2b3b4acbbce40ed796273e57d6d03711
                              wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                          ),
                      ],
+diff --git a/crates/horizon-client-render/src/gfx/pack_post/undrawn_terrain_tests.rs b/crates/horizon-client-render/src/gfx/pack_post/undrawn_terrain_tests.rs
+index 2be178922241c8994d7e93962d64e3d25af68888..e425a73a3772e0efb979525d6ccd527339ce92cd 100644
+--- a/crates/horizon-client-render/src/gfx/pack_post/undrawn_terrain_tests.rs
++++ b/crates/horizon-client-render/src/gfx/pack_post/undrawn_terrain_tests.rs
+@@ -48,3 +48,41 @@ fn a_pack_without_terrain_programs_takes_terrain_from_the_game() {
+     };
+     assert_eq!(taken, (true, true));
+ }
++
++/// A broken post-only pack must not take over the world; a working composite alone remains valid.
++#[test]
++fn invalid_only_is_refused_but_sparse_composite_runs() {
++    let _gpu = crate::gfx::test_gpu::lock();
++    let Some(gpu) = Fixture::new() else { return };
++    let load = |fragment: &str| {
++        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
++        for (name, text) in [("composite.vsh", VERTEX), ("composite.fsh", fragment)] {
++            zip.start_file(
++                format!("shaders/{name}"),
++                zip::write::SimpleFileOptions::default(),
++            )
++            .unwrap();
++            zip.write_all(text.as_bytes()).unwrap();
++        }
++        let pack = horizon_shaders::Pack::from_zip_bytes(
++            "empty-pack-test",
++            zip.finish().unwrap().into_inner(),
++        )
++        .unwrap();
++        horizon_shaders::load_post(
++            &pack,
++            "",
++            &Default::default(),
++            &horizon_shaders::Macros::standard(),
++            &Default::default(),
++        )
++    };
++    let bad = "#version 120\n/* RENDERTARGETS: 0 */\nvoid main() { gl_FragData[0] = vec4(0.03, 0.6, ; }\n";
++    let error = match gpu.try_build(load(bad)) {
++        Ok(_) => panic!("invalid-only pack ran"),
++        Err(e) => e,
++    };
++    assert_eq!(error.reason, "no usable shader programs");
++    assert!(error.notes.iter().any(|n| n == "composite: skipped"));
++    assert!(gpu.try_build(load(WHITE)).is_ok());
++}
 diff --git a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs b/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
 index 50bed31b356a4dbafe71684cb6659d946a98046a..dc5cc96c3b0381b60c9d653d92ca639948d0c0a7 100644
 --- a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
@@ -126105,10 +126200,10 @@ index 1efa0c8c7252c3d1b1779611be299d4f73d059f8..e98f1d3660d2a11cab2bece4c1c75142
      fn sampler_and_block_bindings() {
          let src = "layout(std140) uniform A {\n float x;\n};\nuniform sampler2D InSampler; // c\nvoid main(){}\n";
 diff --git a/crates/horizon-shaders/src/post.rs b/crates/horizon-shaders/src/post.rs
-index 59b77599fcd5cbfb440986962db9da1e93ed1408..b120fd987f0bf17e1420385015b037ee267a2d0d 100644
+index 59b77599fcd5cbfb440986962db9da1e93ed1408..238b171b18adfc7bcef52f31806d185074c5f7ea 100644
 --- a/crates/horizon-shaders/src/post.rs
 +++ b/crates/horizon-shaders/src/post.rs
-@@ -3466,6 +3466,53 @@ blend.composite1.colortex3 = ONE ONE ONE ONE
+@@ -3466,6 +3466,85 @@ blend.composite1.colortex3 = ONE ONE ONE ONE
          );
      }
  
@@ -126156,6 +126251,38 @@ index 59b77599fcd5cbfb440986962db9da1e93ed1408..b120fd987f0bf17e1420385015b037ee
 +        assert_eq!(
 +            post.entities.as_ref().map(|p| p.name.as_str()),
 +            Some("gbuffers_basic")
++        );
++    }
++
++    #[test]
++    fn malformed_composite_produces_no_usable_post_program() {
++        let vsh = "#version 120\nvoid main() { gl_Position = ftransform(); }\n";
++        let bad = "#version 120\n/* RENDERTARGETS: 0 */\nvoid main() { gl_FragData[0] = vec4(0.03, 0.6, ; }\n";
++        let pack = Pack::from_zip_bytes(
++            "invalid",
++            zip(&[
++                ("shaders/composite.vsh", vsh),
++                ("shaders/composite.fsh", bad),
++            ]),
++        )
++        .unwrap();
++        let post = load_post(
++            &pack,
++            "",
++            &Properties::default(),
++            &Macros::standard(),
++            &GameInputs::default(),
++        );
++        assert!(post.programs.is_empty());
++        assert!(
++            post.notes.iter().any(|n| n == "composite: skipped"),
++            "{:?}",
++            post.notes
++        );
++        assert!(
++            post.notes.iter().any(|n| n.contains("composite.fsh")),
++            "{:?}",
++            post.notes
 +        );
 +    }
 +
