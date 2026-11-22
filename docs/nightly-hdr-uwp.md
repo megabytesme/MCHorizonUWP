@@ -27,6 +27,8 @@ Local patch `0.1.17` pairs with the same `0.1.18` client bundle and Builder 1.0.
 
 The signed x86 development build also passed the classic-pack refusal and stock scRGB controls on the desktop. Both captures were verified on the isolated x86 package. [Archived HDR log handling](hdr-run-evidence.md)
 
+The exact signed ARM64 guard APPX, SHA-256 `4c6d9551fe2b60a3d43636a22cbbbc6d25ac540f953908778632a58a16d96def`, passed both backends on the Surface Pro X Adreno 680. D3D11 refused `audit_post_only` and saved the stock world with F2. D3D12 drew the world in SDR on the internal display and logged frame-pressure selections of 80%, 75% and 80%. The trace establishes the active frame-pressure path. The triggering GPU timestamp samples and recovery of GPU timing are open. The ARM32 build signed as an isolated offline profile with HTTPS disabled and awaits Lumia runtime testing.
+
 Use the exact upstream and wgpu archives, the pinned Wasm inputs and the four-architecture host kit to regenerate the candidate. The resulting development catalog is unsigned. Run from the product worktree on Ben-Desktop. [Pinned input recipe](nightly-runtime-completion-2026-11-21.md)
 
 ```powershell
