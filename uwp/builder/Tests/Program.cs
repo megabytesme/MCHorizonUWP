@@ -1368,6 +1368,10 @@ Require(fetchStep.Arguments.Contains("fetch") && fetchStep.Arguments.Contains("t
     && fetchStep.Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml"), "fetch uses target, host and overrides");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--offline"), "build uses fetched dependencies offline");
 Require(recipe.Notes.Any(note => note.Contains("HTTPS")), "ARM HTTPS limitation disclosed");
+var secureArmRecipe = LocalRecipe.Plan(selection, secureArm32: true);
+Require(secureArmRecipe.Steps.Single(step => step.Name == "Prepare ARM32 overrides").Arguments.Contains("uwp/arm32-deps/prepare-native-tls.py"), "secure ARM stages native TLS");
+Require(secureArmRecipe.Steps.Single(step => step.Name == "Fetch Cargo dependencies").Arguments.Contains(".local/arm32-windows-sys/patches-native-tls.toml"), "secure ARM fetch uses native TLS config");
+Require(!secureArmRecipe.Notes.Any(note => note.Contains("offline TLS")), "secure ARM does not report the historical offline limitation");
 Require(recipe.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("native-d3d11,uwp-dx11-renderer,uwp-dx12-renderer,native-touch-mod,uwp-audio,uwp-https,uwp-controller,xaml-shell"), "touch and controller build features");
 var withDevice = new BuildSelection(TargetProfile.WindowsMobile, true, NativeDeviceVibration: true);
 Require(withDevice.ModIds.Contains(BuildSelection.DeviceVibrationModId)

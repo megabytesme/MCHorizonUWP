@@ -101,7 +101,10 @@ public static class LocalBuildRunner
             return jobs;
         }
 
-        var plan = LocalRecipe.Plan(selection, release?.Patch, release?.Client.Version);
+        var secureArm32 = selection.Target == TargetProfile.WindowsMobile && release is not null
+            && NightlyUwp.Matches(release.Patch.UpstreamCommit)
+            && File.Exists(Path.Combine(source, "uwp", "arm32-deps", "Cargo.nightly-native-tls.lock"));
+        var plan = LocalRecipe.Plan(selection, release?.Patch, release?.Client.Version, secureArm32);
         var sourceMods = selection.TrustedNativeSourceFolders?.Select(Path.GetFullPath).ToArray() ?? [];
         if (sourceMods.Length != 0 && release is null)
             throw new InvalidOperationException("Native source builds require an authenticated release.");
@@ -207,11 +210,11 @@ public static class LocalBuildRunner
         var arm = selection.Target == TargetProfile.WindowsMobile;
         if (arm)
         {
-            progress?.Report("Preparing the ARM32 offline dependency overrides.");
-            await RunProcess(python, snapshot, ["uwp/arm32-deps/prepare.py", "--offline-arm32"],
+            progress?.Report(secureArm32 ? "Preparing ARM32 online TLS dependencies." : "Preparing the ARM32 offline dependency overrides.");
+            await RunProcess(python, snapshot, secureArm32 ? ["uwp/arm32-deps/prepare-native-tls.py"] : ["uwp/arm32-deps/prepare.py", "--offline-arm32"],
                 new Dictionary<string, string> { ["RUSTUP_TOOLCHAIN"] = LocalRecipe.RustToolchain });
             if (NightlyUwp.Matches(release?.Patch.UpstreamCommit))
-                File.Copy(Path.Combine(snapshot, "uwp", "arm32-deps", "Cargo.nightly-offline.lock"),
+                File.Copy(Path.Combine(snapshot, "uwp", "arm32-deps", secureArm32 ? "Cargo.nightly-native-tls.lock" : "Cargo.nightly-offline.lock"),
                     Path.Combine(snapshot, "uwp", "game-bridge", "Cargo.lock"), overwrite: true);
         }
 

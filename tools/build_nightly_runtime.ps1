@@ -87,7 +87,9 @@ if (Test-Path -LiteralPath (Join-Path $source $wasmConfig) -PathType Leaf) {
     throw 'Stage the pinned Wasmtime source and bridge lockfile before building with uwp-wasm.'
 }
 if ($Architecture -eq 'arm') {
-    $armConfig = '.local/arm32-windows-sys/patches-offline-arm32.toml'
+    $armConfig = if (Test-Path -LiteralPath (Join-Path $source 'uwp/arm32-deps/Cargo.nightly-native-tls.lock')) {
+        '.local/arm32-windows-sys/patches-native-tls.toml'
+    } else { '.local/arm32-windows-sys/patches-offline-arm32.toml' }
     if (-not (Test-Path -LiteralPath (Join-Path $source $armConfig) -PathType Leaf)) {
         throw 'Prepare the ARM32 overrides and matching bridge Cargo.lock in a private ARM32 source snapshot first.'
     }

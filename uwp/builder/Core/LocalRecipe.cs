@@ -83,7 +83,7 @@ public static class LocalRecipe
         }
     }
 
-    public static LocalBuildPlan Plan(BuildSelection selection, CatalogPatch? preparedPatch = null, string? clientVersion = null)
+    public static LocalBuildPlan Plan(BuildSelection selection, CatalogPatch? preparedPatch = null, string? clientVersion = null, bool secureArm32 = false)
     {
         var sourceCommit = preparedPatch?.UpstreamCommit ?? SourceCommit;
         var features = selection.FeaturesForClient(clientVersion);
@@ -105,11 +105,12 @@ public static class LocalRecipe
             new("Snapshot pinned source", "git", ["archive", "--format=tar", sourceCommit]),
             new("Prepare Rust source copy", "powershell", ["-NoProfile", "-File", "uwp/rust-std/prepare-source.ps1", "-Destination", ".local/builder-rust-std", "-Toolchain", RustToolchain]),
         };
-        if (arm32) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
+        if (arm32) steps.Add(new("Prepare ARM32 overrides", "python", secureArm32
+            ? ["uwp/arm32-deps/prepare-native-tls.py"] : ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
         var prefix = new List<string> { "+" + RustToolchain };
         if (NightlyUwp.UsesWasmRuntime(clientVersion, selection.Target))
             prefix.AddRange(["--config", NightlyUwp.WasmtimeConfig]);
-        if (arm32) prefix.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
+        if (arm32) prefix.AddRange(["--config", secureArm32 ? ".local/arm32-windows-sys/patches-native-tls.toml" : ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
         var fetch = new List<string>(prefix);
         fetch.AddRange(["fetch", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--target", selection.RustTarget,
             "--target", "x86_64-pc-windows-msvc", "-Z", "build-std=std,panic_abort"]);
@@ -150,7 +151,7 @@ public static class LocalRecipe
         if (selection.NativeDeviceVibration) notes.Add("Device vibration is an optional native mod with its own setting, separate from controller vibration; unsupported devices are ignored.");
         if (clientId is null) notes.Add("No Microsoft application ID was supplied; sign-in needs a build configured with an approved public client ID.");
         else notes.Add("Microsoft sign-in uses the configured public application ID and device-code flow; Xbox/Minecraft access depends on that registration.");
-        if (arm32) notes.Add("ARM32 uses the offline TLS dependency override; account, skin and Minecraft session requests use the WinRT HTTPS adapter.");
+        if (arm32 && !secureArm32) notes.Add("ARM32 uses the offline TLS dependency override; account, skin and Minecraft session requests use the WinRT HTTPS adapter.");
         return new(sourceCommit, selection.RustTarget, features, steps.AsReadOnly(), notes.AsReadOnly());
     }
 
