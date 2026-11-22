@@ -125686,10 +125686,108 @@ index a6aa821e45f4bbeeefcba83117fbabfada44c527..4c3ab30db38afef611676fbabf4dfd5d
      }
  }
 diff --git a/crates/horizon-client-render/src/gfx/pack_post.rs b/crates/horizon-client-render/src/gfx/pack_post.rs
-index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..570b079e498e77f0036696bc5554ebe203d97b77 100644
+index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..2b3b4acbbce40ed796273e57d6d03711526e22a2 100644
 --- a/crates/horizon-client-render/src/gfx/pack_post.rs
 +++ b/crates/horizon-client-render/src/gfx/pack_post.rs
-@@ -2958,8 +2958,9 @@ impl PackPost {
+@@ -1124,26 +1124,37 @@ fn helper(
+     (pipeline, layout)
+ }
+ 
+-fn entry(binding: u32, ty: wgpu::BindingType) -> wgpu::BindGroupLayoutEntry {
++fn entry(
++    binding: u32,
++    visibility: wgpu::ShaderStages,
++    ty: wgpu::BindingType,
++) -> wgpu::BindGroupLayoutEntry {
+     wgpu::BindGroupLayoutEntry {
+         binding,
+-        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT | wgpu::ShaderStages::COMPUTE,
++        visibility,
+         ty,
+         count: None,
+     }
+ }
+ 
+ fn texture_entry(binding: u32, sample_type: wgpu::TextureSampleType) -> wgpu::BindGroupLayoutEntry {
+-    texture_entry_of(binding, sample_type, wgpu::TextureViewDimension::D2)
++    texture_entry_of(
++        binding,
++        wgpu::ShaderStages::FRAGMENT,
++        sample_type,
++        wgpu::TextureViewDimension::D2,
++    )
+ }
+ 
+ fn texture_entry_of(
+     binding: u32,
++    visibility: wgpu::ShaderStages,
+     sample_type: wgpu::TextureSampleType,
+     view_dimension: wgpu::TextureViewDimension,
+ ) -> wgpu::BindGroupLayoutEntry {
+     entry(
+         binding,
++        visibility,
+         wgpu::BindingType::Texture {
+             sample_type,
+             view_dimension,
+@@ -1540,6 +1551,7 @@ fn owned_buffers(
+ #[allow(clippy::too_many_arguments, clippy::type_complexity)]
+ fn bindings(
+     features: wgpu::Features,
++    stages: wgpu::ShaderStages,
+     interface: &horizon_shaders::Interface,
+     name: &str,
+     group: Group,
+@@ -1564,6 +1576,7 @@ fn bindings(
+     }
+     let mut entries = vec![entry(
+         0,
++        stages,
+         wgpu::BindingType::Buffer {
+             ty: wgpu::BufferBindingType::Uniform,
+             has_dynamic_offset: false,
+@@ -1752,11 +1765,12 @@ fn bindings(
+             Source::ShadowColor(n) => shadow_reads |= 1 << n,
+             _ => {}
+         }
+-        entries.push(texture_entry_of(s.binding, sample_type, dimension));
++        entries.push(texture_entry_of(s.binding, stages, sample_type, dimension));
+         let kind = SamplerKind::of(src, filtering);
+         let sampler = *kinds.entry(kind).or_insert_with(|| {
+             entries.push(entry(
+                 s.binding + 1,
++                stages,
+                 wgpu::BindingType::Sampler(kind.binding_type()),
+             ));
+             s.binding + 1
+@@ -1955,7 +1969,17 @@ fn build_pass(
+         return None;
+     }
+     let (entries, samplers, slots, reads, shadow_reads, images) = bindings(
+-        features, interface, &p.name, p.group, &p.buffers, geometry, formats, shadow, notes, pack,
++        features,
++        wgpu::ShaderStages::VERTEX_FRAGMENT,
++        interface,
++        &p.name,
++        p.group,
++        &p.buffers,
++        geometry,
++        formats,
++        shadow,
++        notes,
++        pack,
+     )?;
+     let final_pass = p.group == Group::Final;
+     // Outputs into an integer buffer, and its integer kind (`packed::bitcast_outputs`).
+@@ -2289,6 +2313,7 @@ fn build_compute(
+     let interface = &c.interface;
+     let (entries, samplers, slots, reads, shadow_reads, images) = bindings(
+         device.features(),
++        wgpu::ShaderStages::COMPUTE,
+         interface,
+         &name,
+         group,
+@@ -2958,8 +2983,9 @@ impl PackPost {
              ids: None,
              cull: false,
          });
@@ -125701,6 +125799,30 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..570b079e498e77f0036696bc5554ebe2
              .then(|| super::pack_hand::PackHand::new(device, &draws.layout));
          let hand = post.hand.zip(hand_geometry).and_then(|(p, geometry)| {
              let g = Geometry {
+@@ -3325,6 +3351,7 @@ impl PackPost {
+                 texture_entry(0, float),
+                 entry(
+                     2,
++                    wgpu::ShaderStages::FRAGMENT,
+                     wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                 ),
+             ],
+@@ -3339,6 +3366,7 @@ impl PackPost {
+                 texture_entry(0, float),
+                 entry(
+                     2,
++                    wgpu::ShaderStages::FRAGMENT,
+                     wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                 ),
+             ],
+@@ -3370,6 +3398,7 @@ impl PackPost {
+                         texture_entry(0, float),
+                         entry(
+                             2,
++                            wgpu::ShaderStages::FRAGMENT,
+                             wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                         ),
+                     ],
 diff --git a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs b/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
 index 50bed31b356a4dbafe71684cb6659d946a98046a..dc5cc96c3b0381b60c9d653d92ca639948d0c0a7 100644
 --- a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
@@ -125913,6 +126035,75 @@ index 8d1a371b807786017f29008d9f9a2cfa4fec9c3b..193e41e79ab1439bd930e7ec165b2d89
              // Every reason GPU Culling's switch can give, whatever this device offers.
              use crate::graphics::GpuCullingOffer as O;
              for offer in [
+diff --git a/crates/horizon-client-render/src/post_glsl.rs b/crates/horizon-client-render/src/post_glsl.rs
+index 1efa0c8c7252c3d1b1779611be299d4f73d059f8..e98f1d3660d2a11cab2bece4c1c75142ff28aabc 100644
+--- a/crates/horizon-client-render/src/post_glsl.rs
++++ b/crates/horizon-client-render/src/post_glsl.rs
+@@ -206,7 +206,7 @@ fn wrap_main(src: &str) -> Result<String, String> {
+ }
+ 
+ fn parse(stage: ShaderStage, text: &str) -> Result<naga::Module, String> {
+-    let module = Frontend::default()
++    let mut module = Frontend::default()
+         .parse(&Options::from(stage), text)
+         .map_err(|e| {
+             e.errors
+@@ -215,6 +215,27 @@ fn parse(stage: ShaderStage, text: &str) -> Result<naga::Module, String> {
+                 .collect::<Vec<_>>()
+                 .join("; ")
+         })?;
++    // GLSL std140 rounds a uniform block's total size to 16 bytes even when its
++    // last member ends earlier. Naga preserves the member offsets but can leave
++    // the struct span short, which downlevel devices reject at pipeline creation.
++    let uniforms: Vec<_> = module
++        .global_variables
++        .iter()
++        .filter_map(|(handle, var)| {
++            (var.space == naga::AddressSpace::Uniform).then_some((handle, var.ty))
++        })
++        .collect();
++    for (global, ty) in uniforms {
++        let mut padded = module.types[ty].clone();
++        if let naga::TypeInner::Struct { span, .. } = &mut padded.inner {
++            let aligned = (*span + 15) & !15;
++            if aligned != *span {
++                *span = aligned;
++                let padded_ty = module.types.insert(padded, naga::Span::UNDEFINED);
++                module.global_variables[global].ty = padded_ty;
++            }
++        }
++    }
+     Validator::new(ValidationFlags::all(), Capabilities::empty())
+         .validate(&module)
+         .map_err(|e| format!("{:?}", e.into_inner()))?;
+@@ -308,6 +329,27 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn translated_uniform_block_spans_match_std140() {
++        let source = "#version 450\nlayout(std140, set=0, binding=1) uniform Small { vec2 size; };\nlayout(location=0) out vec4 color;\nvoid main() { color = vec4(size, 0.0, 1.0); }";
++        let module = parse(ShaderStage::Fragment, source).unwrap();
++        let global = module
++            .global_variables
++            .iter()
++            .find(|(_, v)| v.space == naga::AddressSpace::Uniform)
++            .unwrap()
++            .1;
++        let naga::TypeInner::Struct { members, span } = &module.types[global.ty].inner else {
++            panic!("uniform block is not a struct")
++        };
++        assert_eq!(*span, 16);
++        assert_eq!(members[0].offset, 0);
++        let bytes =
++            crate::post_chain::pack_block(&[crate::post_chain::Uniform::Vec2([1.0, 2.0])]).unwrap();
++        assert_eq!(&bytes[..8], &[0, 0, 128, 63, 0, 0, 0, 64]);
++        assert!(bytes[8..16].iter().all(|&b| b == 0));
++    }
++
+     #[test]
+     fn sampler_and_block_bindings() {
+         let src = "layout(std140) uniform A {\n float x;\n};\nuniform sampler2D InSampler; // c\nvoid main(){}\n";
 diff --git a/crates/horizon-shaders/src/post.rs b/crates/horizon-shaders/src/post.rs
 index 59b77599fcd5cbfb440986962db9da1e93ed1408..b120fd987f0bf17e1420385015b037ee267a2d0d 100644
 --- a/crates/horizon-shaders/src/post.rs
