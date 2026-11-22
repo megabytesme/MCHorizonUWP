@@ -2074,6 +2074,10 @@ static async Task TestReleaseSource()
         Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.ClassicPackGuardPatch, NightlyUwp.HdrClient)
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.ClassicPackGuardPatch, NightlyUwp.November20Client),
             "The classic shader pack guard uses the existing HDR client bundle");
+        Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.GraphicsCompatibilityPatch, NightlyUwp.HdrClient)
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.GraphicsCompatibilityPatch, NightlyUwp.November20Client)
+            && !NightlyUwp.MatchesRecipe(NightlyUwp.UpstreamCommit, NightlyUwp.GraphicsCompatibilityPatch, NightlyUwp.HdrClient),
+            "The graphics compatibility patch requires the pinned November 20 source and HDR client bundle");
         Require(NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.14")
             && NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, "0.1.13", "0.1.15")
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.November20Patch, "0.1.14")
