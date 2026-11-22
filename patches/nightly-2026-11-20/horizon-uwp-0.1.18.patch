@@ -4653,10 +4653,10 @@ index c1cb12cbfc60f11be27abfeedb53325dfb53702b..9863736f552101a4f6d0c5ca79899edf
  test-payload-probe = []
  # Isolated server-publication slots for resource-backed game fixtures only.
 diff --git a/crates/horizon-client-render/Cargo.toml b/crates/horizon-client-render/Cargo.toml
-index a9121f71a51ed6263c61a24e032469ad2137522f..edab22cffc8d5b11f01980e7a5e1a7432f819dc5 100644
+index a9121f71a51ed6263c61a24e032469ad2137522f..8f9e7c0663f238fb9197eba0578f12a677d08f75 100644
 --- a/crates/horizon-client-render/Cargo.toml
 +++ b/crates/horizon-client-render/Cargo.toml
-@@ -63,20 +63,32 @@ smallvec = { version = "1", features = ["const_new"] }
+@@ -63,20 +63,33 @@ smallvec = { version = "1", features = ["const_new"] }
  symphonia = { version = "0.5", default-features = false, features = ["ogg", "vorbis"] }
  unicode-bidi = "0.3.18"
  ureq = { version = "2", default-features = false, features = ["tls"] }
@@ -4686,6 +4686,7 @@ index a9121f71a51ed6263c61a24e032469ad2137522f..edab22cffc8d5b11f01980e7a5e1a743
 +
  [features]
 +uwp-dx11-renderer = ["wgpu/dx11"]
++uwp-dx12-renderer = ["horizon-hdr/uwp-dx12-renderer"]
 +native-d3d11 = ["dep:horizon-native-terrain"]
 +uwp-https = ["dep:horizon-uwp-https-bridge"]
 +uwp-audio = ["dep:horizon-uwp-xaudio-stream"]
@@ -6668,7 +6669,7 @@ index 190fb30d80531e835a23323c8d722cd6c2e19679..f4c3bfcbdea3a0ed581a46b16d79efaf
          let sets = ids
              .into_iter()
 diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
-index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005aa16bcc8f 100644
+index ade121700540ab728a674ac7928e2d27d63330eb..1cf4d825bf91277b2b2f46d0e1c84079f278cce2 100644
 --- a/crates/horizon-client-render/src/gfx.rs
 +++ b/crates/horizon-client-render/src/gfx.rs
 @@ -170,6 +170,32 @@ fn entity_pipeline_factory<'a>(
@@ -6793,7 +6794,16 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
      /// Frame generation (Horizon setting).
      frame_gen: frame_gen::FrameGen,
      /// The entities' texture atlas (`entity_group`'s), for frame generation's motion.
-@@ -1955,7 +2002,20 @@ fn sprite_views(
+@@ -1757,6 +1804,8 @@ pub struct Renderer {
+     output_caps: output::OutputCapabilities,
+     /// An output that failed to apply, not tried again until something it needs changes.
+     output_rejected: Option<output_apply::Rejected>,
++    /// A rejected HDR configuration still needs one confirmed SDR present.
++    sdr_recovery_waiting: bool,
+     /// Since when Auto keeps HDR on through the display's loss of its report.
+     auto_off_since: Option<std::time::Instant>,
+     /// The output applied (`update_output`), with the frame every pipeline that draws it
+@@ -1955,7 +2004,20 @@ fn sprite_views(
      textures: &[wgpu::Texture],
      unused: &wgpu::TextureView,
      mips: Option<u32>,
@@ -6814,7 +6824,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
      (0..SPRITE_ARRAYS as usize)
          .map(|i| match textures.get(i) {
              Some(t) => t.create_view(&wgpu::TextureViewDescriptor {
-@@ -1983,6 +2043,19 @@ const SPRITE_NEAREST: wgpu::SamplerDescriptor<'static> = wgpu::SamplerDescriptor
+@@ -1983,6 +2045,19 @@ const SPRITE_NEAREST: wgpu::SamplerDescriptor<'static> = wgpu::SamplerDescriptor
      anisotropy_clamp: 1,
      border_color: None,
  };
@@ -6834,7 +6844,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
  /// The terrain sprites' sampler: LevelRenderer.chunkLayerSampler's linear one (clamped to the
  /// edge) in every Texture Filtering mode, with `anisotropy` samples when it is above 1 (wgpu
  /// then needs a linear mipmap filter too).
-@@ -2002,7 +2075,7 @@ fn sprite_sampler_descriptor(anisotropy: u16) -> wgpu::SamplerDescriptor<'static
+@@ -2002,7 +2077,7 @@ fn sprite_sampler_descriptor(anisotropy: u16) -> wgpu::SamplerDescriptor<'static
  fn sampler_anisotropy(bit: i32) -> u16 {
      1u16 << bit.clamp(0, 4)
  }
@@ -6843,7 +6853,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
  #[allow(clippy::too_many_arguments)]
  fn terrain_group(
      device: &wgpu::Device,
-@@ -2014,11 +2087,37 @@ fn terrain_group(
+@@ -2014,11 +2089,37 @@ fn terrain_group(
      lightmap: &wgpu::TextureView,
      lightmap_sampler: &wgpu::Sampler,
      emission_thresholds: &wgpu::TextureView,
@@ -6881,7 +6891,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
      device.create_bind_group(&wgpu::BindGroupDescriptor {
          label: Some(label),
          layout,
-@@ -2382,6 +2481,8 @@ impl Renderer {
+@@ -2382,6 +2483,8 @@ impl Renderer {
                  open_device(&window, offscreen, api, request.needs(layers)).await?
              }
          };
@@ -6890,7 +6900,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // Computed once: the sprite arrays, the shaders' constants and the
          // shader pack atlas all cut the sprites by it.
          let split = check_layers(&adapter, layers)?;
-@@ -2405,7 +2506,7 @@ impl Renderer {
+@@ -2405,7 +2508,7 @@ impl Renderer {
              (None, _) => None,
          };
          let (config, present_modes, hdr_output) = if let Some((config, caps)) = configured {
@@ -6899,7 +6909,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              if previous.is_none() {
                  log::info!(
                      "Horizon renderer: HDR output {}",
-@@ -2425,10 +2526,14 @@ impl Renderer {
+@@ -2425,10 +2528,14 @@ impl Renderer {
                  present_mode: wgpu::PresentMode::Immediate,
                  desired_maximum_frame_latency: 2,
                  alpha_mode: wgpu::CompositeAlphaMode::Opaque,
@@ -6916,7 +6926,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              // Only where one is named: splitscreen's views draw offscreen too.
              if let Some(output) = hdr_output
                  && previous.is_none()
-@@ -2463,9 +2568,16 @@ impl Renderer {
+@@ -2463,9 +2570,16 @@ impl Renderer {
          };
          output_caps.log_missing_hdr_frame(previous.is_none());
          let frame = output::resolve_frame(settings, request, output_caps, display, config.format);
@@ -6936,7 +6946,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          if previous.is_none() {
              startup_step(format_args!("creating the pipelines"));
          }
-@@ -2487,7 +2599,11 @@ impl Renderer {
+@@ -2487,7 +2601,11 @@ impl Renderer {
          let gpu_timer = timing::GpuTimer::new(&device, &queue);
          let shader = kept.create_shader_module(wgpu::ShaderModuleDescriptor {
              label: Some("Horizon terrain"),
@@ -6949,7 +6959,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          });
          let entry = |binding, visibility, ty| wgpu::BindGroupLayoutEntry {
              binding,
-@@ -2504,35 +2620,85 @@ impl Renderer {
+@@ -2504,35 +2622,85 @@ impl Renderer {
              ("SPRITE_ARRAYS", f64::from(sprite_arrays)),
              ("SPRITE_SPLIT", f64::from(split)),
          ];
@@ -7042,7 +7052,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              }),
              Some(wgpu::VertexBufferLayout {
                  array_stride: 16,
-@@ -2540,14 +2706,47 @@ impl Renderer {
+@@ -2540,14 +2708,47 @@ impl Renderer {
                  attributes: &instance_attributes,
              }),
          ];
@@ -7091,7 +7101,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // The solid terrain's fragment constants without HDR output's lighting, for the
          // frames HDR is off (`SolidPipeline`).
          let plain_constants = [
-@@ -2572,10 +2771,14 @@ impl Renderer {
+@@ -2572,10 +2773,14 @@ impl Renderer {
                               samples: u32| {
              let mut constants = constants.to_vec();
              // The debug crosshair draws with the HUD, in gamma.
@@ -7110,7 +7120,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              let desc = wgpu::RenderPipelineDescriptor {
                  label: Some(label),
                  layout: Some(layout),
-@@ -2591,7 +2794,7 @@ impl Renderer {
+@@ -2591,7 +2796,7 @@ impl Renderer {
                      ..Default::default()
                  },
                  depth_stencil: Some(wgpu::DepthStencilState {
@@ -7119,7 +7129,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      depth_write_enabled: Some(depth_write),
                      depth_compare: Some(if depth_test {
                          wgpu::CompareFunction::GreaterEqual
-@@ -2791,7 +2994,7 @@ impl Renderer {
+@@ -2791,7 +2996,7 @@ impl Renderer {
              "Sky",
              "vs_sky",
              "fs_sky",
@@ -7128,7 +7138,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              tri,
              None,
              false,
-@@ -2802,7 +3005,7 @@ impl Renderer {
+@@ -2802,7 +3007,7 @@ impl Renderer {
              "Sky base",
              "vs_sky",
              "fs_sky_base",
@@ -7137,7 +7147,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              tri,
              None,
              false,
-@@ -2815,19 +3018,22 @@ impl Renderer {
+@@ -2815,19 +3020,22 @@ impl Renderer {
              step_mode: wgpu::VertexStepMode::Vertex,
              attributes: &sunrise_attributes,
          })];
@@ -7172,7 +7182,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let sunrise_pipeline = pipeline(
              "Sunrise fan",
              "vs_sunrise",
-@@ -2843,13 +3049,15 @@ impl Renderer {
+@@ -2843,13 +3051,15 @@ impl Renderer {
              "Dark disc",
              "vs_sky",
              "fs_dark_disc",
@@ -7189,7 +7199,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let depth_reset = kept.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
              label: Some("Hand depth reset"),
              layout: Some(&layout),
-@@ -2857,11 +3065,11 @@ impl Renderer {
+@@ -2857,11 +3067,11 @@ impl Renderer {
                  module: &shader,
                  entry_point: Some("vs_sky"),
                  compilation_options: Default::default(),
@@ -7203,7 +7213,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  depth_write_enabled: Some(true),
                  depth_compare: Some(wgpu::CompareFunction::Always),
                  stencil: Default::default(),
-@@ -2872,7 +3080,7 @@ impl Renderer {
+@@ -2872,7 +3082,7 @@ impl Renderer {
                  module: &shader,
                  entry_point: Some("fs_depth_reset"),
                  compilation_options: wgpu::PipelineCompilationOptions {
@@ -7212,7 +7222,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      ..Default::default()
                  },
                  targets: &[Some(wgpu::ColorTargetState {
-@@ -2888,7 +3096,7 @@ impl Renderer {
+@@ -2888,7 +3098,7 @@ impl Renderer {
              "Block outline",
              "vs_line",
              "fs_line",
@@ -7221,7 +7231,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              wgpu::PrimitiveTopology::TriangleStrip,
              None,
              true,
-@@ -2900,7 +3108,7 @@ impl Renderer {
+@@ -2900,7 +3110,7 @@ impl Renderer {
              "Block outline secondary",
              "vs_line",
              "fs_line",
@@ -7230,7 +7240,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              wgpu::PrimitiveTopology::TriangleStrip,
              None,
              false,
-@@ -2913,7 +3121,7 @@ impl Renderer {
+@@ -2913,7 +3123,7 @@ impl Renderer {
              "Debug lines opaque",
              "vs_debug_line",
              "fs_debug_line",
@@ -7239,7 +7249,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              wgpu::PrimitiveTopology::TriangleStrip,
              None,
              true,
-@@ -2924,7 +3132,7 @@ impl Renderer {
+@@ -2924,7 +3134,7 @@ impl Renderer {
              "Debug lines",
              "vs_debug_line",
              "fs_debug_line",
@@ -7248,7 +7258,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              wgpu::PrimitiveTopology::TriangleStrip,
              None,
              false,
-@@ -2935,7 +3143,7 @@ impl Renderer {
+@@ -2935,7 +3145,7 @@ impl Renderer {
              "Debug lines on top",
              "vs_debug_line",
              "fs_debug_line",
@@ -7257,7 +7267,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              wgpu::PrimitiveTopology::TriangleStrip,
              None,
              false,
-@@ -2951,7 +3159,7 @@ impl Renderer {
+@@ -2951,7 +3161,7 @@ impl Renderer {
                  "3d crosshair",
                  "vs_debug_line",
                  "fs_debug_line",
@@ -7266,7 +7276,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  wgpu::PrimitiveTopology::TriangleStrip,
                  None,
                  false,
-@@ -2967,25 +3175,41 @@ impl Renderer {
+@@ -2967,25 +3177,41 @@ impl Renderer {
          drop(terrain_step);
          let globals = device.create_buffer(&wgpu::BufferDescriptor {
              label: Some("Horizon globals"),
@@ -7312,7 +7322,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
              mapped_at_creation: false,
          });
-@@ -3004,48 +3228,107 @@ impl Renderer {
+@@ -3004,48 +3230,107 @@ impl Renderer {
          let gl = adapter.get_info().backend == wgpu::Backend::Gl;
          // Keep every colour layer's companion, split by the same device limit. Native
          // material stages read the first array; terrain packs stitch all of them.
@@ -7461,7 +7471,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              .sprites
              .into_iter()
              .enumerate()
-@@ -3074,46 +3357,62 @@ impl Renderer {
+@@ -3074,46 +3359,62 @@ impl Renderer {
                              | wgpu::TextureUsages::COPY_DST
                              // Shader packs' atlas copies them (pack_atlas.rs).
                              | wgpu::TextureUsages::COPY_SRC
@@ -7557,7 +7567,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let lightmap = device.create_texture(&wgpu::TextureDescriptor {
              label: Some("Lightmap"),
              size: wgpu::Extent3d {
-@@ -3135,8 +3434,6 @@ impl Renderer {
+@@ -3135,8 +3436,6 @@ impl Renderer {
              min_filter: wgpu::FilterMode::Linear,
              ..Default::default()
          });
@@ -7566,7 +7576,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let group = terrain_group(
              &device,
              "Horizon terrain resources",
-@@ -3147,6 +3444,7 @@ impl Renderer {
+@@ -3147,6 +3446,7 @@ impl Renderer {
              &lightmap_view,
              &lightmap_sampler,
              &emission_stats.view,
@@ -7574,7 +7584,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          let fluid_sampler = device.create_sampler(&fluid::SAMPLER);
          let fluid_group = terrain_group(
-@@ -3159,22 +3457,41 @@ impl Renderer {
+@@ -3159,22 +3459,41 @@ impl Renderer {
              &lightmap_view,
              &lightmap_sampler,
              &emission_stats.view,
@@ -7622,7 +7632,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          let crosshair_group = terrain_group(
              &device,
-@@ -3186,6 +3503,7 @@ impl Renderer {
+@@ -3186,6 +3505,7 @@ impl Renderer {
              &lightmap_view,
              &lightmap_sampler,
              &emission_stats.view,
@@ -7630,7 +7640,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          let mirror_group = terrain_group(
              &device,
-@@ -3197,6 +3515,7 @@ impl Renderer {
+@@ -3197,6 +3517,7 @@ impl Renderer {
              &lightmap_view,
              &lightmap_sampler,
              &emission_stats.view,
@@ -7638,7 +7648,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          let index_quads = 1 << 16;
          let indices = Self::quad_indices(&device, index_quads);
-@@ -3204,9 +3523,7 @@ impl Renderer {
+@@ -3204,9 +3525,7 @@ impl Renderer {
          let instances = device.create_buffer(&wgpu::BufferDescriptor {
              label: Some("Section origins"),
              size: instance_capacity * 16,
@@ -7649,7 +7659,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              mapped_at_creation: false,
          });
          let prepared_instance_capacity = 64;
-@@ -3229,36 +3546,49 @@ impl Renderer {
+@@ -3229,36 +3548,49 @@ impl Renderer {
              mapped_at_creation: false,
          });
          let (atlas_pixels, atlas_width, atlas_height) = hud_atlas;
@@ -7725,7 +7735,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // vanilla's `GlintSampler`: enchanted_glint_item as its own texture,
          // repeated per pixel (`clamp: false`), linear without mipmaps
          // (`blur: true`).
-@@ -3283,10 +3613,15 @@ impl Renderer {
+@@ -3283,10 +3615,15 @@ impl Renderer {
              glint_pixels,
          );
          let glint_view = glint_texture.create_view(&Default::default());
@@ -7743,7 +7753,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              mag_filter: wgpu::FilterMode::Linear,
              min_filter: wgpu::FilterMode::Linear,
              ..Default::default()
-@@ -3314,29 +3649,84 @@ impl Renderer {
+@@ -3314,29 +3651,84 @@ impl Renderer {
              glint_armor_pixels,
          );
          let glint_armor_view = glint_armor_texture.create_view(&Default::default());
@@ -7840,7 +7850,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let static_entity_bindings =
              device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                  label: Some("Static block-entity transform"),
-@@ -3350,109 +3740,118 @@ impl Renderer {
+@@ -3350,109 +3742,118 @@ impl Renderer {
                      },
                  )],
              });
@@ -8051,7 +8061,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let entity_layout = kept.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
              label: Some("Entity layout"),
              bind_group_layouts: &[Some(&entity_bindings)],
-@@ -3500,25 +3899,36 @@ impl Renderer {
+@@ -3500,25 +3901,36 @@ impl Renderer {
              usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
              mapped_at_creation: false,
          });
@@ -8092,7 +8102,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              &kept,
              &entity_layout,
              &cloud_layout,
-@@ -3526,6 +3936,9 @@ impl Renderer {
+@@ -3526,6 +3938,9 @@ impl Renderer {
              &entity_vertex,
              frame_format,
              linear_light,
@@ -8102,7 +8112,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          let entity_pipeline = |label, cull_mode, depth_write, compare, bias, blend, clouds| {
              entity_pipeline_with(EntityPipelineOptions {
-@@ -3608,15 +4021,18 @@ impl Renderer {
+@@ -3608,15 +4023,18 @@ impl Renderer {
              alpha_blend,
              false,
          );
@@ -8130,7 +8140,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // RenderPipelines.TEXT_SEE_THROUGH: translucent, no depth test or
          // writes, culled like every world text pipeline (TEXT_SNIPPET keeps
          // RenderPipeline.Builder's default): a name tag or text display hides
-@@ -3652,11 +4068,14 @@ impl Renderer {
+@@ -3652,11 +4070,14 @@ impl Renderer {
              fragment: "fs_entity_unmarked",
              write_mask: wgpu::ColorWrites::ALL,
          });
@@ -8146,7 +8156,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          // RenderPipelines.ENTITY_SOLID: a surface of an entity that is coplanar with
          // terrain wins the tie in vanilla (the boat's floor over the trapdoor on the
-@@ -3702,6 +4121,7 @@ impl Renderer {
+@@ -3702,6 +4123,7 @@ impl Renderer {
                  write_mask: wgpu::ColorWrites::ALL,
              })
          });
@@ -8154,7 +8164,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let static_entity_pipeline =
              device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                  label: Some("Static block entities"),
-@@ -3714,7 +4134,7 @@ impl Renderer {
+@@ -3714,7 +4136,7 @@ impl Renderer {
                  },
                  primitive: wgpu::PrimitiveState::default(),
                  depth_stencil: Some(wgpu::DepthStencilState {
@@ -8163,7 +8173,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      depth_write_enabled: Some(true),
                      depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                      stencil: Default::default(),
-@@ -3725,7 +4145,7 @@ impl Renderer {
+@@ -3725,7 +4147,7 @@ impl Renderer {
                      module: &static_entity_shader,
                      entry_point: Some("fs_entity_unmarked"),
                      compilation_options: wgpu::PipelineCompilationOptions {
@@ -8172,7 +8182,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                          ..Default::default()
                      },
                      targets: &[Some(wgpu::ColorTargetState {
-@@ -3773,6 +4193,25 @@ impl Renderer {
+@@ -3773,6 +4195,25 @@ impl Renderer {
              }),
          ];
          // BlendFunction.LIGHTNING: src alpha, one; no depth writes.
@@ -8198,7 +8208,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let additive_descriptor = wgpu::RenderPipelineDescriptor {
              label: Some("Additive entities"),
              layout: Some(&entity_layout),
-@@ -3787,7 +4226,7 @@ impl Renderer {
+@@ -3787,7 +4228,7 @@ impl Renderer {
                  ..Default::default()
              },
              depth_stencil: Some(wgpu::DepthStencilState {
@@ -8207,7 +8217,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  depth_write_enabled: Some(false),
                  depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                  stencil: Default::default(),
-@@ -3798,7 +4237,7 @@ impl Renderer {
+@@ -3798,7 +4239,7 @@ impl Renderer {
                  module: &entity_shader,
                  entry_point: Some("fs_celestial"),
                  compilation_options: wgpu::PipelineCompilationOptions {
@@ -8216,7 +8226,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      ..Default::default()
                  },
                  targets: &[Some(wgpu::ColorTargetState {
-@@ -3845,18 +4284,27 @@ impl Renderer {
+@@ -3845,18 +4286,27 @@ impl Renderer {
              },
              ..additive_descriptor
          });
@@ -8245,7 +8255,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let forcefield_texture = device.create_texture_with_data(
              &queue,
              &wgpu::TextureDescriptor {
-@@ -3866,7 +4314,7 @@ impl Renderer {
+@@ -3866,7 +4316,7 @@ impl Renderer {
                      height: forcefield_size,
                      depth_or_array_layers: 1,
                  },
@@ -8254,7 +8264,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  sample_count: 1,
                  dimension: wgpu::TextureDimension::D2,
                  format: wgpu::TextureFormat::Rgba8Unorm,
-@@ -3874,16 +4322,28 @@ impl Renderer {
+@@ -3874,16 +4324,28 @@ impl Renderer {
                  view_formats: &[],
              },
              wgpu::util::TextureDataOrder::LayerMajor,
@@ -8287,7 +8297,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              ..Default::default()
          });
          let border_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-@@ -3964,11 +4424,31 @@ impl Renderer {
+@@ -3964,11 +4426,31 @@ impl Renderer {
          });
          let border_shader = kept.create_shader_module(wgpu::ShaderModuleDescriptor {
              label: Some("Horizon world border"),
@@ -8320,7 +8330,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let border_pipeline = kept.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
              label: Some("World border"),
              layout: Some(&border_layout),
-@@ -3987,7 +4467,7 @@ impl Renderer {
+@@ -3987,7 +4469,7 @@ impl Renderer {
                  ..Default::default()
              },
              depth_stencil: Some(wgpu::DepthStencilState {
@@ -8329,7 +8339,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  depth_write_enabled: Some(true),
                  depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                  stencil: Default::default(),
-@@ -4002,23 +4482,12 @@ impl Renderer {
+@@ -4002,23 +4484,12 @@ impl Renderer {
                  module: &border_shader,
                  entry_point: Some("fs_border"),
                  compilation_options: wgpu::PipelineCompilationOptions {
@@ -8355,7 +8365,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      write_mask: wgpu::ColorWrites::ALL,
                  })],
              }),
-@@ -4027,7 +4496,11 @@ impl Renderer {
+@@ -4027,7 +4498,11 @@ impl Renderer {
          });
          let screen_shader = kept.create_shader_module(wgpu::ShaderModuleDescriptor {
              label: Some("Horizon screen effects"),
@@ -8368,7 +8378,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          });
          let screen_attributes =
              wgpu::vertex_attr_array![0=>Float32x4,1=>Float32x2,2=>Float32x4,3=>Float32x4];
-@@ -4036,18 +4509,21 @@ impl Renderer {
+@@ -4036,18 +4511,21 @@ impl Renderer {
              step_mode: wgpu::VertexStepMode::Vertex,
              attributes: &screen_attributes,
          })];
@@ -8401,7 +8411,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // One per blend and `.png.mcmeta` sampling (screen_effects::SAMPLE_*):
          // the shader is specialised, so a pixel pays for none of the others.
          let screen_pipelines: [wgpu::RenderPipeline; 8] = std::array::from_fn(|i| {
-@@ -4130,7 +4606,7 @@ impl Renderer {
+@@ -4130,7 +4608,7 @@ impl Renderer {
              .get_downlevel_capabilities()
              .flags
              .contains(wgpu::DownlevelFlags::INDIRECT_EXECUTION);
@@ -8410,7 +8420,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // Metal draws solid terrain in two passes (`split_solid`): meshes put all
          // their opaque quads first, so each pass draws its part in a run or two.
          crate::mesher::group_parts(adapter.get_info().backend == wgpu::Backend::Metal);
-@@ -4250,7 +4726,10 @@ impl Renderer {
+@@ -4250,7 +4728,10 @@ impl Renderer {
          let multi_draw = device
              .features()
              .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
@@ -8422,7 +8432,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let batchable = translucent_batchable(&adapter.get_info(), multi_draw);
          crate::graphics::offer_translucent_batching(batchable);
          let translucent_batching = batchable && translucent_batching;
-@@ -4292,6 +4771,7 @@ impl Renderer {
+@@ -4292,6 +4773,7 @@ impl Renderer {
          }
          // Without indirect draws (OpenGL before 4.0 without indirect execution, or
          // before 4.2 + GL_ARB_shader_draw_parameters without indirect first instance)
@@ -8430,7 +8440,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // even creating an indirect buffer fails; one draw per section reads
          // `draws` on the CPU instead.
          let indirect = device.create_buffer(&wgpu::BufferDescriptor {
-@@ -4323,18 +4803,48 @@ impl Renderer {
+@@ -4323,18 +4805,48 @@ impl Renderer {
                  }
                  Some(cull)
              });
@@ -8487,7 +8497,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          drop(pipelines_step);
          reuse.finish(generation);
          if previous.is_some() {
-@@ -4356,15 +4866,21 @@ impl Renderer {
+@@ -4356,15 +4868,21 @@ impl Renderer {
                  on_off(gpu_timer.is_some()),
              ));
          }
@@ -8512,7 +8522,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          Ok(Self {
              msaa,
              display: None,
-@@ -4520,6 +5036,11 @@ impl Renderer {
+@@ -4520,6 +5038,11 @@ impl Renderer {
              mip_levels,
              mipmaps: mip_levels - 1,
              terrain_layout: bindings,
@@ -8524,7 +8534,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              terrain_sprites: sprite_constants.map(|(_, v)| v),
              sprite_split: split,
              sprite_sampler,
-@@ -4594,6 +5115,7 @@ impl Renderer {
+@@ -4594,6 +5117,7 @@ impl Renderer {
              occlusion: occlusion::Occlusion::new(crate::chunk::MIN_Y, crate::chunk::HEIGHT / 16),
              layout: crate::chunk::ColumnLayout::VANILLA,
              world_post,
@@ -8532,7 +8542,15 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              frame_gen: frame_gen::FrameGen::new(),
              entity_atlas: atlas_view.clone(),
              hdr: None,
-@@ -4731,7 +5253,7 @@ impl Renderer {
+@@ -4601,6 +5125,7 @@ impl Renderer {
+             emission_stats,
+             output_caps,
+             output_rejected: None,
++            sdr_recovery_waiting: previous.is_some_and(|r| r.sdr_recovery_waiting),
+             auto_off_since: None,
+             // Nothing is presented as HDR yet: `update_output` applies the settings.
+             output: output::resolve_output(settings, output_caps, display, frame, false),
+@@ -4731,7 +5256,7 @@ impl Renderer {
      pub fn set_lines_shader(&mut self, program: Option<&crate::core_shader::CoreProgram>) {
          let format = self.output.frame.format;
          // A pack's GLSL writes vanilla's gamma: a frame of linear light keeps the built-in one.
@@ -8541,7 +8559,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          self.core_lines =
              program.and_then(|program| core_lines::CoreLines::new(&self.device, format, program));
      }
-@@ -4743,10 +5265,40 @@ impl Renderer {
+@@ -4743,10 +5268,40 @@ impl Renderer {
          stars: Option<&crate::core_shader::CoreProgram>,
      ) {
          // As `set_lines_shader`: not on a frame of linear light.
@@ -8583,7 +8601,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
      /// LevelRenderer.submitBlockOutline: the buffer holds `edges` per stroke, the black
      /// secondary stroke first when high contrast is on.
      #[horizon_mod_api_macros::replaceable]
-@@ -4805,6 +5357,18 @@ impl Renderer {
+@@ -4805,6 +5360,18 @@ impl Renderer {
              .unwrap_or_else(std::sync::PoisonError::into_inner) =
              self.surface.take().and_then(|s| Arc::try_unwrap(s).ok());
      }
@@ -8602,7 +8620,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
      /// Reattach a window after surface loss or a failed renderer replacement.
      pub fn recreate_surface(&mut self) -> Result<()> {
          self.queue.wait();
-@@ -4844,7 +5408,22 @@ impl Renderer {
+@@ -4844,7 +5411,22 @@ impl Renderer {
          Ok(())
      }
      /// The world's depth, which occlusion culling's test and post effects may read.
@@ -8626,7 +8644,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          device
              .create_texture(&wgpu::TextureDescriptor {
                  label: Some("Horizon depth"),
-@@ -4856,13 +5435,8 @@ impl Renderer {
+@@ -4856,13 +5438,8 @@ impl Renderer {
                  mip_level_count: 1,
                  sample_count: 1,
                  dimension: wgpu::TextureDimension::D2,
@@ -8642,7 +8660,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  view_formats: &[],
              })
              .create_view(&Default::default())
-@@ -4914,7 +5488,12 @@ impl Renderer {
+@@ -4914,7 +5491,12 @@ impl Renderer {
          } else {
              self.offscreen = Some(Self::offscreen_target(&self.device, &self.config));
          }
@@ -8656,7 +8674,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          if let Some(pipeline) = &mut self.external {
              pipeline.resize([width, height]);
          }
-@@ -5488,6 +6067,11 @@ impl Renderer {
+@@ -5488,6 +6070,11 @@ impl Renderer {
              indices: &self.indices,
              flat: self.flat.as_ref(),
              multi_draw: self.multi_draw,
@@ -8668,7 +8686,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              looks: self.look_groups.as_ref(),
          };
          lists.draw(pass, indirect, base, first, count, pulled);
-@@ -6182,6 +6766,8 @@ impl Renderer {
+@@ -6182,6 +6769,8 @@ impl Renderer {
      pub fn output(&self) -> output::EffectiveOutput {
          output::EffectiveOutput {
              msaa: self.msaa_offered(),
@@ -8677,7 +8695,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              ..self.output_with_rays()
          }
      }
-@@ -6218,7 +6804,12 @@ impl Renderer {
+@@ -6218,7 +6807,12 @@ impl Renderer {
      /// masks. Only with HDR output on: nothing else reads them.
      pub fn measure_emission(&mut self) {
          if let Some(hdr) = &self.hdr {
@@ -8691,7 +8709,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              self.emission_stats
                  .measure(&self.device, &self.queue, &views, hdr.masks);
          }
-@@ -6262,6 +6853,7 @@ impl Renderer {
+@@ -6262,6 +6856,7 @@ impl Renderer {
      }
      /// Frame generation on or off (FSR 3.1's frame interpolation).
      pub fn set_frame_generation(&mut self, on: bool) {
@@ -8699,7 +8717,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          if !on {
              self.frame_gen.stop();
          }
-@@ -6277,6 +6869,12 @@ impl Renderer {
+@@ -6277,6 +6872,12 @@ impl Renderer {
          upscale: f32,
          sharpness: f32,
      ) {
@@ -8712,7 +8730,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          self.world_post.set_sharpness(&self.device, sharpness);
          let taa = taa && self.world_post.supports_taa();
          self.world_post.scale = scale.clamp(0.25, 2.0);
-@@ -6284,6 +6882,22 @@ impl Renderer {
+@@ -6284,6 +6885,22 @@ impl Renderer {
          self.world_post.taa = taa;
          self.world_post.upscale = if taa { upscale.clamp(1.0, 4.0) } else { 1.0 };
      }
@@ -8735,11 +8753,13 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
      /// Runs `post` over the world from now on (`None`: no pack), for the dimension `dimension`;
      /// `block_ids` gives each source state its model and fluid material ids (two values
      /// per state); emission and ownership come from the mesher's quad records.
-@@ -6295,6 +6909,12 @@ impl Renderer {
+@@ -6295,6 +6912,14 @@ impl Renderer {
          pack: Option<horizon_shaders::Post>,
          block_ids: &[i32],
      ) -> std::result::Result<Option<(Vec<String>, Vec<String>)>, pack_post::Refused> {
-+        if pack.is_some() && let Some(reason) = self.classic_shader_pack_unavailable() {
++        if pack.is_some()
++            && let Some(reason) = self.classic_shader_pack_unavailable()
++        {
 +            return Err(pack_post::Refused {
 +                reason: reason.into(),
 +                notes: Vec::new(),
@@ -8748,7 +8768,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          if pack.is_none() {
              self.pack_atlas = None;
              self.pack_material_atlases = None;
-@@ -6569,7 +7189,14 @@ impl Renderer {
+@@ -6569,7 +7194,14 @@ impl Renderer {
          let clouds = self.cloud_bindings.clone();
          let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
          let cancelled = cancel.clone();
@@ -8763,7 +8783,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              let instance = wgpu::vertex_attr_array![5=>Float32x4];
              let vertex = wgpu::VertexBufferLayout {
                  array_stride: std::mem::size_of::<TerrainVertex>() as u64,
-@@ -6706,6 +7333,9 @@ impl Renderer {
+@@ -6706,6 +7338,9 @@ impl Renderer {
              block_light::LightTable,
          )>,
      ) -> std::result::Result<Vec<String>, String> {
@@ -8773,7 +8793,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          self.world_held = false;
          let linear = pack.is_some();
          if (linear || self.output.frame.format == LINEAR_FRAME)
-@@ -6894,7 +7524,7 @@ impl Renderer {
+@@ -6894,7 +7529,7 @@ impl Renderer {
      /// or sampleRGSS for RGSS.
      pub fn set_texture_filtering(&mut self, filtering: i32, bit: i32) {
          let filtering = filtering.clamp(0, 2) as u32;
@@ -8782,7 +8802,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              sampler_anisotropy(bit)
          } else {
              1
-@@ -6904,16 +7534,21 @@ impl Renderer {
+@@ -6904,16 +7539,21 @@ impl Renderer {
          }
          self.texture_filtering = filtering;
          self.max_anisotropy = anisotropy;
@@ -8807,7 +8827,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          self.group = terrain_group(
              &self.device,
-@@ -6925,6 +7560,7 @@ impl Renderer {
+@@ -6925,6 +7565,7 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8815,7 +8835,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
          self.fluid_group = terrain_group(
              &self.device,
-@@ -6936,17 +7572,29 @@ impl Renderer {
+@@ -6936,17 +7577,29 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8846,7 +8866,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          );
      }
      /// Block sprite layers per array on this device: a sprite's array is its layer over it, its
-@@ -6958,9 +7606,14 @@ impl Renderer {
+@@ -6958,9 +7611,14 @@ impl Renderer {
      /// reduced copies (0: none).
      pub fn set_mipmap_levels(&mut self, levels: u32) {
          self.mipmap_option = levels;
@@ -8862,7 +8882,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              self.sprite_minimum_size,
              self.mip_levels,
          );
-@@ -7242,7 +7895,12 @@ impl Renderer {
+@@ -7242,7 +7900,12 @@ impl Renderer {
          // tried again at half the size next frame; the window keeps its last one.
          let checks = GpuChecks::push(&self.device);
          let target = (!layered).then(|| Self::offscreen_target(&self.device, &config));
@@ -8876,7 +8896,16 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          if let Some(e) = checks.pop() {
              log::warn!(
                  "Horizon renderer: no memory for a {}x{} screenshot ({e}); trying half the size",
-@@ -7655,8 +8313,14 @@ impl Renderer {
+@@ -7360,7 +8023,7 @@ impl Renderer {
+         // passes, HDR output without the HUD's layer (or the float frame HDR was started
+         // with) or the title screen.
+         let fg = self.frame_gen.on
+-            && !(self.frame_gen.paused || self.frame_gen.refused)
++            && !(self.frame_gen.paused || self.frame_gen.refused || self.sdr_recovery_waiting)
+             && (self.hdr.as_ref()).map_or(
+                 self.output.frame.format == self.config.format.remove_srgb_suffix(),
+                 hdr::Hdr::layered,
+@@ -7655,8 +8318,14 @@ impl Renderer {
              view_origin: [0.0; 4],
              world_view: [0.0; 4],
          };
@@ -8893,7 +8922,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // The sunrise fan as sixteen triangles. Its clip positions use the sky's
          // own view (no TAA jitter; the bob and the spin, as `fs_sky`'s `view_ray`),
          // and its apex weight interpolates the barycentric the shader used to
-@@ -7692,12 +8356,22 @@ impl Renderer {
+@@ -7692,12 +8361,22 @@ impl Renderer {
              view_proj: hand_view_proj.to_cols_array_2d(),
              ..globals
          };
@@ -8922,7 +8951,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // GameRenderer.render3dHud: DebugCrosshairRenderer draws with the
          // hand's projection but no bob, and FogMode.NONE (no fog colour).
          let crosshair_globals = Globals {
-@@ -7705,12 +8379,22 @@ impl Renderer {
+@@ -7705,12 +8384,22 @@ impl Renderer {
              fog_color: [0.0; 4],
              ..globals
          };
@@ -8951,7 +8980,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          // 4x MSAA, unless a classic shader pack runs (a failed or refused one leaves `None`):
          // it and native displacement keep their single-sample pipelines, as does a material
          // whose four-sample layers the driver refused. Nor where its targets ran out of video
-@@ -8036,9 +8720,7 @@ impl Renderer {
+@@ -8036,9 +8725,7 @@ impl Renderer {
              self.instances = self.device.create_buffer(&wgpu::BufferDescriptor {
                  label: Some("Section origins"),
                  size: self.instance_capacity * 16,
@@ -8962,7 +8991,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  mapped_at_creation: false,
              });
          }
-@@ -8916,13 +9598,22 @@ impl Renderer {
+@@ -8916,13 +9603,22 @@ impl Renderer {
                      .entry(snapshot.section)
                      .or_insert_with(|| {
                          let capacity = vertices.next_power_of_two().max(4);
@@ -8987,7 +9016,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                          static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                          GpuStaticEntitySection {
                              buffer: self.device.create_buffer(&wgpu::BufferDescriptor {
-@@ -8939,13 +9630,22 @@ impl Renderer {
+@@ -8939,13 +9635,22 @@ impl Renderer {
                          }
                      });
                  if gpu.origin != snapshot.origin {
@@ -9012,7 +9041,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      gpu.origin = snapshot.origin;
                      static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                  }
-@@ -8999,21 +9699,40 @@ impl Renderer {
+@@ -8999,21 +9704,40 @@ impl Renderer {
                  frame.camera.y.floor() as i32,
                  frame.camera.z.floor() as i32,
              ];
@@ -9068,7 +9097,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              static_bytes_uploaded += std::mem::size_of::<StaticEntityUniform>() as u64;
              self.static_entity_camera = Some(frame.camera);
          }
-@@ -9303,12 +10022,21 @@ impl Renderer {
+@@ -9303,12 +10027,21 @@ impl Renderer {
                  .as_ref()
                  .and_then(|p| p.1.as_ref())
                  .is_some_and(|p| p.has_weather());
@@ -9096,7 +9125,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let (world_view, world_depth) = match &scaled {
              Some((color, depth)) => (color, depth),
              None => (&view_target, &self.depth),
-@@ -9431,6 +10159,11 @@ impl Renderer {
+@@ -9431,6 +10164,11 @@ impl Renderer {
                      indices: &self.indices,
                      flat: self.flat.as_ref(),
                      multi_draw: self.multi_draw,
@@ -9108,7 +9137,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      looks: self.look_groups.as_ref(),
                  },
                  flat_frame,
-@@ -9502,7 +10235,7 @@ impl Renderer {
+@@ -9502,7 +10240,7 @@ impl Renderer {
                      ),
                      depth: target(
                          "Water mirror depth",
@@ -9117,7 +9146,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                          wgpu::TextureUsages::RENDER_ATTACHMENT,
                      ),
                  });
-@@ -9530,12 +10263,22 @@ impl Renderer {
+@@ -9530,12 +10268,22 @@ impl Renderer {
                      hdr_light: [0.0, 0.0, globals.hdr_light[2], 0.0],
                      ..globals
                  };
@@ -9146,7 +9175,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                      label: Some("Water mirror"),
                      timestamp_writes: self
-@@ -9564,6 +10307,9 @@ impl Renderer {
+@@ -9564,6 +10312,9 @@ impl Renderer {
                  pass.set_bind_group(0, &self.mirror_group, &[]);
                  if sky_visible && frame.skybox {
                      pass.set_pipeline(&self.sky);
@@ -9156,7 +9185,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      pass.draw(0..3, 0..1);
                  }
                  // The solid terrain: occlusion culling is off with a mirror, so every draw
-@@ -9729,6 +10475,9 @@ impl Renderer {
+@@ -9729,6 +10480,9 @@ impl Renderer {
                          }
                          None => {
                              pass.set_pipeline(&self.sky_base);
@@ -9166,7 +9195,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                              pass.draw(0..3, 0..1);
                          }
                      }
-@@ -9793,6 +10542,9 @@ impl Renderer {
+@@ -9793,6 +10547,9 @@ impl Renderer {
                  }
                  if !frame.title && frame.dark_disc && !pack_draws_sky {
                      pass.set_pipeline(&self.dark_disc);
@@ -9176,7 +9205,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                      pass.draw(0..3, 0..1);
                  }
              }
-@@ -10780,6 +11532,9 @@ impl Renderer {
+@@ -10780,6 +11537,9 @@ impl Renderer {
                  pass.stage(self.own_timing.as_mut(), "hand");
                  pass.set_pipeline(&self.depth_reset);
                  pass.set_bind_group(0, &self.group, &[]);
@@ -9186,7 +9215,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  pass.draw(0..3, 0..1);
                  self.draw_hand(&mut pass, hand_quads, world_quads + additive_quads);
              }
-@@ -10978,17 +11733,21 @@ impl Renderer {
+@@ -10978,17 +11738,21 @@ impl Renderer {
              let onto = (&view_target, &target_texture, generated);
              fg_made = self.draw_generated(&mut encoder, frame, &camera, &overlay, onto);
          } else if scaled.is_some() {
@@ -9215,7 +9244,35 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
                  None => (&self.depth, size),
              };
              native_render::world_drawn(&mut native_render::WorldDrawn {
-@@ -11376,6 +12135,7 @@ impl Renderer {
+@@ -11142,6 +11906,7 @@ impl Renderer {
+             && checks.is_none()
+             && !first_frame
+             && !reconfigure
++            && !self.sdr_recovery_waiting
+             && self.hdr_marker.is_none()
+             && (surface_frame.is_none() || self.config.present_mode != wgpu::PresentMode::Fifo)
+         {
+@@ -11255,7 +12020,19 @@ impl Renderer {
+             if first_frame {
+                 startup_step(format_args!("presenting the first frame"));
+             }
++            #[cfg(all(target_vendor = "uwp", feature = "uwp-dx12-renderer"))]
++            let before = self.sdr_recovery_present_count();
+             self.queue.present(surface_frame);
++            #[cfg(all(target_vendor = "uwp", feature = "uwp-dx12-renderer"))]
++            if let Some(before) = before
++                && self
++                    .sdr_recovery_present_count()
++                    .is_some_and(|after| after != before)
++            {
++                self.sdr_recovery_waiting = false;
++                self.display_fresh = true;
++                log::info!("Horizon renderer: restored SDR output presented its first frame");
++            }
+             if self.hdr.is_some()
+                 && let Some(marker) = self.hdr_marker.take()
+             {
+@@ -11376,6 +12153,7 @@ impl Renderer {
              .and_then(|request| self.take_readback(request, encoder, target_texture));
          // GameRenderer.render: applyPostEffects, after the level and before the GUI.
          if !frame.title
@@ -9223,7 +9280,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
              && !frame.post_effects.effects.is_empty()
              && target_texture
                  .usage()
-@@ -11501,13 +12261,18 @@ impl Renderer {
+@@ -11501,13 +12279,18 @@ impl Renderer {
                      .unwrap_or(&self.debug_lines_on_top),
              });
              pass.set_bind_group(0, &self.crosshair_group, &[]);
@@ -9246,7 +9303,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
          let blur_at = menu_blur.map_or(0, |_| frame.hud.blur_at);
          self.hud.draw_range(
              encoder,
-@@ -12215,6 +12980,17 @@ mod tests {
+@@ -12215,6 +12998,17 @@ mod tests {
          assert!(u64::from(super::padded_row(w)) * u64::from(h) <= max, "{f}");
          assert!(f > 3.7, "{f}");
      }
@@ -9264,7 +9321,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005a
      #[test]
      fn drawable_size_skips_minimized_and_oversized_windows() {
          use super::drawable_size;
-@@ -13512,7 +14288,14 @@ impl DisplayReading {
+@@ -13512,7 +14306,14 @@ impl DisplayReading {
      /// What wgpu reads from the OS for `surface`'s display; without one, `hdr::offscreen_display`.
      fn read(surface: Option<&wgpu::Surface>, adapter: &wgpu::Adapter) -> Self {
          surface.map_or_else(hdr::offscreen_display, |s| {
@@ -11926,10 +11983,34 @@ index 02039a44eaa1c9d06b3147c8cda757fee8c65dda..c28080622fb8e23917310feda33e37d7
      }
      [format, wgpu::TextureFormat::Depth32Float, SURFACE_FORMAT]
 diff --git a/crates/horizon-client-render/src/gfx/output_apply.rs b/crates/horizon-client-render/src/gfx/output_apply.rs
-index aea14dee4171a76ff45bea4a113452d4fbab9ab0..744be52ee762bc4a6032b47f31a22c9150b587b3 100644
+index aea14dee4171a76ff45bea4a113452d4fbab9ab0..6e813c7cfecfcca19e1003532be18beeae3462a9 100644
 --- a/crates/horizon-client-render/src/gfx/output_apply.rs
 +++ b/crates/horizon-client-render/src/gfx/output_apply.rs
-@@ -308,7 +308,10 @@ impl Drop for DisplayReader {
+@@ -89,6 +89,23 @@ fn name(encoding: Option<hdr::Output>) -> &'static str {
+     encoding.map_or("SDR", hdr::Output::name)
+ }
+ 
++/// Keep the SDR frame from being rebuilt just to retry a rejected HDR output. A new
++/// output request still resolves with the actual capabilities, and packs can still
++/// request their own frame while SDR is active.
++fn frame_caps_after_rejection(
++    caps: OutputCapabilities,
++    candidate: &EffectiveOutput,
++    rejected: Rejected,
++) -> OutputCapabilities {
++    OutputCapabilities {
++        held: caps.held
++            || (candidate.encoding.is_some()
++                && rejected.key == key(candidate)
++                && rejected.caps == caps),
++        ..caps
++    }
++}
++
+ /// The swapchain's configuration for `encoding`: `config` (what every pipeline draws in), or
+ /// HDR10 or scRGB, which HDR output's last pass draws, or frame generation's present thread
+ /// copies to where the surface takes copies.
+@@ -308,7 +325,10 @@ impl Drop for DisplayReader {
  /// What `surface` offers now (`None` offscreen): Vulkan's offered formats can change with
  /// desktop HDR or the window's output, and a display can offer the other encoding.
  fn offer(surface: Option<&wgpu::Surface>, adapter: &wgpu::Adapter) -> Option<Option<hdr::Output>> {
@@ -11941,6 +12022,141 @@ index aea14dee4171a76ff45bea4a113452d4fbab9ab0..744be52ee762bc4a6032b47f31a22c91
  }
  
  /// Takes what a due poll read into `reading` and `caps`: the display's report `now`, and what
+@@ -406,6 +426,14 @@ fn refused(
+ }
+ 
+ impl Renderer {
++    #[cfg(all(target_vendor = "uwp", feature = "uwp-dx12-renderer"))]
++    pub(super) fn sdr_recovery_present_count(&self) -> Option<u64> {
++        if !self.sdr_recovery_waiting || self.hdr.is_some() {
++            return None;
++        }
++        horizon_hdr::dx12_present_count(self.surface.as_deref()?)
++    }
++
+     fn present_sdr(&mut self) {
+         self.hdr = None;
+         self.drop_hdr_marker();
+@@ -510,14 +538,30 @@ impl Renderer {
+             self.output.frame,
+             self.surface.is_some() || self.offscreen.is_some(),
+         );
++        // A display report can arrive while a restored SDR surface is occluded or
++        // still waiting for its first buffer. Defer the HDR request until it presents.
++        if self.sdr_recovery_waiting && candidate.encoding.is_some() {
++            return;
++        }
+         let (applied, caps) = (self.output, self.output_caps);
+         let mut rejected = self.output_rejected.take();
++        #[cfg(all(target_vendor = "uwp", feature = "uwp-dx12-renderer"))]
++        let before = rejected;
+         let renderer = &mut Applying {
+             renderer: self,
+             marker,
+         };
+         let next = commit(renderer, &applied, candidate, caps, &mut rejected);
+         self.output_rejected = rejected;
++        #[cfg(all(target_vendor = "uwp", feature = "uwp-dx12-renderer"))]
++        if rejected != before
++            && rejected.is_some_and(|failure| failure.key.0.is_some())
++            && next.encoding.is_none()
++            && self.surface.is_some()
++            && self.info.backend == wgpu::Backend::Dx12
++        {
++            self.sdr_recovery_waiting = true;
++        }
+         let [paper_white, peak, black] = next.nits;
+         if next.encoding != applied.encoding {
+             match next.encoding {
+@@ -601,13 +645,29 @@ impl Renderer {
+         settings: &crate::graphics::Graphics,
+         request: FrameRequest,
+     ) -> output::FrameConfiguration {
+-        output::resolve_frame(
+-            settings,
+-            request,
+-            self.caps_for(settings),
+-            graced(self.auto_off_since, self.reading, &self.output),
+-            self.config.format,
+-        )
++        if self.sdr_recovery_waiting {
++            return self.output.frame;
++        }
++        let caps = self.caps_for(settings);
++        let reading = graced(self.auto_off_since, self.reading, &self.output);
++        let frame = output::resolve_frame(settings, request, caps, reading, self.config.format);
++        // The restored swapchain is ready to draw. The frame policy used to see only the
++        // advertised HDR offer, build a renderer and immediately undo that recovery.
++        if frame != self.output.frame
++            && self.output.encoding.is_none()
++            && let Some(rejected) = self.output_rejected
++        {
++            let candidate = output::resolve_output(
++                settings,
++                caps,
++                reading,
++                self.output.frame,
++                self.surface.is_some() || self.offscreen.is_some(),
++            );
++            let caps = frame_caps_after_rejection(caps, &candidate, rejected);
++            return output::resolve_frame(settings, request, caps, reading, self.config.format);
++        }
++        frame
+     }
+ 
+     /// The swapchain's configuration: `config` (what every pipeline draws in), or
+@@ -1053,6 +1113,51 @@ mod tests {
+         assert_eq!(swapchain.asked.len(), 4);
+     }
+ 
++    #[test]
++    fn rejected_hdr_does_not_replace_the_restored_sdr_frame() {
++        let settings = Graphics {
++            hdr: HdrMode::Auto,
++            ..Graphics::default()
++        };
++        let (caps, hdr_display) = window(Some(ScRgb), Some(true));
++        let (_, sdr_display) = window(Some(ScRgb), Some(false));
++        let sdr = snapshot(&settings, NO_PACK, caps, sdr_display);
++        let wanted = candidate(&settings, caps, hdr_display, &sdr);
++        let mut swapchain = Swapchain {
++            fails: vec![Some(ScRgb)],
++            ..Default::default()
++        };
++        let mut rejected = None;
++        let kept = commit(&mut swapchain, &sdr, wanted, caps, &mut rejected);
++        assert_eq!(kept.encoding, None);
++
++        let rejected = rejected.unwrap();
++        let frame_caps = frame_caps_after_rejection(caps, &wanted, rejected);
++        assert_eq!(
++            snapshot(&settings, NO_PACK, frame_caps, hdr_display).frame,
++            kept.frame
++        );
++        assert_ne!(
++            snapshot(&settings, NO_PACK, caps, hdr_display).frame,
++            kept.frame
++        );
++
++        let another_output = candidate(&settings, caps, sdr_display, &kept);
++        assert_eq!(
++            frame_caps_after_rejection(caps, &another_output, rejected),
++            caps
++        );
++        let other_caps = OutputCapabilities {
++            hdr: Some(Pq),
++            ..caps
++        };
++        let available = candidate(&settings, other_caps, hdr_display, &kept);
++        assert_eq!(
++            frame_caps_after_rejection(other_caps, &available, rejected),
++            other_caps
++        );
++    }
++
+     /// The window on a display without HDR: HDR10 no longer configures and the surface, read
+     /// again, offers no HDR, so SDR is configured in the same frame. Offered scRGB instead, the
+     /// next frame moves to it; an SDR swapchain that fails, an encoding still offered or no
 diff --git a/crates/horizon-client-render/src/gfx/pack_timing.rs b/crates/horizon-client-render/src/gfx/pack_timing.rs
 index 0fd70514212f85988665a09b94cc048a99014f47..77d8bfe7c0d1aebd9be7e21db92684262fc1878b 100644
 --- a/crates/horizon-client-render/src/gfx/pack_timing.rs
@@ -16206,7 +16422,7 @@ index 0000000000000000000000000000000000000000..dc48c28e116b0fb410141949aad66983
 +    return vec4(mix(in.color.rgb, globals.fog_color.rgb, f), in.color.a);
 +}
 diff --git a/crates/horizon-client/Cargo.toml b/crates/horizon-client/Cargo.toml
-index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..3a6f10d51d5603c09c246d45c95d118a391986e5 100644
+index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..7e71634c29d211cccf90fa8286eb40dfcba24537 100644
 --- a/crates/horizon-client/Cargo.toml
 +++ b/crates/horizon-client/Cargo.toml
 @@ -59,8 +59,8 @@ horizon-friends = { path = "../horizon-friends", optional = true }
@@ -16242,7 +16458,7 @@ index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..3a6f10d51d5603c09c246d45c95d118a
  
  [target.'cfg(target_os = "macos")'.dependencies]
  # Splitscreen: a window filling a monitor goes over its menu bar (game/runtime/split/windows.rs
-@@ -127,7 +124,36 @@ winit = { version = "0.30.13", features = ["android-native-activity"] }
+@@ -127,7 +124,37 @@ winit = { version = "0.30.13", features = ["android-native-activity"] }
  # DirectX 12 driver (`graphicsApi`, graphics.rs).
  wgpu = { version = "30.0.1", default-features = false, features = ["gles"] }
  
@@ -16272,6 +16488,7 @@ index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..3a6f10d51d5603c09c246d45c95d118a
 +native-touch-mod = ["dep:horizon-uwp-touch-controls"]
 +native-device-vibration-mod = ["dep:horizon-uwp-device-vibration-service"]
 +uwp-dx11-renderer = ["wgpu/dx11", "horizon-client-render/uwp-dx11-renderer"]
++uwp-dx12-renderer = ["horizon-client-render/uwp-dx12-renderer"]
 +uwp-controller = ["dep:gilrs", "dep:horizon-uwp-gamepad"]
 +uwp-audio = ["horizon-client-render/uwp-audio"]
 +uwp-https = ["horizon-client-render/uwp-https", "horizon-client-lib/uwp-https"]
@@ -21933,7 +22150,7 @@ index e2da07f9d3472220fae5b57c6fdcd00110b31091..80d97d1b8eea7535bd9715613b03fd66
      #[link_name = "GetCurrentThreadStackLimits"]
      fn get_current_thread_stack_limits(low: *mut usize, high: *mut usize);
 diff --git a/crates/horizon-hdr/Cargo.toml b/crates/horizon-hdr/Cargo.toml
-index bd16669b020a256a275cd5d31769caa0974ba1a5..848824371927d5665481d02a754d91efde93ff75 100644
+index bd16669b020a256a275cd5d31769caa0974ba1a5..313e9156da8c30b89763bd250ff11a25e61a9260 100644
 --- a/crates/horizon-hdr/Cargo.toml
 +++ b/crates/horizon-hdr/Cargo.toml
 @@ -7,9 +7,9 @@ rust-version.workspace = true
@@ -21948,25 +22165,36 @@ index bd16669b020a256a275cd5d31769caa0974ba1a5..848824371927d5665481d02a754d91ef
  # The version wgpu-hal already uses.
  ash = { version = "0.38", default-features = false }
  
-@@ -19,5 +19,8 @@ wayland-backend = { version = "0.3.10", default-features = false, features = ["c
+@@ -19,5 +19,11 @@ wayland-backend = { version = "0.3.10", default-features = false, features = ["c
  wayland-client = { version = "0.31.10", default-features = false }
  wayland-protocols = { version = "0.32.8", default-features = false, features = ["client", "staging"] }
  
 +[target.'cfg(not(target_vendor = "uwp"))'.dependencies]
 +wgpu = { version = "30.0.1", default-features = false, features = ["vulkan"] }
 +
++[features]
++uwp-dx12-renderer = ["wgpu/dx12"]
++
  [lints]
  workspace = true
 diff --git a/crates/horizon-hdr/src/lib.rs b/crates/horizon-hdr/src/lib.rs
-index 0c399b883bc4f3579c430cc3627ddb7fef00d04a..aafc3fd414c3977d9f53d0dfe5bf2e580dee003c 100644
+index 0c399b883bc4f3579c430cc3627ddb7fef00d04a..de1336596f04f3e8d730709f5b0cdbe9cd87884d 100644
 --- a/crates/horizon-hdr/src/lib.rs
 +++ b/crates/horizon-hdr/src/lib.rs
-@@ -6,10 +6,13 @@
+@@ -6,10 +6,21 @@
  #[cfg(target_os = "linux")]
  pub mod wayland;
  
 +#[cfg(any(target_vendor = "uwp", test))]
 +pub mod uwp;
++
++/// Counts accepted DXGI presents on the configured UWP D3D12 swapchain.
++#[cfg(all(target_vendor = "uwp", feature = "uwp-dx12-renderer"))]
++pub fn dx12_present_count(surface: &wgpu::Surface<'_>) -> Option<u64> {
++    // Safety: these guards keep the surface and its swapchain alive for the read-only query.
++    let surface = unsafe { surface.as_hal::<wgpu::hal::api::Dx12>() }?;
++    surface.successful_presents()
++}
 +
  /// Opens a Vulkan device with `VK_EXT_hdr_metadata` too, when the GPU offers
  /// it, so [`set_metadata`] can tell the compositor the real peak brightness.
@@ -21976,7 +22204,7 @@ index 0c399b883bc4f3579c430cc3627ddb7fef00d04a..aafc3fd414c3977d9f53d0dfe5bf2e58
  pub fn open_vulkan_device(
      adapter: &wgpu::Adapter,
      desc: &wgpu::DeviceDescriptor<'_>,
-@@ -60,7 +63,7 @@ pub fn experimental_features() -> wgpu::ExperimentalFeatures {
+@@ -60,7 +71,7 @@ pub fn experimental_features() -> wgpu::ExperimentalFeatures {
  /// content is BT.709, peaks at `peak` nits and is no darker than `black`. Needs a
  /// device from `open_vulkan_device` and a configured surface; does nothing otherwise.
  pub fn set_metadata(device: &wgpu::Device, surface: &wgpu::Surface<'_>, peak: f32, black: f32) {
@@ -21985,7 +22213,7 @@ index 0c399b883bc4f3579c430cc3627ddb7fef00d04a..aafc3fd414c3977d9f53d0dfe5bf2e58
      {
          use wgpu::hal::api::Vulkan;
          // Safety: read-only access to handles wgpu keeps alive while these guards live.
-@@ -87,11 +90,11 @@ pub fn set_metadata(device: &wgpu::Device, surface: &wgpu::Surface<'_>, peak: f3
+@@ -87,11 +98,11 @@ pub fn set_metadata(device: &wgpu::Device, surface: &wgpu::Surface<'_>, peak: f3
          // Safety: a live swapchain of this device, one metadata entry for it.
          unsafe { loader.set_hdr_metadata(&[swapchain], &[metadata(peak, black)]) };
      }
@@ -21999,7 +22227,7 @@ index 0c399b883bc4f3579c430cc3627ddb7fef00d04a..aafc3fd414c3977d9f53d0dfe5bf2e58
  fn metadata(peak: f32, black: f32) -> ash::vk::HdrMetadataEXT<'static> {
      let xy = |x, y| ash::vk::XYColorEXT { x, y };
      ash::vk::HdrMetadataEXT::default()
-@@ -107,7 +110,7 @@ fn metadata(peak: f32, black: f32) -> ash::vk::HdrMetadataEXT<'static> {
+@@ -107,7 +118,7 @@ fn metadata(peak: f32, black: f32) -> ash::vk::HdrMetadataEXT<'static> {
          .max_frame_average_light_level(0.0)
  }
  
@@ -126313,3 +126541,247 @@ index 59b77599fcd5cbfb440986962db9da1e93ed1408..238b171b18adfc7bcef52f31806d1850
      /// A pack's own `gbuffers_hand_water` draws the translucent held items: after deferred,
      /// blended, beside its opaque `gbuffers_hand`.
      #[test]
+diff --git a/uwp/wgpu-dx11/dx12-uwp-hdr-recovery.patch b/uwp/wgpu-dx11/dx12-uwp-hdr-recovery.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..02198acadfa0d73115ea0b5d80794b26073019cd
+--- /dev/null
++++ b/uwp/wgpu-dx11/dx12-uwp-hdr-recovery.patch
+@@ -0,0 +1,224 @@
++diff --git a/wgpu-hal/src/dx12/mod.rs b/wgpu-hal/src/dx12/mod.rs
++index b0521b3825de58e16b333eeafc63a95b5dd13498..d1ab6995e6328fe7cd783b578507f4a472c9c8d2 100644
++--- a/wgpu-hal/src/dx12/mod.rs
+++++ b/wgpu-hal/src/dx12/mod.rs
++@@ -100,7 +100,6 @@ use hashbrown::HashMap;
++ use parking_lot::{Mutex, RwLock};
++ use suballocation::Allocator;
++ use windows::{
++-    core::{Free as _, Interface},
++     Win32::{
++         Foundation,
++         Graphics::{
++@@ -110,6 +109,7 @@ use windows::{
++         },
++         System::Threading,
++     },
+++    core::{Free as _, Interface},
++ };
++ 
++ #[cfg(target_vendor = "uwp")]
++@@ -664,6 +664,12 @@ struct SwapChain {
++     /// Handle is freed in [`Self::release_resources()`]
++     waitable: Option<Foundation::HANDLE>,
++     acquired_count: usize,
+++    #[cfg(target_vendor = "uwp")]
+++    successful_presents: u64,
+++    #[cfg(target_vendor = "uwp")]
+++    color_space: wgt::SurfaceColorSpace,
+++    #[cfg(target_vendor = "uwp")]
+++    replace_after_hdr_rejection: bool,
++     present_mode: wgt::PresentMode,
++     format: wgt::TextureFormat,
++     size: wgt::Extent3d,
++@@ -704,6 +710,19 @@ impl Surface {
++         Some(self.swap_chain.read().as_ref()?.raw.clone())
++     }
++ 
+++    /// Successful native Present calls on the currently configured UWP swapchain.
+++    #[cfg(target_vendor = "uwp")]
+++    pub fn successful_presents(&self) -> Option<u64> {
+++        Some(self.swap_chain.read().as_ref()?.successful_presents)
+++    }
+++
+++    #[cfg(target_vendor = "uwp")]
+++    fn replace_after_hdr_rejection(&self) {
+++        if let Some(chain) = self.swap_chain.write().as_mut() {
+++            chain.replace_after_hdr_rejection = true;
+++        }
+++    }
+++
++     /// Returns the waitable handle associated with this swap chain, if any.
++     /// Handle is only valid while the swap chain is alive.
++     pub unsafe fn waitable_handle(&self) -> Option<Foundation::HANDLE> {
++@@ -1553,7 +1572,27 @@ impl crate::Surface for Surface {
++         // For high latency extra buffers seems excessive, so go with a minimum of 3 and beyond that add 1.
++         let swap_chain_buffer = (config.maximum_frame_latency + 1).min(16);
++ 
++-        let swap_chain = match self.swap_chain.write().take() {
+++        #[cfg(target_vendor = "uwp")]
+++        let uwp_panel = matches!(&self.target, SurfaceTarget::SwapChainPanel(_));
+++        #[cfg(target_vendor = "uwp")]
+++        let replace_uwp_panel = uwp_panel
+++            && self.swap_chain.read().as_ref().is_none_or(|chain| {
+++                chain.format != config.format
+++                    || chain.color_space != config.color_space
+++                    || chain.replace_after_hdr_rejection
+++            });
+++        #[cfg(target_vendor = "uwp")]
+++        let previous = if replace_uwp_panel {
+++            // Keep the visible composition chain until its replacement is ready.
+++            None
+++        } else {
+++            // A same-encoding resize keeps the attached chain. Reattaching it would
+++            // republish XAML's resize notification on every configuration.
+++            self.swap_chain.write().take()
+++        };
+++        #[cfg(not(target_vendor = "uwp"))]
+++        let previous = self.swap_chain.write().take();
+++        let swap_chain = match previous {
++             //Note: this path doesn't properly re-initialize all of the things
++             Some(sc) => {
++                 let raw = unsafe { sc.release_resources() };
++@@ -1694,28 +1733,9 @@ impl crate::Surface for Surface {
++                             ));
++                         }
++                     }
++-                    SurfaceTarget::SwapChainPanel(swap_chain_panel) => {
++-                        #[cfg(target_vendor = "uwp")]
++-                        {
++-                            use windows::core::Interface as _;
++-                            let _ = swap_chain_panel;
++-                            // The XAML panel belongs to the UI apartment. The UWP host
++-                            // marshals this attachment back to that apartment before
++-                            // querying ISwapChainPanelNative and calling SetSwapChain.
++-                            let result = unsafe {
++-                                horizon_uwp_attach_game_swapchain(swap_chain1.as_raw())
++-                            };
++-                            if result < 0 {
++-                                log::error!(
++-                                    "Unable to SetSwapChain on the UWP UI thread: HRESULT 0x{result:08X}"
++-                                );
++-                                return Err(crate::SurfaceError::Other(
++-                                    "ISwapChainPanelNative::SetSwapChain on the UWP UI thread",
++-                                ));
++-                            }
++-                        }
+++                    SurfaceTarget::SwapChainPanel(_swap_chain_panel) => {
++                         #[cfg(not(target_vendor = "uwp"))]
++-                        if let Err(err) = unsafe { swap_chain_panel.SetSwapChain(&swap_chain1) } {
+++                        if let Err(err) = unsafe { _swap_chain_panel.SetSwapChain(&swap_chain1) } {
++                             log::error!("Unable to SetSwapChain: {err}");
++                             return Err(crate::SurfaceError::Other(
++                                 "ISwapChainPanelNative::SetSwapChain",
++@@ -1765,13 +1785,16 @@ impl crate::Surface for Surface {
++         // The UWP panel uses this path for actual HDR presentation only.
++         let color_space = map_surface_color_space(config.color_space);
++         #[cfg(target_vendor = "uwp")]
++-        let uwp_panel = matches!(&self.target, SurfaceTarget::SwapChainPanel(_));
++-        #[cfg(target_vendor = "uwp")]
++         if uwp_panel && config.color_space != wgt::SurfaceColorSpace::Srgb {
++             let support = unsafe { swap_chain.CheckColorSpaceSupport(color_space) };
++             let present = Dxgi::DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT.0 as u32;
++             if !support.as_ref().is_ok_and(|flags| flags & present != 0) {
++-                log::warn!("UWP HDR swapchain color space {color_space:?} lacks DXGI present support: {support:?}");
+++                log::warn!(
+++                    "UWP HDR swapchain color space {color_space:?} lacks DXGI present support: {support:?}"
+++                );
+++                if replace_uwp_panel {
+++                    self.replace_after_hdr_rejection();
+++                }
++                 return Err(crate::SurfaceError::Other(
++                     "UWP DXGI HDR color space is unavailable for presentation",
++                 ));
++@@ -1791,6 +1814,10 @@ impl crate::Surface for Surface {
++         }
++         color_result.map_err(|err| {
++             log::error!("SetColorSpace1 failed: {err}");
+++            #[cfg(target_vendor = "uwp")]
+++            if replace_uwp_panel && config.color_space != wgt::SurfaceColorSpace::Srgb {
+++                self.replace_after_hdr_rejection();
+++            }
++             crate::SurfaceError::Other("IDXGISwapChain3::SetColorSpace1")
++         })?;
++ 
++@@ -1815,6 +1842,27 @@ impl crate::Surface for Surface {
++         unsafe { swap_chain.SetMaximumFrameLatency(config.maximum_frame_latency) }
++             .into_device_result("SetMaximumFrameLatency")?;
++ 
+++        let mut resources = Vec::with_capacity(swap_chain_buffer as usize);
+++        for i in 0..swap_chain_buffer {
+++            let resource = unsafe { swap_chain.GetBuffer(i) }
+++                .into_device_result("Failed to get swapchain buffer")?;
+++            resources.push(resource);
+++        }
+++
+++        #[cfg(target_vendor = "uwp")]
+++        if replace_uwp_panel {
+++            use windows::core::Interface as _;
+++            // The native color space and all fallible DXGI setup succeeded. Commit the
+++            // replacement to the XAML panel while the previous chain is still alive.
+++            let result = unsafe { horizon_uwp_attach_game_swapchain(swap_chain.as_raw()) };
+++            if result < 0 {
+++                log::error!("Unable to SetSwapChain on the UWP UI thread: HRESULT 0x{result:08X}");
+++                return Err(crate::SurfaceError::Other(
+++                    "ISwapChainPanelNative::SetSwapChain on the UWP UI thread",
+++                ));
+++            }
+++        }
+++
++         let waitable = match device.options.latency_waitable_object {
++             wgt::Dx12UseFrameLatencyWaitableObject::None => None,
++             wgt::Dx12UseFrameLatencyWaitableObject::Wait
++@@ -1823,23 +1871,25 @@ impl crate::Surface for Surface {
++             }
++         };
++ 
++-        let mut resources = Vec::with_capacity(swap_chain_buffer as usize);
++-        for i in 0..swap_chain_buffer {
++-            let resource = unsafe { swap_chain.GetBuffer(i) }
++-                .into_device_result("Failed to get swapchain buffer")?;
++-            resources.push(resource);
++-        }
++-
++-        let mut swapchain = self.swap_chain.write();
++-        *swapchain = Some(SwapChain {
+++        let previous = self.swap_chain.write().replace(SwapChain {
++             raw: swap_chain,
++             resources,
++             waitable,
++             acquired_count: 0,
+++            #[cfg(target_vendor = "uwp")]
+++            successful_presents: 0,
+++            #[cfg(target_vendor = "uwp")]
+++            color_space: config.color_space,
+++            #[cfg(target_vendor = "uwp")]
+++            replace_after_hdr_rejection: false,
++             present_mode: config.present_mode,
++             format: config.format,
++             size: config.extent,
++         });
+++        // A UWP panel may have kept its previous chain attached until this commit.
+++        if let Some(previous) = previous {
+++            drop(unsafe { previous.release_resources() });
+++        }
++ 
++         Ok(())
++     }
++@@ -1990,9 +2040,13 @@ impl crate::Queue for Queue {
++         };
++ 
++         profiling::scope!("IDXGISwapchain3::Present");
++-        unsafe { sc.raw.Present(interval, flags) }
++-            .ok()
++-            .into_device_result("Present")?;
+++        let result = unsafe { sc.raw.Present(interval, flags) };
+++        #[cfg(target_vendor = "uwp")]
+++        if result.0 == 0 {
+++            // S_OK only. Do not count an error or a DXGI status such as occlusion.
+++            sc.successful_presents = sc.successful_presents.wrapping_add(1);
+++        }
+++        result.ok().into_device_result("Present")?;
++ 
++         Ok(())
++     }
+diff --git a/uwp/wgpu-dx11/bridge-feature-after-client.patch b/uwp/wgpu-dx11/bridge-feature-after-client.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..a1d15128cb5dc0229199677a457c788dcbe2344e
+GIT binary patch
+literal 608
+zcmaiw!D_=W42JK4y@SZrRZV)>PJ_T6WAxy}s$)p3BAj&W=@*-lLYih5AEfX9B+L5C
+z1rVK&VDxyqYG($*M!a>Tzl=COMjm=-cA5nu?xqW+)V`sv0ju}J2dMnkbpgRdKM_VA
+z+YSe|@Cn~#$KroEVB32NQLmZu{I&!wO}-_Zd?T}I&g?t3@T{AUg7&AXP$*aulDx>x
+zT}PeD<pI`PJtdL{@72?`=ad-rAM<k7!@BHjM(cU&XlY1pE@;ak3iti}Z>u9G{z2qW
+PM@C{pCT{tcW<vh}a!by3
+
+literal 0
+HcmV?d00001
+

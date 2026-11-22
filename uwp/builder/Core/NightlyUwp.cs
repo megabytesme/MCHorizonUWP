@@ -11,6 +11,11 @@ public static class NightlyUwp
     public const string ClassicPackGuardPatch = "0.1.17";
     public const string GraphicsCompatibilityPatch = "0.1.18";
     internal const string HdrWgpuPatchHash = "4c31f9349e28d294fa6d1663a6c4d3cacc134a9a4c8b1e2aea63688230e0c934";
+    internal const string HdrBridgeFeaturePatchHash = "c449c46562fbc802cbe0341227921d1d93a27706e091a35cdd0a8c9ece1e3234";
+    internal const string HdrBridgeManifestHash = "7ef2a0100cf799e1472187d0a4905065d575106c56dbdeda9ba54b072ecca516";
+    internal const string HdrBridgeConfiguredManifestHash = "ebd774643d7fce532beaa169ddaac42e91dde4d5dadebdef93b2728e074566e5";
+    // Git applies the embedded text addition with Windows line endings.
+    internal const string HdrWgpuRecoveryPatchHash = "f2c0dd2ed62e2456eb2ca74aa7328225e92513b7d12a290090ce02516cc583be";
     public const string November20Client = "0.1.17";
     private const string November20InitialPatch = "0.1.13";
     private const string November20InitialClient = "0.1.14";

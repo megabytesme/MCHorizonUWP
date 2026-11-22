@@ -23,16 +23,39 @@ public static class SourceAssembler
         Extract(upstreamZip, root, upstream: true);
         await ApplyPatchAsync(git, root, patch, check: true);
         await ApplyPatchAsync(git, root, patch, check: false);
+        var bundle = Path.Combine(root, "uwp", "wgpu-dx11");
+        var bridgeRecovery = Path.Combine(bundle, "bridge-feature-after-client.patch");
+        var nativeRecovery = Path.Combine(bundle, "dx12-uwp-hdr-recovery.patch");
+        var hdrRecoveryRecipe = File.Exists(bridgeRecovery) || File.Exists(nativeRecovery);
         Extract(clientZip, root, upstream: false);
+        if (hdrRecoveryRecipe)
+        {
+            if (!string.Equals(upstreamCommit, NightlyUwp.November20Commit, StringComparison.OrdinalIgnoreCase)
+                || clientVersion != NightlyUwp.HdrClient)
+                throw new InvalidDataException("The HDR recovery patches require the November 20 HDR source and client recipe.");
+            await VerifyAsync(bridgeRecovery, NightlyUwp.HdrBridgeFeaturePatchHash);
+            await VerifyAsync(nativeRecovery, NightlyUwp.HdrWgpuRecoveryPatchHash);
+            // The client ZIP owns the bridge manifest. Apply the renderer feature after extraction.
+            var manifest = Path.Combine(root, "uwp", "game-bridge", "Cargo.toml");
+            await VerifyAsync(manifest, NightlyUwp.HdrBridgeManifestHash);
+            await ApplyPatchAsync(git, root, bridgeRecovery, check: true);
+            await ApplyPatchAsync(git, root, bridgeRecovery, check: false);
+            await VerifyAsync(manifest, NightlyUwp.HdrBridgeConfiguredManifestHash);
+        }
         if (NightlyUwp.Matches(upstreamCommit))
         {
-            var bundle = Path.Combine(root, "uwp", "wgpu-dx11");
             var fixedWgpu = NightlyUwp.UsesFixedWgpu(clientVersion);
             await StageNightlyWgpuAsync(root, Path.Combine(bundle, "wgpu.zip"),
                 clientVersion == NightlyUwp.HdrClient ? Path.Combine(bundle, "dx12-uwp-hdr-surface.patch") :
                     fixedWgpu ? null : Path.Combine(bundle, "reuse-upload-buffer-shadow.patch"), git,
                 fixedWgpu ? NightlyUwp.FixedWgpuArchiveHash : NightlyUwp.WgpuArchiveHash,
                 clientVersion == NightlyUwp.HdrClient ? NightlyUwp.HdrWgpuPatchHash : NightlyUwp.WgpuPatchHash);
+            if (hdrRecoveryRecipe)
+            {
+                var destination = Path.Combine(root, "third_party", "wgpu-dx11");
+                await ApplyPatchAsync(git, destination, nativeRecovery, check: true);
+                await ApplyPatchAsync(git, destination, nativeRecovery, check: false);
+            }
         }
     }
 
