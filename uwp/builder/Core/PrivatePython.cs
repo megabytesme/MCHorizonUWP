@@ -11,7 +11,7 @@ internal static class PrivatePython
         "9e35319bffedab8b36ad44d8f377cb4f1733bcec257a0b6d04d94f01486ddb38");
     internal static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MCHorizonUWP", "Python", "3.13.17-x64");
 
-    internal static async Task<bool> IsUsableAsync(string? executable)
+    internal static async Task<bool> IsUsableAsync(string? executable, bool requireToml = false)
     {
         if (executable is null || !File.Exists(executable)) return false;
         try
@@ -20,7 +20,8 @@ internal static class PrivatePython
                 RedirectStandardOutput = true, RedirectStandardError = true };
             start.ArgumentList.Add("-I");
             start.ArgumentList.Add("-c");
-            start.ArgumentList.Add("import argparse, json, os, pathlib, re, shutil, subprocess, sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)");
+            start.ArgumentList.Add(requireToml ? "import argparse, json, os, pathlib, re, shutil, subprocess, tomllib"
+                : "import argparse, json, os, pathlib, re, shutil, subprocess, sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)");
             using var process = Process.Start(start);
             if (process is null) return false;
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -31,15 +32,15 @@ internal static class PrivatePython
         catch (Exception error) when (error is System.ComponentModel.Win32Exception or IOException or UnauthorizedAccessException) { return false; }
     }
 
-    internal static async Task<string?> FindAsync(string? installed, string root)
-        => await FindCandidatesAsync(installed is null ? [] : [installed], root);
+    internal static async Task<string?> FindAsync(string? installed, string root, bool requireToml = false)
+        => await FindCandidatesAsync(installed is null ? [] : [installed], root, requireToml);
 
-    internal static async Task<string?> FindCandidatesAsync(IEnumerable<string> installed, string root)
+    internal static async Task<string?> FindCandidatesAsync(IEnumerable<string> installed, string root, bool requireToml = false)
     {
         foreach (var candidate in installed)
-            if (await IsUsableAsync(candidate)) return Path.GetFullPath(candidate);
+            if (await IsUsableAsync(candidate, requireToml)) return Path.GetFullPath(candidate);
         var local = Path.Combine(root, "python.exe");
-        return await IsUsableAsync(local) ? Path.GetFullPath(local) : null;
+        return await IsUsableAsync(local, requireToml) ? Path.GetFullPath(local) : null;
     }
 
     internal static void Activate(string executable)
@@ -51,9 +52,9 @@ internal static class PrivatePython
         Environment.SetEnvironmentVariable("PATH", string.Join(Path.PathSeparator, parts));
     }
 
-    internal static async Task<string> EnsureAsync(string? installed, string root, string downloads)
+    internal static async Task<string> EnsureAsync(string? installed, string root, string downloads, bool requireToml = false)
     {
-        var existing = await FindAsync(installed, root);
+        var existing = await FindAsync(installed, root, requireToml);
         if (existing is not null) return existing;
         root = Path.GetFullPath(root);
         if (Directory.Exists(root) || File.Exists(root)) throw new IOException("The private Python installation is incomplete; it was left unchanged.");
@@ -82,7 +83,7 @@ internal static class PrivatePython
                     source.CopyTo(output);
                 }
             }
-            if (!await IsUsableAsync(Path.Combine(staging, "python.exe"))) throw new InvalidDataException("The embedded Python package could not run.");
+            if (!await IsUsableAsync(Path.Combine(staging, "python.exe"), requireToml)) throw new InvalidDataException("The embedded Python package could not run.");
             Directory.Move(staging, root);
             return Path.Combine(root, "python.exe");
         }

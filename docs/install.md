@@ -30,6 +30,23 @@ then open the client APPX in App Installer. Alternatively, use PowerShell's
 already installed on the target must have the exact name and publisher expected
 by the client. An embedded-resource client does not need that framework.
 
+## Native modpack on Windows PC
+
+For a Builder output containing an executable native modpack, keep both
+`native-modpack/main.appxbundle` and `native-modpack/optional.appxbundle`.
+Install the same framework dependencies listed above, then install the related
+set on Windows 10 build 16299 or newer.
+
+```powershell
+Add-AppxPackage -Path .\native-modpack\main.appxbundle `
+    -ExternalPackages .\native-modpack\optional.appxbundle
+```
+
+The related-set update includes revised main package metadata and preserves the
+compiled game binaries when only mod code changes. Close the game before
+updating the package set. Enable or disable mods in the game and restart for
+the next launch to use that selection.
+
 ## Windows 10 Mobile
 
 Select ARM32 in the builder. Enable Developer Mode, Device discovery and Device

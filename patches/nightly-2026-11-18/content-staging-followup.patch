@@ -1,0 +1,296 @@
+diff --git a/crates/horizon-client/src/mod_content.rs b/crates/horizon-client/src/mod_content.rs
+--- a/crates/horizon-client/src/mod_content.rs
++++ b/crates/horizon-client/src/mod_content.rs
+@@ -994,7 +994,14 @@
+ }
+ 
+ fn read_json(path: &Path) -> Result<J> {
+-    Ok(serde_json::from_slice(&fs::read(path)?).map_err(|e| format!("{}: {e}", path.display()))?)
++    let document = if cfg!(all(target_vendor = "uwp", target_arch = "arm")) {
++        // A large table can approach the 32-bit address-space limit. Build
++        // the tree without keeping a second, contiguous copy of its input.
++        serde_json::from_reader(std::io::BufReader::new(fs::File::open(path)?))
++    } else {
++        serde_json::from_slice(&fs::read(path)?)
++    };
++    Ok(document.map_err(|e| format!("{}: {e}", path.display()))?)
+ }
+ 
+ impl Plan<'_> {
+@@ -2779,11 +2786,21 @@
+         #[cfg(target_vendor = "uwp")]
+         {
+             let started = std::time::Instant::now();
++            // Hide per-file filesystem latency on larger targets. ARM32
++            // keeps the copy on the caller's stack and uses one open file.
++            let max_workers = if cfg!(target_arch = "arm") {
++                1
++            } else if cfg!(target_pointer_width = "32") {
++                4
++            } else {
++                8
++            };
+             let copied = uwp_overlay::materialize(
+                 base,
+                 out,
+                 horizon_core::prepared_files::FILE_NAME,
+                 _rewrites,
++                horizon_threads::worker_count().min(max_workers),
+             )?;
+             log::info!(
+                 "Horizon: copied {} prepared files ({} bytes) for mod staging in {} ms",
+@@ -2835,6 +2852,9 @@
+         Ok(())
+     }
+     fn write(&self, rel: &str, bytes: &[u8]) -> Result<()> {
++        self.write_with(rel, |path| Ok(fs::write(path, bytes)?))
++    }
++    fn write_with(&self, rel: &str, write: impl FnOnce(&Path) -> Result<()>) -> Result<()> {
+         let name = rel;
+         let rel = Path::new(rel);
+         if let Some(parent) = rel.parent() {
+@@ -2844,7 +2864,7 @@
+         if fs::symlink_metadata(&path).is_ok() {
+             fs::remove_file(&path)?;
+         }
+-        fs::write(path, bytes)?;
++        write(&path)?;
+         self.written
+             .lock()
+             .unwrap_or_else(std::sync::PoisonError::into_inner)
+@@ -3019,6 +3039,15 @@
+             let mut doc = read_json(&path)?;
+             plan.json(name, &mut doc)
+                 .map_err(|e| format!("{name}: {e}"))?;
++            if cfg!(all(target_vendor = "uwp", target_arch = "arm")) {
++                use std::io::Write;
++                return overlay.write_with(name, |path| {
++                    let mut output = std::io::BufWriter::new(fs::File::create(path)?);
++                    serde_json::to_writer(&mut output, &doc)?;
++                    output.flush()?;
++                    Ok(())
++                });
++            }
+             serde_json::to_vec(&doc)?
+         } else {
+             let (mut named, _) = nbt::read_named(&fs::read(&path)?, Limits::tables())
+diff --git a/crates/horizon-client/src/mod_content/uwp_overlay.rs b/crates/horizon-client/src/mod_content/uwp_overlay.rs
+--- a/crates/horizon-client/src/mod_content/uwp_overlay.rs
++++ b/crates/horizon-client/src/mod_content/uwp_overlay.rs
+@@ -1,4 +1,12 @@
+-use std::{fs, io, path::Path};
++use std::{
++    fs, io,
++    path::{Path, PathBuf},
++    sync::{Arc, Mutex, mpsc},
++    thread,
++};
++
++/// Bound the number of pending file paths independently of the framework size.
++const PENDING_FILES: usize = 64;
+ 
+ #[derive(Default, Debug)]
+ pub(super) struct Copied {
+@@ -11,46 +19,125 @@
+     out: &Path,
+     prepared_bundle: &str,
+     rewrites: &[(&str, u64)],
++    workers: usize,
+ ) -> io::Result<Copied> {
+-    materialize_except(base, out, |relative| {
++    let skip = |relative: &Path| {
+         // SoundRegistry and Audio read the layered ResourceSource over base.
+         relative == Path::new("assets/minecraft/sounds")
+             || relative == Path::new(prepared_bundle)
+             || rewrites.iter().any(|(name, _)| relative == Path::new(name))
++    };
++    if workers < 2 {
++        return materialize_serial(base, out, &skip);
++    }
++    thread::scope(|scope| {
++        let (send, receive) = mpsc::sync_channel::<(PathBuf, PathBuf)>(PENDING_FILES);
++        let receive = Arc::new(Mutex::new(receive));
++        let workers: Vec<_> = (0..workers)
++            .filter_map(|_| {
++                let receive = Arc::clone(&receive);
++                thread::Builder::new()
++                    .name("content-copy".into())
++                    .stack_size(256 * 1024)
++                    .spawn_scoped(scope, move || {
++                        let mut copied = Copied::default();
++                        loop {
++                            let next = receive.lock().unwrap_or_else(|e| e.into_inner()).recv();
++                            let Ok((source, target)) = next else {
++                                return Ok(copied);
++                            };
++                            copied.copy(&source, &target)?;
++                        }
++                    })
++                    .ok()
++            })
++            .collect();
++        if workers.is_empty() {
++            return materialize_serial(base, out, &skip);
++        }
++        // A worker that fails must drop its receiver. If all workers fail, the
++        // producer wakes up even when it was waiting to send to a full queue.
++        drop(receive);
++        let walked = walk(base, out, Path::new(""), &skip, &mut |source, target| {
++            send.send((source, target)).map_err(|_| {
++                io::Error::new(io::ErrorKind::BrokenPipe, "content copy workers stopped")
++            })
++        });
++        drop(send);
++        let mut copied = Copied::default();
++        let mut failure = None;
++        for worker in workers {
++            match worker
++                .join()
++                .unwrap_or_else(|_| Err(io::Error::other("a content copy worker panicked")))
++            {
++                Ok(part) => {
++                    copied.files += part.files;
++                    copied.bytes += part.bytes;
++                }
++                Err(error) => {
++                    failure.get_or_insert(error);
++                }
++            }
++        }
++        // Prefer the file error to the resulting channel disconnect.
++        failure.map_or(walked.map(|()| copied), Err)
+     })
+ }
+ 
+-fn materialize_except(base: &Path, out: &Path, skip: impl Fn(&Path) -> bool) -> io::Result<Copied> {
+-    fn visit(
+-        base: &Path,
+-        out: &Path,
+-        directory: &Path,
+-        skip: &impl Fn(&Path) -> bool,
+-        copied: &mut Copied,
+-    ) -> io::Result<()> {
+-        for item in fs::read_dir(base.join(directory))? {
+-            let item = item?;
+-            let relative = directory.join(item.file_name());
+-            if skip(&relative) {
+-                continue;
+-            }
+-            let source = item.path();
+-            let target = out.join(&relative);
+-            let kind = item.file_type()?;
+-            if kind.is_dir() || (kind.is_symlink() && source.is_dir()) {
+-                fs::create_dir(&target)?;
+-                visit(base, out, &relative, skip, copied)?;
+-            } else {
+-                copied.bytes += fs::copy(source, target)?;
+-                copied.files += 1;
+-            }
+-        }
++impl Copied {
++    fn copy(&mut self, source: &Path, target: &Path) -> io::Result<()> {
++        self.bytes += fs::copy(source, target).map_err(|err| {
++            io::Error::new(
++                err.kind(),
++                format!(
++                    "copying {} to {}: {err}",
++                    source.display(),
++                    target.display()
++                ),
++            )
++        })?;
++        self.files += 1;
+         Ok(())
+     }
+-
++}
++
++fn materialize_serial(
++    base: &Path,
++    out: &Path,
++    skip: &impl Fn(&Path) -> bool,
++) -> io::Result<Copied> {
+     let mut copied = Copied::default();
+-    visit(base, out, Path::new(""), &skip, &mut copied)?;
++    walk(base, out, Path::new(""), skip, &mut |source, target| {
++        copied.copy(&source, &target)
++    })?;
+     Ok(copied)
++}
++
++fn walk(
++    base: &Path,
++    out: &Path,
++    directory: &Path,
++    skip: &impl Fn(&Path) -> bool,
++    copy: &mut impl FnMut(PathBuf, PathBuf) -> io::Result<()>,
++) -> io::Result<()> {
++    for item in fs::read_dir(base.join(directory))? {
++        let item = item?;
++        let relative = directory.join(item.file_name());
++        if skip(&relative) {
++            continue;
++        }
++        let source = item.path();
++        let target = out.join(&relative);
++        let kind = item.file_type()?;
++        if kind.is_dir() || (kind.is_symlink() && source.is_dir()) {
++            fs::create_dir(&target)?;
++            walk(base, out, &relative, skip, copy)?;
++        } else {
++            copy(source, target)?;
++        }
++    }
++    Ok(())
+ }
+ 
+ /// These tables only gain block-state rows. Standalone items still require
+@@ -92,15 +179,39 @@
+             fs::write(path, b"base").unwrap();
+         }
+         fs::create_dir(&out).unwrap();
+-        let copied = materialize(&base, &out, "horizon-data.bin", &[(table, 4)]).unwrap();
+-        assert_eq!((copied.files, copied.bytes), (2, 8));
+-        for file in [sound, table, "horizon-data.bin"] {
+-            assert!(!out.join(file).exists());
+-            assert_eq!(fs::read(base.join(file)).unwrap(), b"base");
+-        }
+-        for file in [other, worldgen] {
+-            assert_eq!(fs::read(out.join(file)).unwrap(), b"base");
+-        }
++        for workers in [1, 4] {
++            let out = out.join(workers.to_string());
++            fs::create_dir_all(&out).unwrap();
++            let copied =
++                materialize(&base, &out, "horizon-data.bin", &[(table, 4)], workers).unwrap();
++            assert_eq!((copied.files, copied.bytes), (2, 8));
++            for file in [sound, table, "horizon-data.bin"] {
++                assert!(!out.join(file).exists());
++                assert_eq!(fs::read(base.join(file)).unwrap(), b"base");
++            }
++            for file in [other, worldgen] {
++                assert_eq!(fs::read(out.join(file)).unwrap(), b"base");
++            }
++        }
++    }
++
++    #[test]
++    fn failed_workers_unblock_the_producer_and_report_a_file_error() {
++        let scratch = tempfile::tempdir().unwrap();
++        let base = scratch.path().join("base");
++        let out = scratch.path().join("overlay");
++        fs::create_dir(&base).unwrap();
++        fs::create_dir(&out).unwrap();
++        // Each copy fails because a directory occupies its destination. More
++        // entries than the queue can hold exercise a blocked producer.
++        for i in 0..PENDING_FILES + 8 {
++            let name = i.to_string();
++            fs::write(base.join(&name), b"base").unwrap();
++            fs::create_dir(out.join(&name)).unwrap();
++        }
++        let error = materialize(&base, &out, "horizon-data.bin", &[], 4).unwrap_err();
++        assert_ne!(error.kind(), io::ErrorKind::BrokenPipe);
++        assert!(error.to_string().contains("copying"));
+     }
+ 
+     #[test]

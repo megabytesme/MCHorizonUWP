@@ -1,6 +1,7 @@
 namespace Horizon.Builder.Core;
 
-public sealed record SignedPackageOutput(string Client, string Certificate, string? ResourceFramework, string InstallationGuide, IReadOnlyList<string>? Dependencies = null);
+public sealed record SignedPackageOutput(string Client, string Certificate, string? ResourceFramework, string InstallationGuide,
+    IReadOnlyList<string>? Dependencies = null, PackagedNativeOutput? NativeModpack = null);
 
 /// <summary>Creates distributable copies of the client and optional private resource framework.</summary>
 public static class PackageOutput

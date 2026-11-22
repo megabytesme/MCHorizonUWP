@@ -1,0 +1,13 @@
+[package]
+name = "horizon-wasmtime-uwp-probe"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+wasmtime = { version = "=50.0.2", default-features = false, features = ["anyhow", "runtime", "std", "pulley", "cranelift", "wat"] }
+
+[patch.crates-io]
+wasmtime = { path = "wasmtime" }

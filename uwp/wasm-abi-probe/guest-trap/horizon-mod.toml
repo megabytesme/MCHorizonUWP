@@ -1,0 +1,8 @@
+id = "uwp_wasm_trap_probe"
+name = "UWP Wasm Trap Probe"
+version = "0.1.0"
+description = "Deliberately traps in the standard client GUI hook for runtime verification."
+api = "0.2"
+side = "client"
+capabilities = ["registries"]
+wasm_memory_mib = 32

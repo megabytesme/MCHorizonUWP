@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$SourceRoot,
+    [ValidateSet('x86', 'x64', 'arm64', 'arm')][string[]]$Architecture = @('x86', 'x64', 'arm64', 'arm'),
     [string]$VisualStudioRoot = 'C:\Program Files\Microsoft Visual Studio\18\Community',
     [string]$Arm32VisualStudioRoot = 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools'
 )
@@ -31,14 +32,14 @@ function Write-BatchLiteral([string]$Value) {
     return $Value
 }
 
-$modernToolset = Get-Toolset $VisualStudioRoot
-$armToolset = Get-Toolset $Arm32VisualStudioRoot
+if ($Architecture | Where-Object { $_ -ne 'arm' }) { $modernToolset = Get-Toolset $VisualStudioRoot }
+if ($Architecture -contains 'arm') { $armToolset = Get-Toolset $Arm32VisualStudioRoot }
 $architectures = @(
     @{ Name = 'x86'; Arch = 'x64_x86'; Machine = 'X86'; Vs = $VisualStudioRoot; Toolset = $modernToolset; Sdk = '10.0.19041.0' },
     @{ Name = 'x64'; Arch = 'x64'; Machine = 'X64'; Vs = $VisualStudioRoot; Toolset = $modernToolset; Sdk = '10.0.19041.0' },
     @{ Name = 'arm64'; Arch = 'x64_arm64'; Machine = 'ARM64'; Vs = $VisualStudioRoot; Toolset = $modernToolset; Sdk = '10.0.26100.0' },
     @{ Name = 'arm'; Arch = 'x64_arm'; Machine = 'ARM'; Vs = $Arm32VisualStudioRoot; Toolset = $armToolset; Sdk = '10.0.19041.0' }
-)
+) | Where-Object { $Architecture -contains $_.Name }
 
 try {
     foreach ($target in $architectures) {
@@ -122,7 +123,7 @@ try {
     Set-Content -LiteralPath (Join-Path $temporary 'README.txt') -Encoding UTF8 -Value @'
 MCHorizonUWP prebuilt host artifacts
 
-This kit contains four project-built UWP host executables and project-owned
+This kit contains the selected project-built UWP host executables and project-owned
 import/link helper artifacts. It intentionally excludes the Microsoft compiler,
 headers, and runtime libraries. The builder provisions the selected target's
 MSVC link libraries from Microsoft's installer on the user's device.

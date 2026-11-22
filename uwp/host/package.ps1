@@ -15,7 +15,9 @@ param(
     [ValidateSet('2.7', '2.8')][string]$WinUIFramework,
     [string]$PackageVersion,
     [string]$ReleaseNotes,
-    [string]$ReleaseMetadataPath
+    [string]$ReleaseMetadataPath,
+    [string]$EmbeddedNativeMods,
+    [string]$WasmStandardLibrary
 )
 $ErrorActionPreference = 'Stop'
 if (-not $WinUIFramework) { $WinUIFramework = if ($Architecture -eq 'arm') { '2.7' } else { '2.8' } }
@@ -95,6 +97,14 @@ if ($GameBridge) {
     Assert-PEArchitecture $GameBridge $Architecture
     Copy-Item -LiteralPath $GameBridge -Destination (Join-Path $stage 'horizon_uwp_game_bridge.dll') -Force
 }
+if ($EmbeddedNativeMods) {
+    if (-not (Test-Path -LiteralPath (Join-Path $EmbeddedNativeMods 'build-record.json') -PathType Leaf)) {
+        throw 'Missing staged embedded native mod build record.'
+    }
+    $nativeStage = Join-Path $stage 'horizon-native-mods'
+    if (Test-Path -LiteralPath $nativeStage) { throw 'Native mod staging already exists; use a fresh OutputDirectory.' }
+    Copy-Item -LiteralPath $EmbeddedNativeMods -Destination $nativeStage -Recurse
+}
 $notesStage = Join-Path $stage 'horizon-release-notes.txt'
 if (Test-Path -LiteralPath $notesStage) { throw 'Release-note staging already exists; use a fresh OutputDirectory.' }
 if ($ReleaseNotes) {
@@ -158,6 +168,16 @@ if ($AngleBin) {
     Copy-Item -LiteralPath $AngleLicense -Destination (Join-Path $licenseStage 'ANGLE.txt') -Force
     if ($ZlibLicense) { Copy-Item -LiteralPath $ZlibLicense -Destination (Join-Path $licenseStage 'zlib.txt') -Force }
 }
+$wasmStage = Join-Path $stage 'horizon-wasm-std.wasm'
+if (Test-Path -LiteralPath $wasmStage) { throw 'Wasm standard library staging already exists; use a fresh OutputDirectory.' }
+if ($WasmStandardLibrary) {
+    $wasmStdHash = '123d39c44516ea2fed47f9a8099b5a96e35a675cf802a7e9aa4d149cb781296b'
+    if ((Get-FileHash -LiteralPath $WasmStandardLibrary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $wasmStdHash) {
+        throw 'Use the shared Wasm standard library built for Horizon Nightly 2026-11-18.'
+    }
+    Copy-Item -LiteralPath $WasmStandardLibrary -Destination $wasmStage
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'uwp/code-generation-probe/wasmtime/LICENSE.wasmtime') -Destination (Join-Path $licenseStage 'Wasmtime.txt')
+}
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'THIRD_PARTY_NOTICES.md') -Destination (Join-Path $stage 'THIRD_PARTY_NOTICES.md') -Force
 $manifest = (Get-Content (Join-Path $hostDir 'AppxManifest.xml') -Raw).Replace('ProcessorArchitecture="x64"', "ProcessorArchitecture=`"$Architecture`"")
 if ($IdentityName) {
@@ -182,6 +202,14 @@ if ($PackageVersion) {
     $manifestXml.Package.Identity.Version = $PackageVersion
     $manifest = $manifestXml.OuterXml
 }
+if ($WasmStandardLibrary) {
+    # The current guest host-stack check imports GetCurrentThreadStackLimits from Windows 10 1709.
+    $manifestXml = [xml]$manifest
+    foreach ($family in $manifestXml.Package.Dependencies.TargetDeviceFamily) {
+        if ([version]$family.MinVersion -lt [version]'10.0.16299.0') { $family.MinVersion = '10.0.16299.0' }
+    }
+    $manifest = $manifestXml.OuterXml
+}
 if ($WinUIFramework) {
     $manifestXml = [xml]$manifest
     $namespace = $manifestXml.DocumentElement.NamespaceURI
@@ -200,6 +228,12 @@ if ($ResourceFrameworkName) {
     $dependency.SetAttribute('Publisher', $manifestXml.Package.Identity.Publisher)
     $dependency.SetAttribute('MinVersion', '1.0.0.0')
     $manifestXml.Package.Dependencies.AppendChild($dependency) | Out-Null
+    $manifest = $manifestXml.OuterXml
+}
+if ($EmbeddedNativeMods) {
+    $manifestXml = [xml]$manifest
+    $manifestXml.Package.Properties.DisplayName = 'MCHorizonUWP Native Test'
+    $manifestXml.Package.Applications.Application.VisualElements.SetAttribute('DisplayName', 'MCHorizonUWP Native Test')
     $manifest = $manifestXml.OuterXml
 }
 Set-Content -Path (Join-Path $stage 'AppxManifest.xml') -Value $manifest -Encoding UTF8

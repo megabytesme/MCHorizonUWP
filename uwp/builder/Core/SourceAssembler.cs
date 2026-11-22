@@ -11,7 +11,8 @@ public static class SourceAssembler
     private const int MaxEntries = 100_000;
 
     public static async Task AssembleAsync(string upstreamZip, string expectedUpstreamHash, string patch,
-        string expectedPatchHash, string clientZip, string expectedClientHash, string output, string git)
+        string expectedPatchHash, string clientZip, string expectedClientHash, string output, string git,
+        string? upstreamCommit = null, string? clientVersion = null)
     {
         await VerifyAsync(upstreamZip, expectedUpstreamHash);
         await VerifyAsync(patch, expectedPatchHash);
@@ -23,6 +24,31 @@ public static class SourceAssembler
         await ApplyPatchAsync(git, root, patch, check: true);
         await ApplyPatchAsync(git, root, patch, check: false);
         Extract(clientZip, root, upstream: false);
+        if (NightlyUwp.Matches(upstreamCommit))
+        {
+            var bundle = Path.Combine(root, "uwp", "wgpu-dx11");
+            var fixedWgpu = NightlyUwp.UsesFixedWgpu(clientVersion);
+            await StageNightlyWgpuAsync(root, Path.Combine(bundle, "wgpu.zip"),
+                fixedWgpu ? null : Path.Combine(bundle, "reuse-upload-buffer-shadow.patch"), git,
+                fixedWgpu ? NightlyUwp.FixedWgpuArchiveHash : NightlyUwp.WgpuArchiveHash);
+        }
+    }
+
+    internal static async Task StageNightlyWgpuAsync(string source, string archive, string? patch, string git,
+        string expectedArchiveHash = NightlyUwp.WgpuArchiveHash)
+    {
+        await VerifyAsync(archive, expectedArchiveHash);
+        if (patch is not null) await VerifyAsync(patch, NightlyUwp.WgpuPatchHash);
+        var destination = Path.Combine(Path.GetFullPath(source), "third_party", "wgpu-dx11");
+        if (Directory.Exists(destination) || File.Exists(destination))
+            throw new IOException("The Nightly wgpu source destination already exists.");
+        Directory.CreateDirectory(destination);
+        Extract(archive, destination, upstream: true);
+        if (patch is not null)
+        {
+            await ApplyPatchAsync(git, destination, patch, check: true);
+            await ApplyPatchAsync(git, destination, patch, check: false);
+        }
     }
 
     private static async Task VerifyAsync(string path, string expected)
@@ -105,6 +131,8 @@ public static class SourceAssembler
         start.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
         start.Environment["GIT_CONFIG_GLOBAL"] = "NUL";
         start.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        // Apply paths relative to the extracted source, including when it lives inside a Git worktree.
+        start.Environment["GIT_CEILING_DIRECTORIES"] = Path.GetDirectoryName(output)!;
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start Git.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();

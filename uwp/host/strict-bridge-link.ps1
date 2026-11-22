@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory)][string]$SdkRoot,
     [Parameter(Mandatory)][string]$RustLld,
     [Parameter(Mandatory)][string]$SentinelObject,
-    [Parameter(Mandatory)][string]$Output
+    [Parameter(Mandatory)][string]$Output,
+    [switch]$NativeMod
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,7 +25,11 @@ $hostImport = Join-Path $hostKit 'HorizonUWPHost.lib'
 $tlsObject = Join-Path $hostKit 'link\tls_index.obj'
 $targetMsvcRuntime = Join-Path $msvc "lib\$sdkArchitecture\store"
 $hostMsvcRuntime = Join-Path $msvc 'lib\x64'
-$bridgeExports = Join-Path $PSScriptRoot 'game-bridge-exports.def'
+$bridgeExports = if ($NativeMod) {
+    Join-Path $PSScriptRoot '..\native-mod-probe\packaged-native-exports.def'
+} else {
+    Join-Path $PSScriptRoot 'game-bridge-exports.def'
+}
 $runtime = @('libcmt.lib', 'tls_index.obj')
 
 foreach ($path in @($rust, $linker, $hostImport, $bridgeExports, $sentinel,
@@ -52,7 +57,9 @@ $arguments = @(
     "/LIBPATH:$sdk\Lib\10.0.19041.0\ucrt\$sdkArchitecture",
     "/LIBPATH:$sdk\Lib\10.0.19041.0\um\$sdkArchitecture",
     "/OUT:$outputPath", "/IMPLIB:$outputPath.lib", "/MAP:$outputPath.map", "/DEF:$bridgeExports",
-    $tlsObject, $rust, $hostImport, $sentinel,
+    $tlsObject, $rust,
+    $(if (-not $NativeMod) { $hostImport }),
+    $sentinel,
     'WindowsApp.lib', 'ntdll.lib', 'd3d11.lib', 'd3d12.lib', 'dxgi.lib', 'xaudio2.lib', 'iphlpapi.lib'
 )
 & $linker @arguments
@@ -120,15 +127,20 @@ try {
         throw 'The linked game bridge has a truncated PE section table.'
     }
     $tlsOffset = $null
+    $tlsTemplate = $null
     for ($section = 0; $section -lt $sectionCount; $section++) {
-        $stream.Position = $sections + $section * 40 + 12
+        $stream.Position = $sections + $section * 40
+        $sectionName = [Text.Encoding]::ASCII.GetString($reader.ReadBytes(8)).TrimEnd([char]0)
+        $sectionSize = $reader.ReadUInt32()
         $sectionRva = $reader.ReadUInt32()
         $rawSize = $reader.ReadUInt32()
         $rawStart = $reader.ReadUInt32()
+        if ($sectionName -ceq '.tls') {
+            $tlsTemplate = [pscustomobject]@{ Rva = $sectionRva; Size = $sectionSize }
+        }
         $offset = [long]$tlsRva - $sectionRva
         if ($offset -ge 0 -and $offset + $tlsSize -le $rawSize) {
             $tlsOffset = $rawStart + $offset
-            break
         }
     }
     if ($null -eq $tlsOffset -or $tlsOffset + $tlsSize -gt $stream.Length) {
@@ -147,6 +159,11 @@ try {
         ($callbacks -ne 0 -and ($callbacks -lt $imageBase -or $callbacks -gt $imageEnd - $pointerSize))) {
         throw 'The linked game bridge has invalid TLS addresses for its PE pointer width.'
     }
+    if (-not $tlsTemplate -or $start -ne $imageBase + $tlsTemplate.Rva -or
+        $end -gt $start + $tlsTemplate.Size -or
+        ($tlsRva -ge $tlsTemplate.Rva -and $tlsRva -lt $tlsTemplate.Rva + $tlsTemplate.Size)) {
+        throw 'The game bridge TLS template does not match section-relative Rust TLS offsets.'
+    }
 } catch {
     Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
     throw
@@ -155,4 +172,5 @@ if (Select-String -LiteralPath "$outputPath.map" -Pattern 'atexit:api-ms-win-crt
     Remove-Item -LiteralPath $outputPath -Force
     throw 'The linked game bridge imports the unavailable UCRT atexit entry point.'
 }
-Write-Host "Strict UWP bridge link succeeded for $Architecture."
+$kind = if ($NativeMod) { 'native mod' } else { 'bridge' }
+Write-Host "Strict UWP $kind link succeeded for $Architecture."

@@ -603,10 +603,11 @@ if ((args.Length == 3 || args.Length == 5) && args[0] == "--verify-local-catalog
 {
     var candidateCatalog = CatalogSignature.Verify(await File.ReadAllBytesAsync(args[1]), await File.ReadAllBytesAsync(args[2]), CatalogTrust.PublicKey());
     var patchVer = args.Length == 5 ? args[3] : candidateCatalog.Patches.OrderByDescending(item => new Version(item.Version)).First().Version;
-    var clientVer = args.Length == 5 ? args[4] : LocalRecipe.ClientVersion;
+    var isNightlyCatalog = candidateCatalog.Patches.Any(patch => patch.Version == patchVer && NightlyUwp.Matches(patch.UpstreamCommit));
+    var clientVer = args.Length == 5 ? args[4] : isNightlyCatalog ? NightlyUwp.ClientVersion : LocalRecipe.ClientVersion;
     foreach (var targetArch in new[] { "x86", "x64", "arm", "arm64" })
         Require(candidateCatalog.Check(patchVer, clientVer, CatalogTrust.BuilderVersion, targetArch).Allowed,
-            $"signed candidate catalog allows {patchVer}/{clientVer} for {targetArch}");
+            $"signed candidate catalog has the intended compatibility for {patchVer}/{clientVer} on {targetArch}");
     Console.WriteLine("The embedded key verified the candidate catalog.");
     return;
 }
@@ -651,7 +652,8 @@ if (args.Length == 1 && args[0] == "--native-index-probe")
     return;
 }
 
-if ((args.Length == 4 || args.Length == 5) && args[0] == "--build-unified-candidate")
+if ((args.Length is 4 or 5 && args[0] == "--build-unified-candidate")
+    || (args.Length == 5 && args[0] == "--build-nightly-candidate"))
 {
     static string InputHash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git is needed for the candidate build.");
@@ -661,9 +663,12 @@ if ((args.Length == 4 || args.Length == 5) && args[0] == "--build-unified-candid
     var upstream = new CatalogArtifact("https://example.test/source", InputHash(args[1]));
     var patch = new CatalogArtifact("https://example.test/patch", InputHash(args[2]));
     var client = new CatalogArtifact("https://example.test/client", InputHash(args[3]));
-    await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git);
-    var prepared = new PreparedRelease(source, new CatalogPatch(LocalRecipe.PatchVersion, LocalRecipe.UpstreamNightlyCommit, 1, upstream, patch),
-        new CatalogClient(LocalRecipe.ClientVersion, 1, client), new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
+    var isNightlyCandidate = args[0] == "--build-nightly-candidate";
+    var candidateCommit = isNightlyCandidate ? NightlyUwp.UpstreamCommit : LocalRecipe.UpstreamNightlyCommit;
+    await SourceAssembler.AssembleAsync(args[1], upstream.Sha256, args[2], patch.Sha256, args[3], client.Sha256, source, git, candidateCommit);
+    var prepared = new PreparedRelease(source, new CatalogPatch(isNightlyCandidate ? NightlyUwp.PatchVersion : LocalRecipe.PatchVersion, candidateCommit, 1, upstream, patch),
+        new CatalogClient(isNightlyCandidate ? NightlyUwp.ClientVersion : LocalRecipe.ClientVersion, 1, client),
+        new CompatibilityResult(true, false, false, "Local development proof"), CatalogTrust.BuilderVersion, "x64");
     var hasResources = args.Length == 5;
     var candidateSelection = new BuildSelection(TargetProfile.DesktopX64, true, UseResourceFramework: hasResources,
         NativeDeviceVibration: true, MicrosoftClientId: HorizonIdentity.ClientId, ReuseResourceFramework: !hasResources,
@@ -860,12 +865,15 @@ if (args.Length == 4 && args[0] == "--signing-proof")
     return;
 }
 
-if (args.Length == 2 && args[0] == "--inspect-candidate-catalog")
+if (args.Length is 2 or 5 && args[0] == "--inspect-candidate-catalog")
 {
     var candidate = CompatibilityCatalog.Parse(await File.ReadAllTextAsync(args[1]));
+    var (patch, client, builder) = args.Length == 5
+        ? (args[2], args[3], args[4])
+        : ("0.1.0", "0.1.0", "0.1.0");
     foreach (var architecture in new[] { "x86", "x64", "arm", "arm64" })
     {
-        var result = candidate.Check("0.1.0", "0.1.0", "0.1.0", architecture);
+        var result = candidate.Check(patch, client, builder, architecture);
         Require(result.Allowed && !result.BuildVerified && !result.DeviceVerified, "candidate status is declared but unverified");
         Console.WriteLine($"{architecture}: compatible candidate, no build or device evidence");
     }
@@ -885,12 +893,21 @@ if (args.Length == 2 && args[0] == "--inspect-current-builder-catalog")
     return;
 }
 
-if (args.Length == 5 && args[0] == "--assemble-candidate")
+if (args.Length is 5 or 6 && args[0] == "--assemble-candidate")
 {
     static string HashInput(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git was not found.");
-    await SourceAssembler.AssembleAsync(args[1], HashInput(args[1]), args[2], HashInput(args[2]), args[3], HashInput(args[3]), args[4], git);
+    await SourceAssembler.AssembleAsync(args[1], HashInput(args[1]), args[2], HashInput(args[2]), args[3], HashInput(args[3]), args[4], git,
+        args.Length == 6 ? args[5] : null);
     Console.WriteLine("Candidate source inputs assembled; this does not authenticate them or build a package.");
+    return;
+}
+
+if (args.Length == 4 && args[0] == "--stage-nightly-wgpu")
+{
+    var git = new SystemProbe().FindOnPath("git.exe") ?? throw new Exception("Git was not found.");
+    await SourceAssembler.StageNightlyWgpuAsync(args[1], args[2], args[3], git);
+    Console.WriteLine("Verified and patched the pinned wgpu source in third_party/wgpu-dx11.");
     return;
 }
 
@@ -1291,13 +1308,22 @@ Require(repoRoot is not null, "repository catalog is available to builder tests"
 var publishedCatalog = CompatibilityCatalog.Parse(await File.ReadAllTextAsync(Path.Combine(repoRoot!.FullName, "catalog", "catalog-v1.json")));
 foreach (var architecture in new[] { "x86", "x64", "arm", "arm64" })
 {
-    Require(publishedCatalog.Check("0.1.1", "0.1.3", CatalogTrust.BuilderVersion, architecture).Allowed,
-        $"the current builder is compatible with patch 0.1.1 and client 0.1.3 for {architecture}");
-    Require(publishedCatalog.Check("0.1.2", "0.1.4", CatalogTrust.BuilderVersion, architecture).Allowed,
-        $"the current builder is compatible with patch 0.1.2 and client 0.1.4 for {architecture}");
-    Require(!publishedCatalog.Check("0.1.2", "0.1.3", CatalogTrust.BuilderVersion, architecture).Allowed,
-        $"the current builder rejects the incompatible patch 0.1.2 and client 0.1.3 pair for {architecture}");
+    Require(CatalogTrust.CheckRecipe(publishedCatalog, "0.1.1", "0.1.3", CatalogTrust.BuilderVersion, architecture).Allowed,
+        $"the first published pair remains available through the retained recipe on {architecture}");
+    Require(CatalogTrust.CheckRecipe(publishedCatalog, "0.1.2", "0.1.4", CatalogTrust.BuilderVersion, architecture).Allowed,
+        $"the second published pair remains available through the retained recipe on {architecture}");
+    Require(!CatalogTrust.CheckRecipe(publishedCatalog, "0.1.2", "0.1.3", CatalogTrust.BuilderVersion, architecture).Allowed,
+        $"the incompatible patch 0.1.2 and client 0.1.3 pair remains rejected on {architecture}");
 }
+var revisedLegacyInputs = publishedCatalog with
+{
+    Clients = publishedCatalog.Clients.Select(client => client.Version == "0.1.4"
+        ? client with { Artifact = client.Artifact with { Sha256 = new string('f', 64) } } : client).ToArray()
+};
+Require(!CatalogTrust.CheckRecipe(revisedLegacyInputs, "0.1.2", "0.1.4", CatalogTrust.BuilderVersion, "x64").Allowed,
+    "a changed bundle cannot use the retained recipe");
+Require(!CatalogTrust.CheckRecipe(publishedCatalog with { Rules = [] }, "0.1.2", "0.1.4", CatalogTrust.BuilderVersion, "x64").Allowed,
+    "the retained recipe respects removed catalog rules");
 
 var selection = new BuildSelection(TargetProfile.WindowsMobile, true);
 Require(selection.ValidatedPackageVersion == LocalRecipe.DefaultPackageVersion, "default package version");
@@ -1364,6 +1390,23 @@ const string installedFramework = "Horizon.Asset.26-3.321aa1f73c8a1a627df3642f1d
 var reuse = new BuildSelection(TargetProfile.WindowsMobile, false, ReuseResourceFramework: true, ExistingResourceFramework: installedFramework);
 var reuseRecipe = LocalRecipe.Plan(reuse);
 LocalRecipe.ValidateResourceSelection(reuse, null, null);
+{
+    var root = Directory.CreateTempSubdirectory("horizon-nightly-resource-test-").FullName;
+    try
+    {
+        File.WriteAllText(Path.Combine(root, "horizon-resources.json"), "{\"minecraft\":\"26.3\",\"schema\":7}");
+        File.WriteAllText(Path.Combine(root, "block-behaviours.json"), "{}");
+        LocalRecipe.ValidateResources(root, LocalRecipe.UpstreamNightlyCommit);
+        try { LocalRecipe.ValidateResources(root, NightlyUwp.UpstreamCommit); throw new Exception("unversioned Nightly resources accepted"); }
+        catch (InvalidDataException) { }
+        File.WriteAllText(Path.Combine(root, "horizon-prepare.json"), "{\"output_version\":4}");
+        try { LocalRecipe.ValidateResources(root, NightlyUwp.UpstreamCommit); throw new Exception("stale Nightly resources accepted"); }
+        catch (InvalidDataException) { }
+        File.WriteAllText(Path.Combine(root, "horizon-prepare.json"), "{\"output_version\":5}");
+        LocalRecipe.ValidateResources(root, NightlyUwp.UpstreamCommit);
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
 try { LocalRecipe.ValidateResourceSelection(new BuildSelection(TargetProfile.WindowsMobile, false), null, null); throw new Exception("missing embedded resources accepted"); }
 catch (InvalidOperationException) { }
 Require(reuseRecipe.Steps.All(step => step.Name != "Package reusable resources"), "reuse does not build another framework");
@@ -2003,6 +2046,46 @@ static async Task TestReleaseSource()
         var recipe = new PreparedRelease(prepared.SourceDirectory, prepared.Patch with { Version = LocalRecipe.PatchVersion, UpstreamCommit = LocalRecipe.UpstreamNightlyCommit },
             prepared.Client with { Version = LocalRecipe.ClientVersion }, prepared.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(recipe, new BuildSelection(TargetProfile.DesktopX64, true));
+        var nightlyRecipe = new PreparedRelease(recipe.SourceDirectory,
+            recipe.Patch with { Version = NightlyUwp.PatchVersion, UpstreamCommit = NightlyUwp.UpstreamCommit },
+            recipe.Client with { Version = NightlyUwp.ClientVersion }, recipe.Compatibility, CatalogTrust.BuilderVersion, "x64");
+        LocalBuildRunner.ValidatePreparedRelease(nightlyRecipe, new BuildSelection(TargetProfile.DesktopX64, true));
+        var trustedSourceSelection = new BuildSelection(TargetProfile.DesktopX64, true,
+            TrustedNativeSourceFolders: [Path.Combine(root, "local-mod-source")]);
+        var nativeCandidate = new PreparedRelease(nightlyRecipe.SourceDirectory,
+            nightlyRecipe.Patch with { Version = NightlyUwp.CandidatePatchVersion },
+            nightlyRecipe.Client with { Version = NightlyUwp.CandidateClientVersion },
+            nightlyRecipe.Compatibility, CatalogTrust.BuilderVersion, "x64");
+        LocalBuildRunner.ValidatePreparedRelease(nativeCandidate, trustedSourceSelection);
+        LocalBuildRunner.ValidatePreparedRelease(nativeCandidate, new BuildSelection(TargetProfile.DesktopX64, true));
+        try
+        {
+            LocalBuildRunner.ValidatePreparedRelease(nightlyRecipe, trustedSourceSelection);
+            throw new Exception("the prior client accepted an embedded native source build");
+        }
+        catch (InvalidOperationException) { }
+        var nightlyPlan = LocalRecipe.Plan(new BuildSelection(TargetProfile.DesktopX64, true),
+            nightlyRecipe.Patch, nightlyRecipe.Client.Version);
+        Require(nightlyPlan.SourceCommit == NightlyUwp.UpstreamCommit, "Nightly recipe uses immutable upstream source");
+        Require(nightlyPlan.Features.Contains("uwp-dx11-renderer") && !nightlyPlan.Features.Contains("native-d3d11"),
+            "the Nightly selects the retained wgpu D3D11 renderer");
+        Require(nightlyPlan.Steps.Single(step => step.Name == "Fetch Cargo dependencies").Arguments.Contains("--locked")
+            && nightlyPlan.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--locked"),
+            "the Nightly uses the staged bridge lockfile for fetch and build");
+        try
+        {
+            LocalBuildRunner.ValidatePreparedRelease(nightlyRecipe,
+                new BuildSelection(TargetProfile.DesktopX64, true, RegistryNativeMods: ["zoom"]));
+            throw new Exception("UWP Nightly accepted a public native SDK mod");
+        }
+        catch (InvalidOperationException error) when (error.Message == NightlyUwp.PublicNativeModsUnavailable) { }
+        var nightlyArm = nightlyRecipe.ForArchitecture("arm", nightlyRecipe.Compatibility);
+        var armSelection = new BuildSelection(TargetProfile.WindowsMobile, true);
+        LocalBuildRunner.ValidatePreparedRelease(nightlyArm, armSelection);
+        var armPlan = LocalRecipe.Plan(armSelection, nightlyArm.Patch, nightlyArm.Client.Version);
+        Require(armPlan.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains(".local/arm32-windows-sys/patches-offline-arm32.toml")
+            && armPlan.Steps.Single(step => step.Name == "Build game bridge").Arguments.Contains("--locked"),
+            "the ARM32 Nightly uses its locked offline dependency overrides");
         var updatedRecipe = new PreparedRelease(recipe.SourceDirectory,
             recipe.Patch with { Version = "0.1.2", UpstreamCommit = new string('b', 40) }, recipe.Client,
             recipe.Compatibility, CatalogTrust.BuilderVersion, "x64");

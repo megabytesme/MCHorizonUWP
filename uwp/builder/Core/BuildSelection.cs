@@ -1,7 +1,7 @@
 namespace Horizon.Builder.Core;
 
 /// <summary>Requested inputs only; this is not a verified recipe or a build record.</summary>
-public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", bool ReuseResourceFramework = false, string ExistingResourceFramework = "", IReadOnlyList<string>? RegistryNativeMods = null, IReadOnlyDictionary<string, string>? RegistryNativeModVersions = null)
+public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, string PackageVersion = LocalRecipe.DefaultPackageVersion, bool PrepareSounds = false, bool UseResourceFramework = false, bool NativeDeviceVibration = false, string MicrosoftClientId = "", bool ReuseResourceFramework = false, string ExistingResourceFramework = "", IReadOnlyList<string>? RegistryNativeMods = null, IReadOnlyDictionary<string, string>? RegistryNativeModVersions = null, IReadOnlyList<string>? TrustedNativeSourceFolders = null)
 {
     public static TargetProfile DefaultTarget(System.Runtime.InteropServices.Architecture architecture) => architecture switch
     {
@@ -14,6 +14,7 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
     public const string TouchModId = "horizon_touch";
     public const string DeviceVibrationModId = "horizon_device_vibration";
     public bool IncludesNativeTouchMod => NativeTouchMod;
+    public bool EmbedsNativeSources => TrustedNativeSourceFolders is { Count: > 0 };
     public string? ValidatedExistingResourceFramework
     {
         get
@@ -77,7 +78,12 @@ public sealed record BuildSelection(TargetProfile Target, bool NativeTouchMod, s
         .Where(feature => feature is not null).Select(feature => feature!).ToArray();
 
     public IReadOnlyList<string> FeaturesForClient(string? clientVersion) =>
-        clientVersion is "0.1.3" or "0.1.4"
-            ? Features.Where(feature => feature != "uwp-dx11-renderer").ToArray()
-            : Features;
+        clientVersion switch
+        {
+            "0.1.3" or "0.1.4" => Features.Where(feature => feature != "uwp-dx11-renderer").ToArray(),
+            _ when NightlyUwp.UsesPackagedCodeRuntime(clientVersion, Target) =>
+                Features.Where(feature => feature != "native-d3d11").Concat(["uwp-wasm", "uwp-native-mods"]).ToArray(),
+            _ when NightlyUwp.IsClient(clientVersion) => Features.Where(feature => feature != "native-d3d11").ToArray(),
+            _ => Features,
+        };
 }

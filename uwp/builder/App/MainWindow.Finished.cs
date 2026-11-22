@@ -7,6 +7,8 @@ namespace Horizon.Builder.App;
 
 public sealed partial class MainWindow
 {
+    private bool builtWithNativeSources;
+
     private sealed record LocalInstallCheck(
         IReadOnlyList<(TargetProfile Target, SignedPackageOutput Output)> Eligible,
         bool RequiresExistingResourceFramework,
@@ -23,7 +25,11 @@ public sealed partial class MainWindow
         string? queryError = null;
         InstalledClientPackage? installedClient = null;
         string? installedClientQueryError = null;
-        try { installedClient = await LocalPackageInstaller.FindInstalledClientAsync(PackageSigning.GetOrCreateIdentity().Publisher); }
+        try
+        {
+            installedClient = await LocalPackageInstaller.FindInstalledClientAsync(PackageSigning.GetOrCreateIdentity().Publisher,
+                nativeTest: builtWithNativeSources);
+        }
         catch (Exception error) { installedClientQueryError = error.Message; }
         if (requiresExistingFramework && builtOutputs.Count > 0 && builtExistingResourceFrameworkName is { } frameworkName)
         {
@@ -38,7 +44,8 @@ public sealed partial class MainWindow
                 queryError = error.Message;
             }
         }
-        var eligible = builtOutputs.Where(item => LocalPackageInstaller.CanInstall(item.Target, hostArchitecture,
+        var eligible = builtOutputs.Where(item => (item.Output.NativeModpack is null || Environment.OSVersion.Version.Build >= 16299)
+            && LocalPackageInstaller.CanInstall(item.Target, hostArchitecture,
             Environment.OSVersion.Version, requiresExistingFramework, frameworkInstalled)).ToArray();
         if (installedClient is not null && Version.TryParse(PackageVersion.Text, out var builtVersion) && builtVersion <= installedClient.Version)
             eligible = [];
@@ -49,17 +56,18 @@ public sealed partial class MainWindow
     private string FormatLocalInstallAvailability(LocalInstallCheck check)
     {
         if (builtOutputs.Count == 0) return string.Empty;
+        var name = builtWithNativeSources ? LocalPackageInstaller.NativeTestPackageName : LocalPackageInstaller.ClientPackageName;
         var appStatus = check.InstalledClientQueryError is { } clientError
-            ? $"Windows could not check for an existing MCHorizonUWP installation: {clientError}"
+            ? $"Windows could not check for an existing {name} installation: {clientError}"
             : check.InstalledClient is { } installed
-                ? $"MCHorizonUWP {installed.Version} is installed for {DisplayInstalledArchitecture(installed.Architecture)}. A higher package version is required to update it."
-                : "No MCHorizonUWP package from this signing identity is installed for this Windows account.";
+                ? $"{name} {installed.Version} is installed for {DisplayInstalledArchitecture(installed.Architecture)}. A higher package version is required to update it."
+                : $"No {name} package from this signing identity is installed for this Windows account.";
         if (check.InstalledClient is { } current && Version.TryParse(PackageVersion.Text, out var candidate) && candidate > current.Version
             && check.Eligible.Any(item => string.Equals(ArchitectureFor(item.Target), current.Architecture, StringComparison.OrdinalIgnoreCase)))
-            appStatus = $"MCHorizonUWP {current.Version} is installed for {DisplayInstalledArchitecture(current.Architecture)}. The matching package will update the same app identity; Windows normally preserves local app data during package updates.";
+            appStatus = $"{name} {current.Version} is installed for {DisplayInstalledArchitecture(current.Architecture)}. The matching package will update the same app identity; Windows normally preserves local app data during package updates.";
         else if (check.InstalledClient is { } installedClient && Version.TryParse(PackageVersion.Text, out var nextVersion) && nextVersion > installedClient.Version
             && check.Eligible.Count > 0)
-            appStatus = $"MCHorizonUWP {installedClient.Version} is installed for {DisplayInstalledArchitecture(installedClient.Architecture)}. A different architecture will be installed only after a data-compatibility warning.";
+            appStatus = $"{name} {installedClient.Version} is installed for {DisplayInstalledArchitecture(installedClient.Architecture)}. A different architecture will be installed only after a data-compatibility warning.";
         if (check.RequiresExistingResourceFramework)
         {
             if (check.ExistingResourceFrameworkName is not { } frameworkName)
@@ -87,6 +95,11 @@ public sealed partial class MainWindow
             var details = new StackPanel { Spacing = 8 };
             AddOutputPath(details, "Output folder", directory);
             AddOutputPath(details, "Client APPX", output.Client);
+            if (output.NativeModpack is { } modpack)
+            {
+                AddOutputPath(details, "Client related-set bundle", modpack.MainBundle);
+                AddOutputPath(details, "Executable native modpack", modpack.OptionalBundle);
+            }
             AddOutputPath(details, "Public signing certificate", output.Certificate);
             AddOutputPath(details, "Installation guide", output.InstallationGuide);
 

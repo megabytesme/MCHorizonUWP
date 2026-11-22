@@ -35,7 +35,7 @@ public static class ReleaseSource
     {
         ArgumentNullException.ThrowIfNull(transport);
         var catalog = await transport.GetCatalogAsync(catalogUri, signatureUri, trustedPublicKey, cancellationToken);
-        var compatibility = catalog.Check(patchVersion, clientVersion, builderVersion, architecture);
+        var compatibility = CatalogTrust.CheckRecipe(catalog, patchVersion, clientVersion, builderVersion, architecture);
         if (!compatibility.Allowed) throw new InvalidOperationException(compatibility.Reason);
         var patch = catalog.Patches.Single(item => item.Version == patchVersion);
         var client = catalog.Clients.Single(item => item.Version == clientVersion);
@@ -50,7 +50,7 @@ public static class ReleaseSource
         await transport.DownloadArtifactAsync(client.Artifact, clientFile, cancellationToken);
         var source = Path.Combine(root, "source");
         await SourceAssembler.AssembleAsync(upstreamFile, patch.Upstream.Sha256, patchFile, patch.Artifact.Sha256,
-            clientFile, client.Artifact.Sha256, source, git);
+            clientFile, client.Artifact.Sha256, source, git, patch.UpstreamCommit, client.Version);
         return new(source, patch, client, compatibility, builderVersion, architecture);
     }
 }

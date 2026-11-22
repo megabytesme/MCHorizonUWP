@@ -1,0 +1,4 @@
+EXPORTS
+    horizon_native_build
+    horizon_native_mod_v1
+    horizon_uwp_native_init_v1

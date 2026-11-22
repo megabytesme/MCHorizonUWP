@@ -22,9 +22,12 @@ uwp-controller = ["horizon-client/uwp-controller"]
 heartbeat = ["horizon-client/heartbeat"]
 uwp-account = ["dep:horizon-account-core", "uwp-https"]
 xaml-shell = ["uwp-account", "heartbeat"]
+uwp-wasm = ["horizon-mod-host/uwp-wasm"]
+uwp-native-mods = ["horizon-mod-host/uwp-native-mods"]
 
 [dependencies]
 horizon-client = { path = "../../crates/horizon-client", default-features = false }
+horizon-mod-host = { path = "../../crates/horizon-mod-host", default-features = false }
 pollster = "0.4"
 horizon-protocol = { path = "../../crates/horizon-protocol" }
 serde_json = "1.0.151"
@@ -41,16 +44,16 @@ raw-window-handle = "0.6.2"
 [patch.crates-io]
 gilrs-core = { path = "../../third_party/gilrs-core" }
 # megabytesme/wgpu-dx11 (uwp branch)
-wgpu = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-wgpu-core = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-wgpu-core-deps-windows-linux-android = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-wgpu-core-deps-apple = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-wgpu-core-deps-emscripten = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-wgpu-hal = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-wgpu-types = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-wgpu-naga-bridge = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-naga = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
-naga-types = { git = "https://github.com/megabytesme/wgpu-dx11.git", rev = "4c24e58de1ee12b9dd3a81cc4490662353011c30" }
+wgpu = { path = "../../third_party/wgpu-dx11/wgpu" }
+wgpu-core = { path = "../../third_party/wgpu-dx11/wgpu-core" }
+wgpu-core-deps-windows-linux-android = { path = "../../third_party/wgpu-dx11/wgpu-core/platform-deps/windows-linux-android" }
+wgpu-core-deps-apple = { path = "../../third_party/wgpu-dx11/wgpu-core/platform-deps/apple" }
+wgpu-core-deps-emscripten = { path = "../../third_party/wgpu-dx11/wgpu-core/platform-deps/emscripten" }
+wgpu-hal = { path = "../../third_party/wgpu-dx11/wgpu-hal" }
+wgpu-types = { path = "../../third_party/wgpu-dx11/wgpu-types" }
+wgpu-naga-bridge = { path = "../../third_party/wgpu-dx11/wgpu-naga-bridge" }
+naga = { path = "../../third_party/wgpu-dx11/naga" }
+naga-types = { path = "../../third_party/wgpu-dx11/naga-types" }
 winit = { path = "../../third_party/winit" }
 parking_lot_core = { path = "../../third_party/parking_lot_core" }
 libmimalloc-sys = { path = "../../third_party/libmimalloc-sys" }
@@ -58,3 +61,11 @@ libmimalloc-sys = { path = "../../third_party/libmimalloc-sys" }
 [profile.release]
 panic = "abort"
 codegen-units = 32
+
+# Keep the Nightly's source-scanning build dependencies optimized in this standalone workspace.
+[profile.release.package.horizon-mod-api-gen]
+opt-level = 3
+[profile.release.package.syn]
+opt-level = 3
+[profile.release.package.proc-macro2]
+opt-level = 3

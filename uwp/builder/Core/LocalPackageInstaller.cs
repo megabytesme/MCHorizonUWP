@@ -14,6 +14,7 @@ public sealed record InstalledClientPackage(string Architecture, Version Version
 public static class LocalPackageInstaller
 {
     public const string ClientPackageName = "MCHorizonUWP";
+    public const string NativeTestPackageName = "MCHorizonUWP-NativeTest";
 
     public static bool CanInstall(TargetProfile target, Architecture machine, Version windows) => (machine, target) switch
     {
@@ -75,7 +76,7 @@ public static class LocalPackageInstaller
 
     /// <summary>Finds this builder's installed client package for the current Windows user.</summary>
     public static async Task<InstalledClientPackage?> FindInstalledClientAsync(string expectedPublisher,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool nativeTest = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedPublisher);
         if (!OperatingSystem.IsWindows()) return null;
@@ -91,7 +92,7 @@ public static class LocalPackageInstaller
         foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-Command",
             "$ErrorActionPreference='Stop'; $n=$env:HORIZON_CLIENT_PACKAGE_NAME; $expectedPublisher=$env:HORIZON_CLIENT_PUBLISHER; $p=@(Get-AppxPackage -Name $n -ErrorAction SilentlyContinue | Where-Object { $_.Name -ceq $n -and $_.Publisher -ceq $expectedPublisher } | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1); if ($p.Count -eq 0) { [Console]::Out.WriteLine('null') } else { [PSCustomObject]@{ architecture=[string]$p[0].Architecture; version=[string]$p[0].Version } | ConvertTo-Json -Compress }" })
             start.ArgumentList.Add(argument);
-        start.Environment["HORIZON_CLIENT_PACKAGE_NAME"] = ClientPackageName;
+        start.Environment["HORIZON_CLIENT_PACKAGE_NAME"] = nativeTest ? NativeTestPackageName : ClientPackageName;
         start.Environment["HORIZON_CLIENT_PUBLISHER"] = expectedPublisher;
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not query installed Horizon packages.");
@@ -126,6 +127,13 @@ public static class LocalPackageInstaller
         if (output.Dependencies is not { Count: > 0 } || !File.Exists(output.Client) || !File.Exists(output.Certificate)
             || output.Dependencies.Any(path => !File.Exists(path)) || output.ResourceFramework is { } resource && !File.Exists(resource))
             throw new FileNotFoundException("The signed package or one of its installation dependencies is missing.");
+        if (output.NativeModpack is { } nativeModpack)
+        {
+            if (Environment.OSVersion.Version.Build < 16299)
+                throw new PlatformNotSupportedException("Executable optional packages require Windows build 16299 or newer.");
+            if (!File.Exists(nativeModpack.MainBundle) || !File.Exists(nativeModpack.OptionalBundle))
+                throw new FileNotFoundException("Both native modpack related-set bundles are required.");
+        }
         using var certificate = new X509Certificate2(output.Certificate);
         var identity = PackageSigning.GetOrCreateIdentity();
         if (certificate.HasPrivateKey || certificate.Thumbprint != identity.Thumbprint || certificate.Subject != identity.Publisher)
@@ -151,13 +159,18 @@ public static class LocalPackageInstaller
             var (name, publisher, architecture, version) = TryReadAppxIdentity(path);
             return new { Path = path, Name = name, Publisher = publisher, Architecture = architecture, Version = version };
         }).ToArray();
-        var payload = JsonSerializer.Serialize(new { Client = Path.GetFullPath(output.Client), Dependencies = dependencyEntries });
+        var payload = JsonSerializer.Serialize(new
+        {
+            Client = Path.GetFullPath(output.NativeModpack?.MainBundle ?? output.Client),
+            ExternalPackage = output.NativeModpack is { } modpack ? Path.GetFullPath(modpack.OptionalBundle) : null,
+            Dependencies = dependencyEntries,
+        });
         var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
         var powershell = Path.Combine(system, "WindowsPowerShell", "v1.0", "powershell.exe");
         var start = new ProcessStartInfo(powershell) { UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-Command",
-            "$ErrorActionPreference='Stop'; $p=ConvertFrom-Json $env:HORIZON_UWP_INSTALL_PATHS; $installed=@(Get-AppxPackage); $needed=@($p.Dependencies | Where-Object { $d=$_; if (-not $d.Name -or -not $d.Publisher -or -not $d.Version) { return $true }; $rv=[version]$d.Version; $m=$installed | Where-Object { $_.Name -ceq $d.Name -and $_.Publisher -ceq $d.Publisher -and [string]$_.Architecture -ieq $d.Architecture -and ([version]$_.Version -ge $rv) } | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1; if ($null -ne $m) { if ($d.Name -like 'Microsoft.UI.Xaml.*' -and $m.InstallLocation) { $mf=Join-Path $m.InstallLocation 'AppxManifest.xml'; if (Test-Path -LiteralPath $mf) { try { Add-AppxPackage -Register -DisableDevelopmentMode -Path $mf -ErrorAction Stop } catch { if ($_.Exception.Message -notmatch '0x80073D02') { throw } } } }; return $false }; return $true } | ForEach-Object { $_.Path }); if ($needed.Count -gt 0) { Add-AppxPackage -Path $p.Client -DependencyPath $needed } else { Add-AppxPackage -Path $p.Client }" })
+            "$ErrorActionPreference='Stop'; $p=ConvertFrom-Json $env:HORIZON_UWP_INSTALL_PATHS; $installed=@(Get-AppxPackage); $needed=@($p.Dependencies | Where-Object { $d=$_; if (-not $d.Name -or -not $d.Publisher -or -not $d.Version) { return $true }; $rv=[version]$d.Version; $m=$installed | Where-Object { $_.Name -ceq $d.Name -and $_.Publisher -ceq $d.Publisher -and [string]$_.Architecture -ieq $d.Architecture -and ([version]$_.Version -ge $rv) } | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1; if ($null -ne $m) { if ($d.Name -like 'Microsoft.UI.Xaml.*' -and $m.InstallLocation) { $mf=Join-Path $m.InstallLocation 'AppxManifest.xml'; if (Test-Path -LiteralPath $mf) { try { Add-AppxPackage -Register -DisableDevelopmentMode -Path $mf -ErrorAction Stop } catch { if ($_.Exception.Message -notmatch '0x80073D02') { throw } } } }; return $false }; return $true } | ForEach-Object { $_.Path }); $parameters=@{ Path=$p.Client }; if ($needed.Count -gt 0) { $parameters.DependencyPath=$needed }; if ($p.ExternalPackage) { $parameters.ExternalPackages=@($p.ExternalPackage) }; Add-AppxPackage @parameters" })
             start.ArgumentList.Add(arg);
         start.Environment["HORIZON_UWP_INSTALL_PATHS"] = payload;
         progress?.Report("Installing the framework dependencies and client for your Windows account.");

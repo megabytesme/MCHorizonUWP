@@ -1,0 +1,84 @@
+diff --git a/crates/horizon-guest-stack/src/lib.rs b/crates/horizon-guest-stack/src/lib.rs
+--- a/crates/horizon-guest-stack/src/lib.rs
++++ b/crates/horizon-guest-stack/src/lib.rs
+@@ -167,7 +167,7 @@
+     })
+ }
+ 
+-#[cfg(windows)]
++#[cfg(all(windows, not(all(target_vendor = "uwp", target_arch = "arm"))))]
+ fn windows_stack_sufficient(required: usize) -> bool {
+     let mut low = 0;
+     let mut high = 0;
+@@ -176,7 +176,70 @@
+     high.saturating_sub(low) >= required
+ }
+ 
+-#[cfg(windows)]
++// The 15063 ARM Store library exposes VirtualQuery. Inspect the reservation
++// that contains a stack local.
++#[cfg(all(target_vendor = "uwp", target_arch = "arm"))]
++fn windows_stack_sufficient(required: usize) -> bool {
++    const MEM_FREE: u32 = 0x10000;
++
++    fn query(address: usize) -> Option<MemoryRegion> {
++        let mut region = std::mem::MaybeUninit::<MemoryRegion>::zeroed();
++        // SAFETY: the address is queried as a number, not dereferenced.
++        // region has the 15063 ARM SDK layout and is writable.
++        let size = unsafe { VirtualQuery(address, region.as_mut_ptr(), size_of::<MemoryRegion>()) };
++        // SAFETY: the output buffer started initialized and contains only integer fields.
++        (size == size_of::<MemoryRegion>()).then(|| unsafe { region.assume_init() })
++    }
++
++    let stack_local = 0_u8;
++    let mut address = std::ptr::from_ref(&stack_local).addr();
++    let Some(mut region) = query(address) else {
++        return false;
++    };
++    let low = region.allocation_base;
++    if low == 0 || low > address {
++        return false;
++    }
++    loop {
++        if region.state == MEM_FREE || region.allocation_base != low {
++            return false;
++        }
++        let Some(end) = region.base_address.checked_add(region.size) else {
++            return false;
++        };
++        if region.base_address > address || end <= address {
++            return false;
++        }
++        if end - low >= required {
++            return true;
++        }
++        address = end;
++        let Some(next) = query(address) else {
++            return false;
++        };
++        region = next;
++    }
++}
++
++#[cfg(all(target_vendor = "uwp", target_arch = "arm"))]
++#[repr(C)]
++struct MemoryRegion {
++    base_address: usize,
++    allocation_base: usize,
++    allocation_protect: u32,
++    size: usize,
++    state: u32,
++    protect: u32,
++    kind: u32,
++}
++
++#[cfg(all(target_vendor = "uwp", target_arch = "arm"))]
++#[link(name = "api-ms-win-core-memory-l1-1-2.dll", kind = "raw-dylib", modifiers = "+verbatim")]
++unsafe extern "system" {
++    fn VirtualQuery(address: usize, region: *mut MemoryRegion, length: usize) -> usize;
++}
++
++#[cfg(all(windows, not(all(target_vendor = "uwp", target_arch = "arm"))))]
+ #[cfg_attr(target_vendor = "uwp", link(name = "WindowsApp"))]
+ #[cfg_attr(not(target_vendor = "uwp"), link(name = "kernel32"))]
+ unsafe extern "system" {

@@ -166,6 +166,11 @@
                 <TextBlock x:Name="NativeModsStatus" Text="Compatibility will be checked before the list opens." TextWrapping="Wrap" VerticalAlignment="Center" />
               </StackPanel>
               <Button x:Name="ClearNativeMods" Content="Clear selected repository mods" Click="ClearNativeMods_Click" Visibility="Collapsed" HorizontalAlignment="Left" />
+              <StackPanel x:Name="NativeSourceOptions" Visibility="Collapsed" Spacing="8">
+                <Button Content="Add trusted native mod source…" Click="AddNativeSource_Click" />
+                <TextBlock x:Name="NativeSourceStatus" Text="No native source projects selected." TextWrapping="Wrap" />
+                <Button Content="Clear native source projects" Click="ClearNativeSource_Click" />
+              </StackPanel>
             </StackPanel>
             <StackPanel x:Name="PackageVersionPage" Spacing="14" Visibility="Collapsed">
               <TextBlock Text="Set the package version" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap" />

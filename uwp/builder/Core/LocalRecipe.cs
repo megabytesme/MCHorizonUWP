@@ -35,11 +35,11 @@ public static class LocalRecipe
         return ["-Resources", resources ?? "<selected-resources>"];
     }
 
-    public static void ValidateResourceSelection(BuildSelection selection, string? resources, string? minecraftDirectory)
+    public static void ValidateResourceSelection(BuildSelection selection, string? resources, string? minecraftDirectory, string? upstreamCommit = null)
     {
         if (selection.ValidatedExistingResourceFramework is not null) return;
         if (string.IsNullOrWhiteSpace(resources)) throw new InvalidOperationException("Choose prepared resources.");
-        ValidateResources(resources);
+        ValidateResources(resources, upstreamCommit);
         if (selection.PrepareSounds) ValidateSoundPreparation(resources, minecraftDirectory);
     }
 
@@ -87,6 +87,7 @@ public static class LocalRecipe
     {
         var sourceCommit = preparedPatch?.UpstreamCommit ?? SourceCommit;
         var features = selection.FeaturesForClient(clientVersion);
+        var pinnedNightly = NightlyUwp.Matches(sourceCommit);
         var packageVersion = selection.ValidatedPackageVersion;
         var clientId = selection.ValidatedMicrosoftClientId;
         var existingFramework = selection.ValidatedExistingResourceFramework;
@@ -106,10 +107,13 @@ public static class LocalRecipe
         };
         if (arm32) steps.Add(new("Prepare ARM32 overrides", "python", ["uwp/arm32-deps/prepare.py", "--offline-arm32"]));
         var prefix = new List<string> { "+" + RustToolchain };
+        if (NightlyUwp.UsesPackagedCodeRuntime(clientVersion, selection.Target))
+            prefix.AddRange(["--config", NightlyUwp.WasmtimeConfig]);
         if (arm32) prefix.AddRange(["--config", ".local/arm32-windows-sys/patches-offline-arm32.toml"]);
         var fetch = new List<string>(prefix);
         fetch.AddRange(["fetch", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--target", selection.RustTarget,
             "--target", "x86_64-pc-windows-msvc", "-Z", "build-std=std,panic_abort"]);
+        if (pinnedNightly) fetch.Add("--locked");
         steps.Add(new("Fetch Cargo dependencies", "cargo", fetch.AsReadOnly()));
         if (selection.PrepareSounds)
         {
@@ -120,6 +124,7 @@ public static class LocalRecipe
         var cargo = new List<string>(prefix);
         cargo.AddRange(["build", "--offline", "--manifest-path", "uwp/game-bridge/Cargo.toml", "--features", string.Join(',', features),
             "-Z", "build-std=std,panic_abort", "--target", selection.RustTarget, "--release", "--target-dir", ".local/builder-target"]);
+        if (pinnedNightly) cargo.Add("--locked");
         steps.Add(new("Build game bridge", "cargo", cargo.AsReadOnly()));
         steps.Add(new("Strict-link host", "cmd", ["/d", "/c", "uwp/host/build-game.cmd", arch]));
         if (selection.UseResourceFramework)
@@ -168,14 +173,28 @@ public static class LocalRecipe
         if (process.ExitCode != 0) throw new InvalidOperationException("The selected Git repository does not contain the pinned Horizon revision.");
     }
 
-    public static void ValidateResources(string resourcesDirectory)
+    public static void ValidateResources(string resourcesDirectory, string? upstreamCommit = null)
     {
-        var manifest = Path.Combine(Path.GetFullPath(resourcesDirectory), "horizon-resources.json");
-        var file = new FileInfo(manifest);
+        var root = Path.GetFullPath(resourcesDirectory);
+        var file = new FileInfo(Path.Combine(root, "horizon-resources.json"));
         if (!file.Exists || file.Length > 1024 * 1024) throw new InvalidDataException("Select prepared resources with a valid Horizon manifest.");
-        using var document = JsonDocument.Parse(File.ReadAllBytes(manifest));
+        using var document = JsonDocument.Parse(File.ReadAllBytes(file.FullName));
         if (!document.RootElement.TryGetProperty("minecraft", out var version) || version.ValueKind != JsonValueKind.String || version.GetString() != MinecraftVersion)
             throw new InvalidDataException("The selected resources are not for Minecraft 26.3.");
+        if (!NightlyUwp.Matches(upstreamCommit)) return;
+
+        const string refreshMessage = "Prepare Minecraft resources with horizon-prepare from Horizon Nightly 2026-11-18 before building this release.";
+        if (!document.RootElement.TryGetProperty("schema", out var schema) || schema.ValueKind != JsonValueKind.Number ||
+            !schema.TryGetInt32(out var schemaVersion) || schemaVersion != NightlyUwp.ResourceSchema)
+            throw new InvalidDataException(refreshMessage);
+        var stamp = new FileInfo(Path.Combine(root, "horizon-prepare.json"));
+        if (!stamp.Exists || stamp.Length > 1024 || !File.Exists(Path.Combine(root, "block-behaviours.json")))
+            throw new InvalidDataException(refreshMessage);
+        using var preparation = JsonDocument.Parse(File.ReadAllBytes(stamp.FullName));
+        if (preparation.RootElement.ValueKind != JsonValueKind.Object ||
+            !preparation.RootElement.TryGetProperty("output_version", out var output) || output.ValueKind != JsonValueKind.Number ||
+            !output.TryGetInt32(out var outputVersion) || outputVersion != NightlyUwp.PrepareOutputVersion)
+            throw new InvalidDataException(refreshMessage);
     }
 
     /// Presence only: preparation verifies individual sound objects separately.
