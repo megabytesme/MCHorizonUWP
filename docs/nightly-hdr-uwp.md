@@ -25,6 +25,8 @@ Builder 1.0.10 accepts the dedicated HDR recipe for x64, x86, ARM64 and ARM32. I
 
 Local patch `0.1.17` pairs with the same `0.1.18` client bundle and Builder 1.0.10. It refuses classic shader packs on the D3D11 FL9_1 compatibility renderer before requesting pack materials or copying the terrain atlas. The signed x64 development build kept the stock world running after refusing the previously crashing `audit_post_only` fixture. On the same binary, D3D12 ran the fixture's composite pass and separately presented a stock HDR world with paired screenshots. [Guard patch](../patches/nightly-2026-11-20/horizon-uwp-0.1.17.patch) · [Shader validation](horizon-uwp-shader-compatibility.md)
 
+The signed x86 development build also passed the classic-pack refusal and stock scRGB controls on the desktop. Both captures were verified on the isolated x86 package. [Archived HDR log handling](hdr-run-evidence.md)
+
 Use the exact upstream and wgpu archives, the pinned Wasm inputs and the four-architecture host kit to regenerate the candidate. The resulting development catalog is unsigned. Run from the product worktree on Ben-Desktop. [Pinned input recipe](nightly-runtime-completion-2026-11-21.md)
 
 ```powershell

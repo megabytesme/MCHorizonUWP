@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidatePattern('^MCHorizonUWP\.HdrDev\.[A-Za-z0-9.]+$')][string]$Identity,
+    [Parameter(Mandatory)][ValidatePattern('^MCHorizonUWP\.(?:HdrDev|HdrGuard)\.[A-Za-z0-9.]+$')][string]$Identity,
     [Parameter(Mandatory)][string]$FixtureWorld,
     [Parameter(Mandatory)][string]$Output,
     [Parameter(Mandatory)][string]$Display,
@@ -155,6 +155,9 @@ function Remove-PanelFaultRequests {
     foreach ($request in $panelFaultCreated) { [IO.File]::Delete($request) }
 }
 
+. "$PSScriptRoot/GameLogArchive.ps1"
+$log = Join-Path $game 'isolated-test-home/logs/latest.log'
+$previousGameLogHash = if (Test-Path -LiteralPath $log -PathType Leaf) { (Get-FileHash -LiteralPath $log).Hash }
 $begin = [DateTime]::UtcNow
 try {
     if ($startupFault) { Add-PanelFaultRequests }
@@ -166,7 +169,6 @@ try {
     throw
 }
 $lifecycle = Join-Path $state 'horizon-uwp-lifecycle.log'
-$log = Join-Path $game 'isolated-test-home/logs/latest.log'
 $hdrChainPattern = 'desc_hr=0x00000000 format=10 alpha=3 .*space=1 set_hr=0x00000000 check_hr=0x00000000 support=0x[0-9A-F]*[13579BDF]\b view_kind=2'
 $sdrChainPattern = 'desc_hr=0x00000000 format=87 alpha=3 .*space=0 set_hr=0x00000000'
 $report = [ordered]@{package=$package.PackageFullName; pid=$pidGame; started=$begin.ToString('o');
@@ -504,7 +506,6 @@ try {
         $report.displayHdrRestored = !$LASTEXITCODE -and $restored -eq 'on'
     }
     if (Test-Path -LiteralPath $lifecycle) { Copy-Item -LiteralPath $lifecycle -Destination "$destination/lifecycle.log" }
-    if (Test-Path -LiteralPath $log) { Copy-Item -LiteralPath $log -Destination "$destination/game.log" }
     if ($gameWindow -and !$process.HasExited) {
         try {
             ([ScratchKeyboardInput]::new($pidGame)).Close()
@@ -517,5 +518,17 @@ try {
         $null = $process.WaitForExit(10000)
         $report.forcedIsolatedShutdown = $true
     }
+    $archiveFailure = $null
+    try {
+        $report.gameLogParts = @(Save-HdrGameLog $log $destination $begin $previousGameLogHash)
+        if ($report.passed -and !$report.gameLogParts.Count) { throw 'No current-run game log was archived.' }
+    } catch {
+        $report.gameLogArchiveError = $_.Exception.Message
+        if ($report.passed) {
+            $report.passed = $false
+            $archiveFailure = $_
+        }
+    }
     $report | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath "$destination/result.json" -Encoding UTF8
+    if ($archiveFailure) { throw $archiveFailure }
 }

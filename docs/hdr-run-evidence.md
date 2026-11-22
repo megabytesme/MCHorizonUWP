@@ -2,6 +2,8 @@
 
 Run `tools/verify_hdr_run.py` with Python 3.11 or later after `Test-HdrGame.ps1` closes the isolated game. Keep the full output directory with `result.json`, `lifecycle.log`, `game.log` and the game PNGs. Supply the original APPX and its trusted package receipt.
 
+The harness preserves the same process's raw log parts under `game-log-parts` and combines them into `game.log` in order. This retains renderer and frame evidence when a run spans midnight or log rotation. The signed x86 run verified from its original pre-midnight gzip and post-midnight log, along with the original results and captures.
+
 ```powershell
 python ./tools/verify_hdr_run.py $Appx $PackageReceipt $Run --expect hdr --display '\\.\DISPLAY2'
 python ./tools/verify_hdr_run.py $DiagnosticAppx $RecoveryIndex $RecoveryRun --expect sdr --case device-recovery
