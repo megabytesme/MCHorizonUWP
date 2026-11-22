@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import runpy
+import shutil
 import tempfile
 import tomllib
 import unittest
@@ -51,6 +52,16 @@ class PackagedSourceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     STAGER["stage"](self.workspace, architecture, sources, GAME)
                 self.assertFalse(self.output.exists())
+
+    def test_stage_native_source_for_hdr_graphics_compatibility_candidate(self):
+        pins = STAGER["STAGING"]
+        game = "mchorizonuwp-0.1.18-patch-0.1.18-x64-" + pins["NOV20_UPSTREAM"]
+        fixture = shutil.copytree(FIXTURE, self.workspace / "november20-fixture")
+        manifest = fixture / "horizon-mod.toml"
+        manifest.write_text(manifest.read_text().replace(pins["UPSTREAM"], pins["NOV20_UPSTREAM"]))
+        STAGER["stage"](self.workspace, "x64", [fixture], game)
+        record = json.loads((self.output / "build-record.json").read_bytes())
+        self.assertEqual(record["game_build_id"], game)
 
     def test_two_native_sources_preserve_manifests_in_sorted_package_inventory(self):
         dependent = PROBE / "hook-after-source"
