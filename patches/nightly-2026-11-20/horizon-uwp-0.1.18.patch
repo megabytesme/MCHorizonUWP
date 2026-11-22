@@ -6668,7 +6668,7 @@ index 190fb30d80531e835a23323c8d722cd6c2e19679..f4c3bfcbdea3a0ed581a46b16d79efaf
          let sets = ids
              .into_iter()
 diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
-index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabbc62ba791 100644
+index ade121700540ab728a674ac7928e2d27d63330eb..5cf3828e5ab76f5f534c2d0375a8005aa16bcc8f 100644
 --- a/crates/horizon-client-render/src/gfx.rs
 +++ b/crates/horizon-client-render/src/gfx.rs
 @@ -170,6 +170,32 @@ fn entity_pipeline_factory<'a>(
@@ -8668,7 +8668,16 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
              looks: self.look_groups.as_ref(),
          };
          lists.draw(pass, indirect, base, first, count, pulled);
-@@ -6218,7 +6802,12 @@ impl Renderer {
+@@ -6182,6 +6766,8 @@ impl Renderer {
+     pub fn output(&self) -> output::EffectiveOutput {
+         output::EffectiveOutput {
+             msaa: self.msaa_offered(),
++            world_post: !self.fl91_caps.fl91,
++            taa: !self.fl91_caps.fl91 && self.world_post.supports_taa(),
+             ..self.output_with_rays()
+         }
+     }
+@@ -6218,7 +6804,12 @@ impl Renderer {
      /// masks. Only with HDR output on: nothing else reads them.
      pub fn measure_emission(&mut self) {
          if let Some(hdr) = &self.hdr {
@@ -8682,7 +8691,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
              self.emission_stats
                  .measure(&self.device, &self.queue, &views, hdr.masks);
          }
-@@ -6262,6 +6851,7 @@ impl Renderer {
+@@ -6262,6 +6853,7 @@ impl Renderer {
      }
      /// Frame generation on or off (FSR 3.1's frame interpolation).
      pub fn set_frame_generation(&mut self, on: bool) {
@@ -8690,7 +8699,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          if !on {
              self.frame_gen.stop();
          }
-@@ -6277,6 +6867,12 @@ impl Renderer {
+@@ -6277,6 +6869,12 @@ impl Renderer {
          upscale: f32,
          sharpness: f32,
      ) {
@@ -8703,7 +8712,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          self.world_post.set_sharpness(&self.device, sharpness);
          let taa = taa && self.world_post.supports_taa();
          self.world_post.scale = scale.clamp(0.25, 2.0);
-@@ -6284,6 +6880,22 @@ impl Renderer {
+@@ -6284,6 +6882,22 @@ impl Renderer {
          self.world_post.taa = taa;
          self.world_post.upscale = if taa { upscale.clamp(1.0, 4.0) } else { 1.0 };
      }
@@ -8726,7 +8735,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
      /// Runs `post` over the world from now on (`None`: no pack), for the dimension `dimension`;
      /// `block_ids` gives each source state its model and fluid material ids (two values
      /// per state); emission and ownership come from the mesher's quad records.
-@@ -6295,6 +6907,12 @@ impl Renderer {
+@@ -6295,6 +6909,12 @@ impl Renderer {
          pack: Option<horizon_shaders::Post>,
          block_ids: &[i32],
      ) -> std::result::Result<Option<(Vec<String>, Vec<String>)>, pack_post::Refused> {
@@ -8739,7 +8748,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          if pack.is_none() {
              self.pack_atlas = None;
              self.pack_material_atlases = None;
-@@ -6569,7 +7187,14 @@ impl Renderer {
+@@ -6569,7 +7189,14 @@ impl Renderer {
          let clouds = self.cloud_bindings.clone();
          let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
          let cancelled = cancel.clone();
@@ -8754,7 +8763,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
              let instance = wgpu::vertex_attr_array![5=>Float32x4];
              let vertex = wgpu::VertexBufferLayout {
                  array_stride: std::mem::size_of::<TerrainVertex>() as u64,
-@@ -6706,6 +7331,9 @@ impl Renderer {
+@@ -6706,6 +7333,9 @@ impl Renderer {
              block_light::LightTable,
          )>,
      ) -> std::result::Result<Vec<String>, String> {
@@ -8764,7 +8773,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          self.world_held = false;
          let linear = pack.is_some();
          if (linear || self.output.frame.format == LINEAR_FRAME)
-@@ -6894,7 +7522,7 @@ impl Renderer {
+@@ -6894,7 +7524,7 @@ impl Renderer {
      /// or sampleRGSS for RGSS.
      pub fn set_texture_filtering(&mut self, filtering: i32, bit: i32) {
          let filtering = filtering.clamp(0, 2) as u32;
@@ -8773,7 +8782,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
              sampler_anisotropy(bit)
          } else {
              1
-@@ -6904,16 +7532,21 @@ impl Renderer {
+@@ -6904,16 +7534,21 @@ impl Renderer {
          }
          self.texture_filtering = filtering;
          self.max_anisotropy = anisotropy;
@@ -8798,7 +8807,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          );
          self.group = terrain_group(
              &self.device,
-@@ -6925,6 +7558,7 @@ impl Renderer {
+@@ -6925,6 +7560,7 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8806,7 +8815,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          );
          self.fluid_group = terrain_group(
              &self.device,
-@@ -6936,17 +7570,29 @@ impl Renderer {
+@@ -6936,17 +7572,29 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8837,7 +8846,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          );
      }
      /// Block sprite layers per array on this device: a sprite's array is its layer over it, its
-@@ -6958,9 +7604,14 @@ impl Renderer {
+@@ -6958,9 +7606,14 @@ impl Renderer {
      /// reduced copies (0: none).
      pub fn set_mipmap_levels(&mut self, levels: u32) {
          self.mipmap_option = levels;
@@ -8853,7 +8862,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
              self.sprite_minimum_size,
              self.mip_levels,
          );
-@@ -7242,7 +7893,12 @@ impl Renderer {
+@@ -7242,7 +7895,12 @@ impl Renderer {
          // tried again at half the size next frame; the window keeps its last one.
          let checks = GpuChecks::push(&self.device);
          let target = (!layered).then(|| Self::offscreen_target(&self.device, &config));
@@ -8867,7 +8876,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          if let Some(e) = checks.pop() {
              log::warn!(
                  "Horizon renderer: no memory for a {}x{} screenshot ({e}); trying half the size",
-@@ -7655,8 +8311,14 @@ impl Renderer {
+@@ -7655,8 +8313,14 @@ impl Renderer {
              view_origin: [0.0; 4],
              world_view: [0.0; 4],
          };
@@ -8884,7 +8893,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          // The sunrise fan as sixteen triangles. Its clip positions use the sky's
          // own view (no TAA jitter; the bob and the spin, as `fs_sky`'s `view_ray`),
          // and its apex weight interpolates the barycentric the shader used to
-@@ -7692,12 +8354,22 @@ impl Renderer {
+@@ -7692,12 +8356,22 @@ impl Renderer {
              view_proj: hand_view_proj.to_cols_array_2d(),
              ..globals
          };
@@ -8913,7 +8922,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          // GameRenderer.render3dHud: DebugCrosshairRenderer draws with the
          // hand's projection but no bob, and FogMode.NONE (no fog colour).
          let crosshair_globals = Globals {
-@@ -7705,12 +8377,22 @@ impl Renderer {
+@@ -7705,12 +8379,22 @@ impl Renderer {
              fog_color: [0.0; 4],
              ..globals
          };
@@ -8942,7 +8951,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          // 4x MSAA, unless a classic shader pack runs (a failed or refused one leaves `None`):
          // it and native displacement keep their single-sample pipelines, as does a material
          // whose four-sample layers the driver refused. Nor where its targets ran out of video
-@@ -8036,9 +8718,7 @@ impl Renderer {
+@@ -8036,9 +8720,7 @@ impl Renderer {
              self.instances = self.device.create_buffer(&wgpu::BufferDescriptor {
                  label: Some("Section origins"),
                  size: self.instance_capacity * 16,
@@ -8953,7 +8962,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                  mapped_at_creation: false,
              });
          }
-@@ -8916,13 +9596,22 @@ impl Renderer {
+@@ -8916,13 +9598,22 @@ impl Renderer {
                      .entry(snapshot.section)
                      .or_insert_with(|| {
                          let capacity = vertices.next_power_of_two().max(4);
@@ -8978,7 +8987,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                          static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                          GpuStaticEntitySection {
                              buffer: self.device.create_buffer(&wgpu::BufferDescriptor {
-@@ -8939,13 +9628,22 @@ impl Renderer {
+@@ -8939,13 +9630,22 @@ impl Renderer {
                          }
                      });
                  if gpu.origin != snapshot.origin {
@@ -9003,7 +9012,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                      gpu.origin = snapshot.origin;
                      static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                  }
-@@ -8999,21 +9697,40 @@ impl Renderer {
+@@ -8999,21 +9699,40 @@ impl Renderer {
                  frame.camera.y.floor() as i32,
                  frame.camera.z.floor() as i32,
              ];
@@ -9059,7 +9068,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
              static_bytes_uploaded += std::mem::size_of::<StaticEntityUniform>() as u64;
              self.static_entity_camera = Some(frame.camera);
          }
-@@ -9303,12 +10020,21 @@ impl Renderer {
+@@ -9303,12 +10022,21 @@ impl Renderer {
                  .as_ref()
                  .and_then(|p| p.1.as_ref())
                  .is_some_and(|p| p.has_weather());
@@ -9087,7 +9096,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          let (world_view, world_depth) = match &scaled {
              Some((color, depth)) => (color, depth),
              None => (&view_target, &self.depth),
-@@ -9431,6 +10157,11 @@ impl Renderer {
+@@ -9431,6 +10159,11 @@ impl Renderer {
                      indices: &self.indices,
                      flat: self.flat.as_ref(),
                      multi_draw: self.multi_draw,
@@ -9099,7 +9108,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                      looks: self.look_groups.as_ref(),
                  },
                  flat_frame,
-@@ -9502,7 +10233,7 @@ impl Renderer {
+@@ -9502,7 +10235,7 @@ impl Renderer {
                      ),
                      depth: target(
                          "Water mirror depth",
@@ -9108,7 +9117,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                          wgpu::TextureUsages::RENDER_ATTACHMENT,
                      ),
                  });
-@@ -9530,12 +10261,22 @@ impl Renderer {
+@@ -9530,12 +10263,22 @@ impl Renderer {
                      hdr_light: [0.0, 0.0, globals.hdr_light[2], 0.0],
                      ..globals
                  };
@@ -9137,7 +9146,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                  let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                      label: Some("Water mirror"),
                      timestamp_writes: self
-@@ -9564,6 +10305,9 @@ impl Renderer {
+@@ -9564,6 +10307,9 @@ impl Renderer {
                  pass.set_bind_group(0, &self.mirror_group, &[]);
                  if sky_visible && frame.skybox {
                      pass.set_pipeline(&self.sky);
@@ -9147,7 +9156,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                      pass.draw(0..3, 0..1);
                  }
                  // The solid terrain: occlusion culling is off with a mirror, so every draw
-@@ -9729,6 +10473,9 @@ impl Renderer {
+@@ -9729,6 +10475,9 @@ impl Renderer {
                          }
                          None => {
                              pass.set_pipeline(&self.sky_base);
@@ -9157,7 +9166,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                              pass.draw(0..3, 0..1);
                          }
                      }
-@@ -9793,6 +10540,9 @@ impl Renderer {
+@@ -9793,6 +10542,9 @@ impl Renderer {
                  }
                  if !frame.title && frame.dark_disc && !pack_draws_sky {
                      pass.set_pipeline(&self.dark_disc);
@@ -9167,7 +9176,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                      pass.draw(0..3, 0..1);
                  }
              }
-@@ -10780,6 +11530,9 @@ impl Renderer {
+@@ -10780,6 +11532,9 @@ impl Renderer {
                  pass.stage(self.own_timing.as_mut(), "hand");
                  pass.set_pipeline(&self.depth_reset);
                  pass.set_bind_group(0, &self.group, &[]);
@@ -9177,7 +9186,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                  pass.draw(0..3, 0..1);
                  self.draw_hand(&mut pass, hand_quads, world_quads + additive_quads);
              }
-@@ -10978,17 +11731,21 @@ impl Renderer {
+@@ -10978,17 +11733,21 @@ impl Renderer {
              let onto = (&view_target, &target_texture, generated);
              fg_made = self.draw_generated(&mut encoder, frame, &camera, &overlay, onto);
          } else if scaled.is_some() {
@@ -9206,7 +9215,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
                  None => (&self.depth, size),
              };
              native_render::world_drawn(&mut native_render::WorldDrawn {
-@@ -11376,6 +12133,7 @@ impl Renderer {
+@@ -11376,6 +12135,7 @@ impl Renderer {
              .and_then(|request| self.take_readback(request, encoder, target_texture));
          // GameRenderer.render: applyPostEffects, after the level and before the GUI.
          if !frame.title
@@ -9214,7 +9223,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
              && !frame.post_effects.effects.is_empty()
              && target_texture
                  .usage()
-@@ -11501,13 +12259,18 @@ impl Renderer {
+@@ -11501,13 +12261,18 @@ impl Renderer {
                      .unwrap_or(&self.debug_lines_on_top),
              });
              pass.set_bind_group(0, &self.crosshair_group, &[]);
@@ -9237,7 +9246,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
          let blur_at = menu_blur.map_or(0, |_| frame.hud.blur_at);
          self.hud.draw_range(
              encoder,
-@@ -12215,6 +12978,17 @@ mod tests {
+@@ -12215,6 +12980,17 @@ mod tests {
          assert!(u64::from(super::padded_row(w)) * u64::from(h) <= max, "{f}");
          assert!(f > 3.7, "{f}");
      }
@@ -9255,7 +9264,7 @@ index ade121700540ab728a674ac7928e2d27d63330eb..0f5ec9c08c6dd419c2d687dd15b0dabb
      #[test]
      fn drawable_size_skips_minimized_and_oversized_windows() {
          use super::drawable_size;
-@@ -13512,7 +14286,14 @@ impl DisplayReading {
+@@ -13512,7 +14288,14 @@ impl DisplayReading {
      /// What wgpu reads from the OS for `surface`'s display; without one, `hdr::offscreen_display`.
      fn read(surface: Option<&wgpu::Surface>, adapter: &wgpu::Adapter) -> Self {
          surface.map_or_else(hdr::offscreen_display, |s| {
@@ -9938,7 +9947,7 @@ index d7d8d805a47248e51d897aff17bde9cbd4bb7518..a945dbd72646bb374c5a50c86299cbab
          frame: &wgpu::TextureView,
 diff --git a/crates/horizon-client-render/src/gfx/fl91.rs b/crates/horizon-client-render/src/gfx/fl91.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..816c59dcb79e581e753ebc4ff7c151cdf32b8f8c
+index 0000000000000000000000000000000000000000..cba03d0aab46c57537b682e4eff3cf9a5a1cfb41
 --- /dev/null
 +++ b/crates/horizon-client-render/src/gfx/fl91.rs
 @@ -0,0 +1,1444 @@
@@ -11315,7 +11324,7 @@ index 0000000000000000000000000000000000000000..816c59dcb79e581e753ebc4ff7c151cd
 +        // 4. world_primitives_fl91, stars_fl91, panorama_fl91, border
 +        let prim = super::super::world_primitives::WorldPrimitives::new_with(
 +            &device,
-+            wgpu::TextureFormat::Bgra8Unorm,
++            (wgpu::TextureFormat::Bgra8Unorm, false),
 +            caps.depth_format,
 +            caps.separate_alpha,
 +            Some(std::sync::Arc::new(tiled)),
@@ -11323,7 +11332,7 @@ index 0000000000000000000000000000000000000000..816c59dcb79e581e753ebc4ff7c151cd
 +        drop(prim);
 +        let _stars = super::super::stars::Stars::new_with(
 +            &device,
-+            wgpu::TextureFormat::Bgra8Unorm,
++            (wgpu::TextureFormat::Bgra8Unorm, false),
 +            caps.depth_format,
 +            caps.separate_alpha,
 +            true,
@@ -13869,7 +13878,7 @@ index 36b6cf5a5a234605727cd6631518e4028d0b131a..f17325fac3484bd7327d38af48332191
  @group(0) @binding(8) var<uniform> params: Params;
  
 diff --git a/crates/horizon-client-render/src/hud.rs b/crates/horizon-client-render/src/hud.rs
-index 01178909a49bed65fcf14aa5621a2f6173eddb09..ecdc2339efc721c386d83d05fc10962fd70ca641 100644
+index 01178909a49bed65fcf14aa5621a2f6173eddb09..97b29bcce4f888e793c2579dde51e086bb89a5bd 100644
 --- a/crates/horizon-client-render/src/hud.rs
 +++ b/crates/horizon-client-render/src/hud.rs
 @@ -77,9 +77,8 @@ pub struct HudAtlas {
@@ -14473,13 +14482,24 @@ index 01178909a49bed65fcf14aa5621a2f6173eddb09..ecdc2339efc721c386d83d05fc10962f
          if let Some(pack_text) = &self.pack_text {
              pack_text.prepare(uploads, encoder, batch, size, batch.scale * self.zoom);
          }
-@@ -4106,6 +4298,16 @@ mod tests {
+@@ -4099,13 +4291,26 @@ mod tests {
+         let built = atlas.pixels.clone();
+         atlas.pack_pixels();
+         assert!(atlas.pixels.is_empty());
+-        assert!(atlas.packed.as_ref().unwrap().wait().len() < built.len());
++        let PackedPixels::Compressed(compressed) = atlas.packed.as_ref().unwrap().wait() else {
++            panic!("expected compressed pixels");
++        };
++        assert!(compressed.len() < built.len());
+         assert!(atlas.pixels() == built.as_slice());
+         // Packing again keeps the same image.
+         atlas.pack_pixels();
          assert!(atlas.pixels() == built.as_slice());
      }
      #[test]
 +    fn atlas_pixels_remain_available_when_compression_cannot_allocate() {
 +        let root = animated_root();
-+        let mut atlas = HudAtlas::build(&root).unwrap();
++        let mut atlas = HudAtlas::build(&ResourceSource::directory(root)).unwrap();
 +        let raw = Arc::new(std::mem::take(&mut atlas.pixels));
 +        let packed = pack_pixel_data_with(raw.clone(), |_| None);
 +        atlas.packed = Some(Arc::new(OnceLock::from(packed)));
@@ -16260,10 +16280,27 @@ index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..3a6f10d51d5603c09c246d45c95d118a
  # Do not enable (including via --all-features); integration is tracked in arismoko/horizon#3491.
  upstream-parallel-mobs = ["horizon-gameplay/upstream-parallel-mobs"]
 diff --git a/crates/horizon-client/assets/horizon/lang/en_us.json b/crates/horizon-client/assets/horizon/lang/en_us.json
-index a73ff9388e6ab2e14945fcc71494532a97e8f030..72c0430d4de6742ede19ab9022a3814020aaed46 100644
+index a73ff9388e6ab2e14945fcc71494532a97e8f030..3920c16c2bde41fcdbc978f0ecf7e78334b6bcbc 100644
 --- a/crates/horizon-client/assets/horizon/lang/en_us.json
 +++ b/crates/horizon-client/assets/horizon/lang/en_us.json
-@@ -1161,6 +1161,7 @@
+@@ -391,6 +391,7 @@
+   "Immediate": "Immediate",
+   "Vulkan": "Vulkan",
+   "DirectX 12": "DirectX 12",
++  "DirectX 11": "DirectX 11",
+   "OpenGL": "OpenGL",
+   "FPS and Graph": "FPS and Graph",
+   "FPS": "FPS",
+@@ -411,6 +412,8 @@
+   "The shader pack's picture is shown at Paper White.": "The shader pack's picture is shown at Paper White.",
+   "In scRGB, your desktop's own color setting applies.": "In scRGB, your desktop's own color setting applies.",
+   "Your GPU or graphics API doesn't support it.": "Your GPU or graphics API doesn't support it.",
++  "Temporal anti-aliasing is unavailable on this renderer.": "Temporal anti-aliasing is unavailable on this renderer.",
++  "The D3D11 compatibility renderer does not support this effect.": "The D3D11 compatibility renderer does not support this effect.",
+   "Not with software rendering, which runs it on the CPU.": "Not with software rendering, which runs it on the CPU.",
+   "Out of video memory: off until the next start.": "Out of video memory: off until the next start.",
+   "The graphics device was lost: off until the next start.": "The graphics device was lost: off until the next start.",
+@@ -1161,6 +1164,7 @@
    "This button also does: %s": "This button also does: %s",
    "Not bound: press this row, then the button that should do it.": "Not bound: press this row, then the button that should do it.",
    "horizon.pad.action.radial": "Radial Menu",
@@ -125615,6 +125652,39 @@ index 31d39f571c6dfad972d49c1c803f86570d561fe5..d8a03d36c9f5e26b44d6a87b492b5a9f
              // One of Horizon's own packs (game/modding/native_shaders.rs).
              self.tick_native_shader_pack(&path);
          } else if let Some(renderer) = &mut self.renderer
+diff --git a/crates/horizon-client-render/src/gfx/output.rs b/crates/horizon-client-render/src/gfx/output.rs
+index a6aa821e45f4bbeeefcba83117fbabfada44c527..4c3ab30db38afef611676fbabf4dfd5dfab77cb4 100644
+--- a/crates/horizon-client-render/src/gfx/output.rs
++++ b/crates/horizon-client-render/src/gfx/output.rs
+@@ -173,6 +173,10 @@ pub struct EffectiveOutput {
+     pub(crate) pack_lights: bool,
+     /// The renderer can draw 4x terrain MSAA (`Renderer::output`).
+     pub(crate) msaa: bool,
++    /// The world post-processing path can apply FXAA, TAA and sharpening.
++    pub(crate) world_post: bool,
++    /// TAA resources were successfully created for this backend.
++    pub(crate) taa: bool,
+     /// What its ray tracing is to a pack that asks for it; `None` before a renderer.
+     pub(crate) rays: Option<RayStatus>,
+ }
+@@ -218,6 +222,8 @@ impl EffectiveOutput {
+         compositor: false,
+         pack_lights: false,
+         msaa: false,
++        world_post: true,
++        taa: true,
+         rays: None,
+     };
+     /// This output while a shader pack runs (`pack`), a `shaders/` one or one of Horizon's
+@@ -357,6 +363,8 @@ pub(crate) fn resolve_output(
+         compositor: reading.compositor,
+         pack_lights: false,
+         msaa: false,
++        world_post: true,
++        taa: true,
+         rays: None,
+     }
+ }
 diff --git a/crates/horizon-client-render/src/gfx/pack_post.rs b/crates/horizon-client-render/src/gfx/pack_post.rs
 index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..570b079e498e77f0036696bc5554ebe203d97b77 100644
 --- a/crates/horizon-client-render/src/gfx/pack_post.rs
@@ -125631,6 +125701,218 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..570b079e498e77f0036696bc5554ebe2
              .then(|| super::pack_hand::PackHand::new(device, &draws.layout));
          let hand = post.hand.zip(hand_geometry).and_then(|(p, geometry)| {
              let g = Geometry {
+diff --git a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs b/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
+index 50bed31b356a4dbafe71684cb6659d946a98046a..dc5cc96c3b0381b60c9d653d92ca639948d0c0a7 100644
+--- a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
++++ b/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
+@@ -57,7 +57,7 @@ fn a_pass_samples_a_sprite_layer_sharp() {
+         dimension: Some(wgpu::TextureViewDimension::D2Array),
+         ..Default::default()
+     });
+-    let views = super::sprite_views(&textures, &unused, Some(1));
++    let views = super::sprite_views(&textures, &unused, Some(1), false);
+     let nearest = device.create_sampler(&super::SPRITE_NEAREST);
+     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+         label: None,
+diff --git a/crates/horizon-client-render/src/graphics_ui.rs b/crates/horizon-client-render/src/graphics_ui.rs
+index 8d1a371b807786017f29008d9f9a2cfa4fec9c3b..193e41e79ab1439bd930e7ec165b2d8980f8f7e2 100644
+--- a/crates/horizon-client-render/src/graphics_ui.rs
++++ b/crates/horizon-client-render/src/graphics_ui.rs
+@@ -953,14 +953,28 @@ impl H {
+             H::TargetFps => labelled("Target FPS", g.target_fps),
+             H::Antialiasing => labelled(
+                 "Anti-aliasing",
+-                match (g.msaa4x && out.msaa, g.fxaa, g.taa) {
++                match (
++                    g.msaa4x && out.msaa,
++                    g.fxaa && out.world_post,
++                    g.taa && out.world_post && out.taa,
++                ) {
+                     (true, _, _) => "4x MSAA",
+                     (_, _, true) => "TAA",
+                     (_, true, false) => "FXAA",
+                     (_, false, false) => "Off",
+                 },
+             ),
+-            H::Upscaling => labelled("Upscaling", g.upscaling.label()),
++            H::Upscaling => labelled(
++                "Upscaling",
++                if out.world_post && out.taa {
++                    g.upscaling.label()
++                } else {
++                    Upscaling::Native.label()
++                },
++            ),
++            H::UpscalingSharpness if !out.world_post || !out.taa => {
++                labelled("Upscaling Sharpness", "Off")
++            }
+             H::UpscalingSharpness => {
+                 labelled("Upscaling Sharpness", format!("{}%", g.upscaling_sharpness))
+             }
+@@ -1098,16 +1112,29 @@ impl H {
+             H::PresentMode => g.present_mode = step(&PresentMode::ALL, g.present_mode, back),
+             // Off, FXAA, TAA, and 4x MSAA where the renderer can draw it.
+             H::Antialiasing => {
+-                let modes = if out.msaa { 4 } else { 3 };
+-                let i = if g.msaa4x {
++                // Cycle only through modes available on this renderer.
++                let mut modes = vec![0];
++                if out.world_post {
++                    modes.push(1);
++                }
++                if out.world_post && out.taa {
++                    modes.push(2);
++                }
++                if out.msaa {
++                    modes.push(3);
++                }
++                let current = if g.msaa4x && out.msaa {
+                     3
+-                } else if g.taa {
++                } else if g.taa && out.world_post && out.taa {
+                     2
++                } else if g.fxaa && out.world_post {
++                    1
+                 } else {
+-                    usize::from(g.fxaa)
++                    0
+                 };
+-                let i = (i + if back { modes - 1 } else { 1 }) % modes;
+-                (g.fxaa, g.taa, g.msaa4x) = (i == 1, i == 2, i == 3);
++                let i = modes.iter().position(|&mode| mode == current).unwrap_or(0);
++                let mode = modes[(i + if back { modes.len() - 1 } else { 1 }) % modes.len()];
++                (g.fxaa, g.taa, g.msaa4x) = (mode == 1, mode == 2, mode == 3);
+                 if !g.taa {
+                     g.upscaling = Upscaling::Native;
+                 }
+@@ -1239,6 +1266,15 @@ impl Item {
+             {
+                 Some("Only applies to asynchronous entity culling.")
+             }
++            Item::Horizon(H::Antialiasing) if !out.world_post && !out.msaa => {
++                Some("The D3D11 compatibility renderer does not support this effect.")
++            }
++            Item::Horizon(H::Upscaling | H::UpscalingSharpness) if !out.world_post => {
++                Some("The D3D11 compatibility renderer does not support this effect.")
++            }
++            Item::Horizon(H::Upscaling | H::UpscalingSharpness) if !out.taa => {
++                Some("Temporal anti-aliasing is unavailable on this renderer.")
++            }
+             Item::Horizon(H::GpuCulling) => crate::graphics::gpu_culling_offer().reason(),
+             // VideoSettingsScreen.tick: Max Anisotropy only works with Anisotropic filtering.
+             Item::Vanilla(Opt::MaxAnisotropy) if s.file.int("textureFiltering") != 2 => {
+@@ -2395,6 +2431,92 @@ mod tests {
+         assert!(shown(upscaling, &s));
+     }
+ 
++    #[test]
++    fn fl91_post_settings_report_effective_state_and_keep_preferences() {
++        let mut s = Settings::default();
++        s.horizon.taa = true;
++        s.horizon.upscaling = Upscaling::ALL[1];
++        s.horizon.upscaling_sharpness = 75;
++        let saved_upscale = s.horizon.upscaling;
++        let out = EffectiveOutput {
++            world_post: false,
++            ..NONE
++        };
++        let aa = Item::Horizon(H::Antialiasing);
++        let upscale = Item::Horizon(H::Upscaling);
++        let sharpness = Item::Horizon(H::UpscalingSharpness);
++        assert_eq!(aa.label(&s, &out).plain(), "Anti-aliasing: Off");
++        assert_eq!(upscale.label(&s, &out).plain(), "Upscaling: Native");
++        for item in [aa, upscale, sharpness] {
++            assert!(item.blocked(&s, &out).is_some());
++            item.cycle(&mut s, false, [854, 480], &out);
++            item.set_slider(&mut s, 0.0, &out);
++        }
++        assert!(s.horizon.taa);
++        assert_eq!(s.horizon.upscaling, saved_upscale);
++        assert_eq!(s.horizon.upscaling_sharpness, 75);
++        let msaa = EffectiveOutput { msaa: true, ..out };
++        assert!(aa.blocked(&s, &msaa).is_none());
++        aa.cycle(&mut s, false, [854, 480], &msaa);
++        assert_eq!(aa.label(&s, &msaa).plain(), "Anti-aliasing: 4x MSAA");
++    }
++
++    #[test]
++    fn post_preferences_survive_restart_and_renderer_switches() {
++        let mut s = Settings::default();
++        s.horizon.taa = true;
++        s.horizon.upscaling = Upscaling::Balanced;
++        s.horizon.upscaling_sharpness = 75;
++        let saved = s.horizon.serialize();
++        let unsupported = EffectiveOutput {
++            world_post: false,
++            ..NONE
++        };
++        let aa = Item::Horizon(H::Antialiasing);
++        let upscale = Item::Horizon(H::Upscaling);
++        s.horizon = crate::graphics::Graphics::parse(&saved);
++        assert_eq!(aa.label(&s, &unsupported).plain(), "Anti-aliasing: Off");
++        assert_eq!(upscale.label(&s, &unsupported).plain(), "Upscaling: Native");
++        assert_eq!(s.horizon.serialize(), saved);
++        assert_eq!(aa.label(&s, &NONE).plain(), "Anti-aliasing: TAA");
++        assert_eq!(upscale.label(&s, &NONE).plain(), "Upscaling: Balanced");
++        assert_eq!(s.horizon.upscaling_sharpness, 75);
++
++        // A saved MSAA selection also has a finite, predictable cycle when switching
++        // to a renderer without MSAA: its effective Off advances to FXAA.
++        s.horizon.msaa4x = true;
++        s.horizon.taa = false;
++        s.horizon.upscaling = Upscaling::Native;
++        assert_eq!(aa.label(&s, &NONE).plain(), "Anti-aliasing: Off");
++        aa.cycle(&mut s, false, [854, 480], &NONE);
++        assert_eq!(aa.label(&s, &NONE).plain(), "Anti-aliasing: FXAA");
++    }
++
++    #[test]
++    fn unavailable_taa_is_skipped_and_preferences_wait_for_a_capable_renderer() {
++        let mut s = Settings::default();
++        s.horizon.taa = true;
++        s.horizon.upscaling = Upscaling::Quality;
++        let out = EffectiveOutput {
++            taa: false,
++            msaa: true,
++            ..NONE
++        };
++        let aa = Item::Horizon(H::Antialiasing);
++        let upscale = Item::Horizon(H::Upscaling);
++        assert_eq!(aa.label(&s, &out).plain(), "Anti-aliasing: Off");
++        assert_eq!(upscale.label(&s, &out).plain(), "Upscaling: Native");
++        assert!(upscale.blocked(&s, &out).is_some());
++        assert_eq!(aa.label(&s, &NONE).plain(), "Anti-aliasing: TAA");
++        for expected in ["FXAA", "4x MSAA", "Off"] {
++            aa.cycle(&mut s, false, [854, 480], &out);
++            assert_eq!(
++                aa.label(&s, &out).plain(),
++                format!("Anti-aliasing: {expected}")
++            );
++        }
++    }
++
+     #[test]
+     fn entity_culling_modes_are_opt_in_and_cycle_from_its_row() {
+         let mut s = Settings::default();
+@@ -2992,6 +3114,18 @@ mod tests {
+             ] {
+                 lang::get(text);
+             }
++            // The compatibility renderer's effective post labels and unavailable reasons.
++            let s = Settings::default();
++            let fl91 = EffectiveOutput {
++                world_post: false,
++                ..NONE
++            };
++            for h in [H::Antialiasing, H::Upscaling, H::UpscalingSharpness] {
++                let item = Item::Horizon(h);
++                item.label(&s, &fl91);
++                lang::get(item.blocked(&s, &fl91).unwrap());
++            }
++            lang::get("Temporal anti-aliasing is unavailable on this renderer.");
+             // Every reason GPU Culling's switch can give, whatever this device offers.
+             use crate::graphics::GpuCullingOffer as O;
+             for offer in [
 diff --git a/crates/horizon-shaders/src/post.rs b/crates/horizon-shaders/src/post.rs
 index 59b77599fcd5cbfb440986962db9da1e93ed1408..b120fd987f0bf17e1420385015b037ee267a2d0d 100644
 --- a/crates/horizon-shaders/src/post.rs
