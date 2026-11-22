@@ -125686,7 +125686,7 @@ index a6aa821e45f4bbeeefcba83117fbabfada44c527..4c3ab30db38afef611676fbabf4dfd5d
      }
  }
 diff --git a/crates/horizon-client-render/src/gfx/pack_post.rs b/crates/horizon-client-render/src/gfx/pack_post.rs
-index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..c01de61558007d583d8492dd5483057d1f03083e 100644
+index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..8d3041736002561a93726f62af49019ab7573041 100644
 --- a/crates/horizon-client-render/src/gfx/pack_post.rs
 +++ b/crates/horizon-client-render/src/gfx/pack_post.rs
 @@ -1124,26 +1124,37 @@ fn helper(
@@ -125872,6 +125872,30 @@ index d38b09e80f7ffc3a8a55f2a33c40a27b4a7c2e2e..c01de61558007d583d8492dd5483057d
                              wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                          ),
                      ],
+@@ -6106,6 +6165,7 @@ mod tests {
+         let reads = |group: Group| {
+             let (_, samplers, ..) = bindings(
+                 device.features(),
++                wgpu::ShaderStages::VERTEX_FRAGMENT,
+                 &interface,
+                 "composite",
+                 group,
+@@ -6198,6 +6258,7 @@ mod tests {
+         };
+         let (_, samplers, ..) = bindings(
+             device.features(),
++            wgpu::ShaderStages::VERTEX_FRAGMENT,
+             &interface,
+             "final",
+             Group::Final,
+@@ -6279,6 +6340,7 @@ mod tests {
+         let mut notes = Vec::new();
+         let (.., images) = bindings(
+             device.features(),
++            wgpu::ShaderStages::VERTEX_FRAGMENT,
+             &interface,
+             "composite",
+             Group::Composite,
 diff --git a/crates/horizon-client-render/src/gfx/pack_post/undrawn_terrain_tests.rs b/crates/horizon-client-render/src/gfx/pack_post/undrawn_terrain_tests.rs
 index 2be178922241c8994d7e93962d64e3d25af68888..e425a73a3772e0efb979525d6ccd527339ce92cd 100644
 --- a/crates/horizon-client-render/src/gfx/pack_post/undrawn_terrain_tests.rs
