@@ -702,6 +702,7 @@ public sealed partial class MainWindow : Window
         {
             var arch = SelectedArchitecture;
             var architectures = SelectedArchitectures();
+            string? recipeBlocker = null;
             foreach (var patch in catalog.Patches.OrderByDescending(item => new Version(item.Version)))
                 foreach (var client in catalog.Clients.OrderByDescending(item => new Version(item.Version)))
                 {
@@ -709,13 +710,18 @@ public sealed partial class MainWindow : Window
                         patch.Version, client.Version, CatalogTrust.BuilderVersion, targetArch)).ToArray();
                     if (checks.Length > 0 && checks.All(check => check.Allowed))
                     {
+                        if (LocalBuildRunner.RecipeBlocker(patch, client) is { } blocker)
+                        {
+                            recipeBlocker ??= blocker;
+                            continue;
+                        }
                         var combined = new CompatibilityResult(true, checks.All(check => check.BuildVerified), checks.All(check => check.DeviceVerified),
                             string.Join(" ", checks.Select(check => check.Reason).Distinct(StringComparer.Ordinal)));
                         ReleaseSelection.Items.Add(new ReleaseChoice(patch.Version, client.Version, arch, combined));
                     }
                 }
             ReleaseStatus.Text = ReleaseSelection.Items.Count == 0
-                ? "No catalog release is declared compatible with every selected architecture and this builder."
+                ? recipeBlocker ?? "No catalog release is declared compatible with every selected architecture and this builder."
                 : "The signed catalog was verified. Choose a release that supports every selected architecture.";
         }
         var matching = previous is null ? null : ReleaseSelection.Items.OfType<ReleaseChoice>()

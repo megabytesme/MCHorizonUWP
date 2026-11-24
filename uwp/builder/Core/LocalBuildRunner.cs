@@ -71,23 +71,36 @@ public static class LocalBuildRunner
         ArgumentNullException.ThrowIfNull(release);
         var arch = selection.Target switch { TargetProfile.DesktopX64 => "x64", TargetProfile.DesktopX86 => "x86",
             TargetProfile.SurfaceProX => "arm64", TargetProfile.WindowsMobile => "arm", _ => "" };
-        if (arch.Length == 0 || !release.Compatibility.Allowed || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion
-            || (release.Client.Version is not ("0.1.3" or "0.1.4" or LocalRecipe.ClientVersion) && !NightlyUwp.IsClient(release.Client.Version))
-            || release.Patch.Bridge != release.Client.Bridge
-            || release.Patch.UpstreamCommit.Length != 40 || release.Patch.UpstreamCommit.Any(character => !Uri.IsHexDigit(character)))
-            throw new InvalidOperationException("The prepared release does not match this build recipe and target.");
+        if (!release.Compatibility.Allowed)
+            throw new InvalidOperationException(release.Compatibility.Reason);
+        if (arch.Length == 0 || release.Architecture != arch || release.BuilderVersion != CatalogTrust.BuilderVersion)
+            throw new InvalidOperationException("The prepared release does not match this Builder version and target architecture.");
+        if (RecipeBlocker(release.Patch, release.Client) is { } blocker)
+            throw new InvalidOperationException(blocker);
         if (NightlyUwp.Matches(release.Patch.UpstreamCommit))
         {
-            if (!NightlyUwp.MatchesRecipe(release.Patch.UpstreamCommit, release.Patch.Version, release.Client.Version))
-                throw new InvalidOperationException("This UWP Nightly requires its matching patch and client.");
             if (selection.RegistryNativeMods is { Count: > 0 })
                 throw new InvalidOperationException(NightlyUwp.PublicNativeModsUnavailable);
         }
-        else if (NightlyUwp.IsClient(release.Client.Version))
-            throw new InvalidOperationException("This client requires the matching UWP Nightly.");
         if (selection.EmbedsNativeSources && (!NightlyUwp.Matches(release.Patch.UpstreamCommit)
             || !NightlyUwp.SupportsNativeSource(release.Patch.Version, release.Client.Version)))
             throw new InvalidOperationException("Native source builds require a compatible Horizon UWP Nightly patch and client.");
+    }
+
+    /// <summary>Explains why a catalog pair cannot run through this Builder's local recipe.</summary>
+    public static string? RecipeBlocker(CatalogPatch patch, CatalogClient client)
+    {
+        if (patch.Bridge != client.Bridge)
+            return "The Horizon patch and UWP client require different bridge interfaces.";
+        if (patch.UpstreamCommit.Length != 40 || patch.UpstreamCommit.Any(character => !Uri.IsHexDigit(character)))
+            return "The Horizon patch does not pin a valid source revision.";
+        if (NightlyUwp.Matches(patch.UpstreamCommit))
+            return NightlyUwp.MatchesRecipe(patch.UpstreamCommit, patch.Version, client.Version)
+                ? null : "This UWP Nightly requires its matching patch and client.";
+        if (NightlyUwp.IsClient(client.Version))
+            return "This client requires the matching UWP Nightly.";
+        return client.Version is "0.1.3" or "0.1.4" or LocalRecipe.ClientVersion
+            ? null : $"This Builder has no recipe for UWP client {client.Version}.";
     }
 
     private static async Task<LocalBuildResult> RunCoreAsync(string source, string? resources, BuildSelection selection,

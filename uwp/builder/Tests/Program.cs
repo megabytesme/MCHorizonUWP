@@ -2067,6 +2067,14 @@ static async Task TestReleaseSource()
             nativeCandidate.Client with { Version = NightlyUwp.November20Client },
             nativeCandidate.Compatibility, CatalogTrust.BuilderVersion, "x64");
         LocalBuildRunner.ValidatePreparedRelease(november20, trustedSourceSelection);
+        Require(LocalBuildRunner.RecipeBlocker(november20.Patch, november20.Client) is null,
+            "a supported November 20 pair is available in Builder");
+        Require(LocalBuildRunner.RecipeBlocker(november20.Patch, november20.Client with { Version = NightlyUwp.HdrClient })
+            == "This UWP Nightly requires its matching patch and client.",
+            "Builder explains a Nightly patch and client recipe mismatch");
+        Require(LocalBuildRunner.RecipeBlocker(recipe.Patch, recipe.Client with { Version = "9.0.0" })
+            == "This Builder has no recipe for UWP client 9.0.0.",
+            "Builder explains why a catalog-compatible future client is unavailable");
         Require(!NightlyUwp.MatchesRecipe(NightlyUwp.UpstreamCommit, NightlyUwp.November20Patch, NightlyUwp.November20Client)
             && !NightlyUwp.MatchesRecipe(NightlyUwp.November20Commit, NightlyUwp.CandidatePatchVersion, NightlyUwp.CandidateClientVersion),
             "Nightly recipes reject source and SDK mismatches");
