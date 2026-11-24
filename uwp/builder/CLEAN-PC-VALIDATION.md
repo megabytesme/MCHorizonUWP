@@ -1,5 +1,10 @@
 # Fresh-PC builder validation (2026-11-06)
 
+The original compact-toolchain work records fresh dependency provisioning,
+the early client selection guard, and the first Sandbox results. Those
+results apply to the Builder and client versions recorded there.
+[Original validation record](https://github.com/megabytesme/MCHorizonUWP/blob/6ea75f2a8a4a48315f3792e7ad7af07069a1ee93/uwp/builder/CLEAN-PC-VALIDATION.md)
+
 The latest-source clean-PC acceptance test is **in progress**. A fresh Sandbox
 resolved dependencies for all four architectures in about 5 minutes 46
 seconds. The first build attempt stopped at the recipe guard because the
