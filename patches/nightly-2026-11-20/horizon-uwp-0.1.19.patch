@@ -17178,10 +17178,23 @@ index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..7e71634c29d211cccf90fa8286eb40df
  # Do not enable (including via --all-features); integration is tracked in arismoko/horizon#3491.
  upstream-parallel-mobs = ["horizon-gameplay/upstream-parallel-mobs"]
 diff --git a/crates/horizon-client/assets/horizon/lang/en_us.json b/crates/horizon-client/assets/horizon/lang/en_us.json
-index a73ff9388e6ab2e14945fcc71494532a97e8f030..3920c16c2bde41fcdbc978f0ecf7e78334b6bcbc 100644
+index a73ff9388e6ab2e14945fcc71494532a97e8f030..a8bc43fec12159afaf5228a9b58692583beb994b 100644
 --- a/crates/horizon-client/assets/horizon/lang/en_us.json
 +++ b/crates/horizon-client/assets/horizon/lang/en_us.json
-@@ -391,6 +391,7 @@
+@@ -12,6 +12,12 @@
+   "horizon.extras.pregen": "Chunk pregeneration",
+   "horizon.extras.pregen.tooltip": "Enables /pregen in your single-player and LAN worlds. With cheats enabled, use /pregen start to generate an area before exploring it. Does not enable the command on servers you join.",
+   "horizon.options.controller": "Controller",
++  "horizon.uwp.narrator.title": "Narrator voice",
++  "horizon.uwp.narrator.description": "Choose an installed Windows voice for the game narrator.",
++  "horizon.uwp.narrator.default": "System default",
++  "horizon.uwp.narrator.preview": "Preview voice",
++  "horizon.uwp.narrator.sample": "This is the Horizon narrator.",
++  "horizon.uwp.narrator.unavailable": "Windows narrator voices are unavailable.",
+   "horizon.options.three_d_skin_layers": "3D Skin Layers",
+   "horizon.options.vibration": "Vibration",
+   "horizon.options.block_vibration": "Haptic Feedback from Bedrock",
+@@ -391,6 +397,7 @@
    "Immediate": "Immediate",
    "Vulkan": "Vulkan",
    "DirectX 12": "DirectX 12",
@@ -17189,7 +17202,7 @@ index a73ff9388e6ab2e14945fcc71494532a97e8f030..3920c16c2bde41fcdbc978f0ecf7e783
    "OpenGL": "OpenGL",
    "FPS and Graph": "FPS and Graph",
    "FPS": "FPS",
-@@ -411,6 +412,8 @@
+@@ -411,6 +418,8 @@
    "The shader pack's picture is shown at Paper White.": "The shader pack's picture is shown at Paper White.",
    "In scRGB, your desktop's own color setting applies.": "In scRGB, your desktop's own color setting applies.",
    "Your GPU or graphics API doesn't support it.": "Your GPU or graphics API doesn't support it.",
@@ -17198,7 +17211,7 @@ index a73ff9388e6ab2e14945fcc71494532a97e8f030..3920c16c2bde41fcdbc978f0ecf7e783
    "Not with software rendering, which runs it on the CPU.": "Not with software rendering, which runs it on the CPU.",
    "Out of video memory: off until the next start.": "Out of video memory: off until the next start.",
    "The graphics device was lost: off until the next start.": "The graphics device was lost: off until the next start.",
-@@ -1161,6 +1164,7 @@
+@@ -1161,6 +1170,7 @@
    "This button also does: %s": "This button also does: %s",
    "Not bound: press this row, then the button that should do it.": "Not bound: press this row, then the button that should do it.",
    "horizon.pad.action.radial": "Radial Menu",
@@ -17792,15 +17805,16 @@ index 22e09156bba684cda5d0568202843df782fd43dc..3195cea9d31b17fe7f771bb7b1b4c6a6
              && let Some(window) = &self.window
          {
 diff --git a/crates/horizon-client/src/game/interface/narrator.rs b/crates/horizon-client/src/game/interface/narrator.rs
-index 712c8418397..4acb0851612 100644
+index 712c841839702e5d13a7b92b03c00c694f79c888..fd3974d25340dd9152624ff2ca89fa154496d306 100644
 --- a/crates/horizon-client/src/game/interface/narrator.rs
 +++ b/crates/horizon-client/src/game/interface/narrator.rs
-@@ -15,6 +15,94 @@ use horizon_narrator::{Status, screen::Trigger};
+@@ -15,6 +15,102 @@ use horizon_narrator::{Status, screen::Trigger};
  use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
  use winit::keyboard::{KeyCode, PhysicalKey};
  
 +#[cfg(target_vendor = "uwp")]
 +pub(in crate::game) mod voice_settings {
++    use horizon_client::lang;
 +    use horizon_client::mod_list::{
 +        Installed, ModList, NativePage, NativeSetting, NativeSettingValue,
 +    };
@@ -17813,8 +17827,8 @@ index 712c8418397..4acb0851612 100644
 +        mods.installed.retain(|row| row.id != ID);
 +        mods.installed.push(Installed {
 +            id: ID.into(),
-+            title: "Narrator voice".into(),
-+            description: "Choose and preview the Windows narrator voice.".into(),
++            title: lang::get("horizon.uwp.narrator.title"),
++            description: lang::get("horizon.uwp.narrator.description"),
 +            problem: None,
 +            dev: true,
 +            native: Some(NativePage::default()),
@@ -17828,12 +17842,19 @@ index 712c8418397..4acb0851612 100644
 +        };
 +        let mut voices = CHOICES.lock().unwrap_or_else(|error| error.into_inner());
 +        *voices = horizon_narrator::voices().unwrap_or_default();
++        row.title = lang::get("horizon.uwp.narrator.title");
++        if voices.is_empty() {
++            row.description = lang::get("horizon.uwp.narrator.unavailable");
++            row.native = Some(NativePage::default());
++            return true;
++        }
++        row.description = lang::get("horizon.uwp.narrator.description");
 +        let selected = voices.iter().position(|v| v.selected).unwrap_or(0);
 +        let options = voices
 +            .iter()
 +            .map(|v| {
 +                if v.id.is_empty() {
-+                    "System default".into()
++                    lang::get("horizon.uwp.narrator.default")
 +                } else {
 +                    format!("{} ({})", v.name, v.language)
 +                }
@@ -17844,7 +17865,7 @@ index 712c8418397..4acb0851612 100644
 +            settings: vec![
 +                NativeSetting {
 +                    key: "voice".into(),
-+                    label: "Narrator voice".into(),
++                    label: lang::get("horizon.uwp.narrator.title"),
 +                    tooltip: None,
 +                    value: NativeSettingValue::Choice {
 +                        options,
@@ -17853,7 +17874,7 @@ index 712c8418397..4acb0851612 100644
 +                },
 +                NativeSetting {
 +                    key: "preview".into(),
-+                    label: "Preview voice".into(),
++                    label: lang::get("horizon.uwp.narrator.preview"),
 +                    tooltip: None,
 +                    value: NativeSettingValue::Toggle(false),
 +                },
@@ -17880,7 +17901,7 @@ index 712c8418397..4acb0851612 100644
 +                }
 +            }
 +        } else if j == 1 {
-+            horizon_narrator::preview_voice("This is the Horizon narrator.");
++            horizon_narrator::preview_voice(&lang::get("horizon.uwp.narrator.sample"));
 +        }
 +        refresh(mods, i);
 +        true
