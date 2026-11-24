@@ -63,6 +63,16 @@ class PackagedSourceTests(unittest.TestCase):
         record = json.loads((self.output / "build-record.json").read_bytes())
         self.assertEqual(record["game_build_id"], game)
 
+    def test_stage_native_source_for_narrator_candidate(self):
+        pins = STAGER["STAGING"]
+        game = "mchorizonuwp-0.1.19-patch-0.1.19-x64-" + pins["NOV20_UPSTREAM"]
+        fixture = shutil.copytree(FIXTURE, self.workspace / "narrator-fixture")
+        manifest = fixture / "horizon-mod.toml"
+        manifest.write_text(manifest.read_text().replace(pins["UPSTREAM"], pins["NOV20_UPSTREAM"]))
+        STAGER["stage"](self.workspace, "x64", [fixture], game)
+        record = json.loads((self.output / "build-record.json").read_bytes())
+        self.assertEqual(record["game_build_id"], game)
+
     def test_two_native_sources_preserve_manifests_in_sorted_package_inventory(self):
         dependent = PROBE / "hook-after-source"
         STAGER["stage"](self.workspace, "x64", [FIXTURE, dependent], GAME)

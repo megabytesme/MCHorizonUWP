@@ -83,7 +83,7 @@ $buildPattern = '^mchorizonuwp-[0-9]+\.[0-9]+\.[0-9]+-patch-[0-9]+\.[0-9]+\.[0-9
     $architecture + '-0b14f8acfd97fa2c750e42795249dcc981178ca4$'
 $november20 = @(
     '0.1.14-patch-0.1.13', '0.1.15-patch-0.1.13', '0.1.16-patch-0.1.14', '0.1.17-patch-0.1.15'
-    '0.1.18-patch-0.1.16', '0.1.18-patch-0.1.17', '0.1.18-patch-0.1.18'
+    '0.1.18-patch-0.1.16', '0.1.18-patch-0.1.17', '0.1.18-patch-0.1.18', '0.1.19-patch-0.1.19'
 ) | ForEach-Object {
     "mchorizonuwp-$_-$architecture-0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
 }

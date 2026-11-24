@@ -1,4 +1,5 @@
 import importlib.util
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -49,6 +50,20 @@ class NativeSourceTests(unittest.TestCase):
             cargo.write('external-proc-macro = "1"\n')
         with self.assertRaisesRegex(ValueError, "other dependencies"):
             STAGER.read_source(self.mod)
+
+    def test_november20_packager_and_stager_allowlists_match(self):
+        powershell = (PROBE / "package-modpack.ps1").read_text(encoding="utf-8")
+        block = powershell.split("$november20 = @(\n", 1)[1].split("\n) | ForEach-Object", 1)[0]
+        pairs = set(re.findall(r"'([0-9.]+)-patch-([0-9.]+)'", block))
+        for arch in ("x86", "x64", "arm64"):
+            actual = set(STAGER.november20_build_ids(arch))
+            expected = {f"mchorizonuwp-{client}-patch-{patch}-{arch}-{STAGER.NOV20_UPSTREAM}"
+                        for client, patch in pairs}
+            self.assertEqual(actual, expected)
+            self.assertIn(f"mchorizonuwp-0.1.19-patch-0.1.19-{arch}-{STAGER.NOV20_UPSTREAM}", actual)
+            self.assertNotIn(f"mchorizonuwp-0.1.19-patch-0.1.18-{arch}-{STAGER.NOV20_UPSTREAM}", actual)
+            self.assertNotIn(f"mchorizonuwp-0.1.18-patch-0.1.19-{arch}-{STAGER.NOV20_UPSTREAM}", actual)
+            self.assertNotIn(f"mchorizonuwp-0.1.19-patch-0.1.19-{arch}-{'a' * 40}", actual)
 
     def test_detects_other_nightly_and_wrong_target_identity(self):
         path = self.mod / "horizon-mod.toml"
