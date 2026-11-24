@@ -55,6 +55,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "../../host/Narrator.h"
 
 using namespace Windows::ApplicationModel::Activation;
 using namespace Windows::ApplicationModel::Core;
@@ -2608,6 +2609,91 @@ void update_navigation_surface(DependencyObject^ node) {
     for (int i = 0; i < count; ++i) update_navigation_surface(VisualTreeHelper::GetChild(node, i));
 }
 
+Border^ narrator_card() {
+    namespace speech = horizon_uwp::narrator;
+    auto panel = ref new StackPanel();
+    panel->Children->Append(text(L"Narrator", 18));
+    auto voices = ref new ComboBox();
+    voices->Header = L"Narrator voice";
+    auto status = text(L"", 14);
+    auto preview = std::make_shared<std::unique_ptr<speech::Speech>>();
+    auto timer = ref new DispatcherTimer();
+    TimeSpan interval{};
+    interval.Duration = 500000; // 50 ms
+    timer->Interval = interval;
+    timer->Tick += ref new EventHandler<Platform::Object^>([preview, status](Platform::Object^ sender, Platform::Object^) {
+        if (!*preview) return;
+        const auto result = (*preview)->poll();
+        if (result == S_FALSE) return;
+        safe_cast<DispatcherTimer^>(sender)->Stop();
+        preview->reset();
+        if (FAILED(result)) status->Text = L"The narrator voice could not be played.";
+    });
+    panel->Unloaded += ref new RoutedEventHandler([preview, timer](Platform::Object^, RoutedEventArgs^) {
+        timer->Stop();
+        preview->reset();
+    });
+    auto add_voice = [voices](Platform::String^ label, Platform::String^ id) {
+        auto item = ref new ComboBoxItem();
+        item->Content = label;
+        item->Tag = id;
+        voices->Items->Append(item);
+    };
+    add_voice(L"System default", L"");
+    int selected = 0;
+    try {
+        const auto saved = speech::saved_voice();
+        const auto installed = speech::SpeechSynthesizer::AllVoices;
+        for (unsigned i = 0; i < installed->Size; ++i) {
+            const auto voice = installed->GetAt(i);
+            if (voice->Id == saved) selected = static_cast<int>(voices->Items->Size);
+            auto label = voice->DisplayName + L" (" + voice->Language + L")";
+            add_voice(label, voice->Id);
+        }
+        if (voices->Items->Size == 1) status->Text = L"Windows reports no installed narrator voices.";
+    } catch (Platform::Exception^) {
+        voices->IsEnabled = false;
+        status->Text = L"Windows narrator voices are unavailable.";
+    }
+    voices->SelectedIndex = selected;
+    auto saved_index = std::make_shared<int>(selected);
+    voices->SelectionChanged += ref new SelectionChangedEventHandler(
+        [saved_index, preview, timer, status](Platform::Object^ sender, SelectionChangedEventArgs^) {
+            auto combo = safe_cast<ComboBox^>(sender);
+            auto item = dynamic_cast<ComboBoxItem^>(combo->SelectedItem);
+            if (!item || combo->SelectedIndex == *saved_index) return;
+            timer->Stop();
+            preview->reset();
+            try {
+                speech::save_voice(safe_cast<Platform::String^>(item->Tag));
+                *saved_index = combo->SelectedIndex;
+                status->Text = L"";
+            } catch (Platform::Exception^) {
+                combo->SelectedIndex = *saved_index;
+                status->Text = L"The narrator voice preference could not be saved.";
+            }
+        });
+    auto play = action_button(L"Preview voice", ref new RoutedEventHandler(
+        [preview, timer, status](Platform::Object^, RoutedEventArgs^) {
+            timer->Stop();
+            preview->reset();
+            try {
+                *preview = std::make_unique<speech::Speech>();
+                (*preview)->start(L"This is the Horizon narrator.", 1.0);
+                status->Text = L"";
+                timer->Start();
+            } catch (Platform::Exception^) {
+                preview->reset();
+                status->Text = L"The narrator voice could not be played.";
+            }
+        }));
+    play->IsEnabled = voices->IsEnabled && voices->Items->Size > 1;
+    panel->Children->Append(voices);
+    panel->Children->Append(play);
+    panel->Children->Append(status);
+    return card(panel);
+}
+
 void refresh() {
     if (!content) return;
 #ifndef HORIZON_UWP_SHELL_PROBE
@@ -2686,6 +2772,7 @@ void refresh() {
             : L"The client is checking the graphics adapters available to this app.", 14);
         launch_card->Children->Append(renderer_status);
         panel->Children->Append(card(launch_card));
+        panel->Children->Append(narrator_card());
 #ifndef HORIZON_UWP_SHELL_PROBE
         auto controller_card = ref new StackPanel();
         controller_card->Children->Append(text(L"Controllers", 18));

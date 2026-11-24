@@ -31,7 +31,7 @@ public static class SourceAssembler
         if (hdrRecoveryRecipe)
         {
             if (!string.Equals(upstreamCommit, NightlyUwp.November20Commit, StringComparison.OrdinalIgnoreCase)
-                || clientVersion != NightlyUwp.HdrClient)
+                || !NightlyUwp.UsesHdrWgpu(clientVersion))
                 throw new InvalidDataException("The HDR recovery patches require the November 20 HDR source and client recipe.");
             await VerifyAsync(bridgeRecovery, NightlyUwp.HdrBridgeFeaturePatchHash);
             await VerifyAsync(nativeRecovery, NightlyUwp.HdrWgpuRecoveryPatchHash);
@@ -46,10 +46,10 @@ public static class SourceAssembler
         {
             var fixedWgpu = NightlyUwp.UsesFixedWgpu(clientVersion);
             await StageNightlyWgpuAsync(root, Path.Combine(bundle, "wgpu.zip"),
-                clientVersion == NightlyUwp.HdrClient ? Path.Combine(bundle, "dx12-uwp-hdr-surface.patch") :
+                NightlyUwp.UsesHdrWgpu(clientVersion) ? Path.Combine(bundle, "dx12-uwp-hdr-surface.patch") :
                     fixedWgpu ? null : Path.Combine(bundle, "reuse-upload-buffer-shadow.patch"), git,
                 fixedWgpu ? NightlyUwp.FixedWgpuArchiveHash : NightlyUwp.WgpuArchiveHash,
-                clientVersion == NightlyUwp.HdrClient ? NightlyUwp.HdrWgpuPatchHash : NightlyUwp.WgpuPatchHash);
+                NightlyUwp.UsesHdrWgpu(clientVersion) ? NightlyUwp.HdrWgpuPatchHash : NightlyUwp.WgpuPatchHash);
             if (hdrRecoveryRecipe)
             {
                 var destination = Path.Combine(root, "third_party", "wgpu-dx11");

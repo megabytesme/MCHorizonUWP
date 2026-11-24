@@ -10,6 +10,8 @@ public static class NightlyUwp
     public const string HdrClient = "0.1.18";
     public const string ClassicPackGuardPatch = "0.1.17";
     public const string GraphicsCompatibilityPatch = "0.1.18";
+    public const string NarratorPatch = "0.1.19";
+    public const string NarratorClient = "0.1.19";
     internal const string HdrWgpuPatchHash = "4c31f9349e28d294fa6d1663a6c4d3cacc134a9a4c8b1e2aea63688230e0c934";
     internal const string HdrBridgeFeaturePatchHash = "c449c46562fbc802cbe0341227921d1d93a27706e091a35cdd0a8c9ece1e3234";
     internal const string HdrBridgeManifestHash = "7ef2a0100cf799e1472187d0a4905065d575106c56dbdeda9ba54b072ecca516";
@@ -56,13 +58,14 @@ public static class NightlyUwp
     private static bool IsNovember20(string? commit) => string.Equals(commit, November20Commit, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsNovember20Client(string? client) =>
-        client is November20InitialClient or November20RuntimeClient or November20DrsClient or November20Client or HdrClient;
+        client is November20InitialClient or November20RuntimeClient or November20DrsClient or November20Client or HdrClient or NarratorClient;
 
     private static bool IsNovember20Recipe(string patch, string client) =>
         (patch, client) is (November20InitialPatch, November20InitialClient or November20RuntimeClient)
             or (November20DrsPatch, November20DrsClient)
             or (November20Patch, November20Client)
-            or (HdrPatch or ClassicPackGuardPatch or GraphicsCompatibilityPatch, HdrClient);
+            or (HdrPatch or ClassicPackGuardPatch or GraphicsCompatibilityPatch, HdrClient)
+            or (NarratorPatch, NarratorClient);
 
     public static bool Matches(string? commit) =>
         IsNovember20(commit) || string.Equals(commit, UpstreamCommit, StringComparison.OrdinalIgnoreCase);
@@ -95,6 +98,8 @@ public static class NightlyUwp
 
     internal static bool UsesWasmRuntime(string? client, TargetProfile target) =>
         UsesPackagedCodeRuntime(client, target) || UsesLegacyArm32Wasm(client, target);
+
+    internal static bool UsesHdrWgpu(string? client) => client is HdrClient or NarratorClient;
 
     internal static bool UsesFixedWgpu(string? client) =>
         client is FixedWgpuClientVersion or StreamingAudioClientVersion || IsNovember20Client(client);
