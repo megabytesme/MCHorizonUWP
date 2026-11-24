@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-11-24",
+  "status": "BLOCKED",
+  "originalDefault": {
+    "branch": "main",
+    "commit": "39ab7f19bff3856df0df3d4a05bbb4b9b4ef947b"
+  },
+  "acceptedBaseline": "31db956fa53cb1e0c8c3bd9cf228d5019548875a",
+  "checkpointSource": "d36537d5d0f4f87d82fa739caeb09ea525d35068",
+  "pinnedInputs": {
+    "horizonNightly": "0a875da91dbb0fdcb7ba8c42c11341aa229af51a",
+    "wgpuBase": "aa7b65c43ef008d0a92d20fcdf9f10fa0883f157",
+    "wgpuHdrOverlay": "432a009d8d44aa2b5988668bb9620d975a275a00",
+    "builder": "1.0.10",
+    "patch": "0.1.18",
+    "client": "0.1.18"
+  },
+  "historicalBranches": {
+    "history/upstream-base": "f42ef42ef6ceccb3c6a20bea2481d87949a51c81",
+    "history/uwp-client-builder-integration": "2165403afd1a5f9748c7ccb6a3f7074fad879222",
+    "history/uwp-dx11-port": "26ff1ae4af9d58abbb44e4b62cfc048723fc3a4f",
+    "history/uwp-native-mipmaps": "8a7f014893ac66f9ef7c558c15df417e12449a1b",
+    "history/uwp-port": "800dc54b7fa6455445985ed6cab279ce734e266e",
+    "history/uwp-pregame-account": "2165403afd1a5f9748c7ccb6a3f7074fad879222",
+    "history/uwp-render-selection": "942b4ac7bb39be30a651c9541de6713d1a485185"
+  },
+  "verifiedArchives": [
+    {
+      "branch": "codex/exhaustive-feature-audit-nov20",
+      "originalScope": "GitHub",
+      "originalSha": "68faac549e203de2b79afc0461400ecacae4e248",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/exhaustive-feature-audit-nov20",
+      "verifiedRemoteSha": "68faac549e203de2b79afc0461400ecacae4e248",
+      "verifiedRemoteTagObject": "d61741fd04b86619c089a1829ac0148ea2e05287"
+    },
+    {
+      "branch": "codex/hdr-angle-implicit-nov21",
+      "originalScope": "GitHub",
+      "originalSha": "971fa3f16a6ebc264764502f6e0561331175f4a0",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/hdr-angle-implicit-nov21",
+      "verifiedRemoteSha": "971fa3f16a6ebc264764502f6e0561331175f4a0",
+      "verifiedRemoteTagObject": "b01948ba73a4db5ee535cee82e8b157be25c2976"
+    },
+    {
+      "branch": "codex/hdr-nov20",
+      "originalScope": "GitHub",
+      "originalSha": "367659b4fd4c14c3a54cf00a9e88a4d8970d10fd",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/hdr-nov20",
+      "verifiedRemoteSha": "367659b4fd4c14c3a54cf00a9e88a4d8970d10fd",
+      "verifiedRemoteTagObject": "1cf8782eb1137b8868f07c0be7546a0873de32f5"
+    },
+    {
+      "branch": "codex/lumia-drs-runtime-evidence-2026-11-21",
+      "originalScope": "GitHub",
+      "originalSha": "795db14368e378d758648ea3605135745bb3b9a1",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/lumia-drs-runtime-evidence-2026-11-21",
+      "verifiedRemoteSha": "795db14368e378d758648ea3605135745bb3b9a1",
+      "verifiedRemoteTagObject": "8838ca8b2cb39715f1c5101cb1f2c2c44023d957"
+    },
+    {
+      "branch": "codex/nightly-2026-11-18",
+      "originalScope": "GitHub",
+      "originalSha": "2e98d4555313e2d9485c207ddc1962e2636001bd",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/nightly-2026-11-18",
+      "verifiedRemoteSha": "2e98d4555313e2d9485c207ddc1962e2636001bd",
+      "verifiedRemoteTagObject": "16ed33b1126ff341deab35446f3afefaab43f7e5"
+    },
+    {
+      "branch": "codex/nightly-2026-11-20",
+      "originalScope": "GitHub",
+      "originalSha": "5c26a8060c1cf2dce20ee5707e84699ed0879e5c",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/nightly-2026-11-20",
+      "verifiedRemoteSha": "5c26a8060c1cf2dce20ee5707e84699ed0879e5c",
+      "verifiedRemoteTagObject": "da779d5c0314afde5dd5fa282b2b7a2fd9e65830"
+    },
+    {
+      "branch": "codex/nightly-2026-11-20-audit",
+      "originalScope": "GitHub",
+      "originalSha": "58a096c0308b39a4244285efb01ea896ebb3d25c",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/nightly-2026-11-20-audit",
+      "verifiedRemoteSha": "58a096c0308b39a4244285efb01ea896ebb3d25c",
+      "verifiedRemoteTagObject": "ea01efa2fdc5b912f6592543d462e5ba52123010"
+    },
+    {
+      "branch": "codex/nightly-2026-11-20-desktop-runtime",
+      "originalScope": "GitHub",
+      "originalSha": "b3f437403e158c470ce4c2963b11bd2bbd3bcf13",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/nightly-2026-11-20-desktop-runtime",
+      "verifiedRemoteSha": "b3f437403e158c470ce4c2963b11bd2bbd3bcf13",
+      "verifiedRemoteTagObject": "d102fcd5341d51fc3cca2edec02a467b140b51d7"
+    },
+    {
+      "branch": "codex/nightly-2026-11-20-gyro",
+      "originalScope": "GitHub",
+      "originalSha": "c570de9d31c89e8c40225430ced56c205694bdad",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/nightly-2026-11-20-gyro",
+      "verifiedRemoteSha": "c570de9d31c89e8c40225430ced56c205694bdad",
+      "verifiedRemoteTagObject": "5c616f27783bd94c71296e6c5312164d62a73bc6"
+    },
+    {
+      "branch": "codex/nightly-2026-11-20-gyro-runtime",
+      "originalScope": "GitHub",
+      "originalSha": "fe749d4d2de73cbe77d5deb627657344147af50f",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/nightly-2026-11-20-gyro-runtime",
+      "verifiedRemoteSha": "fe749d4d2de73cbe77d5deb627657344147af50f",
+      "verifiedRemoteTagObject": "5a0e7e1476e28c38ea5287acc54c8acc1f4e60fe"
+    },
+    {
+      "branch": "codex/nightly-2026-11-20-screenshot-storage",
+      "originalScope": "GitHub",
+      "originalSha": "1d593c69967ebf49646afc52b4fdc2cf74845aa0",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/nightly-2026-11-20-screenshot-storage",
+      "verifiedRemoteSha": "1d593c69967ebf49646afc52b4fdc2cf74845aa0",
+      "verifiedRemoteTagObject": "b533efebd9770de2aa3483a7997f070e3132adf4"
+    },
+    {
+      "branch": "codex/p01-p02-qa-candidate",
+      "originalScope": "GitHub",
+      "originalSha": "2f0496c788e67a448f20610ea1bb5817e1104e0b",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/p01-p02-qa-candidate",
+      "verifiedRemoteSha": "2f0496c788e67a448f20610ea1bb5817e1104e0b",
+      "verifiedRemoteTagObject": "549ffd4396dd3e9cd9a647808ed89b1a35d5680a"
+    },
+    {
+      "branch": "codex/product-nov20-development",
+      "originalScope": "GitHub",
+      "originalSha": "ac1efc804e98acea99d478fac3c15be550d90ddf",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/product-nov20-development",
+      "verifiedRemoteSha": "ac1efc804e98acea99d478fac3c15be550d90ddf",
+      "verifiedRemoteTagObject": "9ce83e9538d1619d8be4c0eedb04af539320c93b"
+    },
+    {
+      "branch": "codex/uwp-narrator",
+      "originalScope": "GitHub",
+      "originalSha": "27612e1b8c8b6996ec7be5211d644f9cc33a0702",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/uwp-narrator",
+      "verifiedRemoteSha": "27612e1b8c8b6996ec7be5211d644f9cc33a0702",
+      "verifiedRemoteTagObject": "e42a05670299b1183729bb31b0e0b5beace58a21"
+    },
+    {
+      "branch": "main",
+      "originalScope": "GitHub",
+      "originalSha": "39ab7f19bff3856df0df3d4a05bbb4b9b4ef947b",
+      "tag": "archive/pre-master-consolidation-2026-11-24/main",
+      "verifiedRemoteSha": "39ab7f19bff3856df0df3d4a05bbb4b9b4ef947b",
+      "verifiedRemoteTagObject": "348a2899f1ca924d3abe403bd3d8e5187f60420f"
+    },
+    {
+      "branch": "codex/product-stabilization-rc",
+      "originalScope": "local only",
+      "originalSha": "6d25e9cb4ab62126850c53f242365cf574b3bc26",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/product-stabilization-rc",
+      "verifiedRemoteSha": "6d25e9cb4ab62126850c53f242365cf574b3bc26",
+      "verifiedRemoteTagObject": "774538224797281a2294d9546c3be6890687e770"
+    },
+    {
+      "branch": "codex/product-stabilization-rc2",
+      "originalScope": "local only",
+      "originalSha": "31db956fa53cb1e0c8c3bd9cf228d5019548875a",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/product-stabilization-rc2",
+      "verifiedRemoteSha": "31db956fa53cb1e0c8c3bd9cf228d5019548875a",
+      "verifiedRemoteTagObject": "d763de6ba90fc8884619f1b9024504b3a165baef"
+    },
+    {
+      "branch": "codex/stabilization-u01-hdr",
+      "originalScope": "local only",
+      "originalSha": "2f0496c788e67a448f20610ea1bb5817e1104e0b",
+      "tag": "archive/pre-master-consolidation-2026-11-24/codex/stabilization-u01-hdr",
+      "verifiedRemoteSha": "2f0496c788e67a448f20610ea1bb5817e1104e0b",
+      "verifiedRemoteTagObject": "8bcd6a71deaa49a7599467c382c8441438a6d56a"
+    },
+    {
+      "branch": "archive/diverged-product-checkout-2026-11-17",
+      "originalScope": "local only",
+      "originalSha": "d16442e5f638a8a1f1ef7f323eebbd63ea7a7fc5",
+      "tag": "archive/pre-master-consolidation-2026-11-24/secondary/archive/diverged-product-checkout-2026-11-17",
+      "verifiedRemoteSha": "d16442e5f638a8a1f1ef7f323eebbd63ea7a7fc5",
+      "verifiedRemoteTagObject": "1980186e42be451be1b6c8f2a10aafb7a0efe6f6"
+    }
+  ],
+  "openGates": [
+    "Verify continuity of raw main catalog URLs used by shipped Builder and client versions.",
+    "Finish and validate the Narrator port against November 20 Nightly and the RC2 Builder recipe.",
+    "Qualify signed packages for the changed checkpoint source and obtain required on-device results.",
+    "Reconcile PR 1 after the canonical branch and its tested source are in place."
+  ]
+}
