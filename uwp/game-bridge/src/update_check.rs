@@ -12,9 +12,9 @@ use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const CATALOG_URL: &str =
-    "https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/main/catalog/catalog-v1.json";
+    "https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/HEAD/catalog/catalog-v1.json";
 const SIGNATURE_URL: &str =
-    "https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/main/catalog/catalog-v1.sig";
+    "https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/HEAD/catalog/catalog-v1.sig";
 const HORIZON_RELEASES_URL: &str =
     "https://api.github.com/repos/horizon-rust/horizon/releases?per_page=100";
 const CLIENT_RELEASE_BASE: &str =

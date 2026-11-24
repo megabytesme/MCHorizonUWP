@@ -43,6 +43,10 @@ The verifier accepts a detached P-256 ECDSA signature over the exact UTF-8
 catalog bytes, using SHA-256 and a 64-byte IEEE P1363 signature. The builder
 embeds the public SubjectPublicKeyInfo key in `uwp/builder/Core/Assets/`.
 `catalog/catalog-v1.json` and its detached `.sig` contain the current release catalog.
+New Builder and client builds load both files from the repository's default
+branch using the raw GitHub `HEAD` URL. The already shipped Builder 1.0.2
+and client 0.1.4 use the raw `main` URLs. Keep those URLs serving the signed
+catalog until compatibility has been verified or those releases are retired.
 The catalog declares x86, x64, ARM32 and ARM64 combinations and records no
 end-to-end builder or device evidence.
 

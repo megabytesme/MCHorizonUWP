@@ -5,8 +5,8 @@ public static class CatalogTrust
 {
     public const string BuilderVersion = "1.0.10";
     private const string RetainedRecipeVersion = "1.0.3";
-    public static readonly Uri CatalogUri = new("https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/main/catalog/catalog-v1.json");
-    public static readonly Uri SignatureUri = new("https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/main/catalog/catalog-v1.sig");
+    public static readonly Uri CatalogUri = new("https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/HEAD/catalog/catalog-v1.json");
+    public static readonly Uri SignatureUri = new("https://raw.githubusercontent.com/megabytesme/MCHorizonUWP/HEAD/catalog/catalog-v1.sig");
 
     public static byte[] PublicKey()
     {
