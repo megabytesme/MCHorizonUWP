@@ -271,6 +271,29 @@ if (args.Length == 4 && args[0] == "--private-sdk-extension-proof")
         Require(Directory.EnumerateFiles(root, "package.zip.invalid-*").Count() == 1, "damaged cache is preserved for inspection");
         await PinnedDownload.EnsureAsync(transport, artifact, cached);
         Require(Directory.EnumerateFiles(root, "package.zip.invalid-*").Count() == 1, "valid cache is reused without another replacement");
+
+        var shared = Path.Combine(root, "shared");
+        var handler = new CatalogFixtureHandler([], [], bytes);
+        using var sharedTransport = new CatalogTransport(handler);
+        var first = Path.Combine(root, "first.zip");
+        var second = Path.Combine(root, "second.zip");
+        await Task.WhenAll(PinnedDownload.EnsureWorkspaceCopyAsync(sharedTransport, artifact, first, cacheRoot: shared),
+            PinnedDownload.EnsureWorkspaceCopyAsync(sharedTransport, artifact, second, cacheRoot: shared));
+        Require(handler.RequestCount == 1 && File.ReadAllBytes(first).SequenceEqual(bytes) && File.ReadAllBytes(second).SequenceEqual(bytes),
+            "concurrent workspaces share one verified download");
+        try { await PinnedDownload.EnsureWorkspaceCopyAsync(sharedTransport, artifact, first, cacheRoot: shared); throw new Exception("existing workspace overwritten"); }
+        catch (IOException) { }
+        Require(File.ReadAllBytes(first).SequenceEqual(bytes), "existing workspace is preserved");
+        var sharedEntry = Path.Combine(shared, artifact.Sha256.ToLowerInvariant() + ".bin");
+        await File.WriteAllTextAsync(sharedEntry, "corrupt");
+        await PinnedDownload.EnsureWorkspaceCopyAsync(sharedTransport, artifact, Path.Combine(root, "third.zip"), cacheRoot: shared);
+        Require(handler.RequestCount == 2 && Directory.EnumerateFiles(shared, "*.invalid-*").Count() == 1,
+            "corrupt shared entry is preserved and replaced");
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        try { await PinnedDownload.EnsureWorkspaceCopyAsync(sharedTransport, artifact, Path.Combine(root, "canceled.zip"), canceled.Token, shared); throw new Exception("cancellation ignored"); }
+        catch (OperationCanceledException) { }
+        Require(!File.Exists(Path.Combine(root, "canceled.zip")), "canceled copy creates no workspace artifact");
     }
     finally { Directory.Delete(root, recursive: true); }
 }
@@ -2036,7 +2059,7 @@ static async Task TestReleaseSource()
         var signatureUri = new Uri("https://example.test/signature");
         var publicKey = key.ExportSubjectPublicKeyInfo();
         var destination = Path.Combine(root, "prepared");
-        var prepared = await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", destination, git);
+        var prepared = await ReleaseSource.PrepareCoreAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", destination, git, default, Path.Combine(root, "release-cache"));
         Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
         Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
         var armPrepared = prepared.ForArchitecture("arm", new CompatibilityResult(true, false, false, "Signed catalog permits ARM32"));
@@ -2145,7 +2168,7 @@ static async Task TestReleaseSource()
         catch (InvalidOperationException) { Require(!Directory.Exists(incompatible), "incompatible release makes no workspace"); }
         inputs["/patch"] = System.Text.Encoding.UTF8.GetBytes("tampered");
         var corrupted = Path.Combine(root, "corrupted");
-        try { await ReleaseSource.PrepareAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", corrupted, git); throw new Exception("corrupt artifact accepted"); }
+        try { await ReleaseSource.PrepareCoreAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", corrupted, git, default, Path.Combine(root, "corrupt-cache")); throw new Exception("corrupt artifact accepted"); }
         catch (InvalidDataException) { Require(!Directory.Exists(Path.Combine(corrupted, "source")), "corrupt artifact is never assembled"); }
     }
     finally { Directory.Delete(root, recursive: true); }
@@ -2317,8 +2340,11 @@ sealed class BuilderUpdateFixtureHandler(string response) : HttpMessageHandler
 }
 sealed class CatalogFixtureHandler(byte[] catalog, byte[] signature, byte[] artifact) : HttpMessageHandler
 {
+    private int requestCount;
+    public int RequestCount => requestCount;
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        Interlocked.Increment(ref requestCount);
         if (request.RequestUri!.AbsolutePath == "/insecure-redirect")
         {
             var redirect = new HttpResponseMessage(System.Net.HttpStatusCode.Redirect);
