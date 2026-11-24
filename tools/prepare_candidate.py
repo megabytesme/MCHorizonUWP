@@ -17,6 +17,8 @@ NIGHTLY_UPSTREAM = "0b14f8acfd97fa2c750e42795249dcc981178ca4"
 NIGHTLY_UPSTREAM_ARCHIVE_SHA256 = "1a73fb817549e9b0ec8870b8aec7efd1ea4e274e8be7563411c053aee6ad48ef"
 NOV20_UPSTREAM = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
 NOV20_UPSTREAM_ARCHIVE_SHA256 = "abd6a91c41407522f9b0ec43d16555f46cd76832625645658bee57e2ab49da3d"
+LEGACY_NARRATOR_UPSTREAM = "e797c725ad99ef311db216de7f41a2e6593353db"
+LEGACY_NARRATOR_PATCH_PATH = "patches/main-2026-11-09/horizon-uwp-0.1.5.patch"
 NOV20_INITIAL_PATCH = "0.1.13"
 NOV20_DRS_PATCH = "0.1.14"
 NOV20_PATCH = "0.1.15"
@@ -247,12 +249,20 @@ def main():
     parser.add_argument("--upstream-archive", required=True, type=Path, help="Verified source ZIP for the pinned upstream commit")
     parser.add_argument("--upstream-repo", required=True, type=Path, help="Git repository containing the pinned upstream commit")
     args = parser.parse_args()
-    nightly = NIGHTLY_RECIPES.get(args.patch_version)
+    legacy_narrator = args.patch_path == LEGACY_NARRATOR_PATCH_PATH
+    if legacy_narrator and args.patch_version != "0.1.5":
+        parser.error("The November 9 narrator source requires patch version 0.1.5")
+    nightly = None if legacy_narrator else NIGHTLY_RECIPES.get(args.patch_version)
     nov20 = args.patch_version in NOV20_PATCHES
     nightly_source = NOV20_UPSTREAM if nov20 else NIGHTLY_UPSTREAM
     nightly_archive_hash = NOV20_UPSTREAM_ARCHIVE_SHA256 if nov20 else NIGHTLY_UPSTREAM_ARCHIVE_SHA256
-    upstream_commit = (args.upstream_commit or (nightly_source if nightly else UPSTREAM)).lower()
-    default_client, default_builder = nightly or ("0.1.0", "1.0.3")
+    default_upstream = nightly_source if nightly else UPSTREAM
+    if legacy_narrator:
+        default_upstream = LEGACY_NARRATOR_UPSTREAM
+    upstream_commit = (args.upstream_commit or default_upstream).lower()
+    if legacy_narrator and upstream_commit != LEGACY_NARRATOR_UPSTREAM:
+        parser.error("The November 9 narrator patch requires its pinned Horizon source")
+    default_client, default_builder = nightly or ("0.1.5" if legacy_narrator else "0.1.0", "1.0.3")
     client_version = args.client_version or default_client
     builder_version = args.builder_version or default_builder
     wasm_inputs = ()
