@@ -32,6 +32,12 @@ public static class ReleaseSource
     public static async Task<PreparedRelease> PrepareAsync(CatalogTransport transport, Uri catalogUri, Uri signatureUri,
         byte[] trustedPublicKey, string patchVersion, string clientVersion, string builderVersion, string architecture,
         string workspace, string git, CancellationToken cancellationToken = default)
+        => await PrepareCoreAsync(transport, catalogUri, signatureUri, trustedPublicKey, patchVersion, clientVersion,
+            builderVersion, architecture, workspace, git, cancellationToken, null);
+
+    internal static async Task<PreparedRelease> PrepareCoreAsync(CatalogTransport transport, Uri catalogUri, Uri signatureUri,
+        byte[] trustedPublicKey, string patchVersion, string clientVersion, string builderVersion, string architecture,
+        string workspace, string git, CancellationToken cancellationToken, string? cacheRoot)
     {
         ArgumentNullException.ThrowIfNull(transport);
         var catalog = await transport.GetCatalogAsync(catalogUri, signatureUri, trustedPublicKey, cancellationToken);
@@ -45,9 +51,9 @@ public static class ReleaseSource
         var upstreamFile = Path.Combine(root, "upstream.zip");
         var patchFile = Path.Combine(root, "patch.diff");
         var clientFile = Path.Combine(root, "client.zip");
-        await transport.DownloadArtifactAsync(patch.Upstream, upstreamFile, cancellationToken);
-        await transport.DownloadArtifactAsync(patch.Artifact, patchFile, cancellationToken);
-        await transport.DownloadArtifactAsync(client.Artifact, clientFile, cancellationToken);
+        await PinnedDownload.EnsureWorkspaceCopyAsync(transport, patch.Upstream, upstreamFile, cancellationToken, cacheRoot);
+        await PinnedDownload.EnsureWorkspaceCopyAsync(transport, patch.Artifact, patchFile, cancellationToken, cacheRoot);
+        await PinnedDownload.EnsureWorkspaceCopyAsync(transport, client.Artifact, clientFile, cancellationToken, cacheRoot);
         var source = Path.Combine(root, "source");
         await SourceAssembler.AssembleAsync(upstreamFile, patch.Upstream.Sha256, patchFile, patch.Artifact.Sha256,
             clientFile, client.Artifact.Sha256, source, git, patch.UpstreamCommit, client.Version);
