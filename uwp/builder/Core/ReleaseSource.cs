@@ -14,6 +14,18 @@ public sealed class PreparedRelease
     public string BuilderVersion { get; }
     public string Architecture { get; }
 
+    public string BuildCacheKey
+    {
+        get
+        {
+            var digests = new[] { Patch.Upstream.Sha256, Patch.Artifact.Sha256, Client.Artifact.Sha256 };
+            if (digests.Any(digest => digest is null || digest.Length != 64 || !digest.All(char.IsAsciiHexDigit)))
+                throw new InvalidDataException("Invalid release artifact digest.");
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.ASCII.GetBytes(string.Join(':', digests).ToLowerInvariant()))).ToLowerInvariant();
+        }
+    }
+
     public PreparedRelease ForArchitecture(string architecture, CompatibilityResult compatibility)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(architecture);

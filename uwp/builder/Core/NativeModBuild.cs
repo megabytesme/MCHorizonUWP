@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -99,16 +100,18 @@ internal static class NativeModBuild
             mixinsRevision = revision;
         }
         if (mixinsRevision is null) throw new InvalidDataException("No native mods were staged.");
-        var toolRoot = Path.Combine(workspace, "native-tool");
-        progress?.Report("Building Horizon's native-mod transformation tool.");
         var cargoEnvironment = new Dictionary<string, string>(hostEnvironment, StringComparer.OrdinalIgnoreCase)
         {
             ["RUSTUP_TOOLCHAIN"] = LocalRecipe.RustToolchain
         };
-        await LocalBuildRunner.RunProcess(cargo, workspace,
-            ["+" + LocalRecipe.RustToolchain, "install", "--locked", "--git", "https://github.com/horizon-rust/horizon-mixins", "--rev", mixinsRevision,
-                "--root", toolRoot, "horizon-mixins-cli"], cargoEnvironment, progress: progress);
-        var executable = Path.Combine(toolRoot, "bin", "horizon-mixins.exe");
+        var executable = await PrepareToolAsync(mixinsRevision, LocalRecipe.RustToolchain,
+            Path.Combine(LocalBuildRunner.SharedCargoTargetDirectory, "native-tools"), workspace, async toolRoot =>
+            {
+                progress?.Report("Building Horizon's native-mod transformation tool.");
+                await LocalBuildRunner.RunProcess(cargo, workspace,
+                    ["+" + LocalRecipe.RustToolchain, "install", "--locked", "--git", "https://github.com/horizon-rust/horizon-mixins", "--rev", mixinsRevision,
+                        "--root", toolRoot, "horizon-mixins-cli"], cargoEnvironment, progress: progress);
+            });
         var staged = Path.Combine(workspace, "native-source");
         await File.WriteAllTextAsync(Path.Combine(source, ".horizon-revision"), targetCommit + "\n");
         var lib = Path.Combine(source, "crates", "horizon-client", "src", "lib.rs");
@@ -123,6 +126,39 @@ internal static class NativeModBuild
         if (await File.ReadAllTextAsync(stagedLib) != original)
             throw new InvalidDataException("A native mod changes the client crate root; this combination is not supported yet.");
         return staged;
+    }
+
+    internal static async Task<string> PrepareToolAsync(string revision, string toolchain, string cacheRoot, string workspace,
+        Func<string, Task> install)
+    {
+        if (!Regex.IsMatch(revision, "^[0-9a-f]{40}$") || !Regex.IsMatch(toolchain, "^[A-Za-z0-9._-]+$"))
+            throw new InvalidDataException("Invalid native tool identity.");
+        Directory.CreateDirectory(cacheRoot);
+        var key = revision + "-" + toolchain;
+        var target = Path.Combine(cacheRoot, key);
+        await using var lease = await PinnedDownload.AcquireLeaseAsync(target + ".lock");
+        var executable = Path.Combine(target, "bin", "horizon-mixins.exe");
+        var marker = Path.Combine(target, ".mchorizon-cache-proof");
+        var valid = false;
+        if (File.Exists(executable) && File.Exists(marker))
+        {
+            var proof = (await File.ReadAllTextAsync(marker)).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            await using var input = File.OpenRead(executable);
+            valid = proof.Length == 2 && proof[0] == key && proof[1].Equals(Convert.ToHexString(await SHA256.HashDataAsync(input)), StringComparison.OrdinalIgnoreCase);
+        }
+        if (!valid)
+        {
+            if (Directory.Exists(target)) Directory.Move(target, target + ".invalid-" + Guid.NewGuid().ToString("N"));
+            var staging = target + ".staging-" + Guid.NewGuid().ToString("N");
+            await install(staging);
+            var built = Path.Combine(staging, "bin", "horizon-mixins.exe");
+            await using (var input = File.OpenRead(built))
+                await File.WriteAllTextAsync(Path.Combine(staging, ".mchorizon-cache-proof"), key + "\n" + Convert.ToHexString(await SHA256.HashDataAsync(input)) + "\n");
+            Directory.Move(staging, target);
+        }
+        var local = Path.Combine(workspace, "horizon-mixins.exe");
+        File.Copy(executable, local, overwrite: false);
+        return local;
     }
 
     private static BundleCompatibility ReadCompatibility(string bundlePath, NativeModCandidate candidate)

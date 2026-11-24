@@ -294,6 +294,26 @@ if (args.Length == 4 && args[0] == "--private-sdk-extension-proof")
         try { await PinnedDownload.EnsureWorkspaceCopyAsync(sharedTransport, artifact, Path.Combine(root, "canceled.zip"), canceled.Token, shared); throw new Exception("cancellation ignored"); }
         catch (OperationCanceledException) { }
         Require(!File.Exists(Path.Combine(root, "canceled.zip")), "canceled copy creates no workspace artifact");
+        var tools = Path.Combine(root, "native-tools");
+        var rev = new string('a', 40);
+        var installs = 0;
+        async Task InstallTool(string directory)
+        {
+            Interlocked.Increment(ref installs);
+            Directory.CreateDirectory(Path.Combine(directory, "bin"));
+            await File.WriteAllTextAsync(Path.Combine(directory, "bin", "horizon-mixins.exe"), "verified tool");
+        }
+        var w1 = Path.Combine(root, "tool-workspace-1");
+        var w2 = Path.Combine(root, "tool-workspace-2");
+        Directory.CreateDirectory(w1); Directory.CreateDirectory(w2);
+        await Task.WhenAll(NativeModBuild.PrepareToolAsync(rev, "1.99.1", tools, w1, InstallTool),
+            NativeModBuild.PrepareToolAsync(rev, "1.99.1", tools, w2, InstallTool));
+        Require(installs == 1, "concurrent native tool requests install once");
+        await File.WriteAllTextAsync(Path.Combine(tools, rev + "-1.99.1", "bin", "horizon-mixins.exe"), "damaged");
+        var w3 = Path.Combine(root, "tool-workspace-3"); Directory.CreateDirectory(w3);
+        await NativeModBuild.PrepareToolAsync(rev, "1.99.1", tools, w3, InstallTool);
+        Require(installs == 2 && File.ReadAllText(Path.Combine(w3, "horizon-mixins.exe")) == "verified tool"
+            && Directory.EnumerateDirectories(tools, "*.invalid-*").Count() == 1, "corrupt native tool is quarantined and rebuilt");
     }
     finally { Directory.Delete(root, recursive: true); }
 }
@@ -2060,6 +2080,11 @@ static async Task TestReleaseSource()
         var publicKey = key.ExportSubjectPublicKeyInfo();
         var destination = Path.Combine(root, "prepared");
         var prepared = await ReleaseSource.PrepareCoreAsync(transport, catalogUri, signatureUri, publicKey, "1.0.0", "1.0.0", "1.0.0", "x64", destination, git, default, Path.Combine(root, "release-cache"));
+        var alternate = new PreparedRelease(prepared.SourceDirectory, prepared.Patch,
+            prepared.Client with { Artifact = prepared.Client.Artifact with { Sha256 = new string('a', 64) } },
+            prepared.Compatibility, prepared.BuilderVersion, prepared.Architecture);
+        Require(prepared.BuildCacheKey.Length == 64 && prepared.BuildCacheKey != alternate.BuildCacheKey,
+            "Cargo cache identity includes authenticated client content");
         Require((await File.ReadAllTextAsync(Path.Combine(prepared.SourceDirectory, "main.txt"))).Replace("\r\n", "\n") == "world\n", "signed release patch applied");
         Require(File.Exists(Path.Combine(prepared.SourceDirectory, "uwp", "host", "file.txt")) && !prepared.Compatibility.BuildVerified, "client overlaid without implying build evidence");
         var armPrepared = prepared.ForArchitecture("arm", new CompatibilityResult(true, false, false, "Signed catalog permits ARM32"));
