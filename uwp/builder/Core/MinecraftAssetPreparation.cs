@@ -43,7 +43,9 @@ public static class MinecraftAssetPreparation
         environment["CARGO_BUILD_JOBS"] = jobs.ToString(System.Globalization.CultureInfo.InvariantCulture);
         progress?.Report($"Starting Cargo compile for the Minecraft resource helper with {jobs} parallel jobs{(requested <= 0 ? " (automatic, memory-aware)" : " (selected limit)")}. The build-speed setting is now locked for this run.");
         progress?.Report("Building Horizon's Minecraft resource preparation helper.");
-        var cargoTarget = LocalBuildRunner.SharedCargoTargetDirectory;
+        var cargoTarget = Path.Combine(LocalBuildRunner.SharedCargoTargetDirectory, release.BuildCacheKey, "assets");
+        Directory.CreateDirectory(cargoTarget);
+        await using var lease = await PinnedDownload.AcquireLeaseAsync(Path.Combine(cargoTarget, ".builder.lock"), cancellationToken);
         await LocalBuildRunner.RunProcess(cargo, tool, ["+" + LocalRecipe.RustToolchain, "build", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
             "--manifest-path", Path.Combine(tool, "Cargo.toml"), "--target-dir", cargoTarget], environment, progress: progress);
         var executable = Path.Combine(cargoTarget, "x86_64-pc-windows-msvc", "release", "horizon-uwp-assets.exe");
