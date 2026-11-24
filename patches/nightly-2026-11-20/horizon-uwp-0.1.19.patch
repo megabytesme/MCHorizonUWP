@@ -12734,7 +12734,7 @@ index 0000000000000000000000000000000000000000..e44833aaf0efecabd1a6ccd2e14d478a
 +    return vec4(color.rgb, 1.0);
 +}
 diff --git a/crates/horizon-client-render/src/gfx/screenshot.rs b/crates/horizon-client-render/src/gfx/screenshot.rs
-index cb05bc55fd5b0eeb74609f62a61440419e1654c5..f63d00d4b9fe83cd12503639102492a4e02f44e9 100644
+index cb05bc55fd5b0eeb74609f62a61440419e1654c5..079d2457a68f2173cd84462937f881b516713875 100644
 --- a/crates/horizon-client-render/src/gfx/screenshot.rs
 +++ b/crates/horizon-client-render/src/gfx/screenshot.rs
 @@ -201,8 +201,8 @@ fn write_png(image: &mod_api::ScreenshotImage, path: &Path) -> Result<()> {
@@ -12744,7 +12744,7 @@ index cb05bc55fd5b0eeb74609f62a61440419e1654c5..f63d00d4b9fe83cd12503639102492a4
 -/// it as `path` only if no file has that name. A hard link never replaces its target,
 -/// unlike a rename on Windows, so the publish is atomic and an existing file is kept.
 +/// it as `path` only if no file has that name. A hard link, or a no-replace move on
-+/// UWP, atomically publishes the completed screenshot and preserves existing files.
++/// UWP, publishes the completed screenshot and preserves existing files.
  /// The temporary file is removed in every case: nothing partial is left behind.
  fn publish_new(path: &Path, write: impl FnOnce(&Path) -> Result<()>) -> Result<()> {
      static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -12754,7 +12754,7 @@ index cb05bc55fd5b0eeb74609f62a61440419e1654c5..f63d00d4b9fe83cd12503639102492a4
      };
 -    let published = write(&temp).and_then(|()| match std::fs::hard_link(&temp, path) {
 +    #[cfg(target_vendor = "uwp")]
-+    let publish = horizon_threads::move_file_no_replace;
++    let publish = publish_uwp;
 +    #[cfg(not(target_vendor = "uwp"))]
 +    let publish = |from: &Path, to: &Path| std::fs::hard_link(from, to);
 +    let published = write(&temp).and_then(|()| match publish(&temp, path) {
@@ -12772,6 +12772,116 @@ index cb05bc55fd5b0eeb74609f62a61440419e1654c5..f63d00d4b9fe83cd12503639102492a4
          log::warn!(
              "Horizon renderer: couldn't remove the temporary screenshot {}: {e}",
              temp.display()
+@@ -239,6 +245,109 @@ fn publish_new(path: &Path, write: impl FnOnce(&Path) -> Result<()>) -> Result<(
+     published
+ }
+ 
++#[cfg(target_vendor = "uwp")]
++fn publish_uwp(from: &Path, to: &Path) -> std::io::Result<()> {
++    use std::{io, os::windows::ffi::OsStrExt};
++
++    unsafe extern "C" {
++        fn horizon_uwp_publish_screenshot(
++            staged_path: *const u16,
++            staged_length: u32,
++            file_name: *const u16,
++            name_length: u32,
++        ) -> i32;
++    }
++
++    publish_with_storage_fallback(
++        || horizon_threads::move_file_no_replace(from, to),
++        || {
++            let staged: Vec<u16> = from.as_os_str().encode_wide().collect();
++            let name: Vec<u16> = to
++                .file_name()
++                .ok_or(io::ErrorKind::InvalidInput)?
++                .encode_wide()
++                .collect();
++            let staged_length =
++                u32::try_from(staged.len()).map_err(|_| io::ErrorKind::InvalidInput)?;
++            let name_length = u32::try_from(name.len()).map_err(|_| io::ErrorKind::InvalidInput)?;
++            // Both UTF-16 buffers live for the entire synchronous call on the writer.
++            let hr = unsafe {
++                horizon_uwp_publish_screenshot(
++                    staged.as_ptr(),
++                    staged_length,
++                    name.as_ptr(),
++                    name_length,
++                )
++            };
++            if hr >= 0 {
++                Ok(())
++            } else if (hr as u32 & 0xffff0000) == 0x80070000 {
++                Err(io::Error::from_raw_os_error(hr & 0xffff))
++            } else {
++                Err(io::Error::other(format!(
++                    "WinRT screenshot publication failed (HRESULT {hr:#010x})"
++                )))
++            }
++        },
++    )
++}
++
++#[cfg(any(target_vendor = "uwp", test))]
++fn publish_with_storage_fallback(
++    direct: impl FnOnce() -> std::io::Result<()>,
++    broker: impl FnOnce() -> std::io::Result<()>,
++) -> std::io::Result<()> {
++    use std::io::ErrorKind;
++
++    match direct() {
++        Err(error)
++            if matches!(
++                error.kind(),
++                ErrorKind::PermissionDenied | ErrorKind::Unsupported
++            ) =>
++        {
++            broker()
++        }
++        result => result,
++    }
++}
++
++#[cfg(test)]
++mod publication_tests {
++    use super::publish_with_storage_fallback;
++    use std::io::ErrorKind;
++
++    #[test]
++    fn broker_handles_storage_permissions_or_unsupported_moves() {
++        for error in [ErrorKind::PermissionDenied, ErrorKind::Unsupported] {
++            assert!(publish_with_storage_fallback(|| Err(error.into()), || Ok(())).is_ok());
++        }
++    }
++
++    #[test]
++    fn collision_and_write_errors_do_not_switch_publication_paths() {
++        for error in [
++            ErrorKind::AlreadyExists,
++            ErrorKind::InvalidInput,
++            ErrorKind::WriteZero,
++        ] {
++            let result =
++                publish_with_storage_fallback(|| Err(error.into()), || panic!("broker called"));
++            assert_eq!(result.unwrap_err().kind(), error);
++        }
++        assert!(publish_with_storage_fallback(|| Ok(()), || panic!("broker called")).is_ok());
++    }
++
++    #[test]
++    fn broker_collision_propagates_to_the_same_non_replacing_writer() {
++        let result = publish_with_storage_fallback(
++            || Err(ErrorKind::PermissionDenied.into()),
++            || Err(ErrorKind::AlreadyExists.into()),
++        );
++        assert_eq!(result.unwrap_err().kind(), ErrorKind::AlreadyExists);
++    }
++}
++
+ /// A relative, portable path. Refuse Windows separators/prefixes on every OS,
+ /// not just on Windows, and inspect every component including the output file.
+ fn screenshot_destination(root: &Path, file_name: &str) -> Result<PathBuf> {
 diff --git a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs b/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs
 index 50bed31b356a4dbafe71684cb6659d946a98046a..dc5cc96c3b0381b60c9d653d92ca639948d0c0a7 100644
 --- a/crates/horizon-client-render/src/gfx/sprite_arrays_tests.rs

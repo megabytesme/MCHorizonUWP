@@ -137,10 +137,11 @@ def verify_upstream(archive_path, repository, commit):
 
 NARRATOR_EXPORTS = tuple(f"horizon_uwp_narrator_{name}".encode("ascii") for name in
                          ("open", "close", "say", "poll", "clear", "voices", "set_voice"))
+SCREENSHOT_EXPORT = b"horizon_uwp_publish_screenshot"
 
 
 def verify_narrator_host_kit(root):
-    """Reject older host kits before pairing them with the narrator bridge."""
+    """Reject older host kits before pairing them with the 0.1.19 bridge."""
     for architecture in ("arm", "arm64", "x86", "x64"):
         for filename in ("HorizonUWP.exe", "HorizonUWPHost.lib"):
             path = root / architecture / filename
@@ -149,6 +150,8 @@ def verify_narrator_host_kit(root):
             data = path.read_bytes()
             if any(name not in data for name in NARRATOR_EXPORTS):
                 raise ValueError(f"Prebuilt host is missing narrator exports: {architecture}/{filename}")
+            if SCREENSHOT_EXPORT not in data:
+                raise ValueError(f"Prebuilt host is missing screenshot publication: {architecture}/{filename}")
 
 
 def client_archive(revision, host_artifacts=None, wgpu_archive=None, wasm_inputs=(), fixed_wgpu=False, hdr_wgpu=False, narrator=False):
