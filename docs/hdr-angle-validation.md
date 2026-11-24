@@ -67,6 +67,10 @@ continues to select SDR. A signed game integration still needs to drive the acti
 selection and verify world/HUD composition, in-process fallback, and signed captures on an
 active HDR output. Missing EGL support keeps the default SDR path available.
 
+The initial probe receipt records fork revision `3cd220017fad76d11e6939984f42917cee9fa5a7`.
+The two receipts distinguish the original FP16 probe from the updated fork with cleanup and retry handling.
+[Initial probe receipt](../deliverables/hdr/angle/x64-fp16-bridge-initial-receipt.json)
+
 A second signed AppX extended the hold time of the final FP16 surface for Windows Graphics
 Capture, with per-view Windows Advanced Color telemetry. The RDP view reported SDR, with 80 nits
 reference white. The first scoped WGC diagnostic found the CoreWindow during startup, then
