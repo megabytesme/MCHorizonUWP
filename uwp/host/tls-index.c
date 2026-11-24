@@ -9,7 +9,7 @@ int _fltused = 0x9875;
 #pragma section(".tls$ZZZ", long, read, write)
 #pragma section(".CRT$XLA", long, read)
 #pragma section(".CRT$XLZ", long, read)
-#pragma section(".tls", long, read, write)
+#pragma section(".rdata$horizon_tls", long, read)
 
 #if defined(_WIN64)
 typedef unsigned long long horizon_tls_uintptr_t;
@@ -31,7 +31,9 @@ __declspec(allocate(".tls$")) char _tls_start = 0;
 __declspec(allocate(".tls$ZZZ")) char _tls_end = 0;
 __declspec(allocate(".CRT$XLA")) void *__xl_a = 0;
 __declspec(allocate(".CRT$XLZ")) void *__xl_z = 0;
-__declspec(allocate(".tls")) const HorizonImageTlsDirectory _tls_used = {
+/* Keep the PE directory outside the TLS template. SECTIONREL relocations for
+ * the Rust TLS variables are measured from the start of the template section. */
+__declspec(allocate(".rdata$horizon_tls")) const HorizonImageTlsDirectory _tls_used = {
     (horizon_tls_uintptr_t)&_tls_start,
     (horizon_tls_uintptr_t)&_tls_end,
     (horizon_tls_uintptr_t)&_tls_index,

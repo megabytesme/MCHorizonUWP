@@ -120,15 +120,20 @@ try {
         throw 'The linked game bridge has a truncated PE section table.'
     }
     $tlsOffset = $null
+    $templateSections = @()
     for ($section = 0; $section -lt $sectionCount; $section++) {
-        $stream.Position = $sections + $section * 40 + 12
+        $stream.Position = $sections + $section * 40
+        $name = [Text.Encoding]::ASCII.GetString($reader.ReadBytes(8)).TrimEnd([char]0)
+        $virtualSize = $reader.ReadUInt32()
         $sectionRva = $reader.ReadUInt32()
         $rawSize = $reader.ReadUInt32()
         $rawStart = $reader.ReadUInt32()
+        if ($name -ceq '.tls') {
+            $templateSections += @{ Rva = [uint64]$sectionRva; Size = [uint64]$virtualSize }
+        }
         $offset = [long]$tlsRva - $sectionRva
         if ($offset -ge 0 -and $offset + $tlsSize -le $rawSize) {
             $tlsOffset = $rawStart + $offset
-            break
         }
     }
     if ($null -eq $tlsOffset -or $tlsOffset + $tlsSize -gt $stream.Length) {
@@ -146,6 +151,10 @@ try {
         $index -lt $imageBase -or $index -gt $imageEnd - 4 -or
         ($callbacks -ne 0 -and ($callbacks -lt $imageBase -or $callbacks -gt $imageEnd - $pointerSize))) {
         throw 'The linked game bridge has invalid TLS addresses for its PE pointer width.'
+    }
+    $template = $templateSections | Where-Object { $_.Rva -eq $start - $imageBase }
+    if (-not $template -or $end - $start -gt $template.Size) {
+        throw 'The Rust TLS template must start at the beginning of its PE section.'
     }
 } catch {
     Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
