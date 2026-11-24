@@ -6,6 +6,7 @@ horizon_uwp_attach_game_swapchain
 horizon_uwp_attach_shell
 horizon_uwp_cache_vanilla_icon
 horizon_uwp_clipboard_get
+horizon_uwp_publish_screenshot
 horizon_uwp_clipboard_set
 horizon_uwp_detach_game_swapchain
 horizon_uwp_device_vibrate
