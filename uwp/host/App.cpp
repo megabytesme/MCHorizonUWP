@@ -14,6 +14,8 @@ extern "C" __declspec(dllimport) int __cdecl system(const char*);
 #include "Dx11Renderer.h"
 #ifdef HORIZON_UWP_GAME_BRIDGE
 #include "../window-bridge/CoreWindowEvents.h"
+#include "Narrator.h"
+#include <roapi.h>
 #include <wrl/client.h>
 #include <windows.applicationmodel.h>
 #include <windows.applicationmodel.core.h>
@@ -35,6 +37,87 @@ extern "C" int32_t __cdecl horizon_uwp_get_advanced_color(float* white, float* p
 }
 extern "C" void __cdecl horizon_uwp_record_swapchain_color(void*, int32_t, int32_t) {}
 #endif
+namespace {
+using NarratorSpeech = horizon_uwp::narrator::Speech;
+}
+
+extern "C" HRESULT __cdecl horizon_uwp_narrator_open(void** handle) {
+    const HRESULT result = RoInitialize(RO_INIT_MULTITHREADED);
+    if (FAILED(result)) return result;
+    try {
+        *handle = new NarratorSpeech();
+        return S_OK;
+    } catch (Platform::Exception^ error) {
+        RoUninitialize();
+        return error->HResult;
+    } catch (...) {
+        RoUninitialize();
+        return E_FAIL;
+    }
+}
+
+extern "C" void __cdecl horizon_uwp_narrator_close(void* handle) {
+    delete static_cast<NarratorSpeech*>(handle);
+    RoUninitialize();
+}
+
+extern "C" HRESULT __cdecl horizon_uwp_narrator_say(
+    void* handle, const wchar_t* text, unsigned length, float volume) {
+    try {
+        static_cast<NarratorSpeech*>(handle)->start(ref new Platform::String(text, length), volume);
+        return S_OK;
+    } catch (Platform::Exception^ error) {
+        return error->HResult;
+    } catch (...) {
+        return E_FAIL;
+    }
+}
+
+extern "C" HRESULT __cdecl horizon_uwp_narrator_poll(void* handle) {
+    try {
+        return static_cast<NarratorSpeech*>(handle)->poll();
+    } catch (...) {
+        static_cast<NarratorSpeech*>(handle)->clear();
+        return E_FAIL;
+    }
+}
+
+extern "C" void __cdecl horizon_uwp_narrator_clear(void* handle) {
+    static_cast<NarratorSpeech*>(handle)->clear();
+}
+
+using NarratorVoiceVisitor = void(__cdecl*)(void*, const wchar_t*, unsigned,
+    const wchar_t*, unsigned, const wchar_t*, unsigned, int);
+
+extern "C" HRESULT __cdecl horizon_uwp_narrator_voices(void* context, NarratorVoiceVisitor visit) {
+    using namespace horizon_uwp::narrator;
+    try {
+        const auto saved = saved_voice();
+        const auto voices = SpeechSynthesizer::AllVoices;
+        // The first row represents the system default, including a missing saved voice.
+        visit(context, L"", 0, L"", 0, L"", 0, find_voice(voices, saved) == nullptr);
+        for (unsigned i = 0; i < voices->Size; ++i) {
+            const auto voice = voices->GetAt(i);
+            const auto id = voice->Id;
+            const auto name = voice->DisplayName;
+            const auto language = voice->Language;
+            visit(context, id->Data(), id->Length(), name->Data(), name->Length(),
+                language->Data(), language->Length(), id == saved);
+        }
+        return S_OK;
+    } catch (Platform::Exception^ error) {
+        return error->HResult;
+    }
+}
+
+extern "C" HRESULT __cdecl horizon_uwp_narrator_set_voice(const wchar_t* id, unsigned length) {
+    try {
+        horizon_uwp::narrator::save_voice(ref new Platform::String(length ? id : L"", length));
+        return S_OK;
+    } catch (Platform::Exception^ error) {
+        return error->HResult;
+    }
+}
 
 static Windows::UI::Core::CoreWindow^ current_window;
 static std::atomic<DWORD> current_window_thread{0};
