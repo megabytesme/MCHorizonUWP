@@ -17766,7 +17766,7 @@ index 22e09156bba684cda5d0568202843df782fd43dc..3195cea9d31b17fe7f771bb7b1b4c6a6
              && let Some(window) = &self.window
          {
 diff --git a/crates/horizon-client/src/game/interface/narrator.rs b/crates/horizon-client/src/game/interface/narrator.rs
-index 712c841839702e5d13a7b92b03c00c694f79c888..fd3974d25340dd9152624ff2ca89fa154496d306 100644
+index 712c84183..3b829314d 100644
 --- a/crates/horizon-client/src/game/interface/narrator.rs
 +++ b/crates/horizon-client/src/game/interface/narrator.rs
 @@ -15,6 +15,102 @@ use horizon_narrator::{Status, screen::Trigger};
@@ -17872,6 +17872,15 @@ index 712c841839702e5d13a7b92b03c00c694f79c888..fd3974d25340dd9152624ff2ca89fa15
  /// `Minecraft`'s constructor: `new GameNarrator`, then
  /// `narrator.checkStatus(options.narrator().get() != OFF)`.
  pub(super) fn start(settings: &Settings) {
+@@ -203,7 +299,7 @@ impl Game<'_> {
+         }
+     }
+     /// The narrator option changed, on the options screen or by its hotkey.
+-    pub(super) fn narrator_status_changed(&mut self) {
++    pub(in crate::game) fn narrator_status_changed(&mut self) {
+         let mut toast = self.narrator_toast.take();
+         update_status(self.settings.narrator(), &mut toast, |toast| {
+             self.add_system_toast(toast)
 diff --git a/crates/horizon-client/src/game/interface/options.rs b/crates/horizon-client/src/game/interface/options.rs
 index 0f7b428cf34cd2f5fe991e81719ac2373562fe77..71d67588e98ac5b5753d680f18c9ee4e3933d6f3 100644
 --- a/crates/horizon-client/src/game/interface/options.rs
@@ -18699,7 +18708,7 @@ index 31d39f571c6dfad972d49c1c803f86570d561fe5..d8a03d36c9f5e26b44d6a87b492b5a9f
              self.tick_native_shader_pack(&path);
          } else if let Some(renderer) = &mut self.renderer
 diff --git a/crates/horizon-client/src/game/interface/startup_menu.rs b/crates/horizon-client/src/game/interface/startup_menu.rs
-index 8ad8b7e4e95..e913642ff61 100644
+index 8ad8b7e4e..8f86daaf6 100644
 --- a/crates/horizon-client/src/game/interface/startup_menu.rs
 +++ b/crates/horizon-client/src/game/interface/startup_menu.rs
 @@ -3,6 +3,7 @@
@@ -18951,7 +18960,24 @@ index 8ad8b7e4e95..e913642ff61 100644
                  // The startup menu runs before the game opens a control socket,
                  // and before its sound engine (no clicks, no volume previews,
                  // and no music tracks to list or play).
-@@ -1137,6 +1345,12 @@ impl Loading {
+@@ -855,6 +1063,16 @@ impl Loading {
+             Action::Accessibility => self.open_menu_options(Page::Accessibility),
+             Action::Language => self.open_menu_options(Page::Language),
+             Action::Sounds => self.open_menu_options(Page::Sound),
++            Action::Narrator if horizon_narrator::is_active() => {
++                self.settings.set_narrator(self.settings.narrator().next());
++                super::narrator::update_status(
++                    self.settings.narrator(),
++                    &mut self.menu.pending_narrator_toast,
++                    Some,
++                );
++                self.settings.save(&Game::options_path());
++            }
++            Action::Narrator => {}
+             Action::Credits => self.open_menu_options(Page::Credits),
+             Action::Mods => {
+                 list_menu_mods(&mut self.settings.mods);
+@@ -1137,6 +1355,12 @@ impl Loading {
              return Ok(());
          }
          match event {
@@ -18964,7 +18990,7 @@ index 8ad8b7e4e95..e913642ff61 100644
              WindowEvent::CloseRequested => {
                  if !self.settings.quit_shortcuts
                      && horizon_client::input::is_quit_shortcut_down(
-@@ -1150,8 +1364,16 @@ impl Loading {
+@@ -1150,8 +1374,16 @@ impl Loading {
                  event_loop.exit();
              }
              WindowEvent::Resized(size) => {
@@ -18982,7 +19008,7 @@ index 8ad8b7e4e95..e913642ff61 100644
                  }
                  self.apply_menu_settings();
              }
-@@ -1352,6 +1574,27 @@ impl Loading {
+@@ -1352,6 +1584,27 @@ impl Loading {
          Ok(())
      }
  
@@ -19010,7 +19036,7 @@ index 8ad8b7e4e95..e913642ff61 100644
      pub(super) fn draw_menu(&mut self, batch: &mut HudBatch) {
          let logs = horizon_client::logging::recent_lines();
          let Some(gui) = &self.gui else {
-@@ -1444,6 +1687,16 @@ impl Loading {
+@@ -1444,6 +1697,16 @@ impl Loading {
          {
              key_focus::draw_outline(&gui.atlas, batch, focus);
          }
@@ -19027,7 +19053,7 @@ index 8ad8b7e4e95..e913642ff61 100644
          // No ClientHost exists while resources load. Toast candidates are
          // admitted on handoff to Game, before their first animation or sound.
      }
-@@ -1505,11 +1758,13 @@ fn list_menu_mods(mods: &mut horizon_client::mod_list::ModList) {
+@@ -1505,11 +1768,13 @@ fn list_menu_mods(mods: &mut horizon_client::mod_list::ModList) {
              id: m.id.clone(),
              title: format!("{} {}", m.name, m.version),
              description: m.description.clone(),
@@ -19042,7 +19068,7 @@ index 8ad8b7e4e95..e913642ff61 100644
  }
  
  #[cfg(test)]
-@@ -1553,6 +1808,8 @@ mod tests {
+@@ -1553,6 +1818,8 @@ mod tests {
          Loading {
              window: None,
              renderer: None,
@@ -132992,3 +133018,121 @@ index 0000000000000000000000000000000000000000..02198acadfa0d73115ea0b5d80794b26
 + 
 +         Ok(())
 +     }
+diff --git a/crates/horizon-client/src/game/world/world_session.rs b/crates/horizon-client/src/game/world/world_session.rs
+index 99c50e7e5..52356ff93 100644
+--- a/crates/horizon-client/src/game/world/world_session.rs
++++ b/crates/horizon-client/src/game/world/world_session.rs
+@@ -38,6 +38,13 @@ impl Game<'_> {
+                 self.open_options_at(true, horizon_client::options_ui::Page::Language)
+             }
+             Action::Sounds => self.open_options_at(true, horizon_client::options_ui::Page::Sound),
++            Action::Narrator => {
++                if horizon_narrator::is_active() {
++                    self.settings.set_narrator(self.settings.narrator().next());
++                    self.narrator_status_changed();
++                    self.settings.save(&Self::options_path());
++                }
++            }
+             Action::Credits => {
+                 self.open_options_at(true, horizon_client::options_ui::Page::Credits)
+             }
+diff --git a/crates/horizon-client/src/title.rs b/crates/horizon-client/src/title.rs
+index f055e5502..0f25dfe85 100644
+--- a/crates/horizon-client/src/title.rs
++++ b/crates/horizon-client/src/title.rs
+@@ -403,6 +403,8 @@ pub enum Action {
+     Language,
+     /// The Mods icon of the main menu: the NeoForge-style mod list.
+     Mods,
++    /// AccessibilityOnboardingScreen's Narrator button.
++    Narrator,
+     /// AccessibilityOnboardingScreen's Music & Sounds button.
+     Sounds,
+     /// The title's bottom text (`PlainTextButton`): `CreditsAndAttributionScreen`.
+@@ -2564,6 +2566,9 @@ Would you like to enable the Narrator or visit the Accessibility Settings?",
+                 );
+                 Action::None
+             }
++            (Mode::Onboarding(_), Some(onboarding::NARRATOR)) if horizon_narrator::is_active() => {
++                Action::Narrator
++            }
+             (Mode::Onboarding(_), Some(onboarding::SOUNDS)) => Action::Sounds,
+             (Mode::Onboarding(_), Some(onboarding::ACCESSIBILITY)) => Action::Accessibility,
+             (Mode::Onboarding(_), Some(onboarding::LANGUAGE)) => Action::Language,
+diff --git a/crates/horizon-client/src/title/onboarding.rs b/crates/horizon-client/src/title/onboarding.rs
+index de65cb501..b78fdefbe 100644
+--- a/crates/horizon-client/src/title/onboarding.rs
++++ b/crates/horizon-client/src/title/onboarding.rs
+@@ -158,6 +158,29 @@ fn title_lines(atlas: &HudAtlas) -> Vec<String> {
+     lines
+ }
+ 
++/// Match the accessibility option's availability and current status caption.
++fn narrator_label(available: bool, status: horizon_narrator::Status) -> String {
++    use horizon_narrator::Status;
++    let (key, fallback) = if !available {
++        ("options.narrator.notavailable", "Not Available")
++    } else {
++        match status {
++            Status::Off => (status.key(), "OFF"),
++            Status::All => (status.key(), "Narrates All"),
++            Status::Chat => (status.key(), "Narrates Chat"),
++            Status::System => (status.key(), "Narrates System"),
++        }
++    };
++    translate(
++        "options.generic_value",
++        "%s: %s",
++        &[
++            &lang::get_or("options.narrator", "Narrator"),
++            &lang::get_or(key, fallback),
++        ],
++    )
++}
++
+ impl Title {
+     /// The first screen of a first launch (`addInitialScreens`).
+     pub fn start_onboarding(&mut self) {
+@@ -196,18 +219,10 @@ impl Title {
+                 trailing: icon,
+                 action: None,
+             };
+-        // The Narrator button is inactive without a narrator, and shows
+-        // `options.narrator.notavailable`.
+-        let narrator = translate(
+-            "options.generic_value",
+-            "%s: %s",
+-            &[
+-                &lang::get_or("options.narrator", "Narrator"),
+-                &lang::get_or("options.narrator.notavailable", "Not Available"),
+-            ],
+-        );
++        let available = horizon_narrator::is_active();
++        let narrator = narrator_label(available, horizon_narrator::status());
+         vec![
+-            button(layout.grid[0], narrator, false, NARRATOR, None),
++            button(layout.grid[0], narrator, available, NARRATOR, None),
+             button(
+                 layout.grid[1],
+                 lang::get_or("options.sounds", "Music & Sounds..."),
+@@ -313,6 +328,20 @@ mod tests {
+     use super::*;
+     use std::time::Duration;
+ 
++    #[test]
++    fn narrator_caption_tracks_available_status_and_unavailable() {
++        use horizon_narrator::Status;
++        for (status, expected) in [
++            (Status::Off, "OFF"),
++            (Status::All, "Narrates All"),
++            (Status::Chat, "Narrates Chat"),
++            (Status::System, "Narrates System"),
++        ] {
++            assert!(narrator_label(true, status).contains(expected));
++            assert!(narrator_label(false, status).contains("Not Available"));
++        }
++    }
++
+     #[test]
+     fn the_widgets_sit_where_the_layouts_put_them() {
+         // 854 x 480 GUI pixels, the title wrapped to 4 lines: the contents
