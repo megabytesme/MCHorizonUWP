@@ -6669,7 +6669,7 @@ index 190fb30d80531e835a23323c8d722cd6c2e19679..f4c3bfcbdea3a0ed581a46b16d79efaf
          let sets = ids
              .into_iter()
 diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
-index ade121700..26fd3c849 100644
+index ade121700..ee0325d80 100644
 --- a/crates/horizon-client-render/src/gfx.rs
 +++ b/crates/horizon-client-render/src/gfx.rs
 @@ -170,6 +170,32 @@ fn entity_pipeline_factory<'a>(
@@ -8150,19 +8150,28 @@ index ade121700..26fd3c849 100644
          );
          let entity_pipeline = |label, cull_mode, depth_write, compare, bias, blend, clouds| {
              entity_pipeline_with(EntityPipelineOptions {
-@@ -3608,15 +4048,18 @@ impl Renderer {
-             alpha_blend,
-             false,
-         );
--        let cloud_pipeline = entity_pipeline(
--            "Clouds",
--            Some(wgpu::Face::Back),
+@@ -3601,22 +4041,25 @@ impl Renderer {
+         // over it and the item would all but vanish (#7031, #7033).
+         let translucent_item_pipeline = entity_pipeline(
+             "Translucent items",
+-            None,
 -            true,
 -            wgpu::CompareFunction::GreaterEqual,
 -            Default::default(),
 -            alpha_blend,
--            true,
+-            false,
 -        );
+-        let cloud_pipeline = entity_pipeline(
+-            "Clouds",
+-            Some(wgpu::Face::Back),
++            None,
+             true,
+             wgpu::CompareFunction::GreaterEqual,
+             Default::default(),
+             alpha_blend,
+-            true,
++            false,
+         );
 +        let cloud_pipeline = entity_pipeline_with(EntityPipelineOptions {
 +            label: "Clouds",
 +            cull_mode: Some(wgpu::Face::Back),
@@ -8484,12 +8493,17 @@ index ade121700..26fd3c849 100644
          // even creating an indirect buffer fails; one draw per section reads
          // `draws` on the CPU instead.
          let indirect = device.create_buffer(&wgpu::BufferDescriptor {
-@@ -4323,18 +4830,48 @@ impl Renderer {
+@@ -4323,18 +4830,50 @@ impl Renderer {
                  }
                  Some(cull)
              });
 -        let depth = Self::depth(&device, &config);
 -        let world_post = world_post::Post::new(&device, frame_format);
+-        let uploads = upload::Uploads::new(&device);
+-        let section_uploads = upload::Uploads::with_chunk(&device, SECTION_UPLOAD_CHUNK);
+-        let stars = stars::Stars::new(&device, (frame_format, linear_light));
+-        let custom_sky = custom_sky::CustomSky::new(&device, (frame_format, linear_light));
+-        let entity_outline = entity_outline::EntityOutline::new(
 +        let depth = Self::depth(&device, &config, fl91_caps.depth_format, fl91);
 +        let world_post = if fl91 {
 +            world_post::Post::disabled(frame_format)
@@ -8505,11 +8519,10 @@ index ade121700..26fd3c849 100644
 +                fullscreen,
 +            )
 +        });
-         let uploads = upload::Uploads::new(&device);
-         let section_uploads = upload::Uploads::with_chunk(&device, SECTION_UPLOAD_CHUNK);
--        let stars = stars::Stars::new(&device, (frame_format, linear_light));
--        let custom_sky = custom_sky::CustomSky::new(&device, (frame_format, linear_light));
--        let entity_outline = entity_outline::EntityOutline::new(
++        let mut uploads = upload::Uploads::new(&device);
++        let mut section_uploads = upload::Uploads::with_chunk(&device, SECTION_UPLOAD_CHUNK);
++        uploads.set_device_lost_flag(device_lost.clone());
++        section_uploads.set_device_lost_flag(device_lost.clone());
 +        let stars = stars::Stars::new_with(
              &device,
 -            (&entity_shader, &entity_layout, &entity_vertex),
@@ -8541,7 +8554,7 @@ index ade121700..26fd3c849 100644
          drop(pipelines_step);
          reuse.finish(generation);
          if previous.is_some() {
-@@ -4356,15 +4893,31 @@ impl Renderer {
+@@ -4356,15 +4895,31 @@ impl Renderer {
                  on_off(gpu_timer.is_some()),
              ));
          }
@@ -8576,7 +8589,7 @@ index ade121700..26fd3c849 100644
          Ok(Self {
              msaa,
              display: None,
-@@ -4395,6 +4948,7 @@ impl Renderer {
+@@ -4395,6 +4950,7 @@ impl Renderer {
              queue: submit::Queue::new(queue, submit::wanted()),
              deferred: None,
              device_lost,
@@ -8584,7 +8597,7 @@ index ade121700..26fd3c849 100644
              config,
              solid,
              solid_opaque,
-@@ -4520,6 +5074,11 @@ impl Renderer {
+@@ -4520,6 +5076,11 @@ impl Renderer {
              mip_levels,
              mipmaps: mip_levels - 1,
              terrain_layout: bindings,
@@ -8596,7 +8609,7 @@ index ade121700..26fd3c849 100644
              terrain_sprites: sprite_constants.map(|(_, v)| v),
              sprite_split: split,
              sprite_sampler,
-@@ -4594,6 +5153,7 @@ impl Renderer {
+@@ -4594,6 +5155,7 @@ impl Renderer {
              occlusion: occlusion::Occlusion::new(crate::chunk::MIN_Y, crate::chunk::HEIGHT / 16),
              layout: crate::chunk::ColumnLayout::VANILLA,
              world_post,
@@ -8604,7 +8617,7 @@ index ade121700..26fd3c849 100644
              frame_gen: frame_gen::FrameGen::new(),
              entity_atlas: atlas_view.clone(),
              hdr: None,
-@@ -4601,6 +5161,7 @@ impl Renderer {
+@@ -4601,6 +5163,7 @@ impl Renderer {
              emission_stats,
              output_caps,
              output_rejected: None,
@@ -8612,7 +8625,7 @@ index ade121700..26fd3c849 100644
              auto_off_since: None,
              // Nothing is presented as HDR yet: `update_output` applies the settings.
              output: output::resolve_output(settings, output_caps, display, frame, false),
-@@ -4731,7 +5292,7 @@ impl Renderer {
+@@ -4731,7 +5294,7 @@ impl Renderer {
      pub fn set_lines_shader(&mut self, program: Option<&crate::core_shader::CoreProgram>) {
          let format = self.output.frame.format;
          // A pack's GLSL writes vanilla's gamma: a frame of linear light keeps the built-in one.
@@ -8621,7 +8634,7 @@ index ade121700..26fd3c849 100644
          self.core_lines =
              program.and_then(|program| core_lines::CoreLines::new(&self.device, format, program));
      }
-@@ -4743,10 +5304,40 @@ impl Renderer {
+@@ -4743,10 +5306,40 @@ impl Renderer {
          stars: Option<&crate::core_shader::CoreProgram>,
      ) {
          // As `set_lines_shader`: not on a frame of linear light.
@@ -8663,7 +8676,7 @@ index ade121700..26fd3c849 100644
      /// LevelRenderer.submitBlockOutline: the buffer holds `edges` per stroke, the black
      /// secondary stroke first when high contrast is on.
      #[horizon_mod_api_macros::replaceable]
-@@ -4805,6 +5396,18 @@ impl Renderer {
+@@ -4805,6 +5398,18 @@ impl Renderer {
              .unwrap_or_else(std::sync::PoisonError::into_inner) =
              self.surface.take().and_then(|s| Arc::try_unwrap(s).ok());
      }
@@ -8682,7 +8695,7 @@ index ade121700..26fd3c849 100644
      /// Reattach a window after surface loss or a failed renderer replacement.
      pub fn recreate_surface(&mut self) -> Result<()> {
          self.queue.wait();
-@@ -4844,7 +5447,22 @@ impl Renderer {
+@@ -4844,7 +5449,22 @@ impl Renderer {
          Ok(())
      }
      /// The world's depth, which occlusion culling's test and post effects may read.
@@ -8706,7 +8719,7 @@ index ade121700..26fd3c849 100644
          device
              .create_texture(&wgpu::TextureDescriptor {
                  label: Some("Horizon depth"),
-@@ -4856,13 +5474,8 @@ impl Renderer {
+@@ -4856,13 +5476,8 @@ impl Renderer {
                  mip_level_count: 1,
                  sample_count: 1,
                  dimension: wgpu::TextureDimension::D2,
@@ -8722,7 +8735,7 @@ index ade121700..26fd3c849 100644
                  view_formats: &[],
              })
              .create_view(&Default::default())
-@@ -4914,7 +5527,12 @@ impl Renderer {
+@@ -4914,7 +5529,12 @@ impl Renderer {
          } else {
              self.offscreen = Some(Self::offscreen_target(&self.device, &self.config));
          }
@@ -8736,7 +8749,7 @@ index ade121700..26fd3c849 100644
          if let Some(pipeline) = &mut self.external {
              pipeline.resize([width, height]);
          }
-@@ -5241,6 +5859,9 @@ impl Renderer {
+@@ -5241,6 +5861,9 @@ impl Renderer {
          }
      }
      fn upload_mesh(&mut self, mesh: &SectionMesh) -> Option<SectionGpu> {
@@ -8746,7 +8759,7 @@ index ade121700..26fd3c849 100644
          let solid = (mesh.solid.len() / 4) as u32;
          let translucent = (mesh.translucent.len() / 4) as u32;
          if solid + translucent == 0 {
-@@ -5248,8 +5869,17 @@ impl Renderer {
+@@ -5248,8 +5871,17 @@ impl Renderer {
          }
          let max = solid.max(translucent);
          if max > self.index_quads {
@@ -8766,7 +8779,19 @@ index ade121700..26fd3c849 100644
          }
          let encoder = self.section_copies.get_or_insert_with(|| {
              self.device
-@@ -5488,6 +6118,11 @@ impl Renderer {
+@@ -5437,6 +6069,11 @@ impl Renderer {
+     }
+     /// The section copies recorded since the last submission, closed.
+     fn take_section_copies(&mut self) -> Option<wgpu::CommandBuffer> {
++        if self.device_lost() {
++            self.section_copies.take();
++            self.section_copy_bytes = 0;
++            return None;
++        }
+         let encoder = self.section_copies.take()?;
+         self.section_copy_bytes = 0;
+         self.section_uploads.finish(&encoder);
+@@ -5488,6 +6125,11 @@ impl Renderer {
              indices: &self.indices,
              flat: self.flat.as_ref(),
              multi_draw: self.multi_draw,
@@ -8778,7 +8803,7 @@ index ade121700..26fd3c849 100644
              looks: self.look_groups.as_ref(),
          };
          lists.draw(pass, indirect, base, first, count, pulled);
-@@ -6182,6 +6817,8 @@ impl Renderer {
+@@ -6182,6 +6824,8 @@ impl Renderer {
      pub fn output(&self) -> output::EffectiveOutput {
          output::EffectiveOutput {
              msaa: self.msaa_offered(),
@@ -8787,7 +8812,7 @@ index ade121700..26fd3c849 100644
              ..self.output_with_rays()
          }
      }
-@@ -6218,7 +6855,12 @@ impl Renderer {
+@@ -6218,7 +6862,12 @@ impl Renderer {
      /// masks. Only with HDR output on: nothing else reads them.
      pub fn measure_emission(&mut self) {
          if let Some(hdr) = &self.hdr {
@@ -8801,7 +8826,7 @@ index ade121700..26fd3c849 100644
              self.emission_stats
                  .measure(&self.device, &self.queue, &views, hdr.masks);
          }
-@@ -6262,6 +6904,7 @@ impl Renderer {
+@@ -6262,6 +6911,7 @@ impl Renderer {
      }
      /// Frame generation on or off (FSR 3.1's frame interpolation).
      pub fn set_frame_generation(&mut self, on: bool) {
@@ -8809,7 +8834,7 @@ index ade121700..26fd3c849 100644
          if !on {
              self.frame_gen.stop();
          }
-@@ -6277,6 +6920,12 @@ impl Renderer {
+@@ -6277,6 +6927,12 @@ impl Renderer {
          upscale: f32,
          sharpness: f32,
      ) {
@@ -8822,7 +8847,7 @@ index ade121700..26fd3c849 100644
          self.world_post.set_sharpness(&self.device, sharpness);
          let taa = taa && self.world_post.supports_taa();
          self.world_post.scale = scale.clamp(0.25, 2.0);
-@@ -6284,6 +6933,22 @@ impl Renderer {
+@@ -6284,6 +6940,22 @@ impl Renderer {
          self.world_post.taa = taa;
          self.world_post.upscale = if taa { upscale.clamp(1.0, 4.0) } else { 1.0 };
      }
@@ -8845,7 +8870,7 @@ index ade121700..26fd3c849 100644
      /// Runs `post` over the world from now on (`None`: no pack), for the dimension `dimension`;
      /// `block_ids` gives each source state its model and fluid material ids (two values
      /// per state); emission and ownership come from the mesher's quad records.
-@@ -6295,6 +6960,14 @@ impl Renderer {
+@@ -6295,6 +6967,14 @@ impl Renderer {
          pack: Option<horizon_shaders::Post>,
          block_ids: &[i32],
      ) -> std::result::Result<Option<(Vec<String>, Vec<String>)>, pack_post::Refused> {
@@ -8860,7 +8885,7 @@ index ade121700..26fd3c849 100644
          if pack.is_none() {
              self.pack_atlas = None;
              self.pack_material_atlases = None;
-@@ -6569,7 +7242,14 @@ impl Renderer {
+@@ -6569,7 +7249,14 @@ impl Renderer {
          let clouds = self.cloud_bindings.clone();
          let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
          let cancelled = cancel.clone();
@@ -8875,7 +8900,7 @@ index ade121700..26fd3c849 100644
              let instance = wgpu::vertex_attr_array![5=>Float32x4];
              let vertex = wgpu::VertexBufferLayout {
                  array_stride: std::mem::size_of::<TerrainVertex>() as u64,
-@@ -6706,6 +7386,9 @@ impl Renderer {
+@@ -6706,6 +7393,9 @@ impl Renderer {
              block_light::LightTable,
          )>,
      ) -> std::result::Result<Vec<String>, String> {
@@ -8885,7 +8910,7 @@ index ade121700..26fd3c849 100644
          self.world_held = false;
          let linear = pack.is_some();
          if (linear || self.output.frame.format == LINEAR_FRAME)
-@@ -6894,7 +7577,7 @@ impl Renderer {
+@@ -6894,7 +7584,7 @@ impl Renderer {
      /// or sampleRGSS for RGSS.
      pub fn set_texture_filtering(&mut self, filtering: i32, bit: i32) {
          let filtering = filtering.clamp(0, 2) as u32;
@@ -8894,7 +8919,7 @@ index ade121700..26fd3c849 100644
              sampler_anisotropy(bit)
          } else {
              1
-@@ -6904,16 +7587,21 @@ impl Renderer {
+@@ -6904,16 +7594,21 @@ impl Renderer {
          }
          self.texture_filtering = filtering;
          self.max_anisotropy = anisotropy;
@@ -8919,7 +8944,7 @@ index ade121700..26fd3c849 100644
          );
          self.group = terrain_group(
              &self.device,
-@@ -6925,6 +7613,7 @@ impl Renderer {
+@@ -6925,6 +7620,7 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8927,7 +8952,7 @@ index ade121700..26fd3c849 100644
          );
          self.fluid_group = terrain_group(
              &self.device,
-@@ -6936,17 +7625,29 @@ impl Renderer {
+@@ -6936,17 +7632,29 @@ impl Renderer {
              &self.lightmap_view,
              &self.lightmap_sampler,
              &self.emission_stats.view,
@@ -8958,7 +8983,7 @@ index ade121700..26fd3c849 100644
          );
      }
      /// Block sprite layers per array on this device: a sprite's array is its layer over it, its
-@@ -6958,9 +7659,14 @@ impl Renderer {
+@@ -6958,9 +7666,14 @@ impl Renderer {
      /// reduced copies (0: none).
      pub fn set_mipmap_levels(&mut self, levels: u32) {
          self.mipmap_option = levels;
@@ -8974,7 +8999,17 @@ index ade121700..26fd3c849 100644
              self.sprite_minimum_size,
              self.mip_levels,
          );
-@@ -7191,10 +7897,17 @@ impl Renderer {
+@@ -7179,6 +7892,9 @@ impl Renderer {
+             });
+             self.hud
+                 .upload_patches(&mut self.uploads, &mut encoder, &frame.hud.patches);
++            if self.device_lost() {
++                return Err("the graphics device was lost during uploads".into());
++            }
+             self.uploads.finish(&encoder);
+             if has_section_copies {
+                 self.section_copy_bytes = 0;
+@@ -7191,10 +7907,17 @@ impl Renderer {
          // A scaled screenshot's frame never reached the window.
          rendered.map(|drawn| drawn && scaled.is_none())
      }
@@ -8995,7 +9030,7 @@ index ade121700..26fd3c849 100644
      }
      /// The frame size of the pending `scaled` screenshot when it is larger than the
      /// window: the window's times the Resolution Scale (when above 100%) and
-@@ -7242,7 +7955,12 @@ impl Renderer {
+@@ -7242,7 +7965,12 @@ impl Renderer {
          // tried again at half the size next frame; the window keeps its last one.
          let checks = GpuChecks::push(&self.device);
          let target = (!layered).then(|| Self::offscreen_target(&self.device, &config));
@@ -9009,7 +9044,7 @@ index ade121700..26fd3c849 100644
          if let Some(e) = checks.pop() {
              log::warn!(
                  "Horizon renderer: no memory for a {}x{} screenshot ({e}); trying half the size",
-@@ -7360,7 +8078,7 @@ impl Renderer {
+@@ -7360,7 +8088,7 @@ impl Renderer {
          // passes, HDR output without the HUD's layer (or the float frame HDR was started
          // with) or the title screen.
          let fg = self.frame_gen.on
@@ -9018,7 +9053,7 @@ index ade121700..26fd3c849 100644
              && (self.hdr.as_ref()).map_or(
                  self.output.frame.format == self.config.format.remove_srgb_suffix(),
                  hdr::Hdr::layered,
-@@ -7655,8 +8373,14 @@ impl Renderer {
+@@ -7655,8 +8383,14 @@ impl Renderer {
              view_origin: [0.0; 4],
              world_view: [0.0; 4],
          };
@@ -9035,7 +9070,7 @@ index ade121700..26fd3c849 100644
          // The sunrise fan as sixteen triangles. Its clip positions use the sky's
          // own view (no TAA jitter; the bob and the spin, as `fs_sky`'s `view_ray`),
          // and its apex weight interpolates the barycentric the shader used to
-@@ -7692,12 +8416,22 @@ impl Renderer {
+@@ -7692,12 +8426,22 @@ impl Renderer {
              view_proj: hand_view_proj.to_cols_array_2d(),
              ..globals
          };
@@ -9064,7 +9099,7 @@ index ade121700..26fd3c849 100644
          // GameRenderer.render3dHud: DebugCrosshairRenderer draws with the
          // hand's projection but no bob, and FogMode.NONE (no fog colour).
          let crosshair_globals = Globals {
-@@ -7705,12 +8439,22 @@ impl Renderer {
+@@ -7705,12 +8449,22 @@ impl Renderer {
              fog_color: [0.0; 4],
              ..globals
          };
@@ -9093,7 +9128,7 @@ index ade121700..26fd3c849 100644
          // 4x MSAA, unless a classic shader pack runs (a failed or refused one leaves `None`):
          // it and native displacement keep their single-sample pipelines, as does a material
          // whose four-sample layers the driver refused. Nor where its targets ran out of video
-@@ -8036,9 +8780,7 @@ impl Renderer {
+@@ -8036,9 +8790,7 @@ impl Renderer {
              self.instances = self.device.create_buffer(&wgpu::BufferDescriptor {
                  label: Some("Section origins"),
                  size: self.instance_capacity * 16,
@@ -9104,7 +9139,7 @@ index ade121700..26fd3c849 100644
                  mapped_at_creation: false,
              });
          }
-@@ -8916,13 +9658,22 @@ impl Renderer {
+@@ -8916,13 +9668,22 @@ impl Renderer {
                      .entry(snapshot.section)
                      .or_insert_with(|| {
                          let capacity = vertices.next_power_of_two().max(4);
@@ -9129,7 +9164,7 @@ index ade121700..26fd3c849 100644
                          static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                          GpuStaticEntitySection {
                              buffer: self.device.create_buffer(&wgpu::BufferDescriptor {
-@@ -8939,13 +9690,22 @@ impl Renderer {
+@@ -8939,13 +9700,22 @@ impl Renderer {
                          }
                      });
                  if gpu.origin != snapshot.origin {
@@ -9154,7 +9189,7 @@ index ade121700..26fd3c849 100644
                      gpu.origin = snapshot.origin;
                      static_bytes_uploaded += std::mem::size_of_val(&snapshot.origin) as u64;
                  }
-@@ -8987,9 +9747,10 @@ impl Renderer {
+@@ -8987,9 +9757,10 @@ impl Renderer {
              .max()
              .unwrap_or(0);
          if max_static_section_quads > self.static_entity_index_quads {
@@ -9168,7 +9203,7 @@ index ade121700..26fd3c849 100644
          }
          if !frame.visible_static_block_entity_sections.is_empty()
              && self.static_entity_camera != Some(frame.camera)
-@@ -8999,21 +9760,40 @@ impl Renderer {
+@@ -8999,21 +9770,40 @@ impl Renderer {
                  frame.camera.y.floor() as i32,
                  frame.camera.z.floor() as i32,
              ];
@@ -9224,7 +9259,7 @@ index ade121700..26fd3c849 100644
              static_bytes_uploaded += std::mem::size_of::<StaticEntityUniform>() as u64;
              self.static_entity_camera = Some(frame.camera);
          }
-@@ -9067,8 +9847,10 @@ impl Renderer {
+@@ -9067,8 +9857,10 @@ impl Renderer {
                  .max(frame.glowing.len() as u32 / 4)
                  .max(outlined / 4);
          if max_quads > self.index_quads {
@@ -9237,7 +9272,7 @@ index ade121700..26fd3c849 100644
          }
          if let Some(b) = &frame.border {
              if b.rebuilt {
-@@ -9223,10 +10005,25 @@ impl Renderer {
+@@ -9223,10 +10015,25 @@ impl Renderer {
                  bytemuck::cast_slice(&self.draws),
              );
          }
@@ -9263,7 +9298,7 @@ index ade121700..26fd3c849 100644
          if let Some(timer) = &mut self.gpu_timer {
              timer.begin(&mut encoder);
          }
-@@ -9303,12 +10100,21 @@ impl Renderer {
+@@ -9303,12 +10110,21 @@ impl Renderer {
                  .as_ref()
                  .and_then(|p| p.1.as_ref())
                  .is_some_and(|p| p.has_weather());
@@ -9291,7 +9326,7 @@ index ade121700..26fd3c849 100644
          let (world_view, world_depth) = match &scaled {
              Some((color, depth)) => (color, depth),
              None => (&view_target, &self.depth),
-@@ -9316,6 +10122,9 @@ impl Renderer {
+@@ -9316,6 +10132,9 @@ impl Renderer {
          if culling && let Some(cull) = &mut self.cull {
              cull.bind_depth(&self.device, world_depth);
          }
@@ -9301,7 +9336,7 @@ index ade121700..26fd3c849 100644
          // The hand draws at the end of the world pass, after a depth reset, when nothing runs
          // between them (a scaled world's post pass, HDR's world copy, a native mod's
          // `world_drawn`): one render pass fewer, ~10 µs of wgpu's encoding a frame.
-@@ -9431,6 +10240,11 @@ impl Renderer {
+@@ -9431,6 +10250,11 @@ impl Renderer {
                      indices: &self.indices,
                      flat: self.flat.as_ref(),
                      multi_draw: self.multi_draw,
@@ -9313,7 +9348,7 @@ index ade121700..26fd3c849 100644
                      looks: self.look_groups.as_ref(),
                  },
                  flat_frame,
-@@ -9502,7 +10316,7 @@ impl Renderer {
+@@ -9502,7 +10326,7 @@ impl Renderer {
                      ),
                      depth: target(
                          "Water mirror depth",
@@ -9322,7 +9357,7 @@ index ade121700..26fd3c849 100644
                          wgpu::TextureUsages::RENDER_ATTACHMENT,
                      ),
                  });
-@@ -9530,12 +10344,22 @@ impl Renderer {
+@@ -9530,12 +10354,22 @@ impl Renderer {
                      hdr_light: [0.0, 0.0, globals.hdr_light[2], 0.0],
                      ..globals
                  };
@@ -9351,7 +9386,7 @@ index ade121700..26fd3c849 100644
                  let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                      label: Some("Water mirror"),
                      timestamp_writes: self
-@@ -9564,6 +10388,9 @@ impl Renderer {
+@@ -9564,6 +10398,9 @@ impl Renderer {
                  pass.set_bind_group(0, &self.mirror_group, &[]);
                  if sky_visible && frame.skybox {
                      pass.set_pipeline(&self.sky);
@@ -9361,7 +9396,7 @@ index ade121700..26fd3c849 100644
                      pass.draw(0..3, 0..1);
                  }
                  // The solid terrain: occlusion culling is off with a mirror, so every draw
-@@ -9729,6 +10556,9 @@ impl Renderer {
+@@ -9729,6 +10566,9 @@ impl Renderer {
                          }
                          None => {
                              pass.set_pipeline(&self.sky_base);
@@ -9371,7 +9406,7 @@ index ade121700..26fd3c849 100644
                              pass.draw(0..3, 0..1);
                          }
                      }
-@@ -9793,6 +10623,9 @@ impl Renderer {
+@@ -9793,6 +10633,9 @@ impl Renderer {
                  }
                  if !frame.title && frame.dark_disc && !pack_draws_sky {
                      pass.set_pipeline(&self.dark_disc);
@@ -9381,7 +9416,7 @@ index ade121700..26fd3c849 100644
                      pass.draw(0..3, 0..1);
                  }
              }
-@@ -10780,6 +11613,9 @@ impl Renderer {
+@@ -10780,6 +11623,9 @@ impl Renderer {
                  pass.stage(self.own_timing.as_mut(), "hand");
                  pass.set_pipeline(&self.depth_reset);
                  pass.set_bind_group(0, &self.group, &[]);
@@ -9391,7 +9426,7 @@ index ade121700..26fd3c849 100644
                  pass.draw(0..3, 0..1);
                  self.draw_hand(&mut pass, hand_quads, world_quads + additive_quads);
              }
-@@ -10978,17 +11814,21 @@ impl Renderer {
+@@ -10978,17 +11824,21 @@ impl Renderer {
              let onto = (&view_target, &target_texture, generated);
              fg_made = self.draw_generated(&mut encoder, frame, &camera, &overlay, onto);
          } else if scaled.is_some() {
@@ -9420,7 +9455,17 @@ index ade121700..26fd3c849 100644
                  None => (&self.depth, size),
              };
              native_render::world_drawn(&mut native_render::WorldDrawn {
-@@ -11142,6 +11982,7 @@ impl Renderer {
+@@ -11086,6 +11936,9 @@ impl Renderer {
+                 .take()
+                 .and_then(|request| self.take_readback(request, &mut encoder, shown_texture))
+         });
++        if self.device_lost() {
++            return Err("the graphics device was lost during uploads".into());
++        }
+         self.uploads.finish(&encoder);
+         if has_section_copies {
+             self.section_copy_bytes = 0;
+@@ -11142,6 +11995,7 @@ impl Renderer {
              && checks.is_none()
              && !first_frame
              && !reconfigure
@@ -9428,7 +9473,7 @@ index ade121700..26fd3c849 100644
              && self.hdr_marker.is_none()
              && (surface_frame.is_none() || self.config.present_mode != wgpu::PresentMode::Fifo)
          {
-@@ -11255,7 +12096,19 @@ impl Renderer {
+@@ -11255,7 +12109,19 @@ impl Renderer {
              if first_frame {
                  startup_step(format_args!("presenting the first frame"));
              }
@@ -9448,7 +9493,7 @@ index ade121700..26fd3c849 100644
              if self.hdr.is_some()
                  && let Some(marker) = self.hdr_marker.take()
              {
-@@ -11376,6 +12229,7 @@ impl Renderer {
+@@ -11376,6 +12242,7 @@ impl Renderer {
              .and_then(|request| self.take_readback(request, encoder, target_texture));
          // GameRenderer.render: applyPostEffects, after the level and before the GUI.
          if !frame.title
@@ -9456,7 +9501,7 @@ index ade121700..26fd3c849 100644
              && !frame.post_effects.effects.is_empty()
              && target_texture
                  .usage()
-@@ -11501,13 +12355,18 @@ impl Renderer {
+@@ -11501,13 +12368,18 @@ impl Renderer {
                      .unwrap_or(&self.debug_lines_on_top),
              });
              pass.set_bind_group(0, &self.crosshair_group, &[]);
@@ -9479,7 +9524,7 @@ index ade121700..26fd3c849 100644
          let blur_at = menu_blur.map_or(0, |_| frame.hud.blur_at);
          self.hud.draw_range(
              encoder,
-@@ -11579,8 +12438,9 @@ impl Renderer {
+@@ -11579,8 +12451,9 @@ impl Renderer {
  }
  /// Out-of-memory and validation error scopes, popped together: the first error either caught.
  struct GpuChecks {
@@ -9490,7 +9535,7 @@ index ade121700..26fd3c849 100644
  }
  impl GpuChecks {
      fn push(device: &wgpu::Device) -> Self {
-@@ -12215,6 +13075,17 @@ mod tests {
+@@ -12215,6 +13088,17 @@ mod tests {
          assert!(u64::from(super::padded_row(w)) * u64::from(h) <= max, "{f}");
          assert!(f > 3.7, "{f}");
      }
@@ -9508,7 +9553,7 @@ index ade121700..26fd3c849 100644
      #[test]
      fn drawable_size_skips_minimized_and_oversized_windows() {
          use super::drawable_size;
-@@ -13512,7 +14383,14 @@ impl DisplayReading {
+@@ -13512,7 +14396,14 @@ impl DisplayReading {
      /// What wgpu reads from the OS for `surface`'s display; without one, `hdr::offscreen_display`.
      fn read(surface: Option<&wgpu::Surface>, adapter: &wgpu::Adapter) -> Self {
          surface.map_or_else(hdr::offscreen_display, |s| {
@@ -13521,13 +13566,15 @@ index d90cd826b8a65c6f27979e24b88169a9c1006a19..b2d072aa918fa92c14706fdcb16a0704
          let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
          // WGL can hang while creating a test instance on Windows (#5238).
 diff --git a/crates/horizon-client-render/src/gfx/upload.rs b/crates/horizon-client-render/src/gfx/upload.rs
-index 721d158f49b7c4e8e8c7c9ec483557dad9170a03..4f26d41794433a5b3141dca95bb86e80f53b78bb 100644
+index 721d158f4..7677e889c 100644
 --- a/crates/horizon-client-render/src/gfx/upload.rs
 +++ b/crates/horizon-client-render/src/gfx/upload.rs
-@@ -11,6 +11,106 @@
+@@ -11,6 +11,108 @@
  //! title artwork loaded, and the world renderer staged it again beside the
  //! block sprites (#15608). Phones share that memory with the game.
  use std::num::NonZeroU64;
++use std::sync::Arc;
++use std::sync::atomic::{AtomicBool, Ordering};
 +use wgpu::util::DeviceExt;
 +
 +// DeviceExt uploads each array layer and mip separately. D3D12 rounds every
@@ -13631,7 +13678,127 @@ index 721d158f49b7c4e8e8c7c9ec483557dad9170a03..4f26d41794433a5b3141dca95bb86e80
  
  /// Large enough for a tick of animated sprites at 16x16 with every mip level.
  const CHUNK: u64 = 1 << 20;
-@@ -230,6 +330,15 @@ mod tests {
+@@ -18,6 +120,7 @@ const CHUNK: u64 = 1 << 20;
+ pub struct Uploads {
+     belt: wgpu::util::StagingBelt,
+     chunk: u64,
++    device_lost: Option<Arc<AtomicBool>>,
+ }
+ 
+ impl Uploads {
+@@ -30,8 +133,13 @@ impl Uploads {
+         Self {
+             belt: wgpu::util::StagingBelt::new(device.clone(), chunk),
+             chunk,
++            device_lost: None,
+         }
+     }
++    /// Associate this belt with its renderer's device-loss state.
++    pub fn set_device_lost_flag(&mut self, lost: Arc<AtomicBool>) {
++        self.device_lost = Some(lost);
++    }
+     /// A mapped staging slice of at least `size` bytes. The belt gives a
+     /// write larger than its chunk a buffer of exactly that size, keeps it for
+     /// good and only reuses it for writes that fit: an upload that grows a
+@@ -39,13 +147,28 @@ impl Uploads {
+     /// buffer each frame until the game ran out of memory (#2826). Rounded up
+     /// to a power of two, the large buffers it keeps are reused, one per
+     /// doubling.
+-    fn allocate(&mut self, size: NonZeroU64, alignment: NonZeroU64) -> wgpu::BufferSlice<'_> {
+-        let size = if size.get() > self.chunk {
++    fn allocate(
++        belt: &mut wgpu::util::StagingBelt,
++        chunk: u64,
++        size: NonZeroU64,
++        alignment: NonZeroU64,
++    ) -> wgpu::BufferSlice<'_> {
++        let size = if size.get() > chunk {
+             size.checked_next_power_of_two().unwrap_or(size)
+         } else {
+             size
+         };
+-        self.belt.allocate(size, alignment)
++        belt.allocate(size, alignment)
++    }
++    fn staging_map_failed(lost: Option<&AtomicBool>, error: wgpu::MapRangeError) {
++        // A failed staging map invalidates this frame. Request renderer replacement
++        // even if the backend's loss callback has not run yet.
++        let Some(lost) = lost else {
++            panic!("staging belt slices are mapped: {error}");
++        };
++        if !lost.swap(true, Ordering::AcqRel) {
++            log::warn!("Horizon renderer: staging upload could not map its buffer: {error}");
++        }
+     }
+     /// Copy tightly packed RGBA8 `pixels` (`width` by `height`) into one mip
+     /// level of one array layer, padding rows to the copy alignment.
+@@ -65,16 +188,28 @@ impl Uploads {
+         };
+         let alignment = NonZeroU64::new(u64::from(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT))
+             .expect("non-zero alignment");
+-        let slice = self.allocate(size, alignment);
++        let lost = self.device_lost.as_deref();
++        let device_lost = || lost.is_some_and(|flag| flag.load(Ordering::Acquire));
++        if device_lost() {
++            return;
++        }
++        let slice = Self::allocate(&mut self.belt, self.chunk, size, alignment);
+         {
+-            let mut view = slice
+-                .get_mapped_range_mut()
+-                .expect("staging belt slices are mapped");
++            let mut view = match slice.get_mapped_range_mut() {
++                Ok(view) => view,
++                Err(error) => {
++                    Self::staging_map_failed(lost, error);
++                    return;
++                }
++            };
+             for (i, src) in pixels.chunks(row).enumerate() {
+                 view.slice(i * padded..i * padded + row)
+                     .copy_from_slice(src);
+             }
+         }
++        if device_lost() {
++            return;
++        }
+         encoder.copy_buffer_to_texture(
+             wgpu::TexelCopyBufferInfo {
+                 buffer: slice.buffer(),
+@@ -112,13 +247,26 @@ impl Uploads {
+             "buffer upload at {offset} of {size} bytes must be 4-byte aligned"
+         );
+         let alignment = NonZeroU64::new(wgpu::COPY_BUFFER_ALIGNMENT).expect("non-zero alignment");
+-        let slice = self.allocate(size, alignment).slice(..size.get());
++        let lost = self.device_lost.as_deref();
++        let device_lost = || lost.is_some_and(|flag| flag.load(Ordering::Acquire));
++        if device_lost() {
++            return;
++        }
++        let slice = Self::allocate(&mut self.belt, self.chunk, size, alignment).slice(..size.get());
++        {
++            let mut mapped = match slice.get_mapped_range_mut() {
++                Ok(view) => view,
++                Err(error) => {
++                    Self::staging_map_failed(lost, error);
++                    return;
++                }
++            };
++            mapped.slice(..).copy_from_slice(bytes);
++        }
++        if device_lost() {
++            return;
++        }
+         encoder.copy_buffer_to_buffer(slice.buffer(), slice.offset(), target, offset, size.get());
+-        slice
+-            .get_mapped_range_mut()
+-            .expect("staging belt slices are mapped")
+-            .slice(..)
+-            .copy_from_slice(bytes);
+     }
+     /// Close this frame's staging buffers: they come back for reuse once the
+     /// encoder's submission finishes on the GPU.
+@@ -230,6 +378,15 @@ mod tests {
  
      /// Every mip level of one layer, read back as tightly packed RGBA8.
      fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture) -> Vec<u8> {
@@ -13647,7 +13814,7 @@ index 721d158f49b7c4e8e8c7c9ec483557dad9170a03..4f26d41794433a5b3141dca95bb86e80
          let mut out = Vec::new();
          for level in 0..texture.mip_level_count() {
              let edge = texture.width() >> level;
-@@ -245,7 +354,11 @@ mod tests {
+@@ -245,7 +402,11 @@ mod tests {
                  wgpu::TexelCopyTextureInfo {
                      texture,
                      mip_level: level,
@@ -13660,7 +13827,7 @@ index 721d158f49b7c4e8e8c7c9ec483557dad9170a03..4f26d41794433a5b3141dca95bb86e80
                      aspect: wgpu::TextureAspect::All,
                  },
                  wgpu::TexelCopyBufferInfo {
-@@ -275,6 +388,39 @@ mod tests {
+@@ -275,6 +436,39 @@ mod tests {
          out
      }
  
@@ -17658,7 +17825,7 @@ index 8bbf3cc7e61b2353bfb2885458cda4b84c52227e..2f367d0e93f0c07645bc1096f9359f05
  
  pub(crate) fn install_client_hooks() {
 diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
-index 6442b0281..b633ace6f 100644
+index 6442b0281..9d412eb3d 100644
 --- a/crates/horizon-client/src/game.rs
 +++ b/crates/horizon-client/src/game.rs
 @@ -198,6 +198,18 @@ use std::{
@@ -17715,7 +17882,7 @@ index 6442b0281..b633ace6f 100644
          }
          // Clear sync data (registries, dialog tags) so dialogs don't leak
          // between worlds.
-@@ -7233,7 +7257,31 @@ impl Game<'_> {
+@@ -7233,7 +7257,37 @@ impl Game<'_> {
          }
          let (screenshot, screenshot_result) = (old.screenshot.take(), old.screenshot_result.take());
          let display = old.display_reading();
@@ -17727,8 +17894,11 @@ index 6442b0281..b633ace6f 100644
 +        let demanding_compatibility_preset = cfg!(target_vendor = "uwp")
 +            && old.uses_d3d11_fl91()
 +            && matches!(preset, Preset::Quality | Preset::Ultra);
-+        let fallback =
-+            (arm_memory_fallback || demanding_compatibility_preset) && preset != Preset::FullPerformance;
++        // The vanilla Fabulous preset is independent of Horizon's preset selector.
++        let fabulous = cfg!(target_vendor = "uwp") && self.settings.graphics_preset == "fabulous";
++        let fallback = fabulous
++            || ((arm_memory_fallback || demanding_compatibility_preset)
++                && preset != Preset::FullPerformance);
          drop(old);
 +        if fallback {
 +            // Release the failed device before rebuilding with a memory-light world.
@@ -17737,17 +17907,20 @@ index 6442b0281..b633ace6f 100644
 +                Preset::FullPerformance,
 +                &mut self.settings,
 +            );
++            if fabulous {
++                self.settings.improved_transparency = false;
++            }
 +            self.settings.save(&Self::options_path());
 +            self.apply_settings();
 +            log::warn!(
-+                "Horizon: switched from {} to Full Performance after FL9_1 device loss (graphics memory exhausted: {memory_exhausted})",
-+                preset.label(),
++                "Horizon: switched from {} to Full Performance after graphics device loss (graphics memory exhausted: {memory_exhausted})",
++                if fabulous { "Fabulous" } else { preset.label() },
 +            );
 +        }
          let mut renderer = build_renderer(
              window,
              self.options.offscreen,
-@@ -7254,6 +7302,15 @@ impl Game<'_> {
+@@ -7254,6 +7308,15 @@ impl Game<'_> {
          )?;
          (renderer.screenshot, renderer.screenshot_result) = (screenshot, screenshot_result);
          self.adopt_renderer(renderer);
@@ -17763,7 +17936,7 @@ index 6442b0281..b633ace6f 100644
          log::info!("Horizon: graphics device recovered; rebuilding world meshes");
          Ok(())
      }
-@@ -7907,6 +7964,7 @@ impl Game<'_> {
+@@ -7907,6 +7970,7 @@ impl Game<'_> {
          self.drop_left_screen_focus();
          // Minecraft.doWorldLoad: the LevelLoadingScreen while single player's
          // server starts, with the server's chunk map and progress.
@@ -17771,7 +17944,7 @@ index 6442b0281..b633ace6f 100644
          if let Some(starting) = &self.integrated_starting {
              // WorldOpenFlows.upgradeAndOpenWorld: the server's file fixers run on
              // FileFixerProgressScreen, before the LevelLoadingScreen has progress.
-@@ -8021,11 +8079,7 @@ impl Game<'_> {
+@@ -8021,11 +8085,7 @@ impl Game<'_> {
              }
              return Ok(false);
          }
@@ -17784,7 +17957,7 @@ index 6442b0281..b633ace6f 100644
              return Ok(false);
          };
          pr.lap("pr_setup");
-@@ -8334,6 +8388,11 @@ impl Game<'_> {
+@@ -8334,6 +8394,11 @@ impl Game<'_> {
              Vec::new()
          };
          pr.lap("pr_outline");
@@ -17796,7 +17969,7 @@ index 6442b0281..b633ace6f 100644
          let title = self.shows_panorama();
          let (yaw, pitch) = if title {
              // PanoramaRenderer: the title cube spins at 0.1 degrees per tick, pitched 10 degrees.
-@@ -8397,6 +8456,21 @@ impl Game<'_> {
+@@ -8397,6 +8462,21 @@ impl Game<'_> {
          pr.lap("pr_projection");
          // GUI hooks project against this frame's camera, including its bob/spin and FOV.
          let mut hud = horizon_client::spans::time("hud", || self.hud(size));
@@ -17818,7 +17991,7 @@ index 6442b0281..b633ace6f 100644
          self.flush_ime(&mut hud);
          self.native_gui_render_post(&mut hud, self.ui.hide_gui, self.focused);
          self.resolve_inline_profiles(&hud.inline_profiles);
-@@ -8814,6 +8888,11 @@ impl Game<'_> {
+@@ -8814,6 +8894,11 @@ impl Game<'_> {
      /// it a handler both can call and a `gamepad::Route` (screenshot and fullscreen do this). A
      /// screen's own raw keys, text and mods' key hooks stay raw on purpose.
      fn handle_window_event_inner(&mut self, event_loop: &dyn EventLoopCtl, mut event: WindowEvent) {
@@ -17830,7 +18003,7 @@ index 6442b0281..b633ace6f 100644
          let pressed = match &event {
              WindowEvent::KeyboardInput { event, .. } => {
                  event.state == ElementState::Pressed && !event.repeat
-@@ -8828,6 +8907,10 @@ impl Game<'_> {
+@@ -8828,6 +8913,10 @@ impl Game<'_> {
              self.modifiers = winit::keyboard::ModifiersState::empty();
              self.physical_keys.clear();
              self.physical_buttons.clear();
@@ -17841,7 +18014,7 @@ index 6442b0281..b633ace6f 100644
              self.drag_button = None;
          }
          if let WindowEvent::ModifiersChanged(m) = &event {
-@@ -9044,8 +9127,18 @@ impl Game<'_> {
+@@ -9044,8 +9133,18 @@ impl Game<'_> {
                      }
                  }
                  WindowEvent::Resized(size) => {
@@ -17861,7 +18034,7 @@ index 6442b0281..b633ace6f 100644
                      }
                  }
                  WindowEvent::RedrawRequested => {
-@@ -9229,8 +9322,18 @@ impl Game<'_> {
+@@ -9229,8 +9328,18 @@ impl Game<'_> {
                      horizon_client::preedit::set_preedit(None)
                  }
                  WindowEvent::Resized(size) => {
@@ -17881,7 +18054,7 @@ index 6442b0281..b633ace6f 100644
                      }
                      self.observe_fullscreen();
                  }
-@@ -9584,21 +9687,13 @@ impl Game<'_> {
+@@ -9584,21 +9693,13 @@ impl Game<'_> {
                  WindowEvent::MouseInput { .. } if self.title_input_active() => {}
                  WindowEvent::MouseInput { state, button, .. } if self.book.is_some() => {
                      if state == ElementState::Pressed && button == MouseButton::Left {
@@ -17905,7 +18078,7 @@ index 6442b0281..b633ace6f 100644
                          self.sign_edit_click(size);
                      }
                  }
-@@ -9754,17 +9849,11 @@ impl Game<'_> {
+@@ -9754,17 +9855,11 @@ impl Game<'_> {
                              self.death_click()?
                          }
                          Screen::Advancements if button == MouseButton::Left => {
@@ -17925,7 +18098,7 @@ index 6442b0281..b633ace6f 100644
                              self.stats_click(size);
                          }
                          Screen::Stats if button == MouseButton::Left => self.stats_release(),
-@@ -10081,6 +10170,23 @@ impl Game<'_> {
+@@ -10081,6 +10176,23 @@ impl Game<'_> {
                      {
                          return Ok(());
                      }
@@ -17949,7 +18122,7 @@ index 6442b0281..b633ace6f 100644
                      self.mapped_key_event(key, event.state == ElementState::Pressed, event.repeat)?;
                  }
                  WindowEvent::RedrawRequested => {
-@@ -10166,6 +10272,7 @@ impl Game<'_> {
+@@ -10166,6 +10278,7 @@ impl Game<'_> {
                              frame_autotune::observe(
                                  &self.settings.horizon,
                                  settled,
@@ -17957,7 +18130,7 @@ index 6442b0281..b633ace6f 100644
                                  (&mut self.gpu_culling_auto, &mut self.dynamic_resolution),
                                  &mut self.frame_graph,
                                  r,
-@@ -10261,6 +10368,8 @@ impl Game<'_> {
+@@ -10261,6 +10374,8 @@ impl Game<'_> {
                          }
                          self.debug_charts.frame_times.log(elapsed.as_nanos() as i64);
                          if self.frames == 0 {
@@ -17966,7 +18139,7 @@ index 6442b0281..b633ace6f 100644
                              // The launcher times Play to this line (launcher/src/perf.rs).
                              log::info!(
                                  "Horizon: first frame after {} ms",
-@@ -10570,6 +10679,8 @@ impl<'a> Game<'a> {
+@@ -10570,6 +10685,8 @@ impl<'a> Game<'a> {
              previous: now,
              last_input: now,
              pad: Default::default(),
@@ -17975,7 +18148,7 @@ index 6442b0281..b633ace6f 100644
              frames: 0,
              glint_frame: Default::default(),
              kept_block_entities: Default::default(),
-@@ -11077,6 +11188,13 @@ fn hwnd(window: &Window) -> Option<isize> {
+@@ -11077,6 +11194,13 @@ fn hwnd(window: &Window) -> Option<isize> {
  }
  
  pub use launch_api::{UsageError, exit_code};
@@ -17989,7 +18162,7 @@ index 6442b0281..b633ace6f 100644
  
  pub(crate) fn run_with(
      options: Options,
-@@ -11281,17 +11399,31 @@ pub(crate) fn run_with(
+@@ -11281,17 +11405,31 @@ pub(crate) fn run_with(
      if let Some(mut game) = game {
          // Minecraft.onGameLoadFinished: a start that made it this far is clean.
          if game.options.execution_role.is_client() {
