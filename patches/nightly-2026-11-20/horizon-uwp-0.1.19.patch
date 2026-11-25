@@ -6669,7 +6669,7 @@ index 190fb30d80531e835a23323c8d722cd6c2e19679..f4c3bfcbdea3a0ed581a46b16d79efaf
          let sets = ids
              .into_iter()
 diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
-index ade121700..3694e4761 100644
+index ade121700..26fd3c849 100644
 --- a/crates/horizon-client-render/src/gfx.rs
 +++ b/crates/horizon-client-render/src/gfx.rs
 @@ -170,6 +170,32 @@ fn entity_pipeline_factory<'a>(
@@ -9279,7 +9279,7 @@ index ade121700..3694e4761 100644
 +            } else {
 +                self.world_post.scale
 +            };
-+            post.prepare(&self.device, size, scale, &self.device_lost, &self.device_memory_exhausted)
++            post.prepare(&self.device, size, scale)
 +        } else {
 +            self.world_post.prepare(
 +                &self.device,
