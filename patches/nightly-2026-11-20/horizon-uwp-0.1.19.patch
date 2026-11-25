@@ -6669,7 +6669,7 @@ index 190fb30d80531e835a23323c8d722cd6c2e19679..f4c3bfcbdea3a0ed581a46b16d79efaf
          let sets = ids
              .into_iter()
 diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
-index ade121700..61c15b285 100644
+index ade121700..e2c235a4d 100644
 --- a/crates/horizon-client-render/src/gfx.rs
 +++ b/crates/horizon-client-render/src/gfx.rs
 @@ -170,6 +170,32 @@ fn entity_pipeline_factory<'a>(
@@ -7997,8 +7997,8 @@ index ade121700..61c15b285 100644
          let static_entity_transform =
              device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                  label: Some("Static block-entity camera position"),
--                contents: bytemuck::bytes_of(&StaticEntityUniform {
--                    camera_block: [0; 4],
+                 contents: bytemuck::bytes_of(&StaticEntityUniform {
+                     camera_block: [0; 4],
 -                    camera_fraction: [0.0; 4],
 -                }),
 -                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
@@ -8048,8 +8048,6 @@ index ade121700..61c15b285 100644
 -                    resource: wgpu::BindingResource::TextureView(&glint_armor_view),
 -                },
 -            ],
-+                contents: bytemuck::bytes_of(&StaticEntityUniform {
-+                    camera_block: [0; 4],
 +                    camera_fraction: [0.0; 4],
 +                }),
 +                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
@@ -9339,7 +9337,18 @@ index ade121700..61c15b285 100644
          let blur_at = menu_blur.map_or(0, |_| frame.hud.blur_at);
          self.hud.draw_range(
              encoder,
-@@ -12215,6 +13026,17 @@ mod tests {
+@@ -11579,8 +12390,9 @@ impl Renderer {
+ }
+ /// Out-of-memory and validation error scopes, popped together: the first error either caught.
+ struct GpuChecks {
+-    memory: wgpu::ErrorScopeGuard,
++    // Rust drops fields in declaration order. Early returns must pop the inner scope first.
+     validation: wgpu::ErrorScopeGuard,
++    memory: wgpu::ErrorScopeGuard,
+ }
+ impl GpuChecks {
+     fn push(device: &wgpu::Device) -> Self {
+@@ -12215,6 +13027,17 @@ mod tests {
          assert!(u64::from(super::padded_row(w)) * u64::from(h) <= max, "{f}");
          assert!(f > 3.7, "{f}");
      }
@@ -9357,7 +9366,7 @@ index ade121700..61c15b285 100644
      #[test]
      fn drawable_size_skips_minimized_and_oversized_windows() {
          use super::drawable_size;
-@@ -13512,7 +14334,14 @@ impl DisplayReading {
+@@ -13512,7 +14335,14 @@ impl DisplayReading {
      /// What wgpu reads from the OS for `surface`'s display; without one, `hdr::offscreen_display`.
      fn read(surface: Option<&wgpu::Surface>, adapter: &wgpu::Adapter) -> Self {
          surface.map_or_else(hdr::offscreen_display, |s| {
