@@ -31,6 +31,17 @@ unsafe extern "C" {
     fn horizon_uwp_game_menu_shown();
 }
 
+#[cfg(all(target_arch = "aarch64", feature = "uwp-dx11-renderer"))]
+unsafe extern "C" {
+    fn horizon_uwp_detach_game_swapchain() -> i32;
+}
+
+/// Detach the lost native D3D11 panel through the UI-thread host dispatcher.
+#[cfg(all(target_arch = "aarch64", feature = "uwp-dx11-renderer"))]
+pub fn detach_lost_d3d11_panel() -> i32 {
+    // The host owns the panel and synchronously marshals the call to its UI thread.
+    unsafe { horizon_uwp_detach_game_swapchain() }
+}
 /// Tell the shell that the first menu (or quick-play world) frame is visible.
 pub fn game_menu_shown() {
     unsafe { horizon_uwp_game_menu_shown() }

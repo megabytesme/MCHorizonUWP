@@ -7,6 +7,7 @@ publish = false
 [workspace]
 
 [features]
+uwp-dx11-renderer = []
 default = ["native-d3d11"]
 native-d3d11 = ["dep:horizon-uwp-d3d11", "dep:log", "dep:windows"]
 

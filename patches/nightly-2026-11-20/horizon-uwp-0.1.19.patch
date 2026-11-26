@@ -17511,7 +17511,7 @@ index 0000000000000000000000000000000000000000..dc48c28e116b0fb410141949aad66983
 +    return vec4(mix(in.color.rgb, globals.fog_color.rgb, f), in.color.a);
 +}
 diff --git a/crates/horizon-client/Cargo.toml b/crates/horizon-client/Cargo.toml
-index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..7e71634c29d211cccf90fa8286eb40dfcba24537 100644
+index fbb552e2e..91c9f83e0 100644
 --- a/crates/horizon-client/Cargo.toml
 +++ b/crates/horizon-client/Cargo.toml
 @@ -59,8 +59,8 @@ horizon-friends = { path = "../horizon-friends", optional = true }
@@ -17576,7 +17576,7 @@ index fbb552e2e75607dc29f9d8a6c6fe1ec733abda79..7e71634c29d211cccf90fa8286eb40df
 +native-d3d11-readback = ["native-d3d11", "horizon-uwp-d3d11/readback-probe"]
 +native-touch-mod = ["dep:horizon-uwp-touch-controls"]
 +native-device-vibration-mod = ["dep:horizon-uwp-device-vibration-service"]
-+uwp-dx11-renderer = ["wgpu/dx11", "horizon-client-render/uwp-dx11-renderer"]
++uwp-dx11-renderer = ["wgpu/dx11", "horizon-client-render/uwp-dx11-renderer", "horizon-native-window/uwp-dx11-renderer"]
 +uwp-dx12-renderer = ["horizon-client-render/uwp-dx12-renderer"]
 +uwp-controller = ["dep:gilrs", "dep:horizon-uwp-gamepad"]
 +uwp-audio = ["horizon-client-render/uwp-audio"]
@@ -17825,7 +17825,7 @@ index 8bbf3cc7e61b2353bfb2885458cda4b84c52227e..2f367d0e93f0c07645bc1096f9359f05
  
  pub(crate) fn install_client_hooks() {
 diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
-index 6442b0281..c03836c1c 100644
+index 6442b0281..507489c5d 100644
 --- a/crates/horizon-client/src/game.rs
 +++ b/crates/horizon-client/src/game.rs
 @@ -198,6 +198,18 @@ use std::{
@@ -17921,10 +17921,28 @@ index 6442b0281..c03836c1c 100644
              return Err("the graphics device was lost again after recovery".into());
          }
          self.last_device_recovery = Some(now);
-@@ -7234,6 +7272,21 @@ impl Game<'_> {
+@@ -7231,9 +7269,39 @@ impl Game<'_> {
+             );
+             horizon_client::graphics::lose_gpu_culling();
+         }
++        // Only the native D3D11 UWP panel on ARM64: ANGLE and DX12 own
++        // their own attachment lifetimes, and the ARM32 path stays unchanged.
++        #[cfg(all(target_vendor = "uwp", target_arch = "aarch64", feature = "uwp-dx11-renderer"))]
++        let detach_lost_panel = old.info.backend == wgpu::Backend::Dx11;
          let (screenshot, screenshot_result) = (old.screenshot.take(), old.screenshot_result.take());
          let display = old.display_reading();
          drop(old);
++        #[cfg(all(target_vendor = "uwp", target_arch = "aarch64", feature = "uwp-dx11-renderer"))]
++        if detach_lost_panel {
++
++            // The host synchronously dispatches to the XAML UI thread and returns
++            // S_OK when no panel exists; never attach a replacement after failure.
++            let hr = horizon_native_window::detach_lost_d3d11_panel();
++            log::warn!("Horizon diagnostic: lost D3D11 panel detach HRESULT 0x{:08X}", hr as u32);
++            if hr < 0 {
++                return Err(format!("could not detach the lost DirectX 11 panel (HRESULT 0x{:08X})", hr as u32).into());
++            }
++        }
 +        if fallback {
 +            // Release the failed device before rebuilding with a memory-light world.
 +            // Save the actual fallback so a restart cannot retry the exhausted preset.
@@ -17943,7 +17961,7 @@ index 6442b0281..c03836c1c 100644
          let mut renderer = build_renderer(
              window,
              self.options.offscreen,
-@@ -7254,6 +7307,15 @@ impl Game<'_> {
+@@ -7254,6 +7322,15 @@ impl Game<'_> {
          )?;
          (renderer.screenshot, renderer.screenshot_result) = (screenshot, screenshot_result);
          self.adopt_renderer(renderer);
@@ -17959,7 +17977,7 @@ index 6442b0281..c03836c1c 100644
          log::info!("Horizon: graphics device recovered; rebuilding world meshes");
          Ok(())
      }
-@@ -7907,6 +7969,7 @@ impl Game<'_> {
+@@ -7907,6 +7984,7 @@ impl Game<'_> {
          self.drop_left_screen_focus();
          // Minecraft.doWorldLoad: the LevelLoadingScreen while single player's
          // server starts, with the server's chunk map and progress.
@@ -17967,7 +17985,7 @@ index 6442b0281..c03836c1c 100644
          if let Some(starting) = &self.integrated_starting {
              // WorldOpenFlows.upgradeAndOpenWorld: the server's file fixers run on
              // FileFixerProgressScreen, before the LevelLoadingScreen has progress.
-@@ -8021,11 +8084,7 @@ impl Game<'_> {
+@@ -8021,11 +8099,7 @@ impl Game<'_> {
              }
              return Ok(false);
          }
@@ -17980,7 +17998,7 @@ index 6442b0281..c03836c1c 100644
              return Ok(false);
          };
          pr.lap("pr_setup");
-@@ -8334,6 +8393,11 @@ impl Game<'_> {
+@@ -8334,6 +8408,11 @@ impl Game<'_> {
              Vec::new()
          };
          pr.lap("pr_outline");
@@ -17992,7 +18010,7 @@ index 6442b0281..c03836c1c 100644
          let title = self.shows_panorama();
          let (yaw, pitch) = if title {
              // PanoramaRenderer: the title cube spins at 0.1 degrees per tick, pitched 10 degrees.
-@@ -8397,6 +8461,21 @@ impl Game<'_> {
+@@ -8397,6 +8476,21 @@ impl Game<'_> {
          pr.lap("pr_projection");
          // GUI hooks project against this frame's camera, including its bob/spin and FOV.
          let mut hud = horizon_client::spans::time("hud", || self.hud(size));
@@ -18014,7 +18032,7 @@ index 6442b0281..c03836c1c 100644
          self.flush_ime(&mut hud);
          self.native_gui_render_post(&mut hud, self.ui.hide_gui, self.focused);
          self.resolve_inline_profiles(&hud.inline_profiles);
-@@ -8814,6 +8893,11 @@ impl Game<'_> {
+@@ -8814,6 +8908,11 @@ impl Game<'_> {
      /// it a handler both can call and a `gamepad::Route` (screenshot and fullscreen do this). A
      /// screen's own raw keys, text and mods' key hooks stay raw on purpose.
      fn handle_window_event_inner(&mut self, event_loop: &dyn EventLoopCtl, mut event: WindowEvent) {
@@ -18026,7 +18044,7 @@ index 6442b0281..c03836c1c 100644
          let pressed = match &event {
              WindowEvent::KeyboardInput { event, .. } => {
                  event.state == ElementState::Pressed && !event.repeat
-@@ -8828,6 +8912,10 @@ impl Game<'_> {
+@@ -8828,6 +8927,10 @@ impl Game<'_> {
              self.modifiers = winit::keyboard::ModifiersState::empty();
              self.physical_keys.clear();
              self.physical_buttons.clear();
@@ -18037,7 +18055,7 @@ index 6442b0281..c03836c1c 100644
              self.drag_button = None;
          }
          if let WindowEvent::ModifiersChanged(m) = &event {
-@@ -9044,8 +9132,18 @@ impl Game<'_> {
+@@ -9044,8 +9147,18 @@ impl Game<'_> {
                      }
                  }
                  WindowEvent::Resized(size) => {
@@ -18057,7 +18075,7 @@ index 6442b0281..c03836c1c 100644
                      }
                  }
                  WindowEvent::RedrawRequested => {
-@@ -9229,8 +9327,18 @@ impl Game<'_> {
+@@ -9229,8 +9342,18 @@ impl Game<'_> {
                      horizon_client::preedit::set_preedit(None)
                  }
                  WindowEvent::Resized(size) => {
@@ -18077,7 +18095,7 @@ index 6442b0281..c03836c1c 100644
                      }
                      self.observe_fullscreen();
                  }
-@@ -9584,21 +9692,13 @@ impl Game<'_> {
+@@ -9584,21 +9707,13 @@ impl Game<'_> {
                  WindowEvent::MouseInput { .. } if self.title_input_active() => {}
                  WindowEvent::MouseInput { state, button, .. } if self.book.is_some() => {
                      if state == ElementState::Pressed && button == MouseButton::Left {
@@ -18101,7 +18119,7 @@ index 6442b0281..c03836c1c 100644
                          self.sign_edit_click(size);
                      }
                  }
-@@ -9754,17 +9854,11 @@ impl Game<'_> {
+@@ -9754,17 +9869,11 @@ impl Game<'_> {
                              self.death_click()?
                          }
                          Screen::Advancements if button == MouseButton::Left => {
@@ -18121,7 +18139,7 @@ index 6442b0281..c03836c1c 100644
                              self.stats_click(size);
                          }
                          Screen::Stats if button == MouseButton::Left => self.stats_release(),
-@@ -10081,6 +10175,23 @@ impl Game<'_> {
+@@ -10081,6 +10190,23 @@ impl Game<'_> {
                      {
                          return Ok(());
                      }
@@ -18145,7 +18163,7 @@ index 6442b0281..c03836c1c 100644
                      self.mapped_key_event(key, event.state == ElementState::Pressed, event.repeat)?;
                  }
                  WindowEvent::RedrawRequested => {
-@@ -10166,6 +10277,7 @@ impl Game<'_> {
+@@ -10166,6 +10292,7 @@ impl Game<'_> {
                              frame_autotune::observe(
                                  &self.settings.horizon,
                                  settled,
@@ -18153,7 +18171,7 @@ index 6442b0281..c03836c1c 100644
                                  (&mut self.gpu_culling_auto, &mut self.dynamic_resolution),
                                  &mut self.frame_graph,
                                  r,
-@@ -10261,6 +10373,8 @@ impl Game<'_> {
+@@ -10261,6 +10388,8 @@ impl Game<'_> {
                          }
                          self.debug_charts.frame_times.log(elapsed.as_nanos() as i64);
                          if self.frames == 0 {
@@ -18162,7 +18180,7 @@ index 6442b0281..c03836c1c 100644
                              // The launcher times Play to this line (launcher/src/perf.rs).
                              log::info!(
                                  "Horizon: first frame after {} ms",
-@@ -10570,6 +10684,8 @@ impl<'a> Game<'a> {
+@@ -10570,6 +10699,8 @@ impl<'a> Game<'a> {
              previous: now,
              last_input: now,
              pad: Default::default(),
@@ -18171,7 +18189,7 @@ index 6442b0281..c03836c1c 100644
              frames: 0,
              glint_frame: Default::default(),
              kept_block_entities: Default::default(),
-@@ -11077,6 +11193,13 @@ fn hwnd(window: &Window) -> Option<isize> {
+@@ -11077,6 +11208,13 @@ fn hwnd(window: &Window) -> Option<isize> {
  }
  
  pub use launch_api::{UsageError, exit_code};
@@ -18185,7 +18203,7 @@ index 6442b0281..c03836c1c 100644
  
  pub(crate) fn run_with(
      options: Options,
-@@ -11281,17 +11404,31 @@ pub(crate) fn run_with(
+@@ -11281,17 +11419,31 @@ pub(crate) fn run_with(
      if let Some(mut game) = game {
          // Minecraft.onGameLoadFinished: a start that made it this far is clean.
          if game.options.execution_role.is_client() {
