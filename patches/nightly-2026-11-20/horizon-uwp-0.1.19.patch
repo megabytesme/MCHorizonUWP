@@ -17825,7 +17825,7 @@ index 8bbf3cc7e61b2353bfb2885458cda4b84c52227e..2f367d0e93f0c07645bc1096f9359f05
  
  pub(crate) fn install_client_hooks() {
 diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
-index 6442b0281..9d412eb3d 100644
+index 6442b0281..c03836c1c 100644
 --- a/crates/horizon-client/src/game.rs
 +++ b/crates/horizon-client/src/game.rs
 @@ -198,6 +198,18 @@ use std::{
@@ -17882,23 +17882,48 @@ index 6442b0281..9d412eb3d 100644
          }
          // Clear sync data (registries, dialog tags) so dialogs don't leak
          // between worlds.
-@@ -7233,7 +7257,37 @@ impl Game<'_> {
+@@ -7197,19 +7221,33 @@ impl Game<'_> {
+     }
+     /// Rebuild GPU-owned state after the backend reports device loss.
+     fn recover_device(&mut self) -> Result<()> {
+-        if !self.renderer.as_ref().is_some_and(Renderer::device_lost) {
++        let Some(old) = self.renderer.as_ref().filter(|renderer| renderer.device_lost()) else {
+             return Ok(());
+-        }
++        };
+         // Split-screen compositors and guests share the device; rebuilding one
+         // renderer alone would leave the other windows using invalid resources.
+         if self.options.paced_by_split {
+             return Err("the graphics device was lost during split-screen play".into());
          }
-         let (screenshot, screenshot_result) = (old.screenshot.take(), old.screenshot_result.take());
-         let display = old.display_reading();
 +        use horizon_client::graphics::Preset;
+         let now = Instant::now();
+-        if self
++        let repeated_loss = self
+             .last_device_recovery
+-            .is_some_and(|last| now.duration_since(last) < Duration::from_secs(60))
+-        {
++            .is_some_and(|last| now.duration_since(last) < Duration::from_secs(60));
 +        let preset = self.settings.horizon.preset;
 +        let memory_exhausted = old.device_memory_exhausted();
-+        let arm_memory_fallback =
-+            cfg!(all(target_vendor = "uwp", target_arch = "arm")) && memory_exhausted;
-+        let demanding_compatibility_preset = cfg!(target_vendor = "uwp")
-+            && old.uses_d3d11_fl91()
-+            && matches!(preset, Preset::Quality | Preset::Ultra);
-+        // The vanilla Fabulous preset is independent of Horizon's preset selector.
-+        let fabulous = cfg!(target_vendor = "uwp") && self.settings.graphics_preset == "fabulous";
-+        let fallback = fabulous
-+            || ((arm_memory_fallback || demanding_compatibility_preset)
-+                && preset != Preset::FullPerformance);
++        let arm_memory_fallback = cfg!(target_arch = "arm") && memory_exhausted;
++        let demanding_compatibility_preset =
++            old.uses_d3d11_fl91() && matches!(preset, Preset::Quality | Preset::Ultra);
++        // This is Minecraft's preset, separate from the Horizon preset.
++        let fabulous = self.settings.graphics_preset == "fabulous";
++        let fallback = cfg!(target_vendor = "uwp")
++            && (fabulous
++                || (preset != Preset::FullPerformance
++                    && (arm_memory_fallback || demanding_compatibility_preset || repeated_loss)));
++        // A second loss may need lighter settings even when a saved preset is Custom.
++        // Permit one such retry. A further loss on the reduced settings stops recovery.
++        if repeated_loss && !fallback {
+             return Err("the graphics device was lost again after recovery".into());
+         }
+         self.last_device_recovery = Some(now);
+@@ -7234,6 +7272,21 @@ impl Game<'_> {
+         let (screenshot, screenshot_result) = (old.screenshot.take(), old.screenshot_result.take());
+         let display = old.display_reading();
          drop(old);
 +        if fallback {
 +            // Release the failed device before rebuilding with a memory-light world.
@@ -17907,20 +17932,18 @@ index 6442b0281..9d412eb3d 100644
 +                Preset::FullPerformance,
 +                &mut self.settings,
 +            );
-+            if fabulous {
-+                self.settings.improved_transparency = false;
-+            }
++            self.settings.improved_transparency = false;
 +            self.settings.save(&Self::options_path());
 +            self.apply_settings();
 +            log::warn!(
-+                "Horizon: switched from {} to Full Performance after graphics device loss (graphics memory exhausted: {memory_exhausted})",
++                "Horizon: switched from {} to Full Performance after graphics device loss (repeated loss: {repeated_loss}, graphics memory exhausted: {memory_exhausted})",
 +                if fabulous { "Fabulous" } else { preset.label() },
 +            );
 +        }
          let mut renderer = build_renderer(
              window,
              self.options.offscreen,
-@@ -7254,6 +7308,15 @@ impl Game<'_> {
+@@ -7254,6 +7307,15 @@ impl Game<'_> {
          )?;
          (renderer.screenshot, renderer.screenshot_result) = (screenshot, screenshot_result);
          self.adopt_renderer(renderer);
@@ -17936,7 +17959,7 @@ index 6442b0281..9d412eb3d 100644
          log::info!("Horizon: graphics device recovered; rebuilding world meshes");
          Ok(())
      }
-@@ -7907,6 +7970,7 @@ impl Game<'_> {
+@@ -7907,6 +7969,7 @@ impl Game<'_> {
          self.drop_left_screen_focus();
          // Minecraft.doWorldLoad: the LevelLoadingScreen while single player's
          // server starts, with the server's chunk map and progress.
@@ -17944,7 +17967,7 @@ index 6442b0281..9d412eb3d 100644
          if let Some(starting) = &self.integrated_starting {
              // WorldOpenFlows.upgradeAndOpenWorld: the server's file fixers run on
              // FileFixerProgressScreen, before the LevelLoadingScreen has progress.
-@@ -8021,11 +8085,7 @@ impl Game<'_> {
+@@ -8021,11 +8084,7 @@ impl Game<'_> {
              }
              return Ok(false);
          }
@@ -17957,7 +17980,7 @@ index 6442b0281..9d412eb3d 100644
              return Ok(false);
          };
          pr.lap("pr_setup");
-@@ -8334,6 +8394,11 @@ impl Game<'_> {
+@@ -8334,6 +8393,11 @@ impl Game<'_> {
              Vec::new()
          };
          pr.lap("pr_outline");
@@ -17969,7 +17992,7 @@ index 6442b0281..9d412eb3d 100644
          let title = self.shows_panorama();
          let (yaw, pitch) = if title {
              // PanoramaRenderer: the title cube spins at 0.1 degrees per tick, pitched 10 degrees.
-@@ -8397,6 +8462,21 @@ impl Game<'_> {
+@@ -8397,6 +8461,21 @@ impl Game<'_> {
          pr.lap("pr_projection");
          // GUI hooks project against this frame's camera, including its bob/spin and FOV.
          let mut hud = horizon_client::spans::time("hud", || self.hud(size));
@@ -17991,7 +18014,7 @@ index 6442b0281..9d412eb3d 100644
          self.flush_ime(&mut hud);
          self.native_gui_render_post(&mut hud, self.ui.hide_gui, self.focused);
          self.resolve_inline_profiles(&hud.inline_profiles);
-@@ -8814,6 +8894,11 @@ impl Game<'_> {
+@@ -8814,6 +8893,11 @@ impl Game<'_> {
      /// it a handler both can call and a `gamepad::Route` (screenshot and fullscreen do this). A
      /// screen's own raw keys, text and mods' key hooks stay raw on purpose.
      fn handle_window_event_inner(&mut self, event_loop: &dyn EventLoopCtl, mut event: WindowEvent) {
@@ -18003,7 +18026,7 @@ index 6442b0281..9d412eb3d 100644
          let pressed = match &event {
              WindowEvent::KeyboardInput { event, .. } => {
                  event.state == ElementState::Pressed && !event.repeat
-@@ -8828,6 +8913,10 @@ impl Game<'_> {
+@@ -8828,6 +8912,10 @@ impl Game<'_> {
              self.modifiers = winit::keyboard::ModifiersState::empty();
              self.physical_keys.clear();
              self.physical_buttons.clear();
@@ -18014,7 +18037,7 @@ index 6442b0281..9d412eb3d 100644
              self.drag_button = None;
          }
          if let WindowEvent::ModifiersChanged(m) = &event {
-@@ -9044,8 +9133,18 @@ impl Game<'_> {
+@@ -9044,8 +9132,18 @@ impl Game<'_> {
                      }
                  }
                  WindowEvent::Resized(size) => {
@@ -18034,7 +18057,7 @@ index 6442b0281..9d412eb3d 100644
                      }
                  }
                  WindowEvent::RedrawRequested => {
-@@ -9229,8 +9328,18 @@ impl Game<'_> {
+@@ -9229,8 +9327,18 @@ impl Game<'_> {
                      horizon_client::preedit::set_preedit(None)
                  }
                  WindowEvent::Resized(size) => {
@@ -18054,7 +18077,7 @@ index 6442b0281..9d412eb3d 100644
                      }
                      self.observe_fullscreen();
                  }
-@@ -9584,21 +9693,13 @@ impl Game<'_> {
+@@ -9584,21 +9692,13 @@ impl Game<'_> {
                  WindowEvent::MouseInput { .. } if self.title_input_active() => {}
                  WindowEvent::MouseInput { state, button, .. } if self.book.is_some() => {
                      if state == ElementState::Pressed && button == MouseButton::Left {
@@ -18078,7 +18101,7 @@ index 6442b0281..9d412eb3d 100644
                          self.sign_edit_click(size);
                      }
                  }
-@@ -9754,17 +9855,11 @@ impl Game<'_> {
+@@ -9754,17 +9854,11 @@ impl Game<'_> {
                              self.death_click()?
                          }
                          Screen::Advancements if button == MouseButton::Left => {
@@ -18098,7 +18121,7 @@ index 6442b0281..9d412eb3d 100644
                              self.stats_click(size);
                          }
                          Screen::Stats if button == MouseButton::Left => self.stats_release(),
-@@ -10081,6 +10176,23 @@ impl Game<'_> {
+@@ -10081,6 +10175,23 @@ impl Game<'_> {
                      {
                          return Ok(());
                      }
@@ -18122,7 +18145,7 @@ index 6442b0281..9d412eb3d 100644
                      self.mapped_key_event(key, event.state == ElementState::Pressed, event.repeat)?;
                  }
                  WindowEvent::RedrawRequested => {
-@@ -10166,6 +10278,7 @@ impl Game<'_> {
+@@ -10166,6 +10277,7 @@ impl Game<'_> {
                              frame_autotune::observe(
                                  &self.settings.horizon,
                                  settled,
@@ -18130,7 +18153,7 @@ index 6442b0281..9d412eb3d 100644
                                  (&mut self.gpu_culling_auto, &mut self.dynamic_resolution),
                                  &mut self.frame_graph,
                                  r,
-@@ -10261,6 +10374,8 @@ impl Game<'_> {
+@@ -10261,6 +10373,8 @@ impl Game<'_> {
                          }
                          self.debug_charts.frame_times.log(elapsed.as_nanos() as i64);
                          if self.frames == 0 {
@@ -18139,7 +18162,7 @@ index 6442b0281..9d412eb3d 100644
                              // The launcher times Play to this line (launcher/src/perf.rs).
                              log::info!(
                                  "Horizon: first frame after {} ms",
-@@ -10570,6 +10685,8 @@ impl<'a> Game<'a> {
+@@ -10570,6 +10684,8 @@ impl<'a> Game<'a> {
              previous: now,
              last_input: now,
              pad: Default::default(),
@@ -18148,7 +18171,7 @@ index 6442b0281..9d412eb3d 100644
              frames: 0,
              glint_frame: Default::default(),
              kept_block_entities: Default::default(),
-@@ -11077,6 +11194,13 @@ fn hwnd(window: &Window) -> Option<isize> {
+@@ -11077,6 +11193,13 @@ fn hwnd(window: &Window) -> Option<isize> {
  }
  
  pub use launch_api::{UsageError, exit_code};
@@ -18162,7 +18185,7 @@ index 6442b0281..9d412eb3d 100644
  
  pub(crate) fn run_with(
      options: Options,
-@@ -11281,17 +11405,31 @@ pub(crate) fn run_with(
+@@ -11281,17 +11404,31 @@ pub(crate) fn run_with(
      if let Some(mut game) = game {
          // Minecraft.onGameLoadFinished: a start that made it this far is clean.
          if game.options.execution_role.is_client() {
@@ -133711,3 +133734,99 @@ index a7cba858d..f98f2bca4 100644
  }
  
  /// Who turns ray tracing on (`HORIZON_RAY_TRACING`).
+diff --git a/crates/horizon-client/src/benchmark.rs b/crates/horizon-client/src/benchmark.rs
+index 456a0378c..9ad5aa1ae 100644
+--- a/crates/horizon-client/src/benchmark.rs
++++ b/crates/horizon-client/src/benchmark.rs
+@@ -17,6 +17,39 @@ use serde_json::Value;
+ 
+ use crate::control::Request;
+ 
++// A benchmark runs on its own driver thread. Retain already-returned raw replies
++// only when explicitly requested; no file I/O occurs in the measured phases.
++#[cfg(target_vendor = "uwp")]
++thread_local! {
++    static RAW_FRAMES: std::cell::RefCell<Option<Vec<(String, u32, Value)>>> =
++        const { std::cell::RefCell::new(None) };
++}
++
++#[cfg(target_vendor = "uwp")]
++fn write_raw_frames(report_path: &Path) -> std::io::Result<()> {
++    use std::io::Write;
++    let rows = RAW_FRAMES.with(|frames| frames.borrow_mut().take());
++    let Some(rows) = rows else { return Ok(()); };
++    let file = std::fs::OpenOptions::new().write(true).create_new(true)
++        .open(report_path.with_extension("frames.csv"))?;
++    let mut out = std::io::BufWriter::new(file);
++    writeln!(out, "phase,repeat,series,sample_index,milliseconds")?;
++    for (phase, repeat, reply) in rows {
++        let phase = phase.replace('"', "\"\"");
++        for key in ["frame_ms", "cpu_ms", "gpu_ms"] {
++            let series = reply[key].as_array().map(Vec::as_slice).unwrap_or(&[]);
++            if series.is_empty() {
++                writeln!(out, "\"{phase}\",{repeat},{key},,")?;
++            }
++            for (i, value) in series.iter().enumerate() {
++                let number = value.as_f64().map(|v| v.to_string()).unwrap_or_default();
++                writeln!(out, "\"{phase}\",{repeat},{key},{i},{number}")?;
++            }
++        }
++    }
++    out.flush()
++}
++
+ pub const SEED: i64 = 1234;
+ /// The world the benchmark creates under `saves/`, replaced on every run.
+ pub const WORLD: &str = "horizon-benchmark";
+@@ -250,6 +283,16 @@ fn time_passes(control: &Control, scene: &str, report: &mut Report) -> Result<bo
+ }
+ 
+ fn run(control: &Control, setup: Setup) -> Result<PathBuf, String> {
++    #[cfg(target_vendor = "uwp")]
++    let setup = {
++        let mut setup = setup;
++        if setup.scenario == "standard" && setup.game_dir.join("benchmark-travel.enabled").is_file() {
++            setup.scenario = "travel".to_owned();
++        }
++        let raw = setup.game_dir.join("benchmark-raw.enabled").is_file();
++        RAW_FRAMES.with(|frames| *frames.borrow_mut() = raw.then(Vec::new));
++        setup
++    };
+     let scenario = Scenario::parse(&setup.scenario)?;
+     let mut report = Report::new(Kind::Game, setup.app.clone());
+     let pid = std::process::id();
+@@ -345,6 +388,10 @@ fn run(control: &Control, setup: Setup) -> Result<PathBuf, String> {
+     let written = report
+         .write_to(&setup.game_dir.join("benchmarks"))
+         .map_err(|e| e.to_string())?;
++    #[cfg(target_vendor = "uwp")]
++    if let Err(error) = write_raw_frames(&written) {
++        eprintln!("Horizon: benchmark raw export failed: {error}");
++    }
+     if setup.profile {
+         match control.call(&stop_capture(&written)) {
+             Ok(done) => println!("Horizon: benchmark capture {}", text(&done["path"])),
+@@ -531,14 +578,21 @@ fn frames_of(reply: &Value, phase: &str, repeat: u32) -> Result<Frames, String>
+             .map(|v| v as f32)
+             .collect()
+     };
+-    Frames::of(
++    let frames = Frames::of(
+         phase,
+         repeat,
+         &series("frame_ms"),
+         &series("cpu_ms"),
+         &series("gpu_ms"),
+     )
+-    .ok_or_else(|| format!("{phase} drew no frames"))
++    .ok_or_else(|| format!("{phase} drew no frames"))?;
++    #[cfg(target_vendor = "uwp")]
++    RAW_FRAMES.with(|raw| {
++        if let Some(rows) = raw.borrow_mut().as_mut() {
++            rows.push((phase.to_owned(), repeat, reply.clone()));
++        }
++    });
++    Ok(frames)
+ }
+ 
+ /// The phase's frame figures over its blocks (one for a flight).

@@ -3232,6 +3232,31 @@ protected:
             if (argument.compare(0, 7, L"server:") == 0 || argument.compare(0, 6, L"world:") == 0)
                 pending_tile_launch = argument;
         }
+#if defined(_M_ARM) && !defined(_M_ARM64)
+        // On the dedicated ARM32 qualification package, a one-shot request uses
+        // the ordinary world launch flow for the disposable fixture.
+        if (pending_tile_launch.empty() && (!args || !args->Arguments || args->Arguments->Length() == 0)) {
+            auto id = Windows::ApplicationModel::Package::Current->Id;
+            auto version = id->Version;
+            if (std::wstring(id->Name->Data()) == L"MCHorizonUWP.Dev.Qualification019.arm" &&
+                std::wstring(id->PublisherId->Data()) == L"4pd4jeb6snrqw" &&
+                version.Major == 1 && version.Minor == 0 && version.Build == 4 && version.Revision == 0) {
+                auto local = ApplicationData::Current->LocalFolder->Path;
+                const auto marker = std::wstring(local->Data(), local->Length()) +
+                    L"\\codex-qa-enter-benchmark-world.once";
+                WIN32_FIND_DATAW info{};
+                HANDLE found = FindFirstFileW(marker.c_str(), &info);
+                if (found != INVALID_HANDLE_VALUE) FindClose(found);
+                if (found != INVALID_HANDLE_VALUE &&
+                    !(info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) &&
+                    info.nFileSizeHigh == 0 && info.nFileSizeLow == 0 &&
+                    DeleteFileW(marker.c_str())) {
+                    pending_tile_launch = L"world:CodexBenchmarkFixture";
+                    horizon_uwp_trace_shell_event("private QA world request consumed");
+                }
+            }
+        }
+#endif
         if (page) {
             window->Activate();
             try_pending_tile_launch(displayed_generation);
